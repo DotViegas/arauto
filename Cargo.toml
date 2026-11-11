@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/arauto-protocol", "crates/arauto-platform"]
+members = ["crates/arauto-protocol", "crates/arauto-platform", "crates/arauto-hub"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,23 +15,30 @@ arauto-protocol = { path = "crates/arauto-protocol" }
 arauto-platform = { path = "crates/arauto-platform" }
 
 anyhow = "1.0.104"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws", "json", "query"] }
 bytes = "1.12.1"
-chacha20poly1305 = "0.11.0"
+# `zeroize`: the key copy inside each cipher object is wiped when it is dropped.
+chacha20poly1305 = { version = "0.11.0", features = ["zeroize"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 dashmap = "6.2.1"
 data-encoding = "2.11.1"
 futures-util = "0.3.34"
 getrandom = "0.4.3"
 hkdf = "0.13.0"
+hyper = { version = "1.12.0", features = ["http1", "server"] }
+hyper-util = { version = "0.1.21", features = ["tokio", "server", "http1", "service"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
 # Only the suite the protocol uses (25519, ChaChaPoly, BLAKE2s), pure Rust: the default
 # feature set would pull a C library and stop cross-target checks.
 snow = { version = "0.10.0", default-features = false, features = ["default-resolver", "use-curve25519", "use-chacha20poly1305", "use-blake2", "use-getrandom"] }
+# No TLS towards the database: it sits on the same private network as the hub.
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "migrate", "json", "macros"] }
 subtle = "2.6.1"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", default-features = false }
+tower = { version = "0.5.3", features = ["util"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "1.29.2", features = ["serde"] }
