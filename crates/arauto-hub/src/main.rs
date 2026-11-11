@@ -4,12 +4,14 @@
 
 use std::io::{BufRead, Write};
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
 use arauto_hub::admin::render::{self, Report};
 use arauto_hub::admin::{self, Session};
-use arauto_hub::config::{ProcessEnv, PublicUrl, StorageConfig};
+use arauto_hub::channel::{self, ChannelSettings};
+use arauto_hub::config::{ProcessEnv, PublicUrl, ServeConfig, StorageConfig};
 use arauto_hub::core::model::DeviceState;
 use arauto_hub::db::{self, PoolOptions};
 use arauto_hub::mark::Mark;
@@ -189,14 +191,7 @@ fn ask_code() -> anyhow::Result<String> {
 
 async fn run(command: Command) -> anyhow::Result<Report> {
     let command = match command {
-        Command::Serve => {
-            return Ok(Report {
-                text: "`serve` is not in this build yet: the channel comes with the next stage \
-                       of the MVP.\n"
-                    .to_owned(),
-                done: false,
-            });
-        }
+        Command::Serve => return serve().await,
         Command::Stored(command) => command,
     };
     let now = SystemClock.now_ms();
@@ -254,6 +249,28 @@ async fn run(command: Command) -> anyhow::Result<Report> {
             Ok(report)
         }
     }
+}
+
+/// `arauto-hub serve`: the hub, until SIGTERM (Ctrl+C on Windows).
+async fn serve() -> anyhow::Result<Report> {
+    // Listening starts here, so a request to stop during the start is not lost.
+    let shutdown = arauto_platform::shutdown_signal()?;
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
+        .try_init();
+    let config = ServeConfig::read(&ProcessEnv)?;
+    channel::serve(
+        &config,
+        ChannelSettings::default(),
+        Arc::new(SystemClock),
+        shutdown,
+    )
+    .await?;
+    Ok(Report {
+        text: "The hub stopped.\n".to_owned(),
+        done: true,
+    })
 }
 
 async fn run_installed(

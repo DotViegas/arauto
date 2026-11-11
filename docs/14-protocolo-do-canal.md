@@ -7,6 +7,12 @@ depois da revisão do desenho. É o formato do que passa entre o conector e o hu
 Este documento não muda nenhuma regra do [04](04-seguranca-conexao.md). Onde os dois divergirem, vale
 o 04, e o erro é daqui. O que a revisão achou e que pede mudança no 04 está na seção 12.
 
+**O lado do hub já existe no código** (etapas 2 e 2b do MVP, 11/11/2026). Onde este texto era omisso,
+o código escolheu uma leitura, e ela está escrita aqui com a marca "no hub". É fato só no sentido de
+que a suíte do hub a confere, em Windows, contra um PostgreSQL de teste e um conector de teste: o
+conector de verdade ainda não existe, e nada foi executado em Linux. Os pontos em que o código e o
+texto ainda não se acertaram estão na seção 13.
+
 ## Resumo
 
 ```
@@ -47,7 +53,13 @@ Todos na porta dos conectores.
 - O conector valida o certificado TLS do endereço pelas autoridades públicas. Endereço `ws://`, sem
   TLS, só é aceito para `127.0.0.1` e `localhost`, em desenvolvimento. Autoridade privada fica para
   depois do MVP.
-- Saúde e métricas ficam em outra porta, que não é publicada ([15](15-mvp.md), seção 6).
+- Saúde e métricas ficam em outra porta, que não é publicada ([15](15-mvp.md), seção 6). No hub, a
+  porta interna responde só `GET /health`, com `ok`; a de conectores não responde a ela.
+- No hub, todo outro endereço, e todo método que não seja `GET`, recebe 404.
+- **Download, no hub.** O nome pedido só é comparado com os nomes da lista e nunca vira caminho de
+  arquivo: `../`, barra, caractere codificado ou letra trocada de caixa simplesmente não acham nada.
+  Um nome da lista tem até 128 letras, dígitos, pontos, hífens e sublinhados, e não começa por ponto.
+  No M1 a lista é vazia: todo download é 404.
 
 Regras do websocket:
 
@@ -55,7 +67,11 @@ Regras do websocket:
 - Cada mensagem tem no máximo 65.535 bytes. O hub configura esse teto na própria biblioteca: uma
   mensagem maior nem chega a ser montada.
 - A extensão de compressão não é negociada.
-- O hub dá 5 segundos para os cabeçalhos da requisição chegarem.
+- O hub dá 5 segundos para os cabeçalhos da requisição chegarem. No hub, o prazo vale também entre
+  duas requisições da mesma conexão: a conexão HTTP fica aberta entre elas, porque fechá-la quebraria
+  a troca para websocket na biblioteca usada.
+- Os `ping` do próprio websocket são respondidos pela biblioteca e não contam como sinal de vida. O
+  batimento que conta é o do protocolo (seção 4).
 
 ## 2. Aperto de mãos
 
@@ -129,6 +145,24 @@ Os limites existem porque a conexão é aberta a qualquer um até a sessão come
 | O hub inteiro | Um orçamento de bytes para mensagens em remontagem (256 MiB de partida). Sem espaço, a conexão que pede mais é fechada com AR-205. |
 | Conexões sem sessão | No máximo 1.024 no hub e 16 por origem, fora as que estão em espera. Acima disso o hub responde 503 ou 429 antes de abrir o websocket. |
 
+Como o hub aplica a tabela:
+
+- **Os 90 segundos** contam desde a abertura do websocket, com o aperto de mãos dentro, e param
+  enquanto a conexão está em espera.
+- **A origem** é o endereço IPv4, ou os primeiros 64 bits do endereço IPv6 (uma rede de uma casa ou
+  de uma operadora). Um IPv4 escrito como IPv6 vale como o IPv4. De onde vem o endereço está em
+  [15](15-mvp.md), seção 4.
+- **Fora do teto**: a conexão em espera e a que está em sessão. Uma conexão TCP que ainda não mandou
+  os cabeçalhos também não conta: só o prazo de 5 segundos a limita.
+- **Mensagem que só o hub envia**, vinda do conector, fecha a conexão, antes ou depois da sessão.
+- **O orçamento do hub inteiro**: o espaço que uma conexão tomou dele volta quando ela termina.
+- **Mensagens grandes**: acima de 256 KiB, o hub interpreta o JSON fora das tarefas de rede.
+- **Escrita.** Cada conexão tem duas filas de saída: controle, com 16 quadros, e dados, com 64. Quem
+  produz dado espera lugar. A fila de controle cheia fecha a conexão sem `closing`. Um quadro que não
+  sai em 30 segundos também fecha: o prazo é por quadro, e não "nenhum byte andou em 30 segundos".
+- **O código.** Silêncio de 90 segundos, `hello` fora do prazo, resposta fora do prazo e `ping` ou
+  `pong` antes do `hello_ok` fecham com AR-204.
+
 O que não cabe:
 
 - Quem monta uma mensagem confere o tamanho antes de enviar.
@@ -154,7 +188,7 @@ segura uma trava da pasta enquanto roda: dois ao mesmo tempo não acontecem.
 
 Batimento: cada lado manda `ping` a cada 30 segundos, desde o `hello_ok`, inclusive na espera.
 Qualquer quadro válido recebido conta como sinal de vida. Noventa segundos sem receber nada encerram
-a conexão.
+a conexão, com AR-204.
 
 Reconexão: depois de uma queda, a primeira tentativa é na hora (C9). As seguintes esperam um tempo
 sorteado entre zero e o teto, que dobra a cada falha, de 1 a 60 segundos. Sem o sorteio, os
@@ -190,7 +224,11 @@ O hub responde `hello_ok`:
 |---|---|
 | Há versão em comum | `{"t":"hello_ok","proto":N}`, com a **maior** versão comum. |
 | O conector é antigo demais | Em `channel`: `{"t":"hello_ok","proto":0,"outdated":true}` e segue a apresentação sem troca (5.3). Em `enroll`: `closing` com AR-401. Em `leave`: atende. |
-| O conector é novo demais | `closing` com AR-402. |
+| O conector é novo demais | `closing` com AR-402, em qualquer `purpose`, inclusive `leave`. |
+
+No hub, o `leave` de um conector novo demais também recebe AR-402: não existe `hello_ok` válido para
+uma faixa de versões toda acima da do hub. O C8 diz que o `leave` é aceito "em qualquer versão"; a
+leitura do hub é que a exceção vale para o conector antigo demais (seção 12).
 
 Quem decide o AR-401 é a versão do **protocolo**. A lista de versões do programa, com revogação,
 fica para depois do MVP.
@@ -209,9 +247,19 @@ mãos e o prólogo, o cabeçalho do quadro, e as mensagens `hello`, `hello_ok`, 
 
 - O `enroll` só é mandado depois do `hello_ok`. Antes disso, ou repetido, fecha a conexão.
 - Depois de `enrolled`, o conector calcula o código, mostra e fecha. É uma conexão curta.
-- As recusas com AR-101 vindas de quem não tem aparelho no hub são registradas **agregadas**: uma
-  linha por origem e por minuto, com a contagem. Uma linha por tentativa deixaria qualquer um encher
-  uma tabela que não se apaga.
+- As recusas de inscrição são registradas **agregadas**: uma linha por origem, organização, código e
+  minuto, com a contagem. Uma linha por tentativa deixaria qualquer um encher uma tabela que não se
+  apaga. No hub vale para toda recusa, e não só para o AR-101 de quem não tem aparelho: o AR-102
+  repetido também é contado assim. A contagem fica em memória até o minuto fechar, e a varredura a
+  grava. **Limite:** o que foi contado no minuto em que o hub para se perde.
+- O convite sem organização (resumo que ninguém emitiu) recebe AR-101 e entra na contagem sem
+  organização.
+- No hub, um convite vencido que a inscrição encontra é encerrado ali mesmo, com o evento
+  `invite.expired`, sem esperar a varredura.
+- Um convite ainda não usado, apresentado por uma identidade que já tem linha de aparelho, de
+  qualquer Hermes, recebe AR-101 e não é gasto: identidade velha não abre pedido novo.
+- Pedido já resolvido responde AR-104 em todo estado que só existe depois de uma aprovação: ativo,
+  quarentena, revogado, substituído e vencido por inatividade.
 
 ### 5.3 Canal (`purpose: channel`)
 
@@ -262,6 +310,28 @@ apresenta assim na partida do líder e, depois, uma vez a cada 24 horas.
   chamada que saiu e ficou sem resposta volta com AR-207: o resultado é desconhecido, e a frase manda
   conferir antes de repetir. O hub não reconhece chamada repetida.
 
+**Como o hub atende a sessão:**
+
+- **Mensagem mandada antes de ler o `session`.** Toda mensagem que o conector mandou antes de o
+  `session` sair do hub (um `call`, um `leave`, qualquer outra) fecha a conexão com AR-204, depois
+  do `session`. O hub sabe a ordem exata: a conexão passa à sessão no instante em que o `session`
+  sai da fila de envio. A promoção já está gravada, e o conector volta com a credencial nova.
+- **A ordem de cada chamada:** primeiro o hub relê o estado do aparelho (C8). Se ele não serve
+  mais, a resposta é `result` com o código do estado (por exemplo, AR-502), seguido de `closing`
+  com o mesmo código. Só depois vêm o nome e os argumentos (AR-711), a liberação (AR-701) e o
+  tamanho da resposta (AR-709).
+- **O identificador repetido** fecha com AR-204. Um identificador sai das chamadas em andamento
+  antes de o `result` dela ser mandado.
+- **A 33ª chamada em andamento** recebe AR-710, mandado pelo próprio laço da sessão: um conector
+  que insiste espera as recusas saírem, e a espera chega à conexão dele. Essa recusa **não relê o
+  estado do aparelho** (seção 12).
+- **No M1** só `arauto_status` é liberada, e o hub a responde sem o motor. Os campos estão em
+  [09](09-contrato-mcp.md), seção 3. As `hermes_*` existem no catálogo e recebem AR-701; as
+  `whatsapp_*` ainda não estão no catálogo e recebem AR-711. A mensagem `tools` nunca é mandada,
+  porque a lista não muda, e nenhum `notice` sai; um `notice_ack` é ignorado.
+- **`saved` fora da troca de 24 horas** fecha a sessão com AR-204 (C7, regra 7).
+- **O `leave` pelo canal aberto** recebe `left` e a conexão termina.
+
 **Avisos.**
 
 | `kind` | Campos | Validação no conector, antes de montar a frase fixa |
@@ -293,6 +363,15 @@ um nome nesse formato e dois números.
   conexão dupla.
 - Os três valores valem como confirmação para o conector apagar a pasta daquela identidade.
 - Um pedido pendente que pede o encerramento vira negado.
+- No hub, um aparelho ativo que sai fica revogado, com o alerta de encerramento pedido pelo aparelho
+  e o endereço de onde veio (C10).
+- **Se o banco voltou de uma cópia** e o hub descobre isso no meio do `leave`, nada é gravado: o hub
+  liga o modo restaurado (seção 6, "Modo restaurado com o hub no ar"), e a conexão curta fecha com
+  AR-205, sem `left`.
+- **Se a marca da auditoria não avançou** depois de o encerramento estar gravado, o hub grava o
+  alerta `mark_not_advanced` para o admin e só então responde `left` com `closed`, porque o
+  encerramento está no banco. O alerta vem antes para não se perder se o hub cair entre os dois:
+  depois do `left`, o conector apaga a pasta.
 
 ## 6. A troca, passo a passo
 
@@ -334,6 +413,48 @@ ou em sessão.
 - Uma conexão que recebeu `credential` e terminou sem `saved` fica registrada. Três em 24 horas geram
   alerta (C7).
 
+**Como o hub faz os passos:**
+
+- **O registro** é um mapa repartido por identidade do aparelho, na memória de um processo. Cada
+  conexão tem o seu número de ordem e o seu estado: tentativa, em espera ou em sessão.
+- **Uma tentativa por vez.** Cada identidade tem a sua vez de ser julgada, do passo 5 ao fim de T1.
+  Logo antes de T1 o hub confere de novo que aquela conexão continua a mais nova e aberta; se não,
+  ela fecha com AR-206 e não recebe nada. Sem isso, uma tentativa abandonada que passou do passo 5
+  podia rodar T1 depois de uma mais nova já ter trocado a credencial, e mandar o aparelho legítimo à
+  quarentena por reuso. Foram as rodadas sorteadas que acharam esse caso.
+- **O pré-julgamento** (passo 7) só lê. Se o banco falha nele, a conexão fecha com AR-205 e não
+  chega a T1.
+- **O teste do passo 8** é respondido pela tarefa que lê da conexão antiga: um `check_ok` com o
+  nonce do teste não espera a sessão, que pode estar ocupada com o banco. Uma conexão antiga que já
+  está terminando não é testada. Se a antiga responde, as duas recebem AR-501 e o aparelho vai à
+  quarentena; no pendente, o pedido é negado (AR-301) e sai o alerta de identidade copiada. Se não
+  responde, só a antiga recebe AR-208. O alerta de conexão tomada só sai se ela servia uma sessão no
+  momento do teste e continuava aberta ao fim do prazo.
+- **O `state` sai antes do `check`.** O `check` é de controle e passa na frente da fila de dados;
+  por isso o hub espera o `state` sair antes de mandá-lo.
+- **A prova de restauração** é olhada antes de qualquer prazo vencido, para o prazo não esconder a
+  prova.
+- **Na primeira confirmação**, o aparelho substituído (o antigo do mesmo Hermes) recebe AR-503, se
+  tiver conexão aberta.
+- **Promoção pela apresentação da pendente.** Um aparelho aprovado que volta apresentando a
+  pendente (caiu depois de gravar, antes de o hub ouvir o "gravei") passa a ativo já em T1, e essa é
+  a primeira confirmação. A sessão continua só depois do "gravei" da credencial seguinte (seção 12).
+- **Falhas na gravação de segurança.** Se T1 ou T2 descobrem um banco restaurado, o hub liga o modo
+  restaurado. Se a marca da auditoria não avançou depois de T2, a promoção fica gravada, mas o hub
+  não abre a sessão: fecha a conexão e grava o alerta `mark_not_advanced`; na volta o conector
+  apresenta o que tem, e ninguém fica trancado. Se a conexão já fechou quando T1 ou T2 rodam, nada é
+  gravado.
+- **Nenhuma espera de rede segura transação ou conexão do banco**, inclusive a espera do pendente.
+
+**A espera do pendente.** O hub manda `state` `waiting` e `check`; respondido, a conexão fica em
+espera e sai do teto de conexões sem sessão. O hub a cutuca quando chega um aviso do comando de
+administração ou quando a varredura vê que o pedido saiu de pendente. Aprovado: novo `state` e a
+troca. Negado ou vencido: `closing` com o código. Um `leave` é aceito durante a espera.
+
+**Modo restaurado com o hub no ar.** Venha a prova de onde vier (a varredura, T1, a apresentação de
+um desconhecido, um `leave`), o hub liga o modo e fecha as sessões e as conexões em espera com o
+código do novo estado do aparelho (suspenso: AR-506). As demais conexões recebem AR-205.
+
 **O julgamento**, para aparelho aprovado ou ativo (é a tabela do C7):
 
 | O conector apresenta | O hub |
@@ -351,16 +472,35 @@ Na apresentação sem troca o hub só olha, nunca emite:
 | Conector antigo demais, aparelho aprovado ou ativo | Aplica as três últimas linhas da tabela acima. Depois, `closing` com AR-401. |
 | Aparelho revogado, substituído ou vencido por inatividade, com lacre válido mais antigo do que a última vigente e a última pendente | Alerta "reuso depois do encerramento" (C7). Depois, o código do estado. |
 | Qualquer estado, lacre válido de geração maior que todas as conhecidas | C11: prova de restauração, a não ser que o aparelho já esteja marcado. |
-| Identidade desconhecida com lacre válido | C11: entra na lista de aparelhos desconhecidos e é prova de restauração, a não ser que já esteja listada. AR-504. |
+| Identidade desconhecida com lacre válido | C11: entra na lista de aparelhos desconhecidos e é prova de restauração, a não ser que já esteja listada. AR-504. No hub, com o modo restaurado ligado, ela é listada e não é prova (seção 13). |
 | Identidade desconhecida com `null` ou com lacre que não abre | AR-504. Nada é gravado por tentativa. |
+
+Mais quatro leituras do hub para esta tabela:
+
+- O lacre do desconhecido é tentado com a chave de cada organização.
+- A prova de um desconhecido fica guardada na linha da lista, como **prova pendente**, até o modo
+  restaurado ser ligado. Um hub que para entre a listagem e o modo encontra a prova de novo na
+  apresentação seguinte, e ligar o modo trata de uma vez todas as provas pendentes.
+- Um aparelho aprovado ou ativo, já marcado por restauração, que apresenta um lacre de geração maior
+  vai à quarentena por reuso; nos outros estados, isso só gera registro. Pelo C11 essa combinação
+  nem deveria existir.
+- O código de um aparelho vencido sem motivo que o explique é AR-507: é o único que nunca leva o
+  conector a descartar nada.
 
 **A troca de 24 horas.** O hub manda `rotate`, faz T1 como se a vigente tivesse sido apresentada,
 manda `credential`, espera o `saved` por 60 segundos, faz T2 e responde `rotated`. As chamadas seguem
 durante a troca. Sem o `saved` no prazo, o hub fecha a conexão, e na volta vale a tabela de sempre.
+No hub, cada sessão confere a hora da troca no mesmo intervalo da varredura (2 segundos), contando
+desde a última troca confirmada daquela conexão. O `saved` que não chega no prazo e o `saved` de
+outra credencial fecham com AR-204.
 
 ## 7. Fechamentos
 
-O hub manda `closing` com o código antes de fechar, sempre que consegue.
+O hub manda `closing` com o código antes de fechar, sempre que consegue. No hub, o `closing` não
+passa na frente da fila de dados: sai depois do que já estava na fila, para manter a ordem (por
+exemplo, o `hello_ok` antes do AR-205), e nada do que for enfileirado depois dele sai. A escrita da
+fila toda tem o mesmo prazo de 30 segundos. Só os quadros de controle passam na frente. Uma conexão
+ainda no aperto de mãos, ou com a fila de controle cheia, fecha sem `closing`.
 
 | Código | Quando | O que o conector faz |
 |---|---|---|
@@ -378,8 +518,15 @@ O hub manda `closing` com o código antes de fechar, sempre que consegue.
 
 "Parar de usar o canal" não encerra o conector ([10](10-maquinas-de-estado.md), seção 6).
 
-Parada em ordem do hub: ele deixa de aceitar conexões, manda `closing` com AR-205 a cada uma, espera
-até 8 segundos pelas chamadas em andamento e sai.
+Parada em ordem do hub, na leitura que não perde resultado:
+
+1. Deixa de aceitar conexões. Um pedido de websocket que ainda chegue recebe 503, e as conexões que
+   ainda estão em HTTP ou no aperto de mãos são cortadas.
+2. Manda `closing` com AR-205, na hora, a cada conexão que não está em sessão.
+3. Cada sessão recusa chamada nova com AR-205, manda o `result` das chamadas em andamento e só então
+   manda `closing` com AR-205.
+4. Passados 8 segundos, fecha à força o que sobrou, com AR-205, e espera mais 2 segundos para o
+   `closing` sair. A parada pode levar, então, até 10 segundos.
 
 ## 8. Código de conferência
 
@@ -476,12 +623,50 @@ quem mantém o projeto aprovar a redação:
 |---|---|
 | O teste de 3 segundos da conexão antiga pode falhar durante uma transferência grande em rede lenta: a resposta espera atrás do que já está na fila de envio do sistema. A conexão antiga é dada por morta e a nova entra, com o alerta de conexão tomada. | C9, como limite. |
 | Um lacre válido, de resumo desconhecido e geração já conhecida, é tratado como reuso (quarentena). Também pode ser sinal de restauração. Guardar o resumo de toda credencial emitida distinguiria os dois. | C7 e C11. |
-| O registro de AR-101 é agregado por origem e por minuto, não um por tentativa. | C3. |
+| As recusas de inscrição são registradas agregadas, uma linha por origem, organização, código e minuto, e não uma por tentativa. No hub isso vale para toda recusa, inclusive o AR-102 repetido; o C3 fala em "registro na auditoria" a cada recusa. A contagem do minuto em que o hub para se perde. | C3. |
 | A regra que usaria a data de emissão do lacre continua em aberto. | C11. |
 | A primeira reconexão é "na hora". Uma espera sorteada de poucos segundos aliviaria a volta em massa depois de o hub reiniciar; hoje quem alivia é o teto de conexões sem sessão. | C9. |
 | O texto ainda fala em "cópia contínua do banco de controle", do desenho com dois arquivos. | C11. |
+
+Pontos que vieram do código do hub (etapas 2 e 2b, 11/11/2026). Cada um diz o que mudaria no 04 e
+por quê; até a aprovação, o 04 continua valendo como está:
+
+| Ponto | Onde entraria |
+|---|---|
+| **Conector antigo demais.** O C8 diz que ele "recebe AR-401 e nada mais". Pela decisão 0030, já decidida, o hub primeiro faz a apresentação sem troca (seção 5.3) e só depois manda AR-401. O hub faz assim. O C8 passaria a descrever essa ordem. | C8, e seção 6, item 3. |
+| **`leave` de conector novo demais.** O C8 aceita o `leave` "em qualquer versão". O hub responde AR-402 ao conector novo demais, também no `leave`, porque não existe `hello_ok` válido para uma faixa toda acima da do hub. O C8 passaria a dizer "em qualquer versão abaixo da máxima do hub". | C8. |
+| **A recusa AR-710 não relê o estado do aparelho.** O C8 manda conferir o estado "em toda chamada". O hub relê em toda chamada que roda, antes de qualquer outra conferência; a 33ª chamada em andamento é recusada sem tocar o banco. Reler ali faria cada recusa disputar o conjunto de conexões com as 32 chamadas em andamento e quebraria o teto. A varredura fecha em até 2 segundos o aparelho que deixou de servir. Ou o C8 passa a dizer "em toda chamada que roda", ou o hub passa a reler também na recusa: decisão de quem mantém. | C8. |
+| **O resumo do convite também é apagado ao cancelar.** O 04 manda apagá-lo quando o convite vence. O hub apaga também quando o convite é cancelado: por convite novo, por revogar ou pelo modo restaurado. Um resumo guardado sem uso só serve a quem lê o banco. | C1 e seção 4. |
+| **Em qual gravação o aprovado vira ativo.** O 04 não diz. No hub, quando um aprovado volta apresentando a pendente, a promoção em T1 já é a primeira confirmação, e o aparelho passa a ativo ali; a sessão só começa depois do "gravei" da credencial seguinte. | C5 e C7. |
+| **A ordem entre prova e prazo.** O 04 não fixa. O hub olha a prova de restauração antes de aplicar um prazo vencido, para o prazo não esconder a prova. | C7 e C11. |
 
 A provar no MVP, pela suíte: a troca com quedas, atrasos e repetições sorteados; a resposta atrasada
 de uma tentativa abandonada; o revogar entre a credencial e o "gravei"; os limites de antes da sessão;
 a mensagem cortada em pedaços; e o soquete local nos dois sistemas. A lista única continua em
 [12-roteiro.md](12-roteiro.md).
+
+**Andamento, 11/11/2026.** Do lado do hub, a suíte já tem teste para a troca com quedas sorteadas dos
+dois lados (com e sem cópia dos arquivos), a resposta atrasada de uma tentativa abandonada, o revogar
+entre a credencial e o "gravei", os limites de antes da sessão e a mensagem cortada em pedaços. Os
+testes rodam contra um conector de teste, não contra o conector do projeto, que ainda não existe, e
+só em Windows. Falta tudo do lado do conector, inclusive o soquete local.
+
+**Limites conhecidos do hub, 11/11/2026:**
+
+- Antes dos cabeçalhos, as conexões TCP não têm teto: só o prazo de 5 segundos as limita.
+- O hub dos testes não teve um proxy de verdade na frente; a leitura do endereço encaminhado foi
+  testada com um proxy confiável na própria máquina.
+- O registro das conexões e a conferência da troca de 24 horas não têm índice por aparelho: cada
+  aviso percorre todas as conexões. O custo não foi medido além de 500 conectores.
+- A tentativa abandonada é coberta por um teste dirigido e pelas rodadas sorteadas; a janela entre a
+  última conferência e o início de T1 não tem teste que a force.
+
+## 13. Pontos em aberto
+
+O código escolheu uma leitura onde o texto diverge dele, ou onde a escolha não é melhora clara. Ficam
+aqui as duas leituras, até quem mantém o projeto decidir.
+
+| Ponto | Leitura do texto | Leitura do código |
+|---|---|---|
+| **Desconhecido com o modo restaurado ligado.** | A tabela da seção 6: um desconhecido com lacre válido é prova de restauração, a não ser que já esteja listado. Com o modo ligado, isso recomeçaria o modo. | Com o modo ligado, o desconhecido é listado e não é prova. Pelo C11, só três coisas recomeçam o modo, e o desconhecido não está entre elas. Evita recomeçar o modo a cada aparelho da linha do tempo perdida. O custo: uma segunda restauração por imagem, feita com o modo ligado, não é percebida por um aparelho que o banco não conhece. Uma saída seria usar a hora de início do modo para separar os dois casos. |
+| **Desconhecido de novo depois do expurgo.** | A lista de aparelhos desconhecidos tem guarda de 90 dias ([15](15-mvp.md), seção 2, regra 11). | Depois do expurgo, a mesma identidade volta a ser "listada agora" e, com o modo desligado, vira prova outra vez. É o mesmo ponto em aberto do C11: falta como distinguir a sobra da linha do tempo perdida de uma restauração nova. Hoje o expurgo ainda não existe no hub. |

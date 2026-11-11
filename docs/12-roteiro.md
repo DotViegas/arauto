@@ -48,7 +48,12 @@ Ainda não está escrito, e é a primeira entrega da fase: como subir um Hermes 
 ### No canal
 
 Desde 10/11/2026 estas provas são feitas dentro do MVP, como testes da suíte
-([15-mvp.md](15-mvp.md), seção 7).
+([15-mvp.md](15-mvp.md), seção 7). Em 11/11/2026 o lado do hub já tem teste, contra um conector de
+teste e só em Windows, para: o aperto de mãos e a inscrição; a troca com quedas sorteadas dos dois
+lados; a troca de 24 horas com o "gravei" que não chega; a cópia com o verdadeiro ligado e desligado;
+o hub restaurado com o hub no ar e com o `admin` antes do `serve`; e as mensagens cortadas em
+pedaços. Nenhuma está "confirmada" ainda: falta o conector do projeto, e as provas que dependem dele
+(arquivo perdido, troca de pasta, comandos repetidos, sair e reconectar cruzados).
 
 | O que provar | Como |
 |---|---|

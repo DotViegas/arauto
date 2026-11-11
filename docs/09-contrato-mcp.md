@@ -18,7 +18,8 @@ avisos: "há N mensagens novas na conversa X do número Y"
 
 O Hermes só vê as famílias de ferramenta cujo verbo ele tem em algum número. Antes da aprovação, e
 depois dela enquanto não tiver acesso, vê só `arauto_status`. As ferramentas de recado aparecem
-quando ele tem ligação na lista de pares.
+quando ele tem ligação na lista de pares. No hub, em 11/11/2026 (M1), a sessão libera só
+`arauto_status`: as de recado entram no M2 e as de WhatsApp no M3.
 
 ## 1. Regras do contrato
 
@@ -47,6 +48,27 @@ quando ele tem ligação na lista de pares.
 | Ferramenta | O que faz |
 |---|---|
 | `arauto_status` | Diz se o Hermes está conectado, a quais números tem acesso e com quais verbos, e se a conversa entre Hermes está liberada. Sem segredo. |
+
+**A resposta de `arauto_status`, no hub em 11/11/2026.** O hub a responde sozinho, sem o motor, e o
+teste confere que ela não leva segredo:
+
+```json
+{"connected": true, "hermes": "nome-do-hermes", "can_be_woken": false, "numbers": [],
+ "peers": {"enabled": false, "can_send": false, "can_receive": false}}
+```
+
+| Campo | Conteúdo |
+|---|---|
+| `connected` | Sempre `true`: a resposta só sai por uma sessão do canal aberta. |
+| `hermes` | O nome do Hermes, no formato restrito. |
+| `can_be_woken` | Se o admin liberou acordar este Hermes. |
+| `numbers` | Os números e os verbos. Vazio até o M3; o formato de cada item é entrega do M3. |
+| `peers.can_send` | Existe ligação deste Hermes para outro. |
+| `peers.can_receive` | Existe ligação de outro Hermes para este. |
+| `peers.enabled` | Um dos dois. |
+
+Só a resposta do hub está escrita. Sem sessão do canal (pedido pendente, canal fora do ar), quem
+responde à ferramenta é o conector, e essa resposta ainda não está escrita.
 
 ### Ler
 

@@ -98,6 +98,37 @@ pub async fn find(
     .await?)
 }
 
+/// The links of a Hermes with the other ones (`docs/13-conversa-entre-hermes.md`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PeerLinks {
+    /// A link from this Hermes to another: it can send.
+    pub outbound: bool,
+    /// A link from another Hermes to this one: it can receive.
+    pub inbound: bool,
+}
+
+/// Whether the Hermes `hermes` has links with other Hermes, in each direction.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn peer_links(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    hermes: Uuid,
+) -> Result<PeerLinks, RepoError> {
+    let (outbound, inbound): (bool, bool) = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM peer_link \
+                        WHERE organization_id = $1 AND from_hermes_id = $2), \
+                EXISTS (SELECT 1 FROM peer_link \
+                        WHERE organization_id = $1 AND to_hermes_id = $2)",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .fetch_one(pool)
+    .await?;
+    Ok(PeerLinks { outbound, inbound })
+}
+
 /// A Hermes line and what is connected to it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HermesLine {

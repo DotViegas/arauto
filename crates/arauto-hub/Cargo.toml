@@ -46,6 +46,7 @@ zeroize.workspace = true
 
 [dev-dependencies]
 arauto-protocol = { workspace = true, features = ["testing"] }
+arauto-testkit.workspace = true
 proptest.workspace = true
 tempfile.workspace = true
 

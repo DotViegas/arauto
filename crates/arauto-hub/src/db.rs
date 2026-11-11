@@ -490,6 +490,9 @@ pub enum SystemTask {
     Restore,
     /// A device nobody knows presented a seal: every organization key is tried on it.
     UnknownSeal,
+    /// The start of `serve`: the channel connections a hub that stopped without warning left
+    /// open are closed in every organization.
+    Start,
 }
 
 /// Every organization, for a named task of the hub itself, oldest first.

@@ -1,9 +1,8 @@
 //! The Arauto hub.
 //!
-//! This is the hub without the network: the foundation, the repositories and the admin
-//! command. The channel is built on them. It follows
-//! `docs/04-seguranca-conexao.md` (C7, C9 and C11), `docs/14-protocolo-do-canal.md`
-//! (sections 6 and 9) and `docs/15-mvp.md` (section 2).
+//! The foundation, the repositories, the admin command and the transport of the channel. It
+//! follows `docs/04-seguranca-conexao.md` (C7, C9 and C11), `docs/14-protocolo-do-canal.md`
+//! and `docs/15-mvp.md` (sections 2 and 3).
 //!
 //! | Module | What it holds |
 //! |---|---|
@@ -16,6 +15,7 @@
 //! | [`core`] | The row types, the pure rule of the credential swap and its in-memory simulator. |
 //! | [`admin`] | The admin command: `init`, `migrate`, `status` and what a person does to Hermes, invites and requests. |
 //! | [`repo`] | The repositories: every read and write of business data, with the organization resolved. |
+//! | [`channel`] | The port of the connectors: the accept loop, the websocket, the handshake, the frames and their limits, `hello`, `leave`, and the entry point of the other purposes. |
 //!
 //! Time is always an `i64` of milliseconds given by the caller, who reads it from an
 //! [`arauto_protocol::clock::Clock`]. No SQL here reads the clock of the database.
@@ -23,6 +23,7 @@
 
 pub mod admin;
 pub mod audit;
+pub mod channel;
 pub mod config;
 pub mod core;
 pub mod db;

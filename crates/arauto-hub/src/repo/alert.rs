@@ -63,6 +63,9 @@ alert_kinds! {
     ReuseAfterClosing => "reuse_after_closing",
     /// Three connections in 24 hours received a credential and ended without the "saved" (C7).
     UnconfirmedSwaps => "unconfirmed_swaps",
+    /// A security event is committed and the audit mark did not follow it: until the next
+    /// event moves the mark, a restoration that loses that event is not noticed (C11).
+    MarkNotAdvanced => "mark_not_advanced",
 }
 
 impl std::fmt::Display for AlertKind {
@@ -176,6 +179,47 @@ pub(crate) async fn raised_since(
     .bind(since)
     .fetch_one(connection)
     .await
+}
+
+/// A security event of a connection of `device` is committed and the audit mark did not
+/// follow it. The hub closed that connection and tells the admin, with the number of the
+/// event.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn mark_not_advanced(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    device: Option<Uuid>,
+    seq: i64,
+    now: i64,
+) -> Result<(), RepoError> {
+    let mut connection = pool.acquire().await?;
+    let hermes: Option<Uuid> = match device {
+        Some(device) => {
+            sqlx::query_scalar(
+                "SELECT hermes_id FROM device WHERE organization_id = $1 AND id = $2",
+            )
+            .bind(organization.id())
+            .bind(device)
+            .fetch_optional(&mut *connection)
+            .await?
+        }
+        None => None,
+    };
+    raise(
+        &mut connection,
+        organization,
+        now,
+        &NewAlert {
+            kind: AlertKind::MarkNotAdvanced,
+            hermes,
+            device,
+            details: AlertDetails::new().number("seq", seq),
+        },
+    )
+    .await?;
+    Ok(())
 }
 
 /// An alert, as the admin reads it.

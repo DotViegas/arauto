@@ -218,7 +218,7 @@ conversa.
 |---|---|
 | O aparelho é trocado (reconectar) | Nada muda: o aparelho novo encontra os fios e os não lidos. |
 | O Hermes fica sem aparelho ativo (quarentena, revogado, suspenso) | As ligações e os fios ficam. Os recados para ele são guardados, sem aviso. |
-| O Hermes é excluído | As ligações dele saem nos dois sentidos, na mesma gravação. Os fios deixam de aparecer para o outro lado. O expurgo apaga o resto. |
+| O Hermes é excluído | As ligações dele saem nos dois sentidos, na mesma gravação. No hub, a mesma gravação encerra o aparelho, o pedido em andamento e o convite dele, como um revogar. Os fios deixam de aparecer para o outro lado. O expurgo apaga o resto. |
 | O admin tira uma ligação | Vale no recado e na leitura seguintes (seção 4). |
 
 ## 8. As ferramentas

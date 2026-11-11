@@ -1,7 +1,9 @@
 # 15 — O primeiro MVP
 
-**Estado: proposta em construção.** Revisada em 10/11/2026, depois da revisão do desenho. O que entra
-na primeira versão que funciona de ponta a ponta, com que tecnologia e em que ordem. As decisões
+**Estado: proposta em construção.** Revisada em 10/11/2026, depois da revisão do desenho, e em
+11/11/2026, com o código do hub das etapas 2 e 2b (o que o hub faz está marcado "no hub"; o
+andamento está na seção 7, e os pontos em aberto na seção 9). O que entra na primeira versão que
+funciona de ponta a ponta, com que tecnologia e em que ordem. As decisões
 estão em [0031](decisoes/0031-banco-postgresql.md),
 [0032](decisoes/0032-conversa-entre-hermes-no-mvp.md), [0033](decisoes/0033-escopo-do-mvp.md),
 [0034](decisoes/0034-nomes-em-ingles.md), [0035](decisoes/0035-pilha-do-websocket.md) e
@@ -64,11 +66,37 @@ mesmo programa e usam as mesmas funções de gravação.
 ```
 
 - Ao aprovar um reconectar, o comando mostra o último uso do aparelho atual e exige `--recognized`
-  ou `--not-recognized` (04, C10). Sem uma das duas, não aprova.
+  ou `--not-recognized` (04, C10). Sem uma das duas, não aprova. No hub, o comando sempre imprime o
+  pedido, com o último uso, antes do resultado, e a aprovação repete o último uso. A pergunta vem
+  antes do código: sem resposta, nada é contado, e "não reconheço" só vale junto com o código certo.
+  Ela também é feita quando o aparelho anterior venceu por inatividade; revogado ou substituído não
+  gera pergunta (seção 9).
 - O código de conferência fica em claro na linha do aparelho até o pedido ser resolvido, e depois é
   apagado. Passado como argumento, fica no histórico do terminal: vale uma vez e morre em 10 minutos.
+  Um código fora do formato de seis dígitos não conta como tentativa.
 - O ator gravado na auditoria é "admin local", com o usuário do sistema que rodou o comando, como
-  texto declarado.
+  texto declarado. Nos demais eventos, o ator é o aparelho (inscrição, ativação, troca confirmada e
+  `leave`) ou o sistema (quarentena, substituição e prazos).
+
+**No hub, em 11/11/2026.** Existem `init`, `serve`, `migrate`, `dev-reset` e, no `admin`, `status`,
+`hermes`, `invite`, `approve`, `deny`, `revoke`, `wake`, `alerts` e `audit`. O `peers` e o `threads`
+vêm no M2; `engine`, `number` e `access`, no M3. O que o comando faz e o texto não dizia:
+
+- **`deny`** só nega pedido pendente. Um aprovado ainda sem credencial sai por `revoke` ou por um
+  convite novo.
+- **`hermes remove`** encerra tudo o que é do Hermes, como um revogar (aparelho, pedido e convite), e
+  tira as ligações dele. Uma linha excluída com aparelho servindo seria um Hermes que ninguém vê.
+- **`alerts`** lista também os aparelhos desconhecidos do C11, com a hora, o endereço e o que ele
+  declara, escapado. `--all` mostra os alertas já vistos. `audit --tail` mostra os últimos 50 por
+  padrão.
+- **Com o modo restaurado ligado**, todo comando do `admin` começa com o aviso do C11.
+- **Com o banco restaurado e o modo ainda desligado**, o `admin` só recusa: não grava, não mexe na
+  marca e manda subir o `serve`, que liga o modo. O `status` continua lendo e sai com erro.
+- **`status`** com mais de uma organização não lista Hermes nem alertas: os comandos que gravam
+  exigem exatamente uma.
+- **Durabilidade.** Todo comando que grava confere `fsync` antes, como o `init`.
+- **`init`** num banco com dados e sem marca responde "já instalado" e não recria a marca. Num banco
+  vazio com marca acima de zero, recusa.
 
 ## 2. Banco: PostgreSQL
 
@@ -107,11 +135,19 @@ Regras que valem para o banco:
    fora: pela identidade do aparelho, pelo resumo do convite e pelo segredo de eventos do motor. As
    tarefas do sistema que atravessam organizações (filas, prazos, expurgo, marca) têm nome e também
    estão na lista. Toda outra função do repositório exige a organização já resolvida. Um teste lê o
-   código do repositório e falha se aparecer uma função fora da lista sem esse parâmetro.
-3. **Identificadores sorteados no hub** (UUID versão 4). A única sequência é a da auditoria.
+   código do repositório e falha se aparecer uma função fora da lista sem esse parâmetro. No hub, a
+   lista tem a entrada pela identidade e a entrada pelo convite (a do motor vem no M3), e as tarefas
+   com nome: instalação, comando de administração, filas, prazos, expurgo, marca, lacre de
+   desconhecido e partida do `serve`. A única função que grava sem organização é a das recusas de
+   convites que ninguém emitiu. O teste lê todo o código do hub que alcança o banco, não só o do
+   repositório, e cada exceção da lista diz por que existe.
+3. **Identificadores sorteados no hub** (UUID versão 4). A única sequência é a da auditoria. A
+   migração 0002 trocou o identificador inteiro de `tool_call` por um UUID, para cumprir esta regra.
 4. **O tempo é do hub.** Colunas de tempo são inteiros, em milissegundos UTC. Nenhuma coluna tem
    valor padrão de tempo e nenhum SQL usa `now()`: um teste varre as migrações. Toda conexão define
-   `lock_timeout` (5 s) e `idle_in_transaction_session_timeout` (30 s).
+   `lock_timeout` (5 s) e `idle_in_transaction_session_timeout` (30 s). A única exceção é a tabela
+   de controle que a biblioteca de migrações cria, `_sqlx_migrations`, cuja coluna `installed_on`
+   tem a hora do banco como padrão. Nenhuma regra a lê, e os testes do relógio a deixam de fora.
 5. **As filas ficam no banco.** Pegar um item é um `UPDATE` curto, sobre uma seleção com
    `FOR UPDATE SKIP LOCKED`, que marca o item como enviado com um prazo de posse, e é confirmado
    antes do envio. Posse vencida volta a pendente. Nenhuma trava espera a confirmação do conector. O
@@ -121,25 +157,46 @@ Regras que valem para o banco:
    ([14](14-protocolo-do-canal.md), seção 6). Nenhuma transação fica aberta durante espera de rede.
 7. **Durabilidade.** As transações de evento de segurança e as da troca rodam com
    `SET LOCAL synchronous_commit = on`. Na partida, o hub confere `fsync` e `full_page_writes` e
-   recusa subir com eles desligados, salvo com uma opção explícita de teste. Um commit perdido da
-   troca pareceria restauração e suspenderia todos. Os metadados de `tool_call` podem ir sem espera.
+   recusa subir com eles desligados, salvo com uma opção explícita de teste
+   (`ARAUTO_ALLOW_UNSAFE_DB=1`). Um commit perdido da troca pareceria restauração e suspenderia todos.
+   Os metadados de `tool_call` podem ir sem espera.
 8. **Migrações embutidas no programa**, só para a frente. `init` aplica tudo num banco vazio. Num
    banco com dados, `serve` não sobe com migração pendente: quem instala tira a cópia de segurança e
-   roda `migrate --i-have-a-backup`. O `admin` recusa rodar contra um banco de outra versão.
+   roda `migrate --i-have-a-backup`. O `admin` recusa rodar contra um banco de outra versão. No hub,
+   em 11/11/2026, há duas: a 0001, do núcleo, e a 0002, da revisão da conexão (prova pendente de
+   aparelho desconhecido, `tool_call` com UUID, chaves compostas por organização e índices). As
+   tabelas do WhatsApp, que a 0001 anunciava para a 0002, vêm numa posterior. Um banco de
+   desenvolvimento criado só com a 0001 precisa de `migrate --i-have-a-backup` ou de `dev-reset`.
 9. **A marca fica fora do banco**, ao lado da chave-mestra (04, C11). Uma função única, usada pelo hub
    e pelo comando de administração, cuida dela: sob uma trava de arquivo entre processos, confere que
    o banco não está atrás da marca antes de gravar um evento de segurança, e depois avança a marca.
    A marca só aumenta. Gravações que esperam se juntam numa só. O hub repete a conferência na partida
    e a cada varredura: um banco restaurado com o hub no ar é percebido em segundos, e um `admin`
-   rodado antes do `serve` não apaga a prova.
+   rodado antes do `serve` não apaga a prova. No hub, a trava cobre só a leitura e a regravação do
+   arquivo da marca, e não a conferência (seção 9). Uma marca estragada é erro, e não "ausente".
+   "Banco com dados" quer dizer: existe linha em `installation`, ou qualquer linha em `audit`.
 10. **A auditoria só cresce**, e guarda só o que muda quem pode o quê. Os gatilhos protegem contra
     erro do programa; quem tem o banco consegue apagar. Recusas repetidas e recados não geram um
-    evento cada ([13](13-conversa-entre-hermes.md), seção 7).
+    evento cada ([13](13-conversa-entre-hermes.md), seção 7). No hub, cada evento diz se é de
+    segurança, e a lista é fechada e tem teste. São de segurança: a instalação, a organização, a
+    chave do hub, os admins, criar e excluir Hermes, mudar o "pode ser acordado", convite usado ou
+    cancelado, aprovar e negar, ativar, quarentena, substituição, revogação, troca confirmada, as
+    ligações da lista de pares e o modo restaurado. Não são: convite emitido, vencido, recusado ou usado
+    por outra identidade,
+    inscrição repetida, código errado, aparelho vencido por prazo, troca sem "gravei", os alertas de
+    reuso e de lacre sem explicação, conexão tomada, teto de recados, aparelho desconhecido listado e
+    migração. O vencimento por prazo fica fora porque a lista do C11 não o inclui.
 11. **Expurgo.** Uma tarefa do hub apaga em lotes pequenos, com a hora do hub, pelo prazo de cada
     tabela: recados, 30 dias; chamadas de ferramenta, 7; avisos resolvidos, 7; eventos do motor já
-    tratados, 1; conexões e aparelhos desconhecidos, 90.
-12. **O banco é acessado direto**, sem agrupador de conexões em modo de transação. O conjunto de
-    conexões tem tamanho fixo (16 de partida), e esperar por uma tem prazo de 5 segundos.
+    tratados, 1; conexões e aparelhos desconhecidos, 90. Em 11/11/2026 os prazos estão na tabela
+    `retention`, mas a tarefa ainda não existe. Ver também o segundo ponto em aberto do
+    [14](14-protocolo-do-canal.md), seção 13.
+12. **O banco é acessado direto**, sem agrupador de conexões em modo de transação. O hub tem dois
+    conjuntos de conexões de tamanho fixo: o dos conectores (16 de partida) e um de 2, só da
+    varredura. Esperar por uma conexão tem prazo de 5 segundos. O conjunto da varredura existe para o
+    revogar valer em menos de 5 segundos mesmo com o dos conectores ocupado, por exemplo numa volta
+    em massa. A escuta do `NOTIFY` usa uma terceira conexão, fora dos dois, e o comando de
+    administração abre o seu próprio conjunto, de 2.
 
 **Como o hub fica sabendo.** O que o próprio hub enfileira acorda o trabalhador por um sinal em
 memória. O `NOTIFY` do PostgreSQL serve só entre processos: o comando de administração grava, e
@@ -147,6 +204,16 @@ avisa o hub com um texto curto, do tipo `revoked:{id}`. O hub escuta numa conex�
 conjunto. Como esse aviso não é guardado, o hub também **varre a cada 2 segundos** e toda vez que a
 escuta reconecta: relê o estado dos aparelhos com conexão aberta, a lista de ferramentas de cada
 sessão e as filas. É a varredura, não o aviso, que garante o revogar em menos de 5 segundos.
+
+No hub, em 11/11/2026, o canal do `NOTIFY` é `arauto_admin`, e o texto é `tipo:id`, de um aparelho
+ou de um Hermes: as conexões dele releem o estado na hora. Cada varredura, nesta ordem: confere a
+marca (banco restaurado liga o modo restaurado); aplica os prazos de cada organização; relê o estado
+de todo aparelho com conexão, numa consulta por organização, fecha com o código do estado a sessão
+que não serve mais e cutuca a conexão em espera cujo pedido saiu de pendente; grava as recusas de
+inscrição dos minutos que fecharam; e, só com o modo ligado, confere se ele terminou. Ainda não há
+lista de ferramentas que mude nem fila de avisos (M2). Um prazo vencido também é aplicado na hora
+por quem o encontra antes da varredura: a inscrição, a aprovação, T1 e T2, que aplicam também os 30
+dias de inatividade. Na partida, o `serve` fecha as conexões que a execução anterior deixou abertas.
 
 Um segundo hub servindo a mesma organização não é tratado no MVP: o registro de conexões vive na
 memória de um processo.
@@ -158,19 +225,20 @@ websocket: é a cifra de cada quadro e o banco.
 
 | Cuidado | Como |
 |---|---|
-| Servidor | `axum` sobre `hyper`, no `tokio` com vários núcleos. O laço que aceita conexões é do projeto: tem prazo para os cabeçalhos, teto de conexões e um sinal de cancelamento por conexão. |
+| Servidor | `axum` sobre `hyper`, no `tokio` com vários núcleos. O laço que aceita conexões é do projeto: tem prazo para os cabeçalhos, teto de conexões e um sinal de cancelamento por conexão. No hub, o laço e as rotas são do projeto, sobre o HTTP/1 do `hyper`; do `axum` vêm o websocket e os tipos de HTTP. O teto de conexões sem sessão é conferido antes de abrir o websocket. |
 | Uma conexão, duas tarefas | Uma lê, outra escreve. Só a que escreve cifra ([14](14-protocolo-do-canal.md), seção 3). |
 | Duas filas de saída | Controle (16 quadros) e dados (64 quadros). A tarefa que escreve olha o controle antes de cada quadro. |
-| Contrapressão | Quem produz dado espera lugar na fila. A conexão só é fechada quando a escrita fica 30 segundos sem andar, ou quando a fila de controle enche. Rede lenta não expulsa ninguém. |
+| Contrapressão | Quem produz dado espera lugar na fila. A conexão só é fechada quando um quadro fica 30 segundos sem sair, ou quando a fila de controle enche. Rede lenta não expulsa ninguém. Quem envia dado não pode desistir no meio de uma mensagem: o fluxo ficaria incompleto e o conector fecharia a conexão pelo prazo de fluxo parado. |
 | Cifra sem trava | O Noise é usado no modo em que o contador é passado à mão, um por sentido. A recusa de quadro repetido ou fora de ordem é código do projeto, com teste. |
 | Memória | Limites por fase e um orçamento do hub inteiro para mensagens em remontagem ([14](14-protocolo-do-canal.md), seção 4). Mensagem acima de 256 KiB é interpretada fora das tarefas de rede. |
 | Sem compressão | O conteúdo já vai cifrado. |
 | Sem espera no envio | `TCP_NODELAY` ligado em cada conexão aceita. |
-| Tabela de conexões | Um mapa repartido, por aparelho. |
-| Banco | Conjunto de tamanho fixo; consultas curtas, por índice. |
+| Tabela de conexões | Um mapa repartido, por identidade do aparelho. |
+| Banco | Conjuntos de tamanho fixo, um para os conectores e um para a varredura; consultas curtas, por índice. |
+| Prazos de remontagem | Medidos num relógio que só anda para a frente, e não no relógio do hub: um salto do relógio do hub não corta uma mensagem que está chegando. |
 | Autorização a cada chamada | Uma consulta por índice, sem memória intermediária. É a regra 9 do projeto; mede-se antes de otimizar. |
 | Volta em massa | O teto de conexões sem sessão segura a primeira onda; quem é recusado volta com espera sorteada. As gravações da marca se juntam. |
-| Parada em ordem | O hub para de aceitar, manda `closing` a cada conexão, espera até 8 segundos e sai. O sinal é SIGTERM, ou Ctrl+C no desenvolvimento. |
+| Parada em ordem | O hub para de aceitar, manda `closing` às conexões sem sessão, deixa cada sessão responder às chamadas em andamento e fechar, espera até 8 segundos, fecha à força o que sobrou e sai ([14](14-protocolo-do-canal.md), seção 7). O sinal é SIGTERM, ou Ctrl+C no desenvolvimento. |
 
 **Meta e teste de carga.** "Ferramenta local" é a que o hub responde sem falar com o motor.
 
@@ -183,6 +251,23 @@ websocket: é a cifra de cada quadro e o banco.
 
 São metas: só viram dado quando o teste rodar, e o resultado vale para a máquina em que rodou. O M1
 já roda uma versão menor (500 conectores: volta em massa, batimento e leitura local).
+
+**A versão menor, rodada uma vez em 11/11/2026.** Num computador de desenvolvimento com Windows, em
+compilação de desenvolvimento, com o hub e os 500 conectores de teste no mesmo processo, todos vindos
+de 127.0.0.1 (então o teto de 16 conexões sem sessão por origem valeu para todos), conjunto de 16
+conexões e `ping` a cada segundo. Fica marcado para não rodar com a suíte normal, e não foi repetido
+depois da última rodada de correções do canal, que acrescentou o conjunto da varredura.
+
+| Medida | Resultado |
+|---|---|
+| Preparar 500 aparelhos (inscrição, aprovação, sessão) | 9,1 s |
+| Volta em massa | 500 sessões em 5,4 s; 648 tentativas recusadas (429 ou AR-205) e repetidas; nenhuma falha |
+| `arauto_status`, 5.000 chamadas | p50 7,1 ms; p95 30,5 ms; p99 42,1 ms; máximo 72,0 ms; nenhuma falha |
+| Quarentenas | Nenhuma |
+
+O p95 ficou acima da meta de 20 ms; o p99 e a volta em massa, dentro. O cenário não é o da meta:
+2.000 conectores em outro processo, numa compilação de produção, não foram medidos, nem a memória por
+sessão parada.
 
 ## 4. O código
 
@@ -202,7 +287,9 @@ deploy/               Dockerfile e arquivo de composição
 ```
 
 Módulos do hub ([03-arquitetura.md](03-arquitetura.md), seção 3): `enrollment`, `channel`, `vault`,
-`core`, `engine`, e o novo `peers`. O `panel` e o `archive` não existem no MVP.
+`core`, `engine`, e o novo `peers`. O `panel` e o `archive` não existem no MVP. No código, em
+11/11/2026: a inscrição mora dentro de `channel`, e há mais `repo` (os repositórios), `audit`,
+`mark`, `restore`, `admin`, `config` e `db`. `engine` e `peers` vêm no M3 e no M2.
 
 | Peça | Biblioteca |
 |---|---|
@@ -230,8 +317,17 @@ Linux x86_64.
 | hub | `ARAUTO_DATABASE_URL` | O banco. |
 | hub | `ARAUTO_DATA_DIR` | Chave-mestra e marca. Fora do volume do banco. |
 | hub | `ARAUTO_LISTEN`, `ARAUTO_LISTEN_INTERNAL` | A porta dos conectores; a porta interna (saúde e eventos do motor). |
-| hub | `ARAUTO_PUBLIC_URL` | O endereço que vai no bloco. |
+| hub | `ARAUTO_PUBLIC_URL` | O endereço que vai no bloco: `https://host[:porta]`, sem caminho, ou `http://` só para 127.0.0.1, `[::1]` e `localhost`. |
 | hub | `ARAUTO_CLIENT_IP_SOURCE`, `ARAUTO_TRUSTED_PROXIES` | De onde vem o endereço do conector: `socket`, ou `forwarded` com a lista de proxies confiáveis. Obrigatória: sem ela o `serve` não sobe. |
+| hub | `ARAUTO_ALLOW_UNSAFE_DB` | `1` deixa o hub subir num banco com `fsync` desligado. Só para teste. |
+
+**O endereço do conector, no hub.** Com `socket`, vale o endereço da conexão, e qualquer cabeçalho de
+encaminhamento é ignorado. Com `forwarded`, o hub só lê o `X-Forwarded-For`, e só quando a conexão
+vem de um proxy da lista (endereços ou redes, até 64). A lista do cabeçalho é lida da direita para a
+esquerda, até 32 endereços: o primeiro que não é proxy confiável é o conector, e o que está à
+esquerda dele foi escrito pelo próprio conector. Um proxy confiável que não diz quem é o conector
+(sem o cabeçalho, com ele inválido ou só com endereços de proxies) recebe 400: tomar o endereço do
+proxy poria todos os conectores atrás dele numa origem só, e um encheria o teto de todos.
 | conector | `ARAUTO_HOME` | A pasta do conector. Padrão: `~/.arauto`. |
 | conector | `ARAUTO_HERMES_BIN` | O comando do Hermes usado no registro. Padrão: `hermes`. |
 
@@ -257,7 +353,11 @@ Sem container. O que é preciso: o Rust da versão fixada e um PostgreSQL 16 loc
   o conector por stdio em quantas cópias se pedir e tem a API local que acorda. `ARAUTO_HERMES_BIN`
   aponta para ele. O `join --no-register` pula o registro.
 - **Zerar o ambiente:** `arauto-hub dev-reset` apaga o banco de desenvolvimento **e** a marca,
-  juntos. Apagar só um dos dois ligaria o modo restaurado, que é o comportamento certo.
+  juntos. Apagar só um dos dois ligaria o modo restaurado, que é o comportamento certo. No hub, ele
+  pede `--yes-erase-everything`, só roda num banco cujo nome termina em `_dev` (ou num banco da
+  suíte), apaga o esquema `public` e não o banco, e deixa a chave-mestra. Apaga o banco primeiro: uma
+  parada entre os dois deixa a marca à frente de um banco vazio, que o `init` recusa e um segundo
+  `dev-reset` resolve.
 - **Windows** é plataforma de desenvolvimento do hub e do conector
   ([decisão 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). O que muda:
 
@@ -276,7 +376,17 @@ Sem container. O que é preciso: o Rust da versão fixada e um PostgreSQL 16 loc
   mensagem que diz o que falta: não são pulados em silêncio.
 - As migrações rodam uma vez, num banco-modelo. Cada teste que precisa de banco próprio cria o seu a
   partir do modelo; os demais dividem um banco e se isolam por organização. O usuário do banco de
-  teste precisa poder criar banco. Bancos de teste antigos são apagados na partida.
+  teste precisa poder criar banco. Bancos de teste antigos são apagados na partida. No hub, os bancos
+  próprios de cada teste ficam até a execução seguinte, em vez de serem apagados ao fim do teste.
+  Os testes de prazo em segundos ficam num binário de teste próprio, porque a criação de bancos a
+  partir do modelo trava o servidor por segundos.
+- **O kit de teste** (`arauto-testkit`, no M1) traz um conector de teste de alto nível, com falhas
+  sob comando (cair em cada passo da troca, segurar o `check_ok`, apresentar outra credencial, não
+  mandar o "gravei", copiar os arquivos), um conector hostil, com um método por abuso dos limites, e o
+  gerador da volta em massa e das leituras medidas. O motor falso e o Hermes falso vêm depois.
+- **O canário de segredo** roda um fluxo inteiro (convite recusado e válido, código errado, sessão,
+  troca de 24 horas, saída, cópia em quarentena) e procura cada segredo, em várias escritas, no
+  registro do processo e nas tabelas de auditoria, alertas, desconhecidos, conexões e convites.
 - Cada teste tem a sua pasta temporária de chave-mestra e marca, e um conjunto de 2 ou 3 conexões.
 - **A regra da troca é uma função pura**: o estado do aparelho mais um evento dão a decisão e as
   gravações. É ela que passa por dezenas de milhares de rodadas sorteadas, em memória, com relógio e
@@ -323,6 +433,23 @@ O critério de pronto de cada fase do [roteiro](12-roteiro.md) continua valendo.
 Valem as regras de verificação do roteiro: motor falso e Hermes falso, rodadas sorteadas, mutantes
 nas regras de segurança e o canário de segredo.
 
+**Andamento do M1, 11/11/2026.** O lado do hub está escrito e tem teste, em Windows:
+
+| Etapa | O que entrou |
+|---|---|
+| 1 | O protocolo comum e o que muda de um sistema para outro. |
+| 2 | O banco e as migrações; a caixa preta; a marca e o modo restaurado; a regra da troca como função pura, com rodadas sorteadas; os repositórios; o comando de administração. |
+| 2b | O canal no hub: o laço que aceita conexões, o aperto de mãos, os quadros e os limites, a inscrição, a espera, a troca, a sessão com `arauto_status`, a troca de 24 horas, a varredura, a escuta do `NOTIFY` e a parada em ordem. O kit de teste: conector de teste, conector hostil e gerador de carga. |
+
+Falta, para o M1: o conector (com o líder, as repassadoras, o soquete local e o servidor MCP), o
+Hermes falso, o expurgo e a carga reduzida contra o conector de verdade. Dos itens do critério de
+pronto, o hub já tem teste para: a resposta atrasada de uma tentativa abandonada; revogar entre a
+credencial e o "gravei"; os limites de antes da sessão; revogar em menos de 5 segundos sem o aviso,
+inclusive com o conjunto dos conectores ocupado; banco restaurado com o hub no ar; e `admin` antes
+do `serve` depois de restaurar. As rodadas sorteadas do canal (120 por execução, com a semente
+impressa) derrubam a conexão de cada lado em cada passo da troca e usam uma cópia dos arquivos em um
+terço delas.
+
 ## 8. O que o MVP não prova
 
 - **As provas "no Hermes".** O registro pelo comando oficial, quantas cópias do conector ele inicia,
@@ -337,3 +464,19 @@ nas regras de segurança e o canário de segredo.
   testadas num servidor.
 - **O motor de verdade.** O adaptador do WAHA é testado contra o comportamento registrado em
   [waha-fatos](../referencia/waha-fatos.md). Não há teste automático em número real.
+- **A escuta do `NOTIFY` reconectando** depois de uma queda do banco. Só foi lida no código da
+  biblioteca; nenhum teste derruba o banco. O revogar não depende dela, e sim da varredura.
+- **Um proxy de verdade** na frente do hub, e a carga completa em outro processo.
+
+## 9. Pontos em aberto
+
+Escolhas do código do hub que contrariam este documento, ou que não são melhora clara. Ficam as duas
+leituras até quem mantém o projeto decidir. Os pontos do canal estão em
+[14](14-protocolo-do-canal.md), seção 13, e os que pedem mudança no 04, na seção 12 do 14.
+
+| Ponto | Leitura do texto | Leitura do código |
+|---|---|---|
+| **A conferência da marca fora da trava** (seção 2, regra 9). | "Sob uma trava de arquivo entre processos, confere [...] antes de gravar um evento de segurança, e depois avança a marca." | A trava cobre só a leitura e a regravação do arquivo da marca. A conferência lê o arquivo sem trava: ele é trocado inteiro, e qualquer valor que já esteve em disco serve à comparação. Segurar a trava durante a transação do banco poria todo evento de segurança em fila e impediria juntar as gravações. A revisão não achou intercalação ruim; ou o texto passa a dizer isso, ou o código passa a segurar a trava. |
+| **`--recognized` digitado antes de ver o último uso** (seção 1). | O comando mostra o último uso e exige `--recognized` ou `--not-recognized`. | O comando sempre imprime o último uso antes do resultado, mas quem digita `--recognized` por hábito escreve a opção antes de ver a tela. Fechar isso pede mudar a linha de comando, por exemplo exigindo junto a data do último uso mostrada. |
+| **Eventos sem organização no `audit --tail`.** | Toda leitura é filtrada pela organização (seção 2, regra 2). | A leitura de uma organização traz também os eventos sem organização: o início do modo restaurado, que pode ter como alvo um aparelho de outra organização e conta aparelhos de todas, e as recusas agregadas de convites que ninguém emitiu. Com uma organização só, como no MVP, não vaza nada. Com duas, o admin de uma leria identificador e contagens da outra. A saída seria um comando próprio para os eventos da instalação, ou tirar do evento o alvo e as contagens de outras organizações. |
+| **Duas partidas ao mesmo tempo com a marca ausente.** | Ligar o modo é uma gravação só. | Duas entradas simultâneas podem ligar o modo duas vezes. A segunda não suspende ninguém novo e só gera mais um evento. |

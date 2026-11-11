@@ -292,6 +292,22 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
         "open",
         "resolves the organization itself, through the entry function",
     ),
+    // The channel: the start of `serve`, and the request to leave of a short connection.
+    (
+        "channel/mod.rs",
+        "recover",
+        "task of the installation: the restored mode, before the hub listens",
+    ),
+    (
+        "channel/mod.rs",
+        "close_left_open",
+        "goes through every organization by the entry function, for the start of `serve`",
+    ),
+    (
+        "channel/hello.rs",
+        "leave_by_identity",
+        "resolves the organization by the identity of the device, through the entry function",
+    ),
 ];
 
 /// Every source file of `src` outside the repositories, with its path from `src`.

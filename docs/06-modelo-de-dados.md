@@ -76,13 +76,22 @@ apagada). O nome tem formato restrito, não muda e não é reaproveitado
 **aparelho_desconhecido**: identidade que o banco não conhece, ou que nele era um pedido encerrado
 pela restauração, e que apresentou um lacre válido
 ([04](04-seguranca-conexao.md), C11). `organizacao_id`, `identidade_publica`, `dados_declarados`,
-`ip`, `visto_em`.
+`ip`, `visto_em`, `prova_pendente`. A prova pendente diz que aquela listagem ainda é prova de
+restauração a tratar: a linha é gravada antes de o modo restaurado ser ligado, e ligar o modo limpa
+todas as pendentes na mesma gravação ([14](14-protocolo-do-canal.md), seção 6).
 
-**convite**: `id`, `hermes_id`, `resumo` (SHA-256 do convite, único; apagado quando vence),
-`criado_por`, `expira_em`, `estado`, `usado_em`, `aparelho_id`.
+**convite**: `id`, `hermes_id`, `resumo` (SHA-256 do convite, único; apagado quando vence e, no hub,
+também quando é cancelado), `criado_por`, `expira_em`, `estado`, `usado_em`, `aparelho_id`.
 
 **conexao_canal**: `id`, `aparelho_id`, `ip`, `versao`, `aberta_em`, `troca_confirmada_em`,
-`fechada_em`, `motivo`. Uma conexão sem `troca_confirmada_em` nunca chegou a ser sessão do canal.
+`fechada_em`, `motivo`. Uma conexão sem `troca_confirmada_em` nunca chegou a ser sessão do canal. No
+hub, também guarda quando recebeu uma credencial: é a conta do alerta das trocas sem "gravei". O
+motivo vem de um catálogo fechado: queda, silêncio, erro de protocolo, tentativa trocada por outra,
+dada por morta, "gravei" fora do prazo, "gravei" recusado, aparelho encerrado, apresentação sem
+troca, hub parando e hub parado. Na partida, o hub fecha as que a execução anterior deixou abertas.
+
+Toda linha que aponta para um aparelho é da organização dele: o banco recusa uma conexão ou um
+convite de uma organização que aponte para um aparelho de outra.
 
 ## 4. Motor, números e conversas
 
@@ -138,8 +147,10 @@ o motor estar no ar. Retenção e expurgo são obrigatórios: são conversas de 
 
 **auditoria**: só acrescenta (o banco proíbe alterar e apagar). `seq`, `organizacao_id`, `quando`,
 `ator_tipo` (admin, aparelho, sistema), `ator_id`, `acao` (catálogo fechado), `alvo_tipo`,
-`alvo_id`, `ip`, `resultado`, `codigo`, `detalhes`. Na tela, o ator "aparelho" aparece com o nome do
-Hermes dele.
+`alvo_id`, `ip`, `resultado`, `codigo`, `seguranca`, `detalhes`. Na tela, o ator "aparelho" aparece
+com o nome do Hermes dele. `seguranca` diz se o evento muda quem pode o quê: só esses avançam a marca
+([15](15-mvp.md), seção 2, regra 10). Os eventos da instalação e as recusas de convites que ninguém
+emitiu não têm organização.
 
 A auditoria **nunca** contém conteúdo de mensagem, convite, credencial, QR, código de pareamento ou
 chave.
@@ -176,5 +187,19 @@ organização.
 
 **alerta**: o que o painel mostraria ao admin. `id`, `organizacao_id`, `tipo` (catálogo fechado),
 `hermes_id`, `aparelho_id`, `quando`, `detalhes`, `visto_em`.
+
+Os tipos de alerta no hub, em 11/11/2026:
+
+| Tipo | Quando |
+|---|---|
+| `invite_misused` | O convite foi usado por outra identidade (C3). Um por pedido. |
+| `identity_copied` | Duas conexões em espera com a mesma identidade (C6). |
+| `quarantined` | Um aparelho foi à quarentena. |
+| `copy_suspected` | O admin não reconheceu o último uso do aparelho antigo, ao aprovar um reconectar (C10). |
+| `connection_taken` | Uma sessão que servia foi dada por morta e outra conexão entrou no lugar (C9). |
+| `device_left` | O próprio aparelho pediu o encerramento (C10). |
+| `reuse_after_closing` | Lacre mais antigo apresentado por aparelho encerrado (C7). No máximo um por aparelho a cada 24 horas, como o registro de lacre sem explicação. |
+| `unconfirmed_swaps` | Três conexões sem "gravei" em 24 horas (C7). |
+| `mark_not_advanced` | Um evento de segurança ficou gravado, mas a marca da auditoria não acompanhou. Sem ele, uma restauração que perdesse exatamente aquele evento passaria despercebida. |
 
 **retencao**: o prazo de guarda de cada tabela que tem expurgo.

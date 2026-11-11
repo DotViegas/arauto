@@ -81,6 +81,10 @@
 | **Vigente e pendente** | As duas credenciais que o hub acompanha por aparelho: a que vale, e a que ele acabou de emitir e ainda não foi confirmada. |
 | **Troca** | O passo em que o conector apresenta a credencial que tem e recebe outra. "Gravei" é a confirmação do conector de que a nova está em disco. |
 | **Em espera** | Conexão de canal que provou a identidade e aguarda: o pedido ainda não foi aprovado. |
+| **Conexão estabelecida** | Conexão de canal em espera ou em sessão. É a que o hub testa antes de tratar outra como conexão dupla. |
+| **Origem** | De onde vem uma conexão, para os tetos do hub: o endereço IPv4, ou os primeiros 64 bits do endereço IPv6. Não confundir com o serviço de origem. |
+| **Varredura** | A tarefa do hub que, a cada 2 segundos, confere a marca, aplica os prazos e relê o estado dos aparelhos com conexão aberta. É ela que garante o revogar em menos de 5 segundos. |
+| **Parada em ordem** | O jeito de o hub parar: deixa de aceitar conexões, deixa as chamadas em andamento responderem e manda `closing` a cada conexão antes de sair. |
 | **Conexão curta** | Conexão do `join` ou do `leave`: prova a identidade, leva um pedido e fecha. Não é canal. |
 | **Pedido em andamento** | Aparelho que ainda não confirmou a primeira credencial: pendente ou aprovado, mesmo que tenha ido à quarentena antes de confirmar. |
 | **Aparelho em uso** | Aparelho que já confirmou credencial: ativo, suspenso ou em quarentena depois de ativo. |

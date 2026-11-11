@@ -792,6 +792,37 @@ pub async fn look(
     }
 }
 
+/// Step 7 of the swap, the pre-judgment: whether T1 would accept what a connection of
+/// `device` presented. It only reads, without a lock: T1 locks, reads again and judges again.
+/// The hub asks it before it tests the established connection of the same device (step 8),
+/// so that a presentation that would be refused anyway never puts an old connection to the
+/// test.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses; [`RepoError::Inconsistent`] when the
+/// key is of another organization.
+pub async fn would_accept(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    key: &OrganizationKey,
+    device: Uuid,
+    presented: Option<&[u8]>,
+) -> Result<bool, RepoError> {
+    if key.organization_id() != organization.id() {
+        return Err(RepoError::Inconsistent(
+            "the key is of another organization",
+        ));
+    }
+    let Some(found) = super::device::by_id(pool, organization, device).await? else {
+        return Ok(false);
+    };
+    let presented = opened(key, &found, presented);
+    Ok(matches!(
+        judge::judge(&found.snapshot(), &presented, Mode::Swap),
+        Decision::Accept { .. }
+    ))
+}
+
 /// What the hub found in a presentation of an identity it does not know.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnknownOutcome {

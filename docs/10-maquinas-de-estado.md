@@ -28,6 +28,9 @@ Todo prazo usa só o relógio do hub.
 
 - Um Hermes tem no máximo um convite emitido por vez.
 - Estados finais ficam gravados. Um convite nunca volta a valer.
+- No hub, o resumo também é apagado quando o convite é cancelado, e não só quando vence
+  ([14](14-protocolo-do-canal.md), seção 12). Um convite vencido que uma inscrição encontra é
+  encerrado ali mesmo.
 - Convite usado, apresentado por **outra identidade** enquanto o pedido está pendente: recusa e
   **alerta** no painel.
 - Em qualquer outro caso de convite que não vale: recusa e só registro na auditoria. **Nunca derruba
@@ -47,7 +50,7 @@ Todo prazo usa só o relógio do hub.
 | ativo | **suspenso** | O hub entrou em modo restaurado ([04](04-seguranca-conexao.md), C11). |
 | ativo | **vencido** | 30 dias sem conectar ([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)). |
 | ativo, suspenso, quarentena | **substituído** | Um aparelho novo do mesmo Hermes teve a primeira credencial confirmada (Reconectar). |
-| aprovado, ativo, suspenso, quarentena | **revogado** | O admin revoga o Hermes; o admin gera outro convite e o aparelho ainda não tinha credencial confirmada; ou o próprio aparelho pede o encerramento (`leave`, ou ao ser trocado por outro na mesma máquina). Encerramento pedido pelo aparelho gera alerta. |
+| aprovado, ativo, suspenso, quarentena | **revogado** | O admin revoga o Hermes ou o exclui; o admin gera outro convite e o aparelho ainda não tinha credencial confirmada; ou o próprio aparelho pede o encerramento (`leave`, ou ao ser trocado por outro na mesma máquina). Encerramento pedido pelo aparelho gera alerta. |
 
 - Um Hermes tem no máximo um aparelho em uso (o que já confirmou credencial: ativo, suspenso ou em
   quarentena) e um pedido em andamento (o que ainda não confirmou: pendente ou aprovado, mesmo que
@@ -58,6 +61,18 @@ Todo prazo usa só o relógio do hub.
   "liberar" nem "reativar".
 - "Incompatível" não é estado do aparelho. É um rótulo calculado a partir da versão do conector
   gravada na última conexão aceita.
+
+No hub, em 11/11/2026:
+
+- **Prazo vencido vale na hora.** Quem encontra um prazo vencido antes da varredura o aplica ali:
+  a inscrição, a aprovação e as duas gravações da troca. As da troca aplicam também os 30 dias de
+  inatividade.
+- **Negar** pelo comando de administração só vale para pedido pendente. Um aprovado sem credencial
+  sai por revogar ou por convite novo.
+- **Excluir um Hermes** encerra tudo o que é dele, como um revogar, e tira as ligações dele
+  ([13](13-conversa-entre-hermes.md), seção 7).
+- **Vencido sem motivo que explique** responde AR-507, o único código que nunca leva o conector a
+  descartar nada.
 
 ## 3. Hermes: o que a tela mostra
 
@@ -167,7 +182,9 @@ continua atendendo o `join` e o `leave` pelo soquete local.
 | Fila de avisos por Hermes | 24 horas ou 1.000 avisos |
 | Intervalo entre avisos do mesmo alvo | 10 segundos |
 | Teto de acordadas do conector | 30 por minuto e 300 por hora |
-| Varredura do hub: aparelhos conectados e filas | A cada 2 segundos |
+| Varredura do hub: aparelhos conectados e filas | A cada 2 segundos, por um conjunto de conexões do banco só dela |
+| Um quadro que não sai do hub | 30 segundos fecham a conexão |
+| Parada em ordem do hub | Até 8 segundos pelas chamadas em andamento, e mais 2 para os últimos `closing` |
 | Conferência da configuração do motor | A cada 5 minutos |
 | Revogação: tempo até o canal cair | Menos de 5 segundos |
 | Inatividade que exige reconectar | 30 dias |

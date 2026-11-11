@@ -1098,6 +1098,10 @@ fn run(fresh: &Fresh, public_url: Option<&str>, args: &[&str]) -> Ran {
     command
         .args(args)
         .env_remove("ARAUTO_PUBLIC_URL")
+        .env_remove("ARAUTO_LISTEN")
+        .env_remove("ARAUTO_LISTEN_INTERNAL")
+        .env_remove("ARAUTO_CLIENT_IP_SOURCE")
+        .env_remove("ARAUTO_TRUSTED_PROXIES")
         .env_remove("ARAUTO_ALLOW_UNSAFE_DB")
         .env("ARAUTO_DATABASE_URL", fresh.db.url().expose())
         .env("ARAUTO_DATA_DIR", fresh.data_dir())
@@ -1127,12 +1131,20 @@ async fn the_program_runs_the_commands_and_fails_when_nothing_was_done() {
         async move { tokio::task::block_in_place(|| run(fresh, public_url, args)) }
     };
 
-    // `serve` is of the next stage, and says so without touching anything.
+    // `serve` without the variables of the hub names every one that is missing, and touches
+    // nothing: the next command still finds the database empty.
     let serve = run(None, &["serve"]).await;
     assert!(
-        !serve.ok && serve.out.contains("next stage"),
+        !serve.ok
+            && [
+                "ARAUTO_LISTEN",
+                "ARAUTO_LISTEN_INTERNAL",
+                "ARAUTO_CLIENT_IP_SOURCE"
+            ]
+            .iter()
+            .all(|variable| serve.err.contains(variable)),
         "{}",
-        serve.out
+        serve.err
     );
     // Before `init`, the admin commands say what is missing.
     let early = run(None, &["admin", "hermes", "list"]).await;

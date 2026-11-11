@@ -258,9 +258,21 @@ async fn pool_of(database: &str) -> PgPool {
         size: 3,
         ..PoolOptions::default()
     };
-    db::connect(&DatabaseUrl::new(url_of(database)), options)
-        .await
-        .unwrap_or_else(|error| panic!("could not open the test database {database}: {error}"))
+    // A database just created can take seconds to take its first connection while the
+    // server forces the files of other new databases to disk: try again, as the creation
+    // does.
+    let url = DatabaseUrl::new(url_of(database));
+    let mut last = None;
+    for _ in 0..6 {
+        match db::connect(&url, options).await {
+            Ok(pool) => return pool,
+            Err(error) => {
+                last = Some(error);
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+        }
+    }
+    panic!("could not open the test database {database}: {last:?}");
 }
 
 /// A database for one test.
