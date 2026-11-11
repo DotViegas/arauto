@@ -1,0 +1,61 @@
+[workspace]
+resolver = "3"
+members = ["crates/arauto-protocol", "crates/arauto-platform"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "Apache-2.0"
+publish = false
+
+# One place for every version. Crates pick what they need with `workspace = true`.
+[workspace.dependencies]
+arauto-protocol = { path = "crates/arauto-protocol" }
+arauto-platform = { path = "crates/arauto-platform" }
+
+anyhow = "1.0.104"
+bytes = "1.12.1"
+chacha20poly1305 = "0.11.0"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+dashmap = "6.2.1"
+data-encoding = "2.11.1"
+futures-util = "0.3.34"
+getrandom = "0.4.3"
+hkdf = "0.13.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+# Only the suite the protocol uses (25519, ChaChaPoly, BLAKE2s), pure Rust: the default
+# feature set would pull a C library and stop cross-target checks.
+snow = { version = "0.10.0", default-features = false, features = ["default-resolver", "use-curve25519", "use-chacha20poly1305", "use-blake2", "use-getrandom"] }
+subtle = "2.6.1"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", default-features = false }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+uuid = { version = "1.29.2", features = ["serde"] }
+x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
+zeroize = "1.9.1"
+
+# Tests only.
+proptest = "1.12.0"
+tempfile = "3.27.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+
+[profile.dev]
+# Crypto is painfully slow without optimisation; keep our own crates debuggable.
+opt-level = 0
+
+[profile.dev.package."*"]
+opt-level = 2

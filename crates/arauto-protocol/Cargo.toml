@@ -1,0 +1,32 @@
+[package]
+name = "arauto-protocol"
+description = "What the Arauto hub and connector share: frames, messages, Noise, invite, verification code, limits, error and tool catalogs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Test helpers (manual clock, seeded random) for the other crates of the workspace.
+testing = []
+
+[dependencies]
+data-encoding.workspace = true
+getrandom.workspace = true
+hkdf.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+snow.workspace = true
+subtle.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+x25519-dalek.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,25 @@
+# Material interno: nunca vai para o repositorio publico
+interno/
+
+# Rust
+target/
+
+# Dados e segredos locais
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+segredos/
+*.chave
+*.key
+*.pem
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Ambiente local de desenvolvimento (banco, chaves de teste)
+.dev/

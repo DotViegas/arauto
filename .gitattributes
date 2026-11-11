@@ -1,0 +1,4 @@
+# Keep line endings stable on every system: test vectors and fixtures are byte-exact.
+* text=auto eol=lf
+*.png binary
+*.pdf binary
