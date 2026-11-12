@@ -440,6 +440,51 @@ fn a_repeated_key_is_refused_wherever_it_is() {
     );
 }
 
+/// The strict reader on its own, for JSON that is not a message of the channel: the same
+/// refusals, and any value, with or without `"t"`.
+#[test]
+fn the_strict_reader_takes_any_value_with_the_rules_of_a_message() {
+    assert_eq!(
+        read_strict(br#"{"v":1,"op":"tools","x":[1,{"y":null}]}"#),
+        Ok(json!({"v":1,"op":"tools","x":[1,{"y":null}]}))
+    );
+    assert_eq!(read_strict(b" [1, 2] \n"), Ok(json!([1, 2])));
+    assert_eq!(read_strict(b"7"), Ok(json!(7)));
+    for (text, error) in [
+        (r#"{"v":1,"v":2}"#.to_owned(), DecodeError::RepeatedKey),
+        (
+            r#"{"a":[{"b":1,"b":1}]}"#.to_owned(),
+            DecodeError::RepeatedKey,
+        ),
+        (r#"{"v":1} {"v":1}"#.to_owned(), DecodeError::Json),
+        ("{".to_owned(), DecodeError::Json),
+        (String::new(), DecodeError::Json),
+        (
+            format!(
+                "{}0{}",
+                "[".repeat(MESSAGE_DEPTH_MAX + 1),
+                "]".repeat(MESSAGE_DEPTH_MAX + 1)
+            ),
+            DecodeError::TooDeep,
+        ),
+        (
+            format!("[{}0]", "0,".repeat(MESSAGE_VALUES_MAX)),
+            DecodeError::TooManyValues,
+        ),
+    ] {
+        assert_eq!(read_strict(text.as_bytes()), Err(error), "{text:.40}");
+    }
+    // Exactly at the ceilings it is read.
+    let deepest = format!(
+        "{}0{}",
+        "[".repeat(MESSAGE_DEPTH_MAX),
+        "]".repeat(MESSAGE_DEPTH_MAX)
+    );
+    assert!(read_strict(deepest.as_bytes()).is_ok());
+    let widest = format!("[{}0]", "0,".repeat(MESSAGE_VALUES_MAX - 2));
+    assert!(read_strict(widest.as_bytes()).is_ok());
+}
+
 #[test]
 fn a_message_of_unknown_type_is_its_own_variant() {
     for text in [

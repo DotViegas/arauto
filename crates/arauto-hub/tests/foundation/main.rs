@@ -4,8 +4,7 @@
 //! These tests need `ARAUTO_TEST_DATABASE_URL`; without it they fail and say so.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-#[path = "../common/mod.rs"]
-mod common;
+use arauto_testkit::hub::db as common;
 
 mod audit;
 mod database;

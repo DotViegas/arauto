@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/arauto-protocol", "crates/arauto-platform", "crates/arauto-hub", "crates/arauto-testkit"]
+members = ["crates/arauto-protocol", "crates/arauto-platform", "crates/arauto-hub", "crates/arauto-connector", "crates/arauto-testkit"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,6 +13,8 @@ publish = false
 [workspace.dependencies]
 arauto-protocol = { path = "crates/arauto-protocol" }
 arauto-platform = { path = "crates/arauto-platform" }
+arauto-hub = { path = "crates/arauto-hub" }
+arauto-connector = { path = "crates/arauto-connector" }
 arauto-testkit = { path = "crates/arauto-testkit" }
 
 anyhow = "1.0.104"
@@ -28,6 +30,9 @@ getrandom = "0.4.3"
 hkdf = "0.13.0"
 hyper = { version = "1.12.0", features = ["http1", "server"] }
 hyper-util = { version = "0.1.21", features = ["tokio", "server", "http1", "service"] }
+# The TLS of the connector (`wss://`), only under its `tls` feature: the `ring` provider compiles
+# C, and the development machine has no C compiler for the Linux target.
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
@@ -46,6 +51,8 @@ tower = { version = "0.5.3", features = ["util"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "1.29.2", features = ["serde"] }
+# The public roots built into the connector, for its `tls` feature.
+webpki-roots = "0.26.11"
 x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 zeroize = "1.9.1"
 

@@ -19,10 +19,17 @@ use std::path::{Path, PathBuf};
 
 /// The functions of `src/repo` that reach the database without a resolved organization, and
 /// why each one may.
-const WITHOUT_ORGANIZATION: &[(&str, &str)] = &[(
-    "flush_refused",
-    "writes the refusals of invites nobody issued: they belong to no organization",
-)];
+const WITHOUT_ORGANIZATION: &[(&str, &str)] = &[
+    (
+        "flush_refused",
+        "writes the refusals of invites nobody issued: they belong to no organization",
+    ),
+    (
+        "retention",
+        "reads the days each table is kept: they are of the installation, the same for every \
+         organization, and the purge then deletes organization by organization",
+    ),
+];
 
 /// The types through which a function reaches the database.
 const DATABASE_HANDLES: &[&str] = &[

@@ -13,9 +13,9 @@
 //! ```
 //!
 //! What `enroll` and `channel` do is behind [`Purposes`]: [`Served`] is the code of the hub,
-//! and the tests of the transport bring their own. Two tasks of the whole hub run beside the
-//! connections: the sweep, every 2 seconds, and the listener of the notices of the admin
-//! command.
+//! and the tests of the transport bring their own. Three tasks of the whole hub run beside the
+//! connections: the sweep, every 2 seconds, the listener of the notices of the admin command,
+//! and the purge of what passed its retention.
 //!
 //! [`serve`] is what `arauto-hub serve` runs; [`start`] is the same start, handing back the
 //! running hub, for the tests and for whoever needs the addresses it bound.
@@ -474,7 +474,10 @@ pub struct Running {
     connectors: SocketAddr,
     internal: SocketAddr,
     accept: Vec<JoinHandle<()>>,
+    /// The sweep and the listener: aborted at the stop.
     background: Vec<JoinHandle<()>>,
+    /// The purge: it sees the stop between two batches, and the stop waits for it.
+    purger: JoinHandle<()>,
 }
 
 impl Running {
@@ -501,39 +504,58 @@ impl Running {
     /// session answer its calls in progress and then close itself with AR-205; wait up to the
     /// grace of the settings (8 seconds) for all of them to end. What is still open then is
     /// closed with AR-205, with the time of a linger for the `closing` to leave.
+    ///
+    /// The purge stops between two batches, within the same grace: a batch it began ends,
+    /// and once the stop returns no batch of it runs. One that does not end in the grace (a
+    /// database that does not answer) is aborted; the database does a batch whole or not at
+    /// all.
     pub async fn stop(self) {
-        self.hub.stopping.send_replace(true);
-        for accept in self.accept {
+        let Self {
+            hub,
+            accept,
+            background,
+            purger,
+            ..
+        } = self;
+        hub.stopping.send_replace(true);
+        for accept in accept {
             let _ = accept.await;
         }
-        for task in self.background {
+        for task in background {
             task.abort();
             let _ = task.await;
         }
-        // A session of the hub sees the stop itself and drains; a connection that becomes a
-        // session after this list was read was closed here before it did.
-        let draining: Vec<u64> = self
-            .hub
-            .registry
-            .all()
-            .iter()
-            .filter(|entry| entry.status() == Status::Session)
-            .map(|entry| entry.serial())
-            .collect();
-        for link in self.hub.links() {
-            if !draining.contains(&link.info().serial) {
-                link.close(ErrorCode::Ar205);
+        let grace = duration(hub.settings.deadlines.shutdown_grace_ms);
+        let sessions = async {
+            // A session of the hub sees the stop itself and drains; a connection that becomes
+            // a session after this list was read was closed here before it did.
+            let draining: Vec<u64> = hub
+                .registry
+                .all()
+                .iter()
+                .filter(|entry| entry.status() == Status::Session)
+                .map(|entry| entry.serial())
+                .collect();
+            for link in hub.links() {
+                if !draining.contains(&link.info().serial) {
+                    link.close(ErrorCode::Ar205);
+                }
             }
-        }
-        let grace = duration(self.hub.settings.deadlines.shutdown_grace_ms);
-        if tokio::time::timeout(grace, self.hub.tasks.idle())
-            .await
-            .is_err()
-        {
-            self.hub.close_all(ErrorCode::Ar205);
-            let linger = duration(self.hub.settings.linger_ms.saturating_mul(2));
-            let _ = tokio::time::timeout(linger, self.hub.tasks.idle()).await;
-        }
+            if tokio::time::timeout(grace, hub.tasks.idle()).await.is_err() {
+                hub.close_all(ErrorCode::Ar205);
+                let linger = duration(hub.settings.linger_ms.saturating_mul(2));
+                let _ = tokio::time::timeout(linger, hub.tasks.idle()).await;
+            }
+        };
+        tokio::join!(sessions, end_within(purger, grace));
+    }
+}
+
+/// Waits for `task` to end by itself, up to `within`; past that, aborts it.
+async fn end_within(mut task: JoinHandle<()>, within: std::time::Duration) {
+    if tokio::time::timeout(within, &mut task).await.is_err() {
+        task.abort();
+        let _ = task.await;
     }
 }
 
@@ -622,12 +644,14 @@ pub async fn start<P: Purposes>(
         tokio::spawn(tasks::sweeper(Arc::clone(&hub))),
         tokio::spawn(tasks::listener(Arc::clone(&hub))),
     ];
+    let purger = tokio::spawn(tasks::purger(Arc::clone(&hub)));
     Ok(Running {
         hub,
         connectors: connectors_addr,
         internal: internal_addr,
         accept,
         background,
+        purger,
     })
 }
 

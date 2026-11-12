@@ -1,4 +1,5 @@
-//! Test tools for Arauto: a scripted connector, a hostile client and a load generator.
+//! Test tools for Arauto: a scripted connector, a hostile client, a load generator and a fake
+//! Hermes.
 //!
 //! Never shipped: only the tests of the workspace use this crate.
 //!
@@ -9,12 +10,16 @@
 //! | [`load`] | A generator of load: many devices, each with its identity, coming back at once, the heartbeat, and local reads with their latencies. |
 //! | [`hostile`] | A client that does, one at a time, every abuse `docs/14-protocolo-do-canal.md` tells the hub to refuse. |
 //! | [`http`] | Plain HTTP over TCP, for what the websocket library would not send: slow headers, a raw upgrade, a path as written. |
+//! | [`hub`] | The real hub in the process of the test: test databases from a template, an installation, a hub started with short deadlines, and the admin steps (Hermes, invite, approval). |
+//! | [`hermes`] | A fake Hermes: the program that records the registration of the connector, and the client of MCP that starts copies of the connector with a filtered environment, talks to them, kills and closes them. |
 #![forbid(unsafe_code)]
 
 pub mod connector;
 pub mod device;
+pub mod hermes;
 pub mod hostile;
 pub mod http;
+pub mod hub;
 pub mod load;
 
 use std::time::Duration;

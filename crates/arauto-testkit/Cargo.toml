@@ -1,6 +1,6 @@
 [package]
 name = "arauto-testkit"
-description = "Test tools for Arauto: a scripted connector, a hostile client and a load generator. Never shipped."
+description = "Test tools for Arauto: a scripted connector, a hostile client, a load generator and the real hub in the process of a test. Never shipped."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+arauto-hub.workspace = true
 arauto-protocol = { workspace = true, features = ["testing"] }
 
 anyhow.workspace = true
@@ -15,8 +16,10 @@ bytes.workspace = true
 data-encoding.workspace = true
 futures-util.workspace = true
 serde_json.workspace = true
+sqlx.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "process"] }
 tokio-tungstenite.workspace = true
 tracing.workspace = true
 uuid = { workspace = true, features = ["v4"] }

@@ -7,16 +7,6 @@
 //! level, and no other test writes into it.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-#[path = "common/mod.rs"]
-mod common;
-
-#[allow(dead_code)]
-#[path = "channel/support.rs"]
-mod support;
-
-#[path = "channel/fixture.rs"]
-mod fixture;
-
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -31,7 +21,7 @@ use arauto_testkit::device::{self, Enrolled, Faults};
 use data_encoding::{BASE32_NOPAD, BASE64, BASE64_NOPAD, BASE64URL_NOPAD, HEXLOWER, HEXUPPER};
 use serde_json::json;
 
-use crate::fixture::Fixture;
+use arauto_testkit::hub::fixture::{self, Fixture};
 
 /// Every line of the log of the process.
 #[derive(Clone, Default)]

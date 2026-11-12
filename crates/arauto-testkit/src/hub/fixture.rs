@@ -1,7 +1,9 @@
 //! A hub of its own, with the purposes of the hub, an admin session on the same database, and
 //! the steps of the admin as functions: create a Hermes, issue the invite, enroll, approve
-//! with the typed code. What the tests of the channel of the hub start from.
-#![allow(dead_code)]
+//! with the typed code. What the tests of the channel start from, on the side of the hub and on
+//! the side of the connector.
+// Test support: a failure here is the failure of the test that called it, with the reason.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -16,13 +18,14 @@ use arauto_hub::repo::approval::{ApproveOutcome, Recognized};
 use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_protocol::invite::Invite;
 use arauto_protocol::message::{CheckNonce, DeclaredText, Message, MessageType, Present, Purpose};
-use arauto_testkit::connector::TestConnector;
-use arauto_testkit::device::{self, Device, Enrolled, Faults, SessionClient};
-use arauto_testkit::{Ended, KitError};
+use arauto_protocol::noise::PublicKey;
 use sqlx::postgres::PgPool;
 use uuid::Uuid;
 
-use crate::support::{self, Installation};
+use super::support::{self, Installation};
+use crate::connector::TestConnector;
+use crate::device::{self, Device, Enrolled, Faults, SessionClient};
+use crate::{Ended, KitError};
 
 /// Patience for anything the hub does at once.
 pub const PATIENCE: Duration = Duration::from_secs(15);
@@ -39,16 +42,23 @@ pub fn name() -> String {
 
 /// A hub of its own: its database, its data folder, its clock.
 pub struct Fixture {
+    /// The database and the data folder.
     pub installation: Installation,
+    /// A pool for the assertions of the test.
     pub pool: PgPool,
+    /// The session of the local admin.
     pub admin: Session,
+    /// The hub, while it runs.
     pub running: Option<Running>,
+    /// The settings the hub starts with.
     pub settings: ChannelSettings,
+    /// The clock of the hub.
     pub clock: Arc<dyn Clock>,
 }
 
 /// The settings of the served tests: the documented values, a sweep every 200 ms, and the
 /// deadlines no test measures stretched.
+#[must_use]
 pub fn settings() -> ChannelSettings {
     let mut settings = support::settings();
     settings.sweep_interval_ms = 200;
@@ -132,18 +142,64 @@ impl Fixture {
         }
     }
 
+    /// Starts the hub with the port of the connectors at `connectors`: after a stop, the
+    /// connectors find it where it was. The port may take a moment to be free again.
+    pub async fn start_at(&mut self, connectors: SocketAddr) {
+        let mut config = support::config(&self.installation, ClientIpSource::Socket);
+        config.listen = connectors;
+        let mut tries = 0u32;
+        loop {
+            let started = channel::start(
+                &config,
+                Options {
+                    settings: self.settings.clone(),
+                    downloads: Downloads::empty(),
+                    purposes: Served,
+                },
+                Arc::clone(&self.clock),
+            )
+            .await;
+            match started {
+                Ok(running) => {
+                    self.running = Some(running);
+                    return;
+                }
+                Err(error) if tries < 100 => {
+                    tries += 1;
+                    tracing::debug!(%error, "the hub could not start yet");
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                Err(error) => panic!("the hub did not start again at {connectors}: {error}"),
+            }
+        }
+    }
+
+    /// The running hub.
     pub fn running(&self) -> &Running {
         self.running.as_ref().expect("the hub runs")
     }
 
+    /// The address of the port of the connectors.
     pub fn addr(&self) -> SocketAddr {
         self.running().connectors_addr()
     }
 
+    /// The address a connector is given in the block: the websocket of the channel.
+    pub fn channel_url(&self) -> String {
+        format!("ws://{}/v1/channel", self.addr())
+    }
+
+    /// The public key of the hub, as the block writes it.
+    pub fn hub_key_text(&self) -> String {
+        self.installation.hub_key.to_text()
+    }
+
+    /// What the connections share.
     pub fn hub(&self) -> &Arc<Hub> {
         self.running().hub()
     }
 
+    /// The time of the hub.
     pub fn now(&self) -> i64 {
         self.clock.now_ms()
     }
@@ -228,17 +284,37 @@ impl Fixture {
 
     /// The row of a device: state and reason.
     pub async fn state_of(&self, device: &Device) -> (String, Option<String>) {
+        self.state_of_key(device.public()).await
+    }
+
+    /// The row of the device of this identity: state and reason.
+    pub async fn state_of_key(&self, identity: &PublicKey) -> (String, Option<String>) {
         sqlx::query_as("SELECT state, state_reason FROM device WHERE public_key = $1")
-            .bind(device.public().as_bytes().as_slice())
+            .bind(identity.as_bytes().as_slice())
             .fetch_one(&self.pool)
             .await
             .unwrap()
     }
 
+    /// Whether the hub has a row for this identity.
+    pub async fn knows(&self, identity: &PublicKey) -> bool {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM device WHERE public_key = $1")
+            .bind(identity.as_bytes().as_slice())
+            .fetch_one(&self.pool)
+            .await
+            .unwrap()
+            > 0
+    }
+
     /// The identifier of a device.
     pub async fn id_of(&self, device: &Device) -> Uuid {
+        self.id_of_key(device.public()).await
+    }
+
+    /// The identifier of the device of this identity.
+    pub async fn id_of_key(&self, identity: &PublicKey) -> Uuid {
         sqlx::query_scalar("SELECT id FROM device WHERE public_key = $1")
-            .bind(device.public().as_bytes().as_slice())
+            .bind(identity.as_bytes().as_slice())
             .fetch_one(&self.pool)
             .await
             .unwrap()
@@ -246,15 +322,29 @@ impl Fixture {
 
     /// How many alerts of `kind` were raised about this device.
     pub async fn alerts(&self, kind: &str, device: &Device) -> i64 {
+        self.alerts_of_key(kind, device.public()).await
+    }
+
+    /// How many alerts of `kind` were raised about the device of this identity.
+    pub async fn alerts_of_key(&self, kind: &str, identity: &PublicKey) -> i64 {
         sqlx::query_scalar(
             "SELECT count(*) FROM alert a JOIN device d ON d.id = a.device_id \
              WHERE a.kind = $1 AND d.public_key = $2",
         )
         .bind(kind)
-        .bind(device.public().as_bytes().as_slice())
+        .bind(identity.as_bytes().as_slice())
         .fetch_one(&self.pool)
         .await
         .unwrap()
+    }
+
+    /// How many connections of the channel of this identity the hub holds right now.
+    pub fn links_of(&self, identity: &PublicKey) -> usize {
+        self.hub()
+            .links()
+            .iter()
+            .filter(|link| link.info().identity == *identity)
+            .count()
     }
 
     /// Whether the restored mode is on.
@@ -291,8 +381,13 @@ impl Fixture {
 
     /// The largest generation the hub issued to `device`.
     pub async fn max_generation(&self, device: &Device) -> i64 {
+        self.max_generation_of_key(device.public()).await
+    }
+
+    /// The largest generation the hub issued to the device of this identity.
+    pub async fn max_generation_of_key(&self, identity: &PublicKey) -> i64 {
         sqlx::query_scalar("SELECT max_generation FROM device WHERE public_key = $1")
-            .bind(device.public().as_bytes().as_slice())
+            .bind(identity.as_bytes().as_slice())
             .fetch_one(&self.pool)
             .await
             .unwrap()

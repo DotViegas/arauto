@@ -1419,6 +1419,29 @@ impl<'de> Visitor<'de> for Strict<'_> {
     }
 }
 
+/// Reads one JSON value with the rules every message is read with: no key twice in an object,
+/// at any depth; at most [`MESSAGE_VALUES_MAX`] values and [`MESSAGE_DEPTH_MAX`] levels; one
+/// value and nothing after it.
+///
+/// It is for JSON that comes from a hostile source without being a message of the channel,
+/// such as a line of the local socket of the connector: reading it never takes much more
+/// memory than the bytes that arrived, and it is never read in two ways.
+///
+/// # Errors
+/// [`DecodeError::Json`], [`DecodeError::RepeatedKey`], [`DecodeError::TooManyValues`] or
+/// [`DecodeError::TooDeep`]. None repeats what was received.
+pub fn read_strict(bytes: &[u8]) -> Result<Value, DecodeError> {
+    let findings = Findings::default();
+    let mut reader = serde_json::Deserializer::from_slice(bytes);
+    Strict {
+        findings: &findings,
+        depth: 0,
+    }
+    .deserialize(&mut reader)
+    .and_then(|value| reader.end().map(|()| value))
+    .map_err(|_| findings.error())
+}
+
 /// Reads the bytes of one message, as the reassembler delivered them.
 ///
 /// `control` is the CONTROL flag of the frame: it must match the type of the message. A
@@ -1427,17 +1450,7 @@ impl<'de> Visitor<'de> for Strict<'_> {
 /// # Errors
 /// [`DecodeError`]. The connection is to be closed.
 pub fn decode(bytes: &[u8], control: bool) -> Result<Message, DecodeError> {
-    let findings = Findings::default();
-    let mut reader = serde_json::Deserializer::from_slice(bytes);
-    let parsed = Strict {
-        findings: &findings,
-        depth: 0,
-    }
-    .deserialize(&mut reader)
-    .and_then(|value| reader.end().map(|()| value));
-    let Ok(value) = parsed else {
-        return Err(findings.error());
-    };
+    let value = read_strict(bytes)?;
     let Value::Object(object) = value else {
         return Err(DecodeError::NotAnObject);
     };

@@ -8,16 +8,6 @@
 //! of the hub is measured here, away from that.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-#[path = "common/mod.rs"]
-mod common;
-
-#[allow(dead_code)]
-#[path = "channel/support.rs"]
-mod support;
-
-#[path = "channel/fixture.rs"]
-mod fixture;
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -26,8 +16,8 @@ use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::message::ChannelState;
 use arauto_testkit::device::{Faults, Reached};
 
-use crate::fixture::{Fixture, PATIENCE, settings};
-use crate::support::eventually;
+use arauto_testkit::hub::fixture::{Fixture, PATIENCE, settings};
+use arauto_testkit::hub::support::eventually;
 
 /// The wait ends by the notice of the admin command, and also without it, by the sweep:
 /// approved, the swap follows; denied, AR-301.

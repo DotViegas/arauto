@@ -14,6 +14,7 @@
 //! | [`LocalListener`], [`LocalStream`] | Unix domain socket in a folder of the user that nobody else can use, owner only, peer user checked | named pipe, first instance, no remote client |
 //! | [`shutdown_signal`] | `SIGTERM` or `SIGINT` | Ctrl+C |
 //! | [`default_home`] | `$HOME/.arauto` | `%USERPROFILE%\.arauto` |
+//! | [`host_name`] | the first line of `/etc/hostname` | nothing |
 //!
 //! The file operations block the calling thread: from asynchronous code, run them with
 //! `tokio::task::spawn_blocking`.
@@ -90,6 +91,7 @@ mod durable;
 mod error;
 mod executable;
 mod home;
+mod host;
 mod local_socket;
 mod lock;
 mod private_dir;
@@ -102,6 +104,7 @@ pub use durable::{remove_stale_temporaries, write_durable};
 pub use error::FsError;
 pub use executable::replace_executable;
 pub use home::{HomeError, default_home};
+pub use host::host_name;
 pub use local_socket::{
     LOCK_FILE_NAME, LocalListener, LocalSocketError, LocalStream, SOCKET_FILE_NAME,
 };

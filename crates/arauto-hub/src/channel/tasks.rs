@@ -1,4 +1,5 @@
-//! The two tasks of the whole hub (`docs/15-mvp.md`, section 2, "Como o hub fica sabendo").
+//! The tasks of the whole hub (`docs/15-mvp.md`, section 2, "Como o hub fica sabendo", and
+//! rule 11).
 //!
 //! - **The sweep**, every 2 seconds, and whenever the listener asks: the audit mark (a database
 //!   restored with the hub running turns the restored mode on), the deadlines of each
@@ -12,6 +13,12 @@
 //!   connection of its own, outside the pool. A notice names a device or a Hermes, and the
 //!   connections of it read their state again at once. The notice is a hint: it is not kept,
 //!   so every time the listener connects again it asks for a sweep.
+//! - **The purge**, every 10 minutes by default ([`super::settings::PurgeSettings`]): what
+//!   passed its retention, by the time of the hub, organization by organization, in small
+//!   batches ([`crate::repo::purge`]). A task of its own, so that a long run never delays the
+//!   sweep; its batches go through the pool of the connections, one connection at a time (the
+//!   pool of the sweep is only the sweep's: `docs/15-mvp.md`, section 2, rule 12). When the
+//!   hub stops, the purge stops between two batches, and the stop waits for it.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -142,6 +149,62 @@ pub(crate) async fn check_standings(hub: &Hub) {
                 Status::Attempt => {}
             }
         }
+    }
+}
+
+/// The purge, until the hub stops: one run each interval, the first one an interval after the
+/// start. A run that sees the stop ends between two batches.
+pub(crate) async fn purger(hub: Arc<Hub>) {
+    let mut stopping = hub.stopping();
+    let every = duration(hub.settings().purge.interval_ms.max(1));
+    loop {
+        tokio::select! {
+            biased;
+            _ = stopping.wait_for(|stopping| *stopping) => return,
+            () = tokio::time::sleep(every) => {}
+        }
+        purge(&hub).await;
+    }
+}
+
+/// One run of the purge, at the time of the hub, through every organization.
+async fn purge(hub: &Hub) {
+    let now = hub.now_ms();
+    let pool = hub.pool();
+    let retention = match repo::purge::retention(pool).await {
+        Ok(retention) => retention,
+        Err(error) => {
+            tracing::error!(%error, "the purge could not read the retention of the tables");
+            return;
+        }
+    };
+    let organizations = match db::organizations_for_system_task(pool, SystemTask::Purge).await {
+        Ok(organizations) => organizations,
+        Err(error) => {
+            tracing::error!(%error, "the purge could not list the organizations");
+            return;
+        }
+    };
+    let batch_rows = hub.settings().purge.batch_rows;
+    let mut rows = 0u64;
+    for organization in organizations {
+        let purged = repo::purge::purge(pool, organization, &retention, now, batch_rows, || {
+            !hub.is_stopping()
+        })
+        .await;
+        match purged {
+            Ok(purged) => {
+                rows = rows.saturating_add(purged.rows());
+                if purged.stopped {
+                    break;
+                }
+            }
+            // What was deleted stays deleted; the next run goes on from there.
+            Err(error) => tracing::error!(%error, "a batch of the purge failed"),
+        }
+    }
+    if rows > 0 {
+        tracing::info!(rows, "the purge deleted what passed its retention");
     }
 }
 

@@ -507,9 +507,16 @@ pub struct Listing<'a> {
     pub listed_as: ListedAs,
 }
 
+/// How many times a listing looks again for its entry. The purge may delete an entry past its
+/// retention between the insert that met it and the read that follows; the entry written then
+/// has the time of now, within its retention, so a second look always settles it. The bound
+/// only keeps the loop finite.
+const LISTING_LOOKS: u32 = 3;
+
 /// Lists an identity that presented a valid seal and that the database does not know, or only
 /// knows as a request a restoration closed: the time, the address and what it declares. An
-/// identity is listed once; the first entry stays.
+/// identity is listed once; the first entry stays until the purge deletes it
+/// ([`crate::repo::purge`]), and an identity whose entry the purge deleted is listed anew.
 ///
 /// Call it only after a seal opened under the key of `organization`. An attempt with no
 /// credential, or with one that does not open, records nothing.
@@ -540,24 +547,25 @@ pub async fn list_unknown_device(
             .fetch_optional(&mut *transaction)
             .await?;
     let proof = listed_as == ListedAs::Stranger && mode_on != Some(true);
-    let listed: Option<Uuid> = sqlx::query_scalar(
-        "INSERT INTO unknown_device (id, organization_id, public_key, declared, address, \
-                                     seen_at, proof_pending) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7) \
-         ON CONFLICT (organization_id, public_key) DO NOTHING \
-         RETURNING id",
-    )
-    .bind(Uuid::new_v4())
-    .bind(organization.id())
-    .bind(identity.as_bytes().as_slice())
-    .bind(sqlx::types::Json(declared))
-    .bind(address.map(|address| address.to_string()))
-    .bind(now)
-    .bind(proof)
-    .fetch_optional(&mut *transaction)
-    .await?;
-    let device = match listed {
-        Some(id) => {
+    let mut looks = 0u32;
+    let device = loop {
+        let listed: Option<Uuid> = sqlx::query_scalar(
+            "INSERT INTO unknown_device (id, organization_id, public_key, declared, address, \
+                                         seen_at, proof_pending) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) \
+             ON CONFLICT (organization_id, public_key) DO NOTHING \
+             RETURNING id",
+        )
+        .bind(Uuid::new_v4())
+        .bind(organization.id())
+        .bind(identity.as_bytes().as_slice())
+        .bind(sqlx::types::Json(declared.clone()))
+        .bind(address.map(|address| address.to_string()))
+        .bind(now)
+        .bind(proof)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if let Some(id) = listed {
             let mut event = Event::new(Action::UnknownDeviceListed, Actor::System)
                 .in_organization(organization)
                 .about(TargetKind::UnknownDevice, id);
@@ -565,26 +573,32 @@ pub async fn list_unknown_device(
                 event = event.from_address(address);
             }
             audit::record(&mut *transaction, now, &event).await?;
-            UnknownDevice {
+            break UnknownDevice {
                 id,
                 newly_listed: true,
                 proof_pending: proof,
-            }
+            };
         }
-        None => {
-            let (id, proof_pending): (Uuid, bool) = sqlx::query_as(
-                "SELECT id, proof_pending FROM unknown_device \
-                 WHERE organization_id = $1 AND public_key = $2",
-            )
-            .bind(organization.id())
-            .bind(identity.as_bytes().as_slice())
-            .fetch_one(&mut *transaction)
-            .await?;
-            UnknownDevice {
+        let found: Option<(Uuid, bool)> = sqlx::query_as(
+            "SELECT id, proof_pending FROM unknown_device \
+             WHERE organization_id = $1 AND public_key = $2",
+        )
+        .bind(organization.id())
+        .bind(identity.as_bytes().as_slice())
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if let Some((id, proof_pending)) = found {
+            break UnknownDevice {
                 id,
                 newly_listed: false,
                 proof_pending,
-            }
+            };
+        }
+        // The purge deleted the entry the insert met: the identity is listed anew, as if the
+        // purge had come a moment earlier.
+        looks = looks.saturating_add(1);
+        if looks >= LISTING_LOOKS {
+            return Err(sqlx::Error::RowNotFound.into());
         }
     };
     transaction.commit().await?;

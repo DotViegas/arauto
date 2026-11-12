@@ -1,4 +1,4 @@
-//! Support for the tests of the hub that need a database, a data folder, or both.
+//! Support for the tests that need a database of the hub, a data folder, or both.
 //!
 //! How the tests use the database (`docs/15-mvp.md`, section 5):
 //!
@@ -19,8 +19,10 @@
 //!   other test touches the server. Their names begin with `arauto_t_` (or with `arauto_x_`,
 //!   for the one test that needs a database whose name does not say "test").
 //!
-//! Each test file declares this module with `#[path = "../common/mod.rs"] mod common;`.
-#![allow(dead_code, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+//! A test binary of the hub names this module `common`:
+//! `use arauto_testkit::hub::db as common;`.
+// Test support: a failure here is the failure of the test that called it, with the reason.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -373,6 +375,12 @@ impl TestHome {
     /// Another handle on the same mark, with its own memory, as another process would have.
     pub fn second_mark(&self) -> Mark {
         Mark::new(&self.data_dir())
+    }
+}
+
+impl Default for TestHome {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

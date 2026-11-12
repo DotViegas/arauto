@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use arauto_protocol::limits::{
     CONNECTIONS_WITHOUT_SESSION_MAX, CONNECTIONS_WITHOUT_SESSION_PER_ORIGIN_MAX, Deadlines,
-    REASSEMBLY_BUDGET_BYTES, SECOND_MS,
+    MINUTE_MS, REASSEMBLY_BUDGET_BYTES, SECOND_MS,
 };
 use arauto_protocol::message::ProtoRange;
 
@@ -47,6 +47,33 @@ pub const SWEEP_INTERVAL_MS: i64 = 2 * SECOND_MS;
 /// may come while the sweep runs.
 pub const SWEEP_POOL_SIZE: u32 = 2;
 
+/// How often the purge runs (`docs/15-mvp.md`, section 2, rule 11): the first run comes one
+/// interval after the start, away from the return in mass of a restart. The retentions are in
+/// days; ten minutes keeps each run short.
+pub const PURGE_INTERVAL_MS: i64 = 10 * MINUTE_MS;
+
+/// The most rows one batch of the purge deletes: each batch is one short statement, and the
+/// connections of the pool and the locks of the rows are let go between two of them.
+pub const PURGE_BATCH_ROWS: u32 = 500;
+
+/// How often the purge runs, and how big its batches are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PurgeSettings {
+    /// From the start to the first run, and then between two runs.
+    pub interval_ms: i64,
+    /// The most rows of one batch; at least one.
+    pub batch_rows: u32,
+}
+
+impl Default for PurgeSettings {
+    fn default() -> Self {
+        Self {
+            interval_ms: PURGE_INTERVAL_MS,
+            batch_rows: PURGE_BATCH_ROWS,
+        }
+    }
+}
+
 /// What the channel needs besides the environment: deadlines, queues and ceilings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelSettings {
@@ -79,6 +106,8 @@ pub struct ChannelSettings {
     /// Whether the hub listens to the notices of the admin command (`NOTIFY`). Off, only the
     /// sweep finds what the admin changed: a test turns it off to prove that.
     pub listen_admin: bool,
+    /// The purge of what passed its retention.
+    pub purge: PurgeSettings,
 }
 
 impl Default for ChannelSettings {
@@ -97,6 +126,7 @@ impl Default for ChannelSettings {
             versions: ProtoRange::CURRENT,
             sweep_interval_ms: SWEEP_INTERVAL_MS,
             listen_admin: true,
+            purge: PurgeSettings::default(),
         }
     }
 }
@@ -133,6 +163,13 @@ mod tests {
         assert_eq!(settings.versions, ProtoRange::CURRENT);
         assert_eq!(settings.sweep_interval_ms, 2_000);
         assert!(settings.listen_admin);
+        assert_eq!(
+            settings.purge,
+            PurgeSettings {
+                interval_ms: 600_000,
+                batch_rows: 500
+            }
+        );
     }
 
     #[test]

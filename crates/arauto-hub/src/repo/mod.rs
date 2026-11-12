@@ -5,10 +5,11 @@
 //! 1. **The organization comes resolved.** Every `async` function of this module takes a
 //!    [`ResolvedOrg`], and every statement filters by it. The organization is found from the
 //!    outside only by the entry functions of [`crate::db`]: by the identity of a device, by
-//!    the digest of an invite, or by a named task of the hub itself. The one function here
-//!    without the parameter is [`enroll::flush_refused`], which writes what was refused to
-//!    whoever belongs to no organization. A test reads these files and fails when another
-//!    function shows up without it.
+//!    the digest of an invite, or by a named task of the hub itself. The functions here
+//!    without the parameter are [`enroll::flush_refused`], which writes what was refused to
+//!    whoever belongs to no organization, and [`purge::retention`], which reads the days of
+//!    each table, the same for every organization. A test reads these files and fails when
+//!    another function shows up without it.
 //! 2. **A write that changes a device reads it again first.** It locks the row of the Hermes
 //!    and then the rows of its devices (`FOR NO KEY UPDATE`, always in that order), reads
 //!    them under the lock and only then decides and writes. No transaction stays open
@@ -29,6 +30,7 @@
 //! | [`connection`] | The record of channel connections and the swaps left unconfirmed. |
 //! | [`closing`] | Revoking a Hermes and the request of a device to leave. |
 //! | [`sweep`] | The deadlines: invite, pending, approved, inactivity. |
+//! | [`purge`] | What passed its retention, deleted in small batches. |
 //! | [`alert`] | What the panel would show the admin. |
 //! | [`audit_log`] | Reading the audit. |
 //! | [`device`] | What a connection needs to know about its device. |
@@ -53,6 +55,7 @@ pub mod device;
 pub mod enroll;
 pub mod hermes;
 pub mod invite;
+pub mod purge;
 pub mod swap;
 pub mod sweep;
 

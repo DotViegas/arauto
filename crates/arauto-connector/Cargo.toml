@@ -1,0 +1,62 @@
+[package]
+name = "arauto-connector"
+description = "The Arauto connector: runs beside a Hermes, speaks MCP over stdio and keeps the channel to the hub."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "arauto_connector"
+path = "src/lib.rs"
+
+[[bin]]
+name = "arauto-connector"
+path = "src/main.rs"
+
+[features]
+# `wss://` hubs: rustls with the public roots built in (docs/15, section 4). Off in the checks
+# of the development machine, because the crypto provider compiles C and there is no C compiler
+# for the Linux target there. The release build turns it on.
+tls = ["dep:rustls", "dep:webpki-roots", "tokio-tungstenite/rustls-tls-webpki-roots"]
+# Faults on command, short deadlines, events and seeded waits, for the tests of this crate
+# only: it is turned on by the dev-dependency below and never by a build that is shipped. It
+# adds neither a command nor an environment variable to the program.
+testing = ["arauto-protocol/testing"]
+
+[dependencies]
+arauto-platform.workspace = true
+arauto-protocol.workspace = true
+
+anyhow.workspace = true
+bytes.workspace = true
+clap.workspace = true
+data-encoding.workspace = true
+futures-util.workspace = true
+getrandom.workspace = true
+rustls = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "io-std", "fs", "process", "signal"] }
+tokio-tungstenite.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+webpki-roots = { workspace = true, optional = true }
+zeroize.workspace = true
+
+[dev-dependencies]
+arauto-connector = { workspace = true, features = ["testing"] }
+arauto-hub.workspace = true
+arauto-protocol = { workspace = true, features = ["testing"] }
+arauto-testkit.workspace = true
+proptest.workspace = true
+sqlx.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
