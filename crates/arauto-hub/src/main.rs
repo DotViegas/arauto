@@ -16,6 +16,7 @@ use arauto_hub::config::{ProcessEnv, PublicUrl, ServeConfig, StorageConfig};
 use arauto_hub::core::access::{Grant, Scope, Verbs};
 use arauto_hub::core::model::DeviceState;
 use arauto_hub::db::{self, PoolOptions};
+use arauto_hub::download;
 use arauto_hub::engine::EngineSettings;
 use arauto_hub::mark::Mark;
 use arauto_hub::repo::alert::AlertFilter;
@@ -38,6 +39,9 @@ struct Cli {
 enum Command {
     /// Runs the hub.
     Serve,
+    /// Asks the hub that runs on this machine whether it is up, by its internal port. Ends
+    /// with 0 when it answers: what the health check of a container runs.
+    Health,
     #[command(flatten)]
     Stored(StoredCommand),
 }
@@ -433,6 +437,7 @@ fn ask_code() -> anyhow::Result<String> {
 async fn run(command: Command) -> anyhow::Result<Report> {
     let command = match command {
         Command::Serve => return serve().await,
+        Command::Health => return health().await,
         Command::Stored(command) => command,
     };
     let now = SystemClock.now_ms();
@@ -501,16 +506,71 @@ async fn serve() -> anyhow::Result<Report> {
         .with_writer(std::io::stderr)
         .try_init();
     let config = ServeConfig::read(&ProcessEnv)?;
-    channel::serve(
-        &config,
-        ChannelSettings::default(),
-        Arc::new(SystemClock),
-        shutdown,
-    )
-    .await?;
+    let options = channel::Options {
+        settings: ChannelSettings::default(),
+        downloads: downloads()?.0,
+        ..channel::Options::default()
+    };
+    let running = channel::start(&config, options, Arc::new(SystemClock)).await?;
+    shutdown.await;
+    running.stop().await;
     Ok(Report {
         text: "The hub stopped.\n".to_owned(),
         done: true,
+    })
+}
+
+/// The files of the folder of downloads, when the environment names one.
+fn downloads() -> anyhow::Result<(channel::Downloads, Vec<download::Listed>)> {
+    match std::env::var_os(download::DOWNLOAD_DIR) {
+        Some(dir) if !dir.is_empty() => download::load(std::path::Path::new(&dir))
+            .with_context(|| format!("could not read the folder of {}", download::DOWNLOAD_DIR)),
+        _ => Ok((channel::Downloads::empty(), Vec::new())),
+    }
+}
+
+/// `arauto-hub health`: one request to the internal port of the hub of this machine.
+async fn health() -> anyhow::Result<Report> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listen = std::env::var(arauto_hub::config::names::LISTEN_INTERNAL)
+        .context("ARAUTO_LISTEN_INTERNAL is not set")?;
+    let listen: std::net::SocketAddr = listen
+        .parse()
+        .context("ARAUTO_LISTEN_INTERNAL is not an address with a port")?;
+    // The hub may listen on every address: it is asked on this machine.
+    let address = if listen.ip().is_unspecified() {
+        let local: std::net::IpAddr = if listen.is_ipv4() {
+            std::net::Ipv4Addr::LOCALHOST.into()
+        } else {
+            std::net::Ipv6Addr::LOCALHOST.into()
+        };
+        std::net::SocketAddr::new(local, listen.port())
+    } else {
+        listen
+    };
+    let asked = async {
+        let mut stream = tokio::net::TcpStream::connect(address).await.ok()?;
+        let request = format!(
+            "GET {} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n",
+            channel::HEALTH_PATH
+        );
+        stream.write_all(request.as_bytes()).await.ok()?;
+        let mut head = [0u8; 64];
+        let read = stream.read(&mut head).await.ok()?;
+        let line = std::str::from_utf8(head.get(..read)?).ok()?;
+        Some(line.starts_with("HTTP/1.1 200"))
+    };
+    let up = matches!(
+        tokio::time::timeout(Duration::from_secs(3), asked).await,
+        Ok(Some(true))
+    );
+    Ok(Report {
+        text: if up {
+            "The hub is up.\n".to_owned()
+        } else {
+            "The hub does not answer on its internal port.\n".to_owned()
+        },
+        done: up,
     })
 }
 
@@ -750,7 +810,12 @@ async fn run_installed(
         },
         InstalledCommand::Invite { name } => {
             let public_url = PublicUrl::read(&ProcessEnv)?;
-            render::block(&session.invite(&name, &public_url, now).await?, now)
+            let listed = downloads()?.1;
+            render::block(
+                &session.invite(&name, &public_url, now).await?,
+                &listed,
+                now,
+            )
         }
         InstalledCommand::Approve {
             name,

@@ -387,7 +387,25 @@ async fn the_admin_command_from_init_to_revoke() {
         Err(AdminError::NoSuchHermes)
     ));
     let block = session.invite("vendas", &url, NOW).await.unwrap();
-    let shown = render::block(&block, NOW).text;
+    let shown = render::block(&block, &[], NOW).text;
+    // With the connector to download, the block says where it is and what its file must be.
+    let connector = arauto_hub::download::Listed {
+        name: "arauto-connector-linux-x86_64".to_owned(),
+        size: 3,
+        sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_owned(),
+    };
+    let with_download = render::block(&block, std::slice::from_ref(&connector), NOW).text;
+    assert!(
+        with_download.contains(
+            "connector: https://hub.example.com/v1/download/arauto-connector-linux-x86_64"
+        ),
+        "{with_download}"
+    );
+    assert!(
+        with_download.contains(&format!("sha256:    {}", connector.sha256)),
+        "{with_download}"
+    );
+    assert!(!shown.contains("sha256"), "{shown}");
     let invite = invite_in(&shown);
     assert_eq!(invite, block.issued.invite.reveal().as_str());
     assert!(

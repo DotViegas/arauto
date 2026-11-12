@@ -52,7 +52,7 @@ use tokio::sync::{Notify, watch};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-pub use http::{BadDownloadName, Downloads};
+pub use http::{BadDownloadName, DOWNLOAD_PREFIX, Downloads, HEALTH_PATH};
 pub use link::{Link, LinkClosed, LinkHandle, LinkInfo, Phase, RecvError, SendError};
 pub use settings::ChannelSettings;
 

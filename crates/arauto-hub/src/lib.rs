@@ -29,6 +29,7 @@ pub mod channel;
 pub mod config;
 pub mod core;
 pub mod db;
+pub mod download;
 pub mod engine;
 pub mod mark;
 mod peer;

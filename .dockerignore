@@ -1,0 +1,7 @@
+# What the image never needs. The folder of internal material never leaves the machine.
+.git
+target
+interno
+.dev
+**/*.env
+deploy/**/*.md

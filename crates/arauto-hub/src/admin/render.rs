@@ -403,7 +403,7 @@ pub fn wake(name: &str, on: bool, outcome: WakeOutcome) -> Report {
 /// `admin invite`: the block. **This shows the invite**, the one secret this command ever
 /// prints, and it is the only time it appears.
 #[must_use]
-pub fn block(block: &Block, now: i64) -> Report {
+pub fn block(block: &Block, downloads: &[crate::download::Listed], now: i64) -> Report {
     let issued = &block.issued;
     let mut text = String::new();
     let kind = if issued.reconnect {
@@ -439,6 +439,17 @@ pub fn block(block: &Block, now: i64) -> Report {
     let invite = issued.invite.reveal();
     let _ = writeln!(text, "invite:  {}", invite.as_str());
     let _ = writeln!(text);
+    // Where the connector is, and what its file must be: whoever installs downloads it,
+    // checks the SHA-256 and only then runs it. Never a script piped into a shell.
+    for file in downloads {
+        if let Some(address) = crate::download::address(&block.hub_url, &file.name) {
+            let _ = writeln!(text, "connector: {address}");
+            let _ = writeln!(text, "sha256:    {}", file.sha256);
+        }
+    }
+    if !downloads.is_empty() {
+        let _ = writeln!(text);
+    }
     let _ = writeln!(
         text,
         "arauto-connector join \"{}\" \"{}\" \"{}\"",

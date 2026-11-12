@@ -1,0 +1,82 @@
+# The Arauto hub and its database (docs/15-mvp.md, section 6).
+#
+#   cp arauto.env.example arauto.env    # and fill it in
+#   docker compose --env-file arauto.env up -d postgres
+#   docker compose --env-file arauto.env run --rm hub init
+#   docker compose --env-file arauto.env up -d
+#
+# What is NOT here, on purpose: the proxy that ends TLS, and the WhatsApp engine. Both belong
+# to whoever installs. See README.md beside this file.
+
+name: arauto
+
+services:
+  hub:
+    image: ${ARAUTO_IMAGE:-arauto-hub:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ARAUTO_DATABASE_URL: postgres://arauto:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/arauto
+      # The address the connectors use from outside: https://, and only the host (and port).
+      ARAUTO_PUBLIC_URL: ${ARAUTO_PUBLIC_URL:?set ARAUTO_PUBLIC_URL}
+      # Behind a proxy the address of each connector comes in a header, believed only from
+      # these proxies. Without a proxy: socket, and remove ARAUTO_TRUSTED_PROXIES.
+      ARAUTO_CLIENT_IP_SOURCE: ${ARAUTO_CLIENT_IP_SOURCE:-forwarded}
+      ARAUTO_TRUSTED_PROXIES: ${ARAUTO_TRUSTED_PROXIES:?set ARAUTO_TRUSTED_PROXIES}
+    volumes:
+      # The master key and the audit mark. NOT the volume of the database, and NOT in its backup.
+      - arauto-data:/var/lib/arauto
+    ports:
+      # Only the port of the connectors, and only on this machine: the proxy reaches it here.
+      - "127.0.0.1:${ARAUTO_PORT:-8443}:8443"
+    networks:
+      - internal
+      - outside
+      # The network the WhatsApp engine shares: it reaches http://hub:8444, never published.
+      - engine
+    # Each connector holds one connection open.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # The hub lets the calls in progress answer for up to 10 seconds before it stops.
+    stop_grace_period: 20s
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arauto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: arauto
+    # The hub refuses a database that does not force its writes to disk: leave fsync on.
+    command: ["postgres", "-c", "fsync=on", "-c", "synchronous_commit=on", "-c", "full_page_writes=on"]
+    volumes:
+      - arauto-postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arauto -d arauto"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 60s
+
+volumes:
+  arauto-data:
+  arauto-postgres:
+
+networks:
+  # The hub and its database, and nothing else.
+  internal:
+    internal: true
+  # Where the published port of the hub lives.
+  outside:
+  # Shared with the WhatsApp engine of whoever installs.
+  engine:
+    name: ${ARAUTO_ENGINE_NETWORK:-arauto-engine}
