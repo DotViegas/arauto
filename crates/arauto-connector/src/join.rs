@@ -172,6 +172,13 @@ async fn locked(
         return Err(Said::Local(Local::Damaged));
     }
     let current = layout.current().map(|folder| folder.id().clone());
+    // The device in use is already registered in Hermes, under the fixed path of the program:
+    // a reconnection registers nothing again. Registering twice would be refused by Hermes or
+    // would replace the entry, with whatever was added to it by hand.
+    let already_registered = layout
+        .current()
+        .and_then(|folder| folder.record())
+        .is_some_and(|record| record.registered);
     // A device of another hub: only after leaving it (C10).
     let other_hub = layout.folders.iter().any(|folder| {
         let counts = folder.has_credential || Some(folder.id()) == current.as_ref();
@@ -230,7 +237,10 @@ async fn locked(
             enrollment,
         } => {
             let changed = install_program(program, &home.program()).await?;
-            let registered = if register {
+            let registered = if register && already_registered {
+                mark_registered(&dir).await;
+                true
+            } else if register {
                 hermes
                     .add(home, settings)
                     .await

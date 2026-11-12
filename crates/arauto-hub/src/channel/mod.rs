@@ -599,14 +599,22 @@ pub async fn start<P: Purposes>(
     // A commit the server may lose would later read as a restored database.
     db::check_durability(&pool, config.storage.allow_unsafe_db).await?;
     db::require_current_schema(&pool, &db::MIGRATOR).await?;
+    // The master key and the key of the hub are read BEFORE anything is judged: a hub
+    // started once with the wrong data folder (an empty volume) would find no audit mark
+    // beside a database with data, take it for a restored copy, suspend every Hermes, and
+    // only then fail for the missing key. Both only read; nothing is created here.
     let mark = Mark::new(&config.storage.data_dir);
-    recover(&pool, &mark, clock.now_ms()).await?;
-    close_left_open(&pool, clock.now_ms()).await?;
+    // A database that was never installed says so, before the key it never had is missed.
+    if matches!(restore::check(&pool, &mark).await?, Standing::NotInstalled) {
+        return Err(ServeError::NotInstalled);
+    }
     let data_dir = config.storage.data_dir.clone();
     let vault = tokio::task::spawn_blocking(move || Vault::open(&data_dir))
         .await
         .map_err(|_| ServeError::Task)??;
     let keypair = admin::hub_keypair(&pool, &vault).await?;
+    recover(&pool, &mark, clock.now_ms()).await?;
+    close_left_open(&pool, clock.now_ms()).await?;
     let connectors = listen(config.listen).await?;
     let internal = listen(config.listen_internal).await?;
     let local = |listener: &TcpListener, address| {

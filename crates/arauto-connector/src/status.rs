@@ -42,6 +42,9 @@ pub enum ChannelStatus {
         hermes: HermesName,
         /// Whether the admin allowed waking it.
         can_be_woken: bool,
+        /// Whether this connector has the key of the local API of Hermes: without it, no
+        /// notice wakes the Hermes, whatever the admin allowed.
+        can_wake: bool,
     },
     /// The channel is down and the connector tries again; the code says why, when known.
     Down(Option<ErrorCode>),
@@ -104,7 +107,13 @@ fn channel_json(channel: &ChannelStatus) -> Value {
         ChannelStatus::Session {
             hermes,
             can_be_woken,
-        } => json!({"channel": "session", "hermes": hermes.as_str(), "can_be_woken": can_be_woken}),
+            can_wake,
+        } => json!({
+            "channel": "session",
+            "hermes": hermes.as_str(),
+            "can_be_woken": can_be_woken,
+            "can_wake": can_wake,
+        }),
         ChannelStatus::Down(code) => {
             json!({"channel": "down", "code": code.map(ErrorCode::as_str)})
         }
@@ -127,6 +136,11 @@ fn channel_from(object: &Map<String, Value>) -> Option<ChannelStatus> {
         "session" => ChannelStatus::Session {
             hermes: HermesName::parse(object.get("hermes")?.as_str()?).ok()?,
             can_be_woken: object.get("can_be_woken")?.as_bool()?,
+            // A leader of an older version does not say it.
+            can_wake: object
+                .get("can_wake")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         },
         "down" => ChannelStatus::Down(code()),
         "stopped" => ChannelStatus::Stopped(code()),
@@ -230,6 +244,7 @@ mod tests {
                 channel: ChannelStatus::Session {
                     hermes: HermesName::parse("hermes-1").unwrap(),
                     can_be_woken: false,
+                    can_wake: true,
                 },
             }),
             request: Some(DeviceStatus {

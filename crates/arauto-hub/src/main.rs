@@ -502,7 +502,12 @@ async fn serve() -> anyhow::Result<Report> {
     // Listening starts here, so a request to stop during the start is not lost.
     let shutdown = arauto_platform::shutdown_signal()?;
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        // Without RUST_LOG the hub says what an operator needs: its start, the warnings of
+        // the engine, the restored mode. With only the errors, a first installation is blind.
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .with_writer(std::io::stderr)
         .try_init();
     let config = ServeConfig::read(&ProcessEnv)?;
@@ -512,7 +517,13 @@ async fn serve() -> anyhow::Result<Report> {
         ..channel::Options::default()
     };
     let running = channel::start(&config, options, Arc::new(SystemClock)).await?;
+    tracing::info!(
+        connectors = %running.connectors_addr(),
+        internal = %running.internal_addr(),
+        "the hub is up"
+    );
     shutdown.await;
+    tracing::info!("the hub is stopping");
     running.stop().await;
     Ok(Report {
         text: "The hub stopped.\n".to_owned(),

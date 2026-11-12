@@ -439,24 +439,47 @@ pub fn block(block: &Block, downloads: &[crate::download::Listed], now: i64) -> 
     let invite = issued.invite.reveal();
     let _ = writeln!(text, "invite:  {}", invite.as_str());
     let _ = writeln!(text);
-    // Where the connector is, and what its file must be: whoever installs downloads it,
-    // checks the SHA-256 and only then runs it. Never a script piped into a shell.
+    // With the connector to download, one chain: download it into the folder of the
+    // connector, check the SHA-256 written here, and only then run it (decision 0017). Every
+    // step is tied to the one before: a file that does not match is never run, and never a
+    // script piped into a shell.
+    let mut chained = false;
     for file in downloads {
-        if let Some(address) = crate::download::address(&block.hub_url, &file.name) {
-            let _ = writeln!(text, "connector: {address}");
-            let _ = writeln!(text, "sha256:    {}", file.sha256);
+        let Some(address) = crate::download::address(&block.hub_url, &file.name) else {
+            continue;
+        };
+        let _ = writeln!(text, "connector: {address}");
+        let _ = writeln!(text, "sha256:    {}", file.sha256);
+        // The chain is for a Unix shell; a program for Windows is downloaded and checked by hand.
+        if file.name.ends_with(".exe") {
+            continue;
         }
-    }
-    if !downloads.is_empty() {
+        chained = true;
+        let name = &file.name;
         let _ = writeln!(text);
+        let _ = writeln!(
+            text,
+            "mkdir -p \"$HOME/.arauto\" && cd \"$HOME/.arauto\" && curl -fsSLo {name} \"{address}\" \
+             && echo \"{}  {name}\" | sha256sum -c - && chmod 700 {name} \
+             && ./{name} join \"{}\" \"{}\" \"{}\"",
+            file.sha256,
+            block.hub_url,
+            block.hub_key.to_text(),
+            invite.as_str()
+        );
     }
-    let _ = writeln!(
-        text,
-        "arauto-connector join \"{}\" \"{}\" \"{}\"",
-        block.hub_url,
-        block.hub_key.to_text(),
-        invite.as_str()
-    );
+    if !chained {
+        if !downloads.is_empty() {
+            let _ = writeln!(text);
+        }
+        let _ = writeln!(
+            text,
+            "arauto-connector join \"{}\" \"{}\" \"{}\"",
+            block.hub_url,
+            block.hub_key.to_text(),
+            invite.as_str()
+        );
+    }
     let _ = writeln!(text);
     let _ = writeln!(
         text,

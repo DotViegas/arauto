@@ -215,9 +215,28 @@ pub async fn run_waking(
         Command::Mcp => {
             let url = api_url.as_deref().and_then(std::ffi::OsStr::to_str);
             let key = api_key.as_deref().and_then(std::ffi::OsStr::to_str);
+            init_log();
             // A value that cannot be used is no waking, never a connector that does not
-            // start: the tools of the Hermes go on.
-            let target = crate::wake::WakeTarget::from_environment(url, key).unwrap_or(None);
+            // start: the tools of the Hermes go on. But it is said, and never the value.
+            let target = match crate::wake::WakeTarget::from_environment(url, key) {
+                Ok(Some(target)) => Some(target),
+                Ok(None) => {
+                    tracing::warn!(
+                        "waking is off: ARAUTO_HERMES_API_KEY is not set, so no notice wakes this Hermes"
+                    );
+                    None
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        "waking is off: ARAUTO_HERMES_API_URL must be http:// with an address of \
+                         this machine written as numbers and a port, like \
+                         http://127.0.0.1:8642/v1/runs, and ARAUTO_HERMES_API_KEY one line \
+                         without spaces"
+                    );
+                    None
+                }
+            };
             mcp(home, settings.waking(target)).await
         }
         Command::Status => {

@@ -3,8 +3,9 @@
 //!
 //! The folder named by [`DOWNLOAD_DIR`] is read once, when the hub starts: every regular file
 //! whose name fits the narrow format of a download goes into the fixed list, whole, in memory.
-//! Nothing a request says ever becomes a path. A file that is too large, a name out of the
-//! format and anything that is not a regular file are left out, and said in the log by a fixed
+//! Nothing a request says ever becomes a path. Only the files whose name starts with
+//! `arauto-connector-` are connectors; a file that is too large, a name out of the format and
+//! anything that is not a regular file are left out, and said in the log by a fixed
 //! word. The SHA-256 of each file is what the block shows: whoever installs checks it before
 //! running the program.
 
@@ -20,6 +21,9 @@ use crate::channel::Downloads;
 
 /// The variable that names the folder of the downloads. Without it, every download is 404.
 pub const DOWNLOAD_DIR: &str = "ARAUTO_DOWNLOAD_DIR";
+
+/// How the name of every file served starts.
+pub const CONNECTOR_PREFIX: &str = "arauto-connector-";
 
 /// The largest file served.
 pub const FILE_MAX_BYTES: u64 = 64 * 1024 * 1024;
@@ -49,7 +53,10 @@ pub fn load(dir: &Path) -> io::Result<(Downloads, Vec<Listed>)> {
         if !entry.file_type()?.is_file() {
             continue;
         }
-        if let Some(name) = entry.file_name().to_str() {
+        // Only connectors: a list of digests or a note left in the folder is no program.
+        if let Some(name) = entry.file_name().to_str()
+            && name.starts_with(CONNECTOR_PREFIX)
+        {
             names.push(name.to_owned());
         }
     }
@@ -111,6 +118,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("arauto-connector-linux-x86_64"), b"abc").unwrap();
         fs::write(dir.path().join(".hidden"), b"x").unwrap();
+        fs::write(dir.path().join("SHA256SUMS"), b"x").unwrap();
         fs::write(dir.path().join("with space"), b"x").unwrap();
         fs::create_dir(dir.path().join("a-folder")).unwrap();
         let (_, listed) = load(dir.path()).unwrap();

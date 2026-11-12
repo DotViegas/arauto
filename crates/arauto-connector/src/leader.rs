@@ -537,6 +537,7 @@ impl State {
                 slot.channel = ChannelStatus::Session {
                     hermes: live.session.hermes.clone(),
                     can_be_woken: live.session.wake,
+                    can_wake: shared.settings.waker.can_wake(),
                 };
                 if is_device {
                     shared.unavailable.send_replace(ErrorCode::Ar203);

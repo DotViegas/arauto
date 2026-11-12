@@ -39,6 +39,11 @@ pub(crate) fn client_ip(
         ClientIpSource::Forwarded { trusted_proxies } => trusted_proxies,
     };
     if !trusts(trusted_proxies, peer) {
+        // A peer that is not on the list and brings the header is how a wrong list looks:
+        // the header is ignored, and every connector seems to come from this one address.
+        if headers.contains_key(FORWARDED_FOR) {
+            warn_once(peer);
+        }
         return Ok(peer);
     }
     let mut chain = Vec::new();
@@ -57,6 +62,27 @@ pub(crate) fn client_ip(
         .rev()
         .find(|address| !trusts(trusted_proxies, *address))
         .ok_or(Untold)
+}
+
+/// Says, once for each address and for a few addresses only, that a peer outside the list
+/// of trusted proxies sent the header: the list is probably wrong.
+fn warn_once(peer: IpAddr) {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock, PoisonError};
+    const TOLD_MAX: usize = 8;
+    static TOLD: OnceLock<Mutex<HashSet<IpAddr>>> = OnceLock::new();
+    // A set of addresses: a panic elsewhere leaves it usable.
+    let mut told = TOLD
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    if told.len() < TOLD_MAX && told.insert(peer) {
+        tracing::warn!(
+            %peer,
+            "a connection that is not from a trusted proxy brought X-Forwarded-For, which was \
+             ignored: if this is your proxy, put this address in ARAUTO_TRUSTED_PROXIES"
+        );
+    }
 }
 
 fn trusts(proxies: &[Network], address: IpAddr) -> bool {

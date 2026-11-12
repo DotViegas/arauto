@@ -145,17 +145,25 @@ pub fn render(report: &Report) -> String {
             let _ = writeln!(text, "Leader: running{process}");
             if let Some(device) = &leader.device {
                 let _ = writeln!(text, "Channel: {}", channel(&device.channel));
-                let woken = match device.channel {
-                    ChannelStatus::Session { can_be_woken, .. } => {
-                        if can_be_woken {
-                            "yes"
+                // Two different things: what the admin allowed, and whether this connector
+                // has the means. Without both, no notice wakes the Hermes.
+                let (allowed, means) = match device.channel {
+                    ChannelStatus::Session {
+                        can_be_woken,
+                        can_wake,
+                        ..
+                    } => (
+                        if can_be_woken { "yes" } else { "no" },
+                        if can_wake {
+                            "configured"
                         } else {
-                            "no"
-                        }
-                    }
-                    _ => "unknown",
+                            "not configured (no notice wakes this Hermes)"
+                        },
+                    ),
+                    _ => ("unknown", "unknown"),
                 };
-                let _ = writeln!(text, "Can be woken: {woken}");
+                let _ = writeln!(text, "Waking allowed by the admin: {allowed}");
+                let _ = writeln!(text, "Key of the local API of Hermes: {means}");
             }
             if let Some(request) = &leader.request {
                 let _ = writeln!(text, "Request channel: {}", channel(&request.channel));

@@ -31,9 +31,19 @@ Preencha o `arauto.env`:
 |---|---|
 | `POSTGRES_PASSWORD` | Uma senha longa e sorteada. Por exemplo: `openssl rand -hex 32`. |
 | `ARAUTO_PUBLIC_URL` | O endereço de fora, com `https://`. Só o nome: sem caminho. |
-| `ARAUTO_TRUSTED_PROXIES` | O endereço do seu proxy como o hub o enxerga, ou a rede dele. |
+| `ARAUTO_TRUSTED_PROXIES` | O endereço do seu proxy **como o hub o enxerga**. Veja abaixo. |
 
 O `arauto.env` guarda uma senha. Não o ponha num repositório.
+
+**O endereço do proxy, visto pelo hub.** Com o proxy no próprio servidor apontando para
+`127.0.0.1:8443`, o hub **não** enxerga `127.0.0.1` nem o endereço do servidor: ele enxerga o
+gateway de uma rede do Docker. A composição fixa essas redes, e o exemplo já traz os dois gateways
+(`172.30.250.1` e `172.30.251.1`). Se você trocar as sub-redes, troque a lista junto.
+
+Lista errada não impede o hub de subir. Ele ignora o cabeçalho, trata todos os conectores como se
+viessem de um endereço só, e avisa **uma vez** no registro: "a connection that is not from a trusted
+proxy brought X-Forwarded-For". Se essa linha aparecer, o endereço que ela mostra é o que falta na
+lista.
 
 ## 2. Construir e iniciar
 
@@ -56,6 +66,10 @@ Daqui em diante, todo comando de administração roda dentro do container:
 docker compose --env-file arauto.env exec hub arauto-hub admin status
 ```
 
+**O registro do hub** sai em `docker compose --env-file arauto.env logs hub`. Ao subir ele diz
+"the hub is up", com os dois endereços. É ali que aparecem os avisos do motor de WhatsApp, a lista
+de proxies errada e o modo restaurado. Para mais detalhe, ponha `RUST_LOG=debug` no `arauto.env`.
+
 ## 3. Conectar o primeiro Hermes
 
 ```
@@ -64,15 +78,31 @@ docker compose --env-file arauto.env exec hub arauto-hub admin invite atendiment
 ```
 
 O `invite` mostra o bloco: o endereço do hub, a chave do hub, o convite (vale 15 minutos e um uso),
-o endereço para baixar o conector e o SHA-256 do arquivo. Na máquina do Hermes: baixe o conector,
-**confira o SHA-256** e só então rode o `arauto-connector join ...` do bloco. O Hermes responde um
-código de seis dígitos. Você o digita aqui:
+o endereço do conector, o SHA-256 do arquivo e **um comando só**, encadeado: ele baixa o conector
+para `~/.arauto`, confere o SHA-256 escrito no bloco e só então roda o `join`. Se o arquivo não
+confere, nada roda.
+
+Esse comando roda **na máquina do Hermes, com o mesmo usuário do Hermes** (de preferência pelo
+próprio Hermes, colando o bloco no canal de comando dele). Não o rode como outro usuário nem por
+`docker exec` como root: o `join` registra o conector no Hermes chamando o programa `hermes`, e
+precisa encontrá-lo.
+
+O `join` responde um código de seis dígitos, no formato `182-239`. Você o digita aqui, com ou sem
+o hífen:
 
 ```
-docker compose --env-file arauto.env exec hub arauto-hub admin approve atendimento 123456
+docker compose --env-file arauto.env exec hub arauto-hub admin approve atendimento 182-239
 ```
 
 O Hermes nasce conectado e sem acesso a nada.
+
+| Se o `join` disser | O que fazer |
+|---|---|
+| `AR-601` (o registro no Hermes falhou) | O programa `hermes` não foi achado, ou recusou. Diga onde ele está com a variável `ARAUTO_HERMES_BIN` e repita o mesmo `join`; ou repita com `--no-register` e registre à mão. O pedido continua aberto no hub. |
+| `AR-101` ou `AR-102` | O convite venceu ou já foi usado. Emita outro com `admin invite`. |
+
+Um **reconectar** (outro convite para um Hermes que já tem aparelho) não registra de novo no
+Hermes: a entrada que já existe continua valendo.
 
 ## 4. Ligar o motor de WhatsApp
 
@@ -87,6 +117,17 @@ docker compose --env-file arauto.env exec hub arauto-hub admin engine health
 
 O `set-key` pede a chave da API do motor no terminal, para ela não ficar no histórico.
 
+**Confira os dois sentidos.** O `engine health` só prova que o hub alcança o motor. O caminho de
+volta, do motor para o hub, é por onde as mensagens chegam na hora:
+
+```
+docker run --rm --network arauto-engine curlimages/curl -s http://hub:8444/health
+```
+
+Tem de responder `ok`. Se esse caminho estiver errado, nada acusa: o hub ainda busca as mensagens
+sozinho a cada 5 minutos, e tudo parece funcionar, só que atrasado. Depois de parear, mande uma
+mensagem ao número: ela tem de aparecer em segundos, não em minutos.
+
 Depois, o número e os acessos:
 
 ```
@@ -95,6 +136,25 @@ Depois, o número e os acessos:
 ... admin wake atendimento on
 ... admin access grant atendimento balcao --scope all --read --send --wake
 ```
+
+**Para o Hermes ser acordado** falta uma coisa que nenhum comando do hub faz: o conector precisa da
+chave da API local do Hermes. Ela chega por duas variáveis na entrada `arauto` do servidor de
+ferramentas do Hermes: `ARAUTO_HERMES_API_KEY` (a chave) e `ARAUTO_HERMES_API_URL` (o endereço, com o
+número da máquina e a porta, como `http://127.0.0.1:8642/v1/runs`; `localhost` não é aceito). Sem
+a chave, as ferramentas funcionam e ninguém é acordado. Confira na máquina do Hermes:
+
+```
+~/.arauto/arauto-connector-linux-x86_64 status
+```
+
+Ele mostra duas linhas: `Waking allowed by the admin` (o que você liberou no hub) e `Key of the
+local API of Hermes` (se o conector tem a chave). O Hermes só acorda com as duas em ordem. O formato
+exato dessa chamada ainda não foi provado contra um Hermes de verdade: é uma das conferências do
+primeiro uso.
+
+Um acesso ao número inteiro acorda em conversa com uma pessoa. Um **grupo** só acorda o Hermes que
+tem uma linha própria para aquele grupo (`admin access chat ... --read --wake`). E o aviso espera a
+conversa ficar quieta por 6 segundos antes de acordar; mude com `admin access wake-wait`.
 
 ## 5. Deixar dois Hermes conversarem
 

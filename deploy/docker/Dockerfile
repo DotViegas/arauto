@@ -17,9 +17,7 @@ RUN cargo build --release --locked -p arauto-hub \
  && cargo build --release --locked -p arauto-connector --features tls \
  && mkdir -p /out/download \
  && cp target/release/arauto-hub /out/arauto-hub \
- && cp target/release/arauto-connector /out/download/arauto-connector-linux-x86_64 \
- && cd /out/download \
- && sha256sum arauto-connector-linux-x86_64 > SHA256SUMS
+ && cp target/release/arauto-connector /out/download/arauto-connector-linux-x86_64
 
 # ---------------------------------------------------------------------------- run
 FROM debian:bookworm-slim

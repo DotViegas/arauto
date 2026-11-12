@@ -28,6 +28,8 @@ services:
       # these proxies. Without a proxy: socket, and remove ARAUTO_TRUSTED_PROXIES.
       ARAUTO_CLIENT_IP_SOURCE: ${ARAUTO_CLIENT_IP_SOURCE:-forwarded}
       ARAUTO_TRUSTED_PROXIES: ${ARAUTO_TRUSTED_PROXIES:?set ARAUTO_TRUSTED_PROXIES}
+      # What the hub says: info by default (its start, the engine, the restored mode).
+      RUST_LOG: ${RUST_LOG:-info}
     volumes:
       # The master key and the audit mark. NOT the volume of the database, and NOT in its backup.
       - arauto-data:/var/lib/arauto
@@ -75,8 +77,18 @@ networks:
   # The hub and its database, and nothing else.
   internal:
     internal: true
-  # Where the published port of the hub lives.
+  # Where the published port of the hub lives. The subnet is fixed: a proxy on the server
+  # reaches the hub through the gateway of one of these two networks, and that is the address
+  # ARAUTO_TRUSTED_PROXIES must name. Change the subnets if they collide with yours.
   outside:
+    ipam:
+      config:
+        - subnet: 172.30.250.0/24
+          gateway: 172.30.250.1
   # Shared with the WhatsApp engine of whoever installs.
   engine:
     name: ${ARAUTO_ENGINE_NETWORK:-arauto-engine}
+    ipam:
+      config:
+        - subnet: 172.30.251.0/24
+          gateway: 172.30.251.1

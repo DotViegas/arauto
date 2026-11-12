@@ -405,6 +405,20 @@ async fn the_admin_command_from_init_to_revoke() {
         with_download.contains(&format!("sha256:    {}", connector.sha256)),
         "{with_download}"
     );
+    // One chain: nothing runs unless the file matches the digest written in the block.
+    let name = &connector.name;
+    let chain = format!(
+        "curl -fsSLo {name} \"https://hub.example.com/v1/download/{name}\" && echo \"{}  {name}\" \
+         | sha256sum -c - && chmod 700 {name} && ./{name} join \"wss://hub.example.com/v1/channel\"",
+        connector.sha256
+    );
+    assert!(with_download.contains(&chain), "{with_download}");
+    assert!(!with_download.contains("| sh "), "{with_download}");
+    assert!(!with_download.contains("| bash"), "{with_download}");
+    assert!(
+        !with_download.contains("\narauto-connector join"),
+        "{with_download}"
+    );
     assert!(!shown.contains("sha256"), "{shown}");
     let invite = invite_in(&shown);
     assert_eq!(invite, block.issued.invite.reveal().as_str());

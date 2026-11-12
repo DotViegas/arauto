@@ -187,6 +187,26 @@ async fn the_start_closes_the_connections_the_last_run_left_open_and_refuses_an_
         matches!(refused, Err(channel::ServeError::NotInstalled)),
         "{refused:?}"
     );
+
+    // The right database with the wrong data folder (an empty volume): the hub refuses for
+    // the missing master key, and does NOT take the database for a restored copy. Nobody is
+    // suspended for a mistake in a mount.
+    let mut config = support::config(&installation, ClientIpSource::Socket);
+    config.storage.data_dir = tempfile::tempdir().unwrap().keep().join("data");
+    let refused = channel::start(&config, Options::default(), Arc::new(SystemClock)).await;
+    assert!(
+        matches!(refused, Err(channel::ServeError::Vault(_))),
+        "{refused:?}"
+    );
+    let restored = arauto_hub::restore::installation(&pool)
+        .await
+        .unwrap()
+        .unwrap()
+        .restored_mode;
+    assert!(
+        !restored,
+        "the restored mode was turned on by a wrong folder"
+    );
 }
 
 fn free_port() -> std::net::SocketAddr {
