@@ -189,7 +189,7 @@ async fn the_catch_up_records_what_arrived_while_the_hub_was_away_once() {
     let open = arauto_hub::repo::engine_event::open(world.hub().pool(), world.organization(), 10)
         .await
         .unwrap();
-    assert_eq!(open.len(), 2, "left for the queue of notices");
+    assert!(open.is_empty(), "each one was handled as it was recorded");
 }
 
 #[tokio::test]

@@ -28,3 +28,4 @@ mod isolation;
 mod numbers;
 mod supervision;
 mod tools;
+mod wake;

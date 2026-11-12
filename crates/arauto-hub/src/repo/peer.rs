@@ -26,7 +26,7 @@ use arauto_protocol::limits::{
     PEER_NOTICES_PER_LINK_PER_HOUR, PEER_NOTICES_PER_RECIPIENT_PER_HOUR, PEER_READ_BUDGET_BYTES,
     PEER_UNREAD_PER_LINK_MAX, SECOND_MS, THROTTLED_RETRY_MS,
 };
-use arauto_protocol::names::{HermesName, MessageText};
+use arauto_protocol::names::{HermesName, MessageText, NumberAlias};
 use arauto_protocol::notice::AckOutcome;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
@@ -1209,16 +1209,36 @@ pub async fn read(
 pub struct DueNotice {
     /// Its identifier, which comes back in `notice_ack`.
     pub id: Uuid,
-    /// The Hermes that sent the messages.
-    pub from: HermesName,
+    /// What it points at.
+    pub target: NoticeTarget,
     /// How many new messages.
     pub count: u16,
 }
 
+/// What a notice points at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoticeTarget {
+    /// Messages of another Hermes.
+    Peer {
+        /// The Hermes that sent them.
+        from: HermesName,
+    },
+    /// Messages in a chat of a number of WhatsApp.
+    Whatsapp {
+        /// The alias of the number.
+        number: NumberAlias,
+        /// The chat, by the identifier of the hub.
+        chat: Uuid,
+    },
+}
+
 /// Takes the notices of `hermes` that may leave now, each with a lease: until the lease ends
 /// the hub waits for the `notice_ack`. Before that it puts back the ones whose lease ended
-/// and expires the ones past their life. Each one is judged again: without the link, without
-/// its wake mark, or with a Hermes that may no longer be woken, it is discarded.
+/// and expires the ones past their life. Each one is judged again. A notice of messages of a
+/// Hermes: without the link, without its wake mark, or with a Hermes that may no longer be
+/// woken, it is discarded. A notice of WhatsApp: without the verb "be woken" in that chat
+/// (`repo::wake`), with a number that is not connected, or with a Hermes that may no longer
+/// be woken, it is discarded.
 ///
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.
@@ -1242,7 +1262,7 @@ pub async fn lease(
     .await?;
     let lapsed: Vec<Uuid> = sqlx::query_scalar(
         "SELECT id FROM notice \
-         WHERE organization_id = $1 AND hermes_id = $2 AND kind = 'peer' AND state = 'sent' \
+         WHERE organization_id = $1 AND hermes_id = $2 AND state = 'sent' \
            AND leased_until <= $3 ORDER BY created_at, id FOR UPDATE",
     )
     .bind(organization.id())
@@ -1277,9 +1297,56 @@ pub async fn lease(
     .bind(i64::from(limit))
     .fetch_all(&mut *tx)
     .await?;
-    let mut due = Vec::new();
+    let mut judged: Vec<(Uuid, i32, Option<NoticeTarget>)> = Vec::new();
     for (id, count, from, still) in rows {
-        if still {
+        let target = if still {
+            Some(NoticeTarget::Peer {
+                from: name_of(&from)?,
+            })
+        } else {
+            None
+        };
+        judged.push((id, count, target));
+    }
+    let left = i64::from(limit).saturating_sub(i64::try_from(judged.len()).unwrap_or(i64::MAX));
+    let rows: Vec<(Uuid, i32, String, Uuid, bool)> = sqlx::query_as(
+        "SELECT n.id, n.count, m.alias, n.chat_id, \
+                (h.can_be_woken AND m.state = 'connected' \
+                 AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake, FALSE)) \
+         FROM notice n \
+         JOIN hermes h ON h.id = n.hermes_id \
+         JOIN number m ON m.id = n.number_id \
+         LEFT JOIN access a ON a.hermes_id = n.hermes_id AND a.number_id = n.number_id \
+         LEFT JOIN access_chat c ON c.access_id = a.id AND c.chat_id = n.chat_id \
+         WHERE n.organization_id = $1 AND n.hermes_id = $2 AND n.kind = 'whatsapp' \
+           AND n.state = 'pending' AND n.not_before <= $3 \
+           AND NOT EXISTS (SELECT 1 FROM notice s \
+                           WHERE s.hermes_id = n.hermes_id AND s.chat_id = n.chat_id \
+                             AND s.id <> n.id AND s.sent_at > $3 - $4) \
+         ORDER BY n.created_at, n.id LIMIT $5 FOR UPDATE OF n SKIP LOCKED",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .bind(now)
+    .bind(PEER_NOTICE_GAP_MS)
+    .bind(left.max(0))
+    .fetch_all(&mut *tx)
+    .await?;
+    for (id, count, alias, chat, still) in rows {
+        let target = if still {
+            Some(NoticeTarget::Whatsapp {
+                number: NumberAlias::parse(&alias)
+                    .map_err(|_| RepoError::Inconsistent("the alias of a number"))?,
+                chat,
+            })
+        } else {
+            None
+        };
+        judged.push((id, count, target));
+    }
+    let mut due = Vec::new();
+    for (id, count, target) in judged {
+        if let Some(target) = target {
             sqlx::query(
                 "UPDATE notice SET state = 'sent', leased_until = $2, sent_at = $3, \
                         attempts = attempts + 1 WHERE id = $1",
@@ -1291,7 +1358,7 @@ pub async fn lease(
             .await?;
             due.push(DueNotice {
                 id,
-                from: name_of(&from)?,
+                target,
                 count: u16::try_from(count).unwrap_or(NOTICE_COUNT_MAX),
             });
         } else {
@@ -1322,8 +1389,9 @@ async fn back_to_pending(
         "UPDATE notice p SET count = LEAST(p.count + s.count, $2) \
          FROM notice s \
          WHERE s.id = $1 AND s.organization_id = $3 AND p.organization_id = $3 \
-           AND p.kind = 'peer' AND p.state = 'pending' \
-           AND p.hermes_id = s.hermes_id AND p.from_hermes_id = s.from_hermes_id \
+           AND p.kind = s.kind AND p.state = 'pending' AND p.hermes_id = s.hermes_id \
+           AND p.from_hermes_id IS NOT DISTINCT FROM s.from_hermes_id \
+           AND p.chat_id IS NOT DISTINCT FROM s.chat_id \
          RETURNING p.id",
     )
     .bind(id)
@@ -1432,7 +1500,7 @@ pub async fn hermes_with_due_notices(
 ) -> Result<Vec<Uuid>, RepoError> {
     Ok(sqlx::query_scalar(
         "SELECT DISTINCT hermes_id FROM notice \
-         WHERE organization_id = $1 AND kind = 'peer' \
+         WHERE organization_id = $1 \
            AND ((state = 'pending' AND not_before <= $2) \
              OR (state = 'sent' AND leased_until <= $2) \
              OR (state IN ('pending', 'sent') AND expires_at <= $2))",

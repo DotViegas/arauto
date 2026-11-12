@@ -69,6 +69,7 @@ pub mod peer;
 pub mod purge;
 pub mod swap;
 pub mod sweep;
+pub mod wake;
 
 /// The channel of PostgreSQL on which the admin command tells the hub that something changed.
 /// The text is short, `kind:id`. It is a hint: the sweep of the hub is what guarantees.

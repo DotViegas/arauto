@@ -35,7 +35,9 @@
 //! The calls go on meanwhile. Without the `saved` in time the connection closes, and on the
 //! way back the usual table holds.
 //!
-//! **The notices** (`docs/13-conversa-entre-hermes.md`, section 5). When the session is
+//! **The notices** (`docs/13-conversa-entre-hermes.md`, section 5; `docs/09-contrato-mcp.md`,
+//! section 5), of messages of another Hermes and of messages in a chat of WhatsApp. When the
+//! session is
 //! poked (by the message that created a notice, or by the sweep, which finds the Hermes with
 //! a notice that may leave) it takes the notices of its Hermes that may leave now, each with
 //! a lease, and sends them. It never looks at the queue on its own clock: a busy database
@@ -55,6 +57,7 @@ use arauto_protocol::message::{
     Call, CallId, CallOutcome, CallResult, Credential, Left, LeftStatus, Message, Payload, Rotated,
     Saved, Session, ToolList, Tools,
 };
+use arauto_protocol::names::ChatId;
 use arauto_protocol::notice::{Notice, NoticeCount, NoticeId, NoticeMsg};
 use arauto_protocol::tools::{self, Grants, ToolCall};
 use serde_json::{Value, json};
@@ -72,6 +75,7 @@ use crate::db::ResolvedOrg;
 use crate::peer::PeerCall;
 use crate::repo::connection::{ChannelConnection, CloseReason};
 use crate::repo::device::Standing;
+use crate::repo::peer::NoticeTarget;
 use crate::repo::swap::{
     self, ConfirmOutcome, IssueOutcome, Issued, IssuedHere, SavedRefused, SessionStart,
 };
@@ -464,13 +468,21 @@ impl Serving<'_> {
             let Some(count) = NoticeCount::new(notice.count) else {
                 continue;
             };
-            let message = Message::Notice(NoticeMsg::new(
-                NoticeId::new(notice.id),
-                &Notice::Peer {
-                    from: notice.from,
-                    count,
-                },
-            ));
+            let pointer = match notice.target {
+                NoticeTarget::Peer { from } => Notice::Peer { from, count },
+                NoticeTarget::Whatsapp { number, chat } => {
+                    // A UUID is always an opaque identifier of a chat.
+                    let Ok(chat) = ChatId::parse(&chat.as_hyphenated().to_string()) else {
+                        continue;
+                    };
+                    Notice::Whatsapp {
+                        number,
+                        chat,
+                        count,
+                    }
+                }
+            };
+            let message = Message::Notice(NoticeMsg::new(NoticeId::new(notice.id), &pointer));
             if self.link.send(&message).await.is_err() {
                 return Some(self.dropped());
             }

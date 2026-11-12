@@ -272,6 +272,7 @@ async fn catch_up(
             }
         };
         let mut transaction = hub.pool().begin().await?;
+        let mut woken = Vec::new();
         for message in found.iter().filter(|message| message.at_ms >= since) {
             let body = caught_up_body(&number.session, message);
             let key_text = format!("message:{}", message.id.as_str());
@@ -284,16 +285,35 @@ async fn catch_up(
                 engine_at: message.at_ms,
                 source: Source::CatchUp,
             };
-            if engine_event::record(&mut transaction, organization, key, &event, now)
-                .await?
-                .is_some()
+            if let Some(row) =
+                engine_event::record(&mut transaction, organization, key, &event, now).await?
             {
                 recorded = recorded.saturating_add(1);
+                // What arrived while the hub was away wakes as what arrives now.
+                let payload = serde_json::from_slice::<serde_json::Value>(&body)
+                    .ok()
+                    .and_then(|body| body.get("payload").cloned())
+                    .unwrap_or_default();
+                woken.extend(
+                    crate::repo::wake::on_message(
+                        &mut transaction,
+                        organization,
+                        key,
+                        number.id,
+                        row,
+                        &payload,
+                        now,
+                    )
+                    .await?,
+                );
             }
             number::advance_messages(&mut transaction, organization, number.id, message.at_ms)
                 .await?;
         }
         transaction.commit().await?;
+        for hermes in woken {
+            crate::peer::poke(hub, hermes);
+        }
     }
     if recorded > 0 {
         tracing::info!(number = %number.id, recorded, "the catch-up recorded messages");

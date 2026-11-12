@@ -87,7 +87,7 @@ async fn a_chat_of_the_engine_is_one_chat_of_the_hub_and_only_of_its_number() {
 }
 
 #[tokio::test]
-async fn an_open_event_is_read_back_whole_for_the_queue_of_notices() {
+async fn the_body_of_an_event_is_read_back_whole_and_a_message_is_handled_as_it_arrives() {
     let world = World::new().await;
     let number = world.connected("vendas", &phone(62)).await;
     let session = number.session.as_str();
@@ -107,18 +107,24 @@ async fn an_open_event_is_read_back_whole_for_the_queue_of_notices() {
         200
     );
     let pool = world.hub().pool();
+    // The message became its notices in the write that recorded it: nothing is left open.
     let open = engine_event::open(pool, world.organization(), 10)
         .await
         .unwrap();
-    let event = open
-        .iter()
-        .find(|event| event.kind == engine_event::EventKind::Message)
-        .expect("the message is still to be handled");
-    assert_eq!(event.number, number.id);
+    assert!(open.is_empty(), "{open:?}");
+    let (event, of_number): (uuid::Uuid, uuid::Uuid) = sqlx::query_as(
+        "SELECT id, number_id FROM engine_event \
+         WHERE organization_id = $1 AND kind = 'message.any' AND processed_at IS NOT NULL",
+    )
+    .bind(world.organization().id())
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(of_number, number.id);
     let key = device::organization_key(pool, world.organization(), &world.vault)
         .await
         .unwrap();
-    let body = engine_event::body(pool, world.organization(), &key, event.id)
+    let body = engine_event::body(pool, world.organization(), &key, event)
         .await
         .unwrap()
         .unwrap();

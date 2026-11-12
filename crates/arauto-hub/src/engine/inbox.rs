@@ -35,6 +35,7 @@ use crate::channel::Hub;
 use crate::db::{self, ResolvedOrg};
 use crate::repo::engine_event::{self, EventKind, NewEvent, Source};
 use crate::repo::number::{self, Observed};
+use crate::repo::wake;
 
 /// The header of the signature of an event.
 pub const SIGNATURE_HEADER: &str = "x-webhook-hmac";
@@ -269,6 +270,7 @@ async fn store(
     let recorded = engine_event::record(&mut transaction, organization, &key, &event, now)
         .await
         .map_err(|_| ())?;
+    let mut woken = Vec::new();
     if let Some(row) = recorded {
         if let Some(observed) = &observed {
             let changed = number::observe(
@@ -296,9 +298,29 @@ async fn store(
             number::advance_messages(&mut transaction, organization, number.id, engine_at)
                 .await
                 .map_err(|_| ())?;
+            // The message becomes the notices of the Hermes it wakes, in this same write.
+            woken = wake::on_message(
+                &mut transaction,
+                organization,
+                &key,
+                number.id,
+                row,
+                &envelope.payload,
+                now,
+            )
+            .await
+            .map_err(|_| ())?;
+        } else {
+            // A reaction, an edit, a deletion: recorded, and they wake nobody.
+            engine_event::handled(&mut transaction, organization, row, now)
+                .await
+                .map_err(|_| ())?;
         }
     }
     transaction.commit().await.map_err(|_| ())?;
+    for hermes in woken {
+        crate::peer::poke(hub, hermes);
+    }
     Ok(Stored::Recorded)
 }
 
