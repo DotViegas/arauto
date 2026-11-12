@@ -13,9 +13,10 @@
 //! ```
 //!
 //! What `enroll` and `channel` do is behind [`Purposes`]: [`Served`] is the code of the hub,
-//! and the tests of the transport bring their own. Three tasks of the whole hub run beside the
+//! and the tests of the transport bring their own. Four tasks of the whole hub run beside the
 //! connections: the sweep, every 2 seconds, the listener of the notices of the admin command,
-//! and the purge of what passed its retention.
+//! the purge of what passed its retention, and the supervision of the engine. The internal
+//! port also takes the events of the engine (`crate::engine`).
 //!
 //! [`serve`] is what `arauto-hub serve` runs; [`start`] is the same start, handing back the
 //! running hub, for the tests and for whoever needs the addresses it bound.
@@ -64,11 +65,13 @@ use crate::admin::{self, AdminError};
 use crate::audit::AuditError;
 use crate::config::{ClientIpSource, DatabaseUrl, ServeConfig};
 use crate::db::{self, DbError, PoolOptions, ResolvedOrg, SystemTask};
+use crate::engine::{self, Engines};
 use crate::mark::Mark;
 use crate::repo::enroll::RefusedEnrollments;
 use crate::repo::{self, RepoError};
 use crate::restore::{self, EnterOutcome, Evidence, RestoreError, Standing};
 use crate::vault::{OrganizationKey, Vault, VaultError};
+use crate::whatsapp::SendCeiling;
 
 /// What the code of each purpose does once `hello_ok` is sent.
 ///
@@ -209,6 +212,8 @@ pub struct Hub {
     refusals: RefusedEnrollments,
     keys: DashMap<Uuid, Arc<OrganizationKey>>,
     sweep_now: Notify,
+    engines: Engines,
+    send_ceiling: SendCeiling,
 }
 
 impl std::fmt::Debug for Hub {
@@ -360,6 +365,17 @@ impl Hub {
                 link.close(ErrorCode::Ar205);
             }
         }
+    }
+
+    /// The engine of each organization.
+    #[must_use]
+    pub fn engines(&self) -> &Engines {
+        &self.engines
+    }
+
+    /// The send limit of every Hermes on every number.
+    pub(crate) fn send_ceiling(&self) -> &SendCeiling {
+        &self.send_ceiling
     }
 
     pub(crate) fn registry(&self) -> &Arc<Registry> {
@@ -623,6 +639,11 @@ pub async fn start<P: Purposes>(
         refusals: RefusedEnrollments::new(),
         keys: DashMap::new(),
         sweep_now: Notify::new(),
+        engines: Engines::new(settings.engine.clone()),
+        send_ceiling: SendCeiling::new(
+            settings.sends_per_minute,
+            arauto_protocol::limits::WHATSAPP_SEND_WINDOW_MS,
+        ),
         settings,
     });
     let purposes = Arc::new(options.purposes);
@@ -643,6 +664,7 @@ pub async fn start<P: Purposes>(
     let background = vec![
         tokio::spawn(tasks::sweeper(Arc::clone(&hub))),
         tokio::spawn(tasks::listener(Arc::clone(&hub))),
+        tokio::spawn(engine::supervisor::run(Arc::clone(&hub))),
     ];
     let purger = tokio::spawn(tasks::purger(Arc::clone(&hub)));
     Ok(Running {

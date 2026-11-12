@@ -10,6 +10,7 @@
 //! | connectors | `GET /v1/channel` | the websocket, after the ceiling of connections without a session (503, 429) |
 //! | connectors | `GET /v1/download/{file}` | a file of the fixed list, or 404 |
 //! | internal | `GET /health` | `ok`, without any secret |
+//! | internal | `POST /v1/engine/{engine}/events` | the inbox of the events of the engine |
 //! | either | anything else | 404 |
 
 use std::collections::HashMap;
@@ -39,6 +40,7 @@ use super::hello::converse;
 use super::link::{self, LinkInfo, Start};
 use super::settings::{READ_BUFFER_BYTES, duration};
 use super::{Hub, Purposes, TaskGuard, handshake};
+use crate::engine::inbox;
 
 /// The path of the websocket.
 pub const CHANNEL_PATH: &str = "/v1/channel";
@@ -107,7 +109,7 @@ impl Downloads {
 pub(crate) enum Port {
     /// The port of the connectors, the only one that is published.
     Connectors,
-    /// The internal port: health, and later the events of the engine.
+    /// The internal port: health and the events of the engine.
     Internal,
 }
 
@@ -192,10 +194,20 @@ async fn route<P: Purposes>(
     hub: Arc<Hub>,
     purposes: Arc<P>,
 ) -> Response<Body> {
+    let path = request.uri().path().to_owned();
+    // The only address that takes a body, on the internal port only.
+    if port == Port::Internal && request.method() == Method::POST {
+        return match inbox::engine_of_path(&path) {
+            Some(engine) => {
+                let (parts, body) = request.into_parts();
+                inbox::receive(&hub, engine, &parts.headers, body).await
+            }
+            None => status(StatusCode::NOT_FOUND),
+        };
+    }
     if request.method() != Method::GET {
         return status(StatusCode::NOT_FOUND);
     }
-    let path = request.uri().path().to_owned();
     match port {
         Port::Connectors if path == CHANNEL_PATH => channel(request, peer, hub, purposes).await,
         Port::Connectors => match path.strip_prefix(DOWNLOAD_PREFIX) {

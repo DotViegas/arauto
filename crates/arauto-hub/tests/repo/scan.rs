@@ -169,6 +169,13 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
     ),
     (
         "db.rs",
+        "organization_of_engine_events",
+        "entry: finds the organization by the engine named in the address of its inbox; \
+         nothing is handed back until the signature made with the secret of its events is \
+         checked (docs/15-mvp.md, section 2, rule 2: the entry by the secret of the engine)",
+    ),
+    (
+        "db.rs",
         "organizations_for_system_task",
         "entry: every organization, for a named task of the hub itself",
     ),

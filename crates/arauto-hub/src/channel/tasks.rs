@@ -5,8 +5,9 @@
 //!   restored with the hub running turns the restored mode on), the deadlines of each
 //!   organization, the state of every device with a channel connection in one query per
 //!   organization (what no longer serves gets the `closing` of its code: this, and not the
-//!   notice, is what closes a revoked device in less than 5 seconds), the refused enrollments
-//!   and the end of the restored mode. It reads through a pool of its own, apart from the one
+//!   notice, is what closes a revoked device in less than 5 seconds; a session whose list of
+//!   tools no longer follows the matrix of accesses is poked, and sends `tools`), the refused
+//!   enrollments and the end of the restored mode. It reads through a pool of its own, apart from the one
 //!   of the connections: a return in mass that holds every connection of that pool does not
 //!   delay a revocation.
 //! - **The listener** of the notices of the admin command (`NOTIFY` on `arauto_admin`), on a
@@ -129,6 +130,21 @@ pub(crate) async fn check_standings(hub: &Hub) {
                     continue;
                 }
             };
+        let mut serving: Vec<Uuid> = entries
+            .iter()
+            .filter(|(entry, _)| entry.status() == Status::Session)
+            .map(|(_, place)| place.hermes)
+            .collect();
+        serving.sort_unstable();
+        serving.dedup();
+        // The list of tools of each session, against what its Hermes has now: one query.
+        let grants = match repo::access::grants_of(hub.sweep_pool(), organization, &serving).await {
+            Ok(grants) => grants,
+            Err(error) => {
+                tracing::error!(%error, "the grants of the Hermes in session could not be read");
+                HashMap::new()
+            }
+        };
         for (entry, place) in entries {
             let standing = standings.get(&place.device);
             match entry.status() {
@@ -138,6 +154,11 @@ pub(crate) async fn check_standings(hub: &Hub) {
                             .and_then(Standing::ended_code)
                             .unwrap_or(ErrorCode::Ar504);
                         entry.handle().close(code);
+                    } else if let Some(now) = grants.get(&place.hermes)
+                        && entry.grants().is_some_and(|given| given != *now)
+                    {
+                        // The session reads again and sends `tools`.
+                        entry.poke();
                     }
                 }
                 Status::Waiting => {
@@ -266,6 +287,13 @@ async fn connect(hub: &Hub) -> Option<PgListener> {
 /// `kind:id`, written by the admin command: the connections of that device, or of every
 /// device of that Hermes, read their state again. Anything else makes the sweep run now.
 fn on_notice(hub: &Hub, payload: &str) {
+    // The engine or a number changed: the supervision applies it now, and the sweep finds
+    // the sessions whose list of tools the number changes.
+    if payload.starts_with("engine:") || payload.starts_with("number:") {
+        hub.engines().supervise_soon();
+        hub.sweep_soon();
+        return;
+    }
     let named = payload
         .split_once(':')
         .and_then(|(_, id)| Uuid::parse_str(id).ok());

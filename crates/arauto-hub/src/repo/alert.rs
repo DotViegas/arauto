@@ -66,6 +66,14 @@ alert_kinds! {
     /// A security event is committed and the audit mark did not follow it: until the next
     /// event moves the mark, a restoration that loses that event is not noticed (C11).
     MarkNotAdvanced => "mark_not_advanced",
+    /// The engine is of a version the hub was not checked against (`referencia/waha-fatos.md`,
+    /// the rule for new versions).
+    EngineVersionUntested => "engine_version_untested",
+    /// A session of the engine had another configuration, for instance another destination
+    /// for its events, and the hub applied its own (`docs/05-modelo-de-ameacas.md`, 19).
+    EngineSessionCorrected => "engine_session_corrected",
+    /// The telephone that paired a number is not the one that was added.
+    NumberSwapped => "number_swapped",
 }
 
 impl std::fmt::Display for AlertKind {

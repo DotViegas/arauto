@@ -23,6 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::message::CheckNonce;
+use arauto_protocol::tools::Grants;
 use dashmap::DashMap;
 use tokio::sync::{Notify, OwnedMutexGuard, oneshot};
 use uuid::Uuid;
@@ -71,6 +72,7 @@ pub(crate) struct Entry {
     handle: LinkHandle,
     status: Mutex<Status>,
     place: Mutex<Option<Place>>,
+    grants: Mutex<Option<Grants>>,
     poke: Notify,
 }
 
@@ -108,6 +110,16 @@ impl Entry {
 
     pub(crate) fn set_place(&self, place: Place) {
         *lock(&self.place) = Some(place);
+    }
+
+    /// What the list of tools this session was given last follows; `None` before the
+    /// session.
+    pub(crate) fn grants(&self) -> Option<Grants> {
+        *lock(&self.grants)
+    }
+
+    pub(crate) fn set_grants(&self, grants: Grants) {
+        *lock(&self.grants) = Some(grants);
     }
 
     /// Asks the task of the connection to read the state of its device again.
@@ -152,6 +164,7 @@ impl Registry {
             handle: link.handle(),
             status: Mutex::new(Status::Attempt),
             place: Mutex::new(None),
+            grants: Mutex::new(None),
             poke: Notify::new(),
         });
         let turn = {

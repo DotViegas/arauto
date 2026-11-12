@@ -41,3 +41,5 @@ protótipo, ou está **pendente**.
 | 0034 | [Nomes em inglês nos comandos, arquivos, módulos e ferramentas](0034-nomes-em-ingles.md) | proposta |
 | 0035 | [Pilha do websocket e formato das mensagens](0035-pilha-do-websocket.md) | proposta |
 | 0036 | [Windows só para desenvolvimento; Linux na produção](0036-windows-so-para-desenvolvimento.md) | proposta |
+| 0038 | [O motor e os números no primeiro MVP](0038-motor-e-numeros-no-mvp.md) | proposta |
+| 0039 | [A matriz de acessos e as ferramentas de WhatsApp no primeiro MVP](0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md) | proposta |

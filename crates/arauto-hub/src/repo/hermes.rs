@@ -219,7 +219,8 @@ pub enum RemoveOutcome {
 }
 
 /// Removes a Hermes line. The row stays, with the date, and its name is never given to
-/// another. In the same write its links with other Hermes go away, and everything of it is
+/// another. In the same write its links with other Hermes and its accesses to numbers go
+/// away, and everything of it is
 /// closed as by a revocation: a removed line with a device still served would be a Hermes
 /// nobody can see.
 ///
@@ -239,6 +240,15 @@ pub async fn remove(
         return Ok(RemoveOutcome::NotFound);
     };
     let closed = close_everything(&mut write, organization, &locked, admin, now).await?;
+    // Its accesses to numbers end with it.
+    super::access::end_all(
+        &mut write,
+        organization,
+        &admin.actor(),
+        super::access::Of::Hermes(locked.hermes.id),
+        now,
+    )
+    .await?;
     let links: Vec<(Uuid, Uuid)> = sqlx::query_as(
         "DELETE FROM peer_link \
          WHERE organization_id = $1 AND (from_hermes_id = $2 OR to_hermes_id = $2) \

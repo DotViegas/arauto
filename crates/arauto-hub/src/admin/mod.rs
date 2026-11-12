@@ -40,7 +40,10 @@ use crate::repo::{self, Admin, RepoError};
 use crate::restore::{self, Evidence, Installation, RestoreError, Standing};
 use crate::vault::{MASTER_KEY_FILE, Vault, VaultError};
 
+pub mod access;
+pub mod qr;
 pub mod render;
+pub mod whatsapp;
 
 /// The name of the organization `init` creates. The MVP has one.
 const FIRST_ORGANIZATION: &str = "default";
@@ -151,6 +154,79 @@ pub enum AdminError {
     /// A blocking task died.
     #[error("a task of the command failed")]
     Task,
+
+    /// The engine was not configured yet.
+    #[error("there is no engine yet: run `arauto-hub admin engine set --url ... --events-url ...`")]
+    NoEngine,
+
+    /// An address of the engine or of its events is not in the format.
+    #[error("not a usable address: {0}")]
+    InvalidAddress(crate::engine::AddressError),
+
+    /// What was typed as the key of the engine is not one.
+    #[error("not a key of the engine: {0}")]
+    InvalidKey(crate::engine::config::ApiKeyError),
+
+    /// The alias is not in the restricted format, or is reserved.
+    #[error("not a valid alias of a number: {0}")]
+    InvalidAlias(NameError),
+
+    /// What was typed is not a telephone with the code of the country.
+    #[error(
+        "a telephone has the code of the country and from 8 to 15 digits, like +55 11 98765-4321"
+    )]
+    InvalidPhone,
+
+    /// There is no number with that alias.
+    #[error("there is no number with that alias")]
+    NoSuchNumber,
+
+    /// The alias is taken, now or by a number that was removed.
+    #[error(
+        "that alias is taken, now or by a number that was removed, and an alias is never reused"
+    )]
+    AliasTaken,
+
+    /// The telephone is already a number.
+    #[error("that telephone is already a number of this hub")]
+    PhoneTaken,
+
+    /// What was asked does not apply to the state the number is in.
+    #[error("the number is {0}: that does not apply now")]
+    NumberNotNow(&'static str),
+
+    /// The engine did not do what was asked.
+    #[error(transparent)]
+    Engine(#[from] crate::engine::EngineError),
+
+    /// The access asked breaks a rule of `docs/08-permissoes.md`, section 1.
+    #[error("{0}")]
+    AccessRule(crate::core::access::AccessRuleError),
+
+    /// The Hermes has no access to that number.
+    #[error(
+        "that Hermes has no access to that number: give it one with `arauto-hub admin access grant`"
+    )]
+    NoAccess,
+
+    /// The chat named is not a chat of that number.
+    #[error("that chat is not a chat of that number")]
+    NoSuchChat,
+
+    /// The access has no line for that chat.
+    #[error("that access has no line for that chat")]
+    NoLine,
+
+    /// What was given is not a chat.
+    #[error(
+        "a chat is a telephone with the code of the country, an identifier of the engine \
+         (like 120363012345678901@g.us) or an identifier shown by `arauto-hub admin access list`"
+    )]
+    InvalidChat,
+
+    /// The engine says the telephone has no WhatsApp.
+    #[error("the engine says that telephone has no WhatsApp")]
+    NoWhatsapp,
 }
 
 impl From<RepoError> for AdminError {

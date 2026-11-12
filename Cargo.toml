@@ -28,7 +28,11 @@ data-encoding = "2.11.1"
 futures-util = "0.3.34"
 getrandom = "0.4.3"
 hkdf = "0.13.0"
-hyper = { version = "1.12.0", features = ["http1", "server"] }
+# The bodies of the HTTP client towards the engine (and of its fake in the tests).
+http-body-util = "0.1.5"
+# `client`: the hub talks to the engine over HTTP/1.1 on the private network, with the client
+# of the library it already serves with, instead of a second HTTP stack.
+hyper = { version = "1.12.0", features = ["http1", "server", "client"] }
 hyper-util = { version = "0.1.21", features = ["tokio", "server", "http1", "service"] }
 # The TLS of the connector (`wss://`), only under its `tls` feature: the `ring` provider compiles
 # C, and the development machine has no C compiler for the Linux target.

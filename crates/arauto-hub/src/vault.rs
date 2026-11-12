@@ -78,6 +78,73 @@ const HUB_KEY_LABEL: &[u8] = b"arauto/hub-key/1";
 /// The label of an organization key encrypted with the master key.
 const ORGANIZATION_KEY_LABEL: &[u8] = b"arauto/org-key/1";
 
+/// The label of a secret of the engine encrypted with the master key.
+const ENGINE_SECRET_LABEL: &[u8] = b"arauto/engine-secret/1";
+
+/// The label of the personal data of the WhatsApp tables, used the two ways of the others.
+const WHATSAPP_LABEL: &[u8] = b"arauto/whatsapp/1";
+
+/// The HKDF `info` of the key of the digests of the WhatsApp tables.
+const WHATSAPP_DIGEST_LABEL: &[u8] = b"arauto/whatsapp-digest/1";
+
+/// Which secret of the engine a sealed block holds. It is bound in the block: the API key
+/// does not open as the secret of the events, nor the other way around.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EngineSecretKind {
+    /// The key of the API of the engine.
+    ApiKey,
+    /// The secret that signs the events of the engine.
+    EventsSecret,
+}
+
+impl EngineSecretKind {
+    const fn tag(self) -> u8 {
+        match self {
+            EngineSecretKind::ApiKey => 1,
+            EngineSecretKind::EventsSecret => 2,
+        }
+    }
+}
+
+/// Which field of the WhatsApp tables a block or a digest is about. It is bound in each one,
+/// so a value moved from one column to another does not open, and two digests of the same
+/// text in two columns differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WhatsappField {
+    /// `number.phone_enc` and `number.phone_digest`.
+    Phone,
+    /// `chat.shown_name_enc`.
+    ShownName,
+    /// `chat_engine_id.id_enc` and `chat_engine_id.id_digest`.
+    ChatEngineId,
+    /// `engine_event.body_enc`.
+    EventBody,
+    /// `engine_event.key_digest`.
+    EventKey,
+    /// The signature of the identifier of a message the hub gives a Hermes
+    /// ([`crate::whatsapp`]): it is kept nowhere, and checked when the Hermes gives it back.
+    MessageRef,
+}
+
+impl WhatsappField {
+    const fn tag(self) -> u8 {
+        match self {
+            WhatsappField::Phone => 1,
+            WhatsappField::ShownName => 2,
+            WhatsappField::ChatEngineId => 3,
+            WhatsappField::EventBody => 4,
+            WhatsappField::EventKey => 5,
+            WhatsappField::MessageRef => 6,
+        }
+    }
+}
+
+/// A stored value of the WhatsApp tables does not open: it was changed, moved from another
+/// row or column, or stored by another organization. The reasons are not told apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("a stored value of the WhatsApp tables does not open")]
+pub struct WhatsappUnreadable;
+
 /// What went wrong in the vault. No variant carries key material.
 #[derive(Debug, thiserror::Error)]
 pub enum VaultError {
@@ -325,8 +392,51 @@ impl Vault {
             organization_id,
             seal: derive(&key, SEAL_LABEL)?,
             peer: derive(&key, PEER_LABEL)?,
+            whatsapp: derive(&key, WHATSAPP_LABEL)?,
+            whatsapp_digest: derive(&key, WHATSAPP_DIGEST_LABEL)?,
         })
     }
+
+    /// Seals a secret of the engine `engine` with the master key, as it goes into
+    /// `engine.api_key_enc` or `engine.events_secret_enc`.
+    ///
+    /// # Errors
+    /// [`VaultError::Random`] when the generator of the system fails.
+    pub fn seal_engine_secret(
+        &self,
+        engine: Uuid,
+        kind: EngineSecretKind,
+        secret: &[u8],
+    ) -> Result<Vec<u8>, VaultError> {
+        seal_block(&self.master, &engine_secret_aad(engine, kind), secret)
+    }
+
+    /// Opens a secret of the engine `engine` sealed by [`Vault::seal_engine_secret`].
+    ///
+    /// # Errors
+    /// [`VaultError::StoredKeyUnreadable`] when the block does not open with this master key
+    /// for that engine and that kind of secret.
+    pub fn open_engine_secret(
+        &self,
+        engine: Uuid,
+        kind: EngineSecretKind,
+        block: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, VaultError> {
+        open_block(&self.master, &engine_secret_aad(engine, kind), block).ok_or(
+            VaultError::StoredKeyUnreadable {
+                what: "engine secret",
+            },
+        )
+    }
+}
+
+fn engine_secret_aad(engine: Uuid, kind: EngineSecretKind) -> Vec<u8> {
+    let mut aad = Vec::with_capacity(ENGINE_SECRET_LABEL.len() + 2 + 16);
+    aad.extend_from_slice(ENGINE_SECRET_LABEL);
+    aad.push(BLOCK_VERSION);
+    aad.push(kind.tag());
+    aad.extend_from_slice(engine.as_bytes());
+    aad
 }
 
 /// A new key pair of the hub, as it is stored.
@@ -343,6 +453,8 @@ pub struct OrganizationKey {
     organization_id: Uuid,
     seal: Secret<KEY_LEN>,
     peer: Secret<KEY_LEN>,
+    whatsapp: Secret<KEY_LEN>,
+    whatsapp_digest: Secret<KEY_LEN>,
 }
 
 impl fmt::Debug for OrganizationKey {
@@ -528,6 +640,65 @@ impl OrganizationKey {
             decrypt(&self.peer, &nonce, &self.peer_aad(ids), text_enc).ok_or(PeerTextUnreadable)?;
         let text = String::from_utf8(text.to_vec()).map_err(|_| PeerTextUnreadable)?;
         MessageText::new(text).map_err(|_| PeerTextUnreadable)
+    }
+
+    /// Encrypts a value of the WhatsApp tables (a telephone, a name shown by the other side,
+    /// an identifier of a chat in the engine, the body of an event), bound to the
+    /// organization, to `field` and to the row `row`.
+    ///
+    /// # Errors
+    /// [`VaultError::Random`] when the generator of the system fails.
+    pub fn seal_whatsapp(
+        &self,
+        field: WhatsappField,
+        row: Uuid,
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, VaultError> {
+        seal_block(&self.whatsapp, &self.whatsapp_aad(field, row), plaintext)
+    }
+
+    /// Opens a value sealed by [`OrganizationKey::seal_whatsapp`] for the same field and row.
+    ///
+    /// # Errors
+    /// [`WhatsappUnreadable`] when it was changed, moved or sealed by another organization.
+    pub fn open_whatsapp(
+        &self,
+        field: WhatsappField,
+        row: Uuid,
+        block: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, WhatsappUnreadable> {
+        open_block(&self.whatsapp, &self.whatsapp_aad(field, row), block).ok_or(WhatsappUnreadable)
+    }
+
+    /// The keyed digest of a value of the WhatsApp tables, within `scope` (the number, or the
+    /// engine): HMAC-SHA-256 with a key of its own, derived from the key of the organization.
+    /// It finds a row by a telephone or an identifier without keeping the value, and it is
+    /// not computable by whoever reads the database without the master key.
+    #[must_use]
+    pub fn whatsapp_digest(&self, field: WhatsappField, scope: Uuid, value: &[u8]) -> [u8; 32] {
+        use hkdf::hmac::{Hmac, KeyInit, Mac};
+        // HMAC takes a key of any length: this never fails.
+        #[allow(clippy::expect_used)]
+        let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(self.whatsapp_digest.expose())
+            .expect("HMAC takes a key of any length");
+        mac.update(WHATSAPP_DIGEST_LABEL);
+        mac.update(&[field.tag()]);
+        mac.update(self.organization_id.as_bytes());
+        mac.update(scope.as_bytes());
+        mac.update(value);
+        let mut digest = [0u8; 32];
+        digest.copy_from_slice(&mac.finalize().into_bytes());
+        digest
+    }
+
+    fn whatsapp_aad(&self, field: WhatsappField, row: Uuid) -> Vec<u8> {
+        let mut aad = Vec::with_capacity(WHATSAPP_LABEL.len() + 2 + 32);
+        aad.extend_from_slice(WHATSAPP_LABEL);
+        aad.push(BLOCK_VERSION);
+        aad.push(field.tag());
+        aad.extend_from_slice(self.organization_id.as_bytes());
+        aad.extend_from_slice(row.as_bytes());
+        aad
     }
 
     fn seal_aad(&self, device: &PublicKey) -> Vec<u8> {
@@ -1119,6 +1290,8 @@ mod tests {
             organization_id: Uuid::new_v4(),
             seal: Secret::new(*key.seal.expose()),
             peer: Secret::new(*key.peer.expose()),
+            whatsapp: Secret::new(*key.whatsapp.expose()),
+            whatsapp_digest: Secret::new(*key.whatsapp_digest.expose()),
         };
         let device = device();
         let issued = key.seal_credential(&device, generation(2), 0).unwrap();
@@ -1309,6 +1482,113 @@ mod tests {
         assert_eq!(format!("{:?}", issued.sealed), "[redacted]");
     }
 
+    // ------------------------------------------------------------------ the engine and the WhatsApp tables
+
+    #[test]
+    fn a_secret_of_the_engine_opens_only_for_its_engine_and_its_kind() {
+        let (_dir, vault) = vault();
+        let engine = Uuid::new_v4();
+        let block = vault
+            .seal_engine_secret(engine, EngineSecretKind::ApiKey, b"s3cr3t-engine-key")
+            .unwrap();
+        assert!(!shows(&format!("{block:?}"), b"s3cr3t-engine-key"));
+        assert_eq!(
+            vault
+                .open_engine_secret(engine, EngineSecretKind::ApiKey, &block)
+                .unwrap()
+                .as_slice(),
+            b"s3cr3t-engine-key"
+        );
+        assert!(
+            vault
+                .open_engine_secret(engine, EngineSecretKind::EventsSecret, &block)
+                .is_err()
+        );
+        assert!(
+            vault
+                .open_engine_secret(Uuid::new_v4(), EngineSecretKind::ApiKey, &block)
+                .is_err()
+        );
+        let (_other_dir, other) = super::tests::vault();
+        assert!(
+            other
+                .open_engine_secret(engine, EngineSecretKind::ApiKey, &block)
+                .is_err()
+        );
+        let mut changed = block.clone();
+        let last = changed.len() - 1;
+        changed[last] ^= 1;
+        assert!(
+            vault
+                .open_engine_secret(engine, EngineSecretKind::ApiKey, &changed)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn a_whatsapp_value_opens_only_in_its_row_its_field_and_its_organization() {
+        let (_dir, vault) = vault();
+        let (_, _, key) = organization(&vault);
+        let (_, _, other) = organization(&vault);
+        let row = Uuid::new_v4();
+        let block = key
+            .seal_whatsapp(WhatsappField::Phone, row, b"5511987654321")
+            .unwrap();
+        assert!(!format!("{block:?}").contains("987654321"));
+        assert_eq!(
+            key.open_whatsapp(WhatsappField::Phone, row, &block)
+                .unwrap()
+                .as_slice(),
+            b"5511987654321"
+        );
+        assert!(
+            key.open_whatsapp(WhatsappField::ChatEngineId, row, &block)
+                .is_err()
+        );
+        assert!(
+            key.open_whatsapp(WhatsappField::Phone, Uuid::new_v4(), &block)
+                .is_err()
+        );
+        assert!(
+            other
+                .open_whatsapp(WhatsappField::Phone, row, &block)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn a_whatsapp_digest_is_keyed_and_bound_to_its_field_and_scope() {
+        let (_dir, vault) = vault();
+        let (_, _, key) = organization(&vault);
+        let (_, _, other) = organization(&vault);
+        let scope = Uuid::new_v4();
+        let digest = key.whatsapp_digest(WhatsappField::Phone, scope, b"5511987654321");
+        assert_eq!(
+            digest,
+            key.whatsapp_digest(WhatsappField::Phone, scope, b"5511987654321")
+        );
+        assert_ne!(
+            digest,
+            key.whatsapp_digest(WhatsappField::Phone, scope, b"5511987654322")
+        );
+        assert_ne!(
+            digest,
+            key.whatsapp_digest(WhatsappField::EventKey, scope, b"5511987654321")
+        );
+        assert_ne!(
+            digest,
+            key.whatsapp_digest(WhatsappField::Phone, Uuid::new_v4(), b"5511987654321")
+        );
+        assert_ne!(
+            digest,
+            other.whatsapp_digest(WhatsappField::Phone, scope, b"5511987654321")
+        );
+        // Not the plain hash of the value: whoever reads the database cannot compute it.
+        use sha2::Digest;
+        let plain: [u8; 32] = Sha256::digest(b"5511987654321").into();
+        assert_ne!(digest, plain);
+    }
+
     #[test]
     fn the_seal_key_is_not_the_peer_key() {
         // A text encrypted for a message is not a credential, and the other way around.
@@ -1319,6 +1599,8 @@ mod tests {
             organization_id: key.organization_id,
             seal: Secret::new(*key.peer.expose()),
             peer: Secret::new(*key.seal.expose()),
+            whatsapp: Secret::new(*key.whatsapp.expose()),
+            whatsapp_digest: Secret::new(*key.whatsapp_digest.expose()),
         };
         let issued = key.seal_credential(&device, generation(1), 0).unwrap();
         assert_eq!(

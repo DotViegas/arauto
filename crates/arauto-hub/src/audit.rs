@@ -22,7 +22,7 @@ use std::net::IpAddr;
 
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::message::DeclaredText;
-use arauto_protocol::names::HermesName;
+use arauto_protocol::names::{HermesName, NumberAlias};
 use sqlx::postgres::{PgConnection, PgPool};
 use sqlx::types::Json;
 use sqlx::{PgExecutor, Postgres, Transaction};
@@ -137,6 +137,34 @@ actions! {
     UnknownDeviceListed => "unknown_device.listed", false;
     /// Migrations were applied to a database with data.
     DatabaseMigrated => "database.migrated", false;
+    /// The engine was created, or its address changed: where every number is reached.
+    EngineConfigured => "engine.configured", true;
+    /// The key of the API of the engine was set or changed.
+    EngineKeyChanged => "engine.key_changed", true;
+    /// A new secret of the events of the engine was drawn.
+    EngineSecretChanged => "engine.secret_changed", true;
+    /// The hub found a session of the engine configured otherwise and applied its own.
+    EngineSessionCorrected => "engine.session_corrected", false;
+    /// A number was added.
+    NumberAdded => "number.added", true;
+    /// A number was removed: every access to it ends.
+    NumberRemoved => "number.removed", true;
+    /// The admin confirmed the new telephone of a swapped number: its accesses work again.
+    NumberConfirmed => "number.confirmed", true;
+    /// The admin asked for a QR or a code to pair a number.
+    NumberPairingStarted => "number.pairing_started", false;
+    /// The admin disconnected, restarted or let go the pairing of a number.
+    NumberChanged => "number.changed", false;
+    /// A Hermes got an access to a number.
+    AccessGranted => "access.granted", true;
+    /// The scope or the verbs of an access changed.
+    AccessChanged => "access.changed", true;
+    /// An access ended: by the admin, or with its Hermes or its number.
+    AccessRemoved => "access.removed", true;
+    /// The line of a chat was set or changed.
+    AccessChatSet => "access_chat.set", true;
+    /// The line of a chat was taken away.
+    AccessChatRemoved => "access_chat.removed", true;
 }
 
 impl fmt::Display for Action {
@@ -181,6 +209,12 @@ pub enum TargetKind {
     UnknownDevice,
     /// An invite.
     Invite,
+    /// The engine of WhatsApp.
+    Engine,
+    /// A number of WhatsApp.
+    Number,
+    /// An access of a Hermes to a number.
+    Access,
 }
 
 impl TargetKind {
@@ -195,6 +229,9 @@ impl TargetKind {
             TargetKind::Device => "device",
             TargetKind::UnknownDevice => "unknown_device",
             TargetKind::Invite => "invite",
+            TargetKind::Engine => "engine",
+            TargetKind::Number => "number",
+            TargetKind::Access => "access",
         }
     }
 }
@@ -260,6 +297,23 @@ impl Details {
     #[must_use]
     pub fn name(mut self, key: &'static str, value: &HermesName) -> Self {
         self.0.insert(key.to_owned(), value.as_str().into());
+        self
+    }
+
+    /// The alias of a number, in the restricted format.
+    #[must_use]
+    pub fn alias(mut self, key: &'static str, value: &NumberAlias) -> Self {
+        self.0.insert(key.to_owned(), value.as_str().into());
+        self
+    }
+
+    /// A list of words fixed in the program, like the verbs of an access.
+    #[must_use]
+    pub fn words(mut self, key: &'static str, values: &[&'static str]) -> Self {
+        self.0.insert(
+            key.to_owned(),
+            serde_json::Value::Array(values.iter().map(|value| (*value).into()).collect()),
+        );
         self
     }
 
@@ -558,6 +612,20 @@ mod tests {
             "peer_link.removed",
             "restored_mode.entered",
             "restored_mode.ended",
+            // Where every number is reached and who proves itself to whom; a number that
+            // comes or goes, or whose swapped telephone the admin accepts.
+            "engine.configured",
+            "engine.key_changed",
+            "engine.secret_changed",
+            "number.added",
+            "number.removed",
+            "number.confirmed",
+            // The matrix of accesses is who can do what on each number (C11: change of access).
+            "access.granted",
+            "access.changed",
+            "access.removed",
+            "access_chat.set",
+            "access_chat.removed",
         ]
         .into_iter()
         .collect();

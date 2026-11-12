@@ -472,6 +472,71 @@ pub async fn organization_of_invite<'e>(
     Ok(id.map(|id| ResolvedOrg { id }))
 }
 
+/// An event of an engine that is not yet proven: the organization comes out of it only when
+/// the signature of the body checks with the secret of that engine
+/// ([`EngineEventsGate::verify`]).
+pub struct EngineEventsGate {
+    organization: Uuid,
+    engine: Uuid,
+    secret_enc: Vec<u8>,
+}
+
+impl std::fmt::Debug for EngineEventsGate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("EngineEventsGate([redacted])")
+    }
+}
+
+impl EngineEventsGate {
+    /// The organization of the engine, when `signature` is the signature of `body` with the
+    /// secret of the events of that engine, compared in constant time. `None` for anything
+    /// else, a secret that does not open included.
+    #[must_use]
+    pub fn verify(
+        self,
+        vault: &crate::vault::Vault,
+        body: &[u8],
+        signature: &str,
+    ) -> Option<(ResolvedOrg, Uuid)> {
+        let secret = vault
+            .open_engine_secret(
+                self.engine,
+                crate::vault::EngineSecretKind::EventsSecret,
+                &self.secret_enc,
+            )
+            .ok()?;
+        let secret = crate::engine::EventsSecret::from_stored(&secret)?;
+        secret.verifies(body, signature).then_some((
+            ResolvedOrg {
+                id: self.organization,
+            },
+            self.engine,
+        ))
+    }
+}
+
+/// The engine `engine`, for an event that says it comes from it, with the sealed secret its
+/// signature is checked with. Nothing of the organization is usable before
+/// [`EngineEventsGate::verify`].
+///
+/// # Errors
+/// [`DbError::Query`] when the database does not answer.
+pub async fn organization_of_engine_events<'e>(
+    executor: impl PgExecutor<'e>,
+    engine: Uuid,
+) -> Result<Option<EngineEventsGate>, DbError> {
+    let row: Option<(Uuid, Vec<u8>)> =
+        sqlx::query_as("SELECT organization_id, events_secret_enc FROM engine WHERE id = $1")
+            .bind(engine)
+            .fetch_optional(executor)
+            .await?;
+    Ok(row.map(|(organization, secret_enc)| EngineEventsGate {
+        organization,
+        engine,
+        secret_enc,
+    }))
+}
+
 /// The work of the hub itself that goes through every organization. Each one is named, so a
 /// search for the name shows who reads across organizations and why.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -493,19 +558,30 @@ pub enum SystemTask {
     /// The start of `serve`: the channel connections a hub that stopped without warning left
     /// open are closed in every organization.
     Start,
+    /// The supervision of the engine, at the start and every 5 minutes: its version, the
+    /// configuration of each session, the pairings that expired and the catch-up.
+    Engine,
 }
 
-/// Every organization, for a named task of the hub itself, oldest first.
+/// Every organization, for a named task of the hub itself, oldest first. The supervision of
+/// the engine only goes through the organizations that have one: a hub without an engine
+/// spends one query on it.
 ///
 /// # Errors
 /// [`DbError::Query`] when the database does not answer.
 pub async fn organizations_for_system_task<'e>(
     executor: impl PgExecutor<'e>,
-    _task: SystemTask,
+    task: SystemTask,
 ) -> Result<Vec<ResolvedOrg>, DbError> {
-    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM organization ORDER BY created_at, id")
-        .fetch_all(executor)
-        .await?;
+    let query = match task {
+        SystemTask::Engine => {
+            "SELECT o.id FROM organization o \
+             WHERE EXISTS (SELECT 1 FROM engine e WHERE e.organization_id = o.id) \
+             ORDER BY o.created_at, o.id"
+        }
+        _ => "SELECT id FROM organization ORDER BY created_at, id",
+    };
+    let ids: Vec<Uuid> = sqlx::query_scalar(query).fetch_all(executor).await?;
     Ok(ids.into_iter().map(|id| ResolvedOrg { id }).collect())
 }
 

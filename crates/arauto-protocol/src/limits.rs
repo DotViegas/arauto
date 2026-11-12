@@ -408,6 +408,58 @@ pub const PEER_READ_THREAD_DEFAULT: u32 = 30;
 /// `hermes_read_thread`: largest `limit`.
 pub const PEER_READ_THREAD_MAX: u32 = 100;
 
+// ---------------------------------------------------------------------------- WhatsApp tools
+
+/// Sendings a Hermes may make on one number in a minute (`docs/08-permissoes.md`, section 7;
+/// `docs/15-mvp.md`, section 1).
+pub const WHATSAPP_SENDS_PER_MINUTE: u32 = 20;
+
+/// The window of the send limit.
+pub const WHATSAPP_SEND_WINDOW_MS: i64 = MINUTE_MS;
+
+/// Bytes of the messages one `whatsapp_read_chat` answers with (`docs/09-contrato-mcp.md`,
+/// section 3).
+pub const WHATSAPP_READ_BUDGET_BYTES: usize = 256 * 1024;
+
+/// Messages `whatsapp_read_chat` reads when the Hermes does not say.
+pub const WHATSAPP_READ_DEFAULT: u32 = 30;
+
+/// Most messages one `whatsapp_read_chat` reads.
+pub const WHATSAPP_READ_MAX: u32 = 200;
+
+/// Chats or groups one listing shows when the Hermes does not say.
+pub const WHATSAPP_LIST_DEFAULT: u32 = 20;
+
+/// Most chats or groups one listing shows.
+pub const WHATSAPP_LIST_MAX: u32 = 100;
+
+/// Participants of a group one `whatsapp_get_group` shows when the Hermes does not say.
+pub const WHATSAPP_PARTICIPANTS_DEFAULT: u32 = 100;
+
+/// Most participants of a group one `whatsapp_get_group` shows.
+pub const WHATSAPP_PARTICIPANTS_MAX: u32 = 200;
+
+/// The largest `offset` of a listing.
+pub const WHATSAPP_OFFSET_MAX: u32 = 100_000;
+
+/// Longest text of a WhatsApp message a Hermes sends, in bytes of UTF-8.
+pub const WHATSAPP_TEXT_MAX_BYTES: usize = 65_536;
+
+/// Largest file sent by content (`docs/09-contrato-mcp.md`, section 3).
+pub const WHATSAPP_SEND_FILE_MAX_BYTES: usize = 3 * 1024 * 1024;
+
+/// Largest file downloaded from a message (`docs/09-contrato-mcp.md`, section 3).
+pub const WHATSAPP_DOWNLOAD_MAX_BYTES: usize = 7 * 1024 * 1024;
+
+/// Most people one text marks in a group.
+pub const WHATSAPP_MENTIONS_MAX: usize = 50;
+
+/// Longest identifier of a message, as the hub gives it to the Hermes.
+pub const WHATSAPP_MESSAGE_ID_MAX_LEN: usize = 400;
+
+/// The latest time, in seconds since 1970, that `before` and `after` take (the year 5138).
+pub const WHATSAPP_TIME_MAX_S: i64 = 99_999_999_999;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,5 +575,15 @@ mod tests {
         assert_eq!(PEER_READ_BUDGET_BYTES, 65_536);
         assert_eq!((PEER_LIST_THREADS_DEFAULT, PEER_LIST_THREADS_MAX), (20, 50));
         assert_eq!((PEER_READ_THREAD_DEFAULT, PEER_READ_THREAD_MAX), (30, 100));
+    }
+
+    #[test]
+    fn whatsapp_ceilings_match_the_documents() {
+        assert_eq!(WHATSAPP_SENDS_PER_MINUTE, 20);
+        assert_eq!(WHATSAPP_SEND_WINDOW_MS, 60_000);
+        assert_eq!(WHATSAPP_READ_BUDGET_BYTES, 262_144);
+        assert_eq!((WHATSAPP_READ_DEFAULT, WHATSAPP_READ_MAX), (30, 200));
+        assert_eq!(WHATSAPP_SEND_FILE_MAX_BYTES, 3_145_728);
+        assert_eq!(WHATSAPP_DOWNLOAD_MAX_BYTES, 7_340_032);
     }
 }

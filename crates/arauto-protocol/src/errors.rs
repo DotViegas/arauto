@@ -101,16 +101,21 @@ error_codes! {
     Ar709 = "AR-709", "Too large: ask for fewer items or send smaller content.";
     Ar710 = "AR-710", "Too many calls at the same time. Try again in a moment.";
     Ar711 = "AR-711", "Invalid argument. Check the description of the tool and call again.";
+    Ar712 = "AR-712", "Message not found: it does not exist, is outside what this Hermes can use, or WhatsApp no longer allows it.";
 }
 
 impl ErrorCode {
     /// The fixed phrase of the code, starting with the code itself.
     ///
-    /// `retry_after` only matters to AR-706, whose phrase then says when the limit comes back.
-    /// No other value ever enters a phrase.
+    /// `retry_after` only matters to the two limits, AR-704 and AR-706, whose phrase then says
+    /// when the limit comes back. No other value ever enters a phrase.
     #[must_use]
     pub fn phrase(self, retry_after: Option<RetryAfter>) -> Cow<'static, str> {
         match (self, retry_after) {
+            (ErrorCode::Ar704, Some(wait)) => Cow::Owned(format!(
+                "AR-704: Send limit reached. It comes back in {wait} second(s); insisting before \
+                 that does not help."
+            )),
             (ErrorCode::Ar706, Some(wait)) => Cow::Owned(format!(
                 "AR-706: Message limit between Hermes agents reached. It comes back in {wait} \
                  second(s); insisting before that does not help."
@@ -196,12 +201,12 @@ mod tests {
     use std::collections::HashSet;
 
     /// The catalog of `docs/11-conector.md`, section 8, written a second time.
-    const CATALOG: [&str; 37] = [
+    const CATALOG: [&str; 38] = [
         "AR-101", "AR-102", "AR-104", "AR-105", "AR-201", "AR-202", "AR-203", "AR-204", "AR-205",
         "AR-206", "AR-207", "AR-208", "AR-301", "AR-302", "AR-303", "AR-401", "AR-402", "AR-501",
         "AR-502", "AR-503", "AR-504", "AR-505", "AR-506", "AR-507", "AR-601", "AR-602", "AR-701",
         "AR-702", "AR-703", "AR-704", "AR-705", "AR-706", "AR-707", "AR-708", "AR-709", "AR-710",
-        "AR-711",
+        "AR-711", "AR-712",
     ];
 
     fn every_phrase() -> Vec<(ErrorCode, String)> {
@@ -395,10 +400,23 @@ mod tests {
     }
 
     #[test]
-    fn only_ar706_uses_the_wait() {
+    fn the_phrase_of_ar704_says_when_the_send_limit_comes_back() {
+        assert_eq!(
+            ErrorCode::Ar704.phrase(RetryAfter::new(37)),
+            "AR-704: Send limit reached. It comes back in 37 second(s); insisting before that \
+             does not help."
+        );
+        assert_eq!(
+            ErrorCode::Ar704.phrase(None),
+            "AR-704: Send limit reached. Wait before sending again; insisting does not help."
+        );
+    }
+
+    #[test]
+    fn only_the_two_limits_use_the_wait() {
         let wait = RetryAfter::new(1_234);
         for code in ErrorCode::ALL {
-            if *code == ErrorCode::Ar706 {
+            if matches!(*code, ErrorCode::Ar704 | ErrorCode::Ar706) {
                 assert!(code.phrase(wait).contains("1234"));
                 continue;
             }

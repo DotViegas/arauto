@@ -11,6 +11,14 @@
 //! | `leave` | The device asks for its own closing: `left`, and the connection ends. |
 //! | `notice_ack` | No notice is sent before the second milestone: ignored. |
 //!
+//! **The list of tools** follows the matrix of accesses (`docs/09-contrato-mcp.md`): the
+//! `session` carries what the WhatsApp verbs of the Hermes release, and when they change
+//! (an access given or taken, a number that changes state or is removed) the session sends
+//! `tools` with the new list. It learns it when it is poked: by the notice of the admin
+//! command, or by the sweep, which compares in one query per organization the grants of
+//! every session with the ones it was given. A call never trusts that list: the WhatsApp
+//! tools read the access at every call ([`crate::whatsapp`]).
+//!
 //! The refusal AR-710 is sent by the loop of the session itself, never by a task of its own:
 //! a connector that keeps calling while 32 calls are in progress waits for its refusals to
 //! leave, and the wait reaches its TCP connection. The AR-710 does not read the device: it is
@@ -27,9 +35,9 @@
 //! The calls go on meanwhile. Without the `saved` in time the connection closes, and on the
 //! way back the usual table holds.
 //!
-//! In the first milestone only `arauto_status` is released: the tools of the conversation
-//! between Hermes come with the second, and the ones of WhatsApp with the third. It is
-//! answered by the hub itself, without the engine, and says no secret.
+//! The tools of the conversation between Hermes come with the second milestone: they are in
+//! the catalog and answer AR-701. `arauto_status` is answered by the hub itself, without the
+//! engine, and says no secret.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -38,7 +46,7 @@ use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::limits::CALLS_IN_FLIGHT_MAX;
 use arauto_protocol::message::{
     Call, CallId, CallOutcome, CallResult, Credential, Left, LeftStatus, Message, Payload, Rotated,
-    Saved, Session, ToolList,
+    Saved, Session, ToolList, Tools,
 };
 use arauto_protocol::tools::{self, Grants, ToolCall};
 use serde_json::{Value, json};
@@ -60,23 +68,31 @@ use crate::repo::swap::{
 };
 use crate::repo::{self, RepoError};
 
-/// What the Hermes has in the first milestone: no link and no number. The lists of pairs and
-/// the matrix of access come with the second and third milestones.
-const GRANTS: Grants = Grants {
-    peer_any: false,
-    peer_outbound: false,
-    whatsapp_read: false,
-    whatsapp_send: false,
-    whatsapp_modify: false,
-};
-
-/// The names of the released tools, as `session` carries them.
-fn released_tools() -> ToolList {
-    let names = tools::released(&GRANTS)
+/// The names of the tools `grants` release, as `session` and `tools` carry them. The links
+/// between Hermes come with the second milestone: they release nothing here.
+fn released_tools(grants: &Grants) -> ToolList {
+    let grants = Grants {
+        peer_any: false,
+        peer_outbound: false,
+        ..*grants
+    };
+    let names = tools::released(&grants)
         .map(tools::ToolSpec::tool_name)
         .collect();
     // The catalog has fewer than 64 tools, each once.
     ToolList::new(names).unwrap_or_default()
+}
+
+/// The grants of a Hermes now. When the database does not answer, nothing but the status:
+/// the next poke or sweep sends the list again.
+async fn grants_of(hub: &Hub, organization: ResolvedOrg, hermes: Uuid) -> Grants {
+    match crate::whatsapp::grants_now(hub, organization, hermes).await {
+        Ok(grants) => grants,
+        Err(error) => {
+            tracing::error!(%error, "the grants of a Hermes could not be read");
+            Grants::default()
+        }
+    }
 }
 
 /// The `saved` was refused (T2): the connection closes with the reason.
@@ -182,9 +198,11 @@ pub(crate) async fn serve(
     record: ChannelConnection,
     start: SessionStart,
 ) -> CloseReason {
+    let grants = grants_of(&hub, organization, start.hermes).await;
+    entry.set_grants(grants);
     let session = Message::Session(Session {
         hermes: start.name,
-        tools: released_tools(),
+        tools: released_tools(&grants),
         wake: start.can_be_woken,
     });
     if link.enter_session(&session).await.is_err() {
@@ -202,6 +220,8 @@ pub(crate) async fn serve(
         entry,
         organization,
         device,
+        hermes: start.hermes,
+        released: grants,
         record,
         calls: JoinSet::new(),
         in_flight: InFlight::default(),
@@ -221,6 +241,10 @@ struct Serving<'a> {
     entry: Arc<Entry>,
     organization: ResolvedOrg,
     device: Uuid,
+    /// The Hermes of the device.
+    hermes: Uuid,
+    /// What the list of tools the connector has follows.
+    released: Grants,
     record: ChannelConnection,
     /// Each call runs in its own task.
     calls: JoinSet<()>,
@@ -366,9 +390,10 @@ impl Serving<'_> {
     }
 
     /// The device of this session, read again: what is no longer active closes with its code.
-    async fn read_again(&self) -> Option<CloseReason> {
+    /// One that still serves gets its list of tools again, when it changed.
+    async fn read_again(&mut self) -> Option<CloseReason> {
         match repo::device::standing(self.hub.pool(), self.organization, self.device).await {
-            Ok(Some(standing)) if standing.may_serve() => None,
+            Ok(Some(standing)) if standing.may_serve() => self.refresh_tools().await,
             Ok(standing) => {
                 self.close(ended_code(standing.as_ref()));
                 Some(CloseReason::DeviceEnded)
@@ -379,6 +404,24 @@ impl Serving<'_> {
                 None
             }
         }
+    }
+
+    /// Sends `tools` when what the Hermes has changed since the list it was given.
+    async fn refresh_tools(&mut self) -> Option<CloseReason> {
+        let grants = grants_of(&self.hub, self.organization, self.hermes).await;
+        if grants == self.released {
+            self.entry.set_grants(grants);
+            return None;
+        }
+        let tools = Message::Tools(Tools {
+            tools: released_tools(&grants),
+        });
+        if self.link.send(&tools).await.is_err() {
+            return Some(self.dropped());
+        }
+        self.released = grants;
+        self.entry.set_grants(grants);
+        None
     }
 
     /// T1 of the 24-hour swap, when it is due.
@@ -610,23 +653,26 @@ async fn run_call(hub: &Hub, organization: ResolvedOrg, device: Uuid, call: &Cal
         Ok(checked) => checked,
         Err(error) => return refusal(error.code()).into(),
     };
-    if !checked.family().released_by(&GRANTS) {
-        return refusal(ErrorCode::Ar701).into();
-    }
     match checked {
         ToolCall::ArautoStatus => status(hub, organization, &standing).await.into(),
-        // No grant of this milestone releases them, so the check above answered them with
-        // AR-701. Reaching here would be a tool the hub does not serve yet.
+        // The access is read again at this call, inside: AR-701 when nothing releases it.
+        ToolCall::Whatsapp(call) => {
+            crate::whatsapp::answer(hub, organization, standing.hermes, &call)
+                .await
+                .into()
+        }
+        // The links between Hermes come with the second milestone: nothing releases them.
         ToolCall::HermesListPeers
         | ToolCall::HermesSendMessage(_)
         | ToolCall::HermesListThreads(_)
-        | ToolCall::HermesReadThread(_) => refusal(ErrorCode::Ar205).into(),
+        | ToolCall::HermesReadThread(_) => refusal(ErrorCode::Ar701).into(),
     }
 }
 
 /// `arauto_status`, answered by the hub without the engine. No secret: the name of the
-/// Hermes, whether it can be woken, its numbers and verbs (none before the third milestone)
-/// and whether it has links with other Hermes.
+/// Hermes, whether it can be woken, its numbers (the alias, the state, the scope and the
+/// verbs; never the telephone or the session of the engine) and whether it has links with
+/// other Hermes.
 async fn status(hub: &Hub, organization: ResolvedOrg, standing: &Standing) -> CallOutcome {
     let links = match repo::hermes::peer_links(hub.pool(), organization, standing.hermes).await {
         Ok(links) => links,
@@ -635,11 +681,18 @@ async fn status(hub: &Hub, organization: ResolvedOrg, standing: &Standing) -> Ca
             return refusal(ErrorCode::Ar205);
         }
     };
+    let numbers = match crate::whatsapp::numbers_of(hub, organization, standing.hermes).await {
+        Ok(numbers) => numbers,
+        Err(error) => {
+            tracing::error!(%error, "the numbers of a Hermes could not be read");
+            return refusal(ErrorCode::Ar205);
+        }
+    };
     let content = json!({
         "connected": true,
         "hermes": standing.name.as_str(),
         "can_be_woken": standing.can_be_woken,
-        "numbers": [],
+        "numbers": numbers,
         "peers": {
             "enabled": links.outbound || links.inbound,
             "can_send": links.outbound,

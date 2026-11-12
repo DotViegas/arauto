@@ -212,6 +212,17 @@ async fn no_secret_reaches_the_log_the_errors_the_audit_or_the_alerts() {
         "unknown_device",
         "channel_connection",
         "invite",
+        // The tables of the WhatsApp (migration 0010): they hold sealed keys of the engine and
+        // encrypted telephones and events, and nothing of this flow may land in them either.
+        // Their own canary is `whatsapp_canary`.
+        "engine",
+        "number",
+        "chat",
+        "chat_engine_id",
+        "engine_event",
+        // The matrix of accesses (also 0010). Its own canary is `whatsapp_tools_canary`.
+        "access",
+        "access_chat",
     ] {
         let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT row_to_json(t)::text FROM {table} t"

@@ -496,7 +496,7 @@ async fn the_list_of_tools_has_the_texts_of_the_catalog() {
 
     fake.tools.send_replace(names(&[
         "hermes_read_thread",
-        "whatsapp_send_text",
+        "whatsapp_search",
         "arauto_status",
         "hermes_list_peers",
     ]));
@@ -599,7 +599,7 @@ async fn a_tool_out_of_the_catalog_never_reaches_the_backend() {
     client.initialize().await;
     for name in [
         "CANARY_tool",
-        "whatsapp_send_text",
+        "whatsapp_search",
         "../../CANARY",
         "",
         "arauto_status ",
@@ -801,7 +801,7 @@ async fn a_change_of_the_list_is_told_once_the_client_is_ready() {
     fake.tools.send_replace(names(&["arauto_status"]));
     client.nothing_before_a_ping().await;
     fake.tools
-        .send_replace(names(&["arauto_status", "whatsapp_read_chat"]));
+        .send_replace(names(&["arauto_status", "whatsapp_search"]));
     client.nothing_before_a_ping().await;
     fake.tools
         .send_replace(names(&["hermes_list_peers", "hermes_list_threads"]));

@@ -50,17 +50,21 @@ pub enum Target {
     ClosedConnections,
     /// `unknown_device`: the listings that are no pending proof of a restoration.
     UnknownDevices,
+    /// `engine_event`: the events of the engine already handled. One still to be handled is
+    /// never purged: it waits for whoever reads the inbox.
+    EngineEvents,
 }
 
 impl Target {
     /// Every target, in the order of a run: the messages before the threads they leave empty.
-    pub const ALL: [Target; 6] = [
+    pub const ALL: [Target; 7] = [
         Target::PeerMessages,
         Target::EmptyThreads,
         Target::ToolCalls,
         Target::ResolvedNotices,
         Target::ClosedConnections,
         Target::UnknownDevices,
+        Target::EngineEvents,
     ];
 
     /// The row of `retention` whose days this target keeps.
@@ -72,6 +76,7 @@ impl Target {
             Target::ResolvedNotices => "notice",
             Target::ClosedConnections => "channel_connection",
             Target::UnknownDevices => "unknown_device",
+            Target::EngineEvents => "engine_event",
         }
     }
 
@@ -85,6 +90,7 @@ impl Target {
             Target::ResolvedNotices => "notice",
             Target::ClosedConnections => "channel_connection",
             Target::UnknownDevices => "unknown_device",
+            Target::EngineEvents => "engine_event",
         }
     }
 
@@ -144,6 +150,12 @@ impl Target {
                 "DELETE FROM unknown_device WHERE organization_id = $1 AND id IN ( \
                      SELECT id FROM unknown_device \
                      WHERE organization_id = $1 AND seen_at <= $2 AND NOT proof_pending \
+                     LIMIT $3 FOR UPDATE SKIP LOCKED)"
+            }
+            Target::EngineEvents => {
+                "DELETE FROM engine_event WHERE organization_id = $1 AND id IN ( \
+                     SELECT id FROM engine_event \
+                     WHERE organization_id = $1 AND processed_at <= $2 \
                      LIMIT $3 FOR UPDATE SKIP LOCKED)"
             }
         }
@@ -307,7 +319,8 @@ mod tests {
                 "tool_call",
                 "notice",
                 "channel_connection",
-                "unknown_device"
+                "unknown_device",
+                "engine_event"
             ]
         );
         // The threads follow the days of the messages that leave them empty.

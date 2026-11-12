@@ -15,6 +15,8 @@
 //! | [`core`] | The row types, the pure rule of the credential swap and its in-memory simulator. |
 //! | [`admin`] | The admin command: `init`, `migrate`, `status` and what a person does to Hermes, invites and requests. |
 //! | [`repo`] | The repositories: every read and write of business data, with the organization resolved. |
+//! | [`engine`] | The WhatsApp engine: its interface, the adapter of the WAHA, the inbox of its events and its supervision. |
+//! | [`whatsapp`] | The WhatsApp tools answered in a session: the check of the matrix at every call, the signed identifiers of messages and the send limit. |
 //! | [`channel`] | The port of the connectors: the accept loop, the websocket, the handshake, the frames and their limits, `hello`, `leave`, and the entry point of the other purposes. |
 //!
 //! Time is always an `i64` of milliseconds given by the caller, who reads it from an
@@ -27,9 +29,11 @@ pub mod channel;
 pub mod config;
 pub mod core;
 pub mod db;
+pub mod engine;
 pub mod mark;
 pub mod repo;
 pub mod restore;
 pub mod vault;
+pub mod whatsapp;
 
 mod lock_wait;

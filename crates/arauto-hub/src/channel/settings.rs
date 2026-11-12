@@ -108,6 +108,11 @@ pub struct ChannelSettings {
     pub listen_admin: bool,
     /// The purge of what passed its retention.
     pub purge: PurgeSettings,
+    /// The deadlines and ceilings of the engine and of its inbox.
+    pub engine: crate::engine::EngineSettings,
+    /// Sendings a Hermes may make on one number in a minute (`docs/08-permissoes.md`,
+    /// section 7).
+    pub sends_per_minute: u32,
 }
 
 impl Default for ChannelSettings {
@@ -127,6 +132,8 @@ impl Default for ChannelSettings {
             sweep_interval_ms: SWEEP_INTERVAL_MS,
             listen_admin: true,
             purge: PurgeSettings::default(),
+            engine: crate::engine::EngineSettings::default(),
+            sends_per_minute: arauto_protocol::limits::WHATSAPP_SENDS_PER_MINUTE,
         }
     }
 }
@@ -170,6 +177,7 @@ mod tests {
                 batch_rows: 500
             }
         );
+        assert_eq!(settings.sends_per_minute, 20);
     }
 
     #[test]

@@ -12,10 +12,12 @@
 //! | [`http`] | Plain HTTP over TCP, for what the websocket library would not send: slow headers, a raw upgrade, a path as written. |
 //! | [`hub`] | The real hub in the process of the test: test databases from a template, an installation, a hub started with short deadlines, and the admin steps (Hermes, invite, approval). |
 //! | [`hermes`] | A fake Hermes: the program that records the registration of the connector, and the client of MCP that starts copies of the connector with a filtered environment, talks to them, kills and closes them. |
+//! | [`engine`] | A fake WhatsApp engine in the format of the WAHA: sessions, pairing, chats, sending, signed events, and failures on command. |
 #![forbid(unsafe_code)]
 
 pub mod connector;
 pub mod device;
+pub mod engine;
 pub mod hermes;
 pub mod hostile;
 pub mod http;

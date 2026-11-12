@@ -34,6 +34,11 @@
 //! | [`alert`] | What the panel would show the admin. |
 //! | [`audit_log`] | Reading the audit. |
 //! | [`device`] | What a connection needs to know about its device. |
+//! | [`engine`] | The engine of the organization: its addresses and its sealed secrets. |
+//! | [`number`] | The numbers of WhatsApp and their states. |
+//! | [`chat`] | The chats of a number, by their identifiers in the engine. |
+//! | [`engine_event`] | The inbox of events of the engine. |
+//! | [`access`] | The matrix of accesses: what each Hermes may do on each number and in each chat. |
 
 use arauto_protocol::message::DeclaredText;
 use sqlx::postgres::{PgConnection, PgPool};
@@ -46,15 +51,20 @@ use crate::db::{DbError, ResolvedOrg};
 use crate::restore::{Evidence, RestoreError};
 use crate::vault::VaultError;
 
+pub mod access;
 pub mod alert;
 pub mod approval;
 pub mod audit_log;
+pub mod chat;
 pub mod closing;
 pub mod connection;
 pub mod device;
+pub mod engine;
+pub mod engine_event;
 pub mod enroll;
 pub mod hermes;
 pub mod invite;
+pub mod number;
 pub mod purge;
 pub mod swap;
 pub mod sweep;

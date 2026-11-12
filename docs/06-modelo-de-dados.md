@@ -119,6 +119,13 @@ sessão do motor a partir dos acessos do Hermes daquele aparelho.
 As regras estão em [08-permissoes.md](08-permissoes.md). Toda alteração gera evento de auditoria com
 o antes e o depois.
 
+No hub, em 12/11/2026 (proposta, [decisão 0039](decisoes/0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md)):
+as tabelas são `access` (`scope`, `can_read`, `can_send`, `can_modify`, `can_wake`,
+`can_start_chats`, `created_by`, `created_at`, `changed_at`) e `access_chat` (com `number_id`, para
+o banco recusar linha de conversa de outro número). O banco também recusa "acordar" sem "ler" e
+"iniciar conversa" sem "enviar" e escopo "todas". Remover o número ou o Hermes apaga os acessos
+dele, cada um com o seu evento.
+
 ## 6. Filas
 
 **evento_motor** (entrada): `motor_id` + `id_do_evento` (único), `tipo`, `corpo_cifrado`,
@@ -201,5 +208,8 @@ Os tipos de alerta no hub, em 11/11/2026:
 | `reuse_after_closing` | Lacre mais antigo apresentado por aparelho encerrado (C7). No máximo um por aparelho a cada 24 horas, como o registro de lacre sem explicação. |
 | `unconfirmed_swaps` | Três conexões sem "gravei" em 24 horas (C7). |
 | `mark_not_advanced` | Um evento de segurança ficou gravado, mas a marca da auditoria não acompanhou. Sem ele, uma restauração que perdesse exatamente aquele evento passaria despercebida. |
+| `engine_version_untested` | A versão do motor mudou para uma que não está na lista das testadas ([waha-fatos](../referencia/waha-fatos.md)). Um por mudança de versão. |
+| `engine_session_corrected` | A supervisão achou uma sessão do motor com configuração diferente da do hub (por exemplo, outro destino de eventos) e a corrigiu ([10](10-maquinas-de-estado.md), seção 4). |
+| `number_swapped` | O celular que pareou um número não é o telefone que o admin adicionou: os acessos ficam parados até `admin number confirm` ou `unpair` ([10](10-maquinas-de-estado.md), seção 4). |
 
 **retencao**: o prazo de guarda de cada tabela que tem expurgo.

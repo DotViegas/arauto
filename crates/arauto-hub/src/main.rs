@@ -8,15 +8,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use arauto_hub::admin::render::{self, Report};
+use arauto_hub::admin::render::{self, Report, access, whatsapp};
+use arauto_hub::admin::whatsapp::{PairMethod, Removal};
 use arauto_hub::admin::{self, Session};
 use arauto_hub::channel::{self, ChannelSettings};
 use arauto_hub::config::{ProcessEnv, PublicUrl, ServeConfig, StorageConfig};
+use arauto_hub::core::access::{Grant, Scope, Verbs};
 use arauto_hub::core::model::DeviceState;
 use arauto_hub::db::{self, PoolOptions};
+use arauto_hub::engine::EngineSettings;
 use arauto_hub::mark::Mark;
 use arauto_hub::repo::alert::AlertFilter;
 use arauto_hub::repo::approval::{ApproveOutcome, Recognition, Recognized};
+use arauto_hub::vault::Vault;
 use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_protocol::message::DeclaredText;
 use clap::{Parser, Subcommand, ValueEnum};
@@ -129,6 +133,199 @@ enum InstalledCommand {
         #[arg(long, value_name = "N", default_value_t = 50)]
         tail: u32,
     },
+    /// The WhatsApp engine: where it is, its key, the secret of its events.
+    Engine {
+        #[command(subcommand)]
+        command: EngineCommand,
+    },
+    /// The WhatsApp numbers and their pairing.
+    Number {
+        #[command(subcommand)]
+        command: NumberCommand,
+    },
+    /// The matrix of accesses: what each Hermes may do on each number and in each chat.
+    Access {
+        #[command(subcommand)]
+        command: AccessCommand,
+    },
+}
+
+/// The verbs given on the command line.
+#[derive(Debug, Clone, Copy, clap::Args)]
+struct VerbArgs {
+    /// See chats and messages, download files, see groups, contacts and the state.
+    #[arg(long)]
+    read: bool,
+    /// Write, react, mark as read, type, forward, ask whether a telephone has WhatsApp.
+    #[arg(long)]
+    send: bool,
+    /// Edit and delete messages.
+    #[arg(long)]
+    modify: bool,
+    /// Be woken when a message arrives. Needs --read.
+    #[arg(long)]
+    wake: bool,
+}
+
+impl VerbArgs {
+    const fn verbs(self) -> Verbs {
+        Verbs {
+            read: self.read,
+            send: self.send,
+            modify: self.modify,
+            wake: self.wake,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum ScopeArg {
+    /// Every chat of the number, those that come later included.
+    All,
+    /// Only the chats given a line with `access chat`.
+    List,
+}
+
+#[derive(Debug, Subcommand)]
+enum AccessCommand {
+    /// Gives a Hermes an access to a number, or changes it whole: the scope and the verbs.
+    Grant {
+        /// The name of the Hermes.
+        hermes: String,
+        /// The alias of the number.
+        number: String,
+        /// Which chats the verbs reach.
+        #[arg(long, value_enum)]
+        scope: ScopeArg,
+        #[command(flatten)]
+        verbs: VerbArgs,
+        /// May write first to someone who never talked to the number. Needs --send and
+        /// --scope all.
+        #[arg(long = "start-chats")]
+        start_chats: bool,
+    },
+    /// Takes the access of a Hermes to a number away, with the lines of its chats.
+    Remove {
+        /// The name of the Hermes.
+        hermes: String,
+        /// The alias of the number.
+        number: String,
+    },
+    /// Gives one chat its own verbs, which replace the verbs of the number there. With no
+    /// verb, the chat is blocked.
+    Chat {
+        /// The name of the Hermes.
+        hermes: String,
+        /// The alias of the number.
+        number: String,
+        /// A telephone with the code of the country, an identifier of the engine, or an
+        /// identifier shown by `access list`.
+        chat: String,
+        #[command(flatten)]
+        verbs: VerbArgs,
+    },
+    /// Takes the line of one chat away.
+    ChatRemove {
+        /// The name of the Hermes.
+        hermes: String,
+        /// The alias of the number.
+        number: String,
+        /// The chat, as `access chat` takes it.
+        chat: String,
+    },
+    /// Lists the accesses, with the lines of their chats.
+    List {
+        /// Only the accesses of this Hermes.
+        hermes: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum EngineCommand {
+    /// Creates the engine, or changes its addresses.
+    Set {
+        /// Where the hub reaches the engine: http://host:port, on the private network.
+        #[arg(long)]
+        url: String,
+        /// Where the engine reaches the internal port of the hub: http://host:port, with no
+        /// underscore in the name.
+        #[arg(long = "events-url")]
+        events_url: String,
+    },
+    /// Sets the key of the API of the engine, read from the terminal (never an argument).
+    SetKey,
+    /// Draws a new secret for the events of the engine. It is never shown.
+    NewEventsSecret,
+    /// The engine: its addresses, whether its secrets are set, the version seen.
+    Show,
+    /// Asks the engine whether it is healthy.
+    Health,
+    /// Asks the engine its version, and says whether it is one the hub was checked against.
+    Version,
+}
+
+#[derive(Debug, Subcommand)]
+enum NumberCommand {
+    /// Adds a number, unpaired.
+    Add {
+        /// The alias: lowercase letters, digits, hyphen and underscore, up to 32.
+        alias: String,
+        /// The telephone, with the code of the country.
+        phone: String,
+        /// Marks the number as a command channel of some Hermes.
+        #[arg(long)]
+        command: bool,
+    },
+    /// Lists the numbers.
+    List {
+        /// Shows the removed ones too.
+        #[arg(long)]
+        all: bool,
+    },
+    /// Pairs a number: shows a QR (or, with --code, a code to type on the telephone).
+    Pair {
+        /// The alias of the number.
+        alias: String,
+        /// A code to type on the telephone instead of a QR.
+        #[arg(long)]
+        code: bool,
+    },
+    /// Disconnects a number: its session stops, without leaving WhatsApp.
+    Disconnect {
+        /// The alias of the number.
+        alias: String,
+    },
+    /// Restarts a failed session of the engine.
+    Restart {
+        /// The alias of the number.
+        alias: String,
+    },
+    /// Accepts the new telephone of a swapped number.
+    Confirm {
+        /// The alias of the number.
+        alias: String,
+    },
+    /// Undoes the pairing of a swapped number. Leaving WhatsApp erases the history the
+    /// engine keeps.
+    Unpair {
+        /// The alias of the number.
+        alias: String,
+        /// Says that the history the engine keeps of this number may be erased.
+        #[arg(long = "erase-engine-history", required = true)]
+        erase_engine_history: bool,
+    },
+    /// Removes a number: every access to it ends.
+    #[command(group = clap::ArgGroup::new("removal").required(true).args(["keep_in_engine", "erase_engine_history"]))]
+    Remove {
+        /// The alias of the number.
+        alias: String,
+        /// Stops its session and keeps it in the engine, with its history.
+        #[arg(long = "keep-in-engine")]
+        keep_in_engine: bool,
+        /// Leaves WhatsApp and deletes its session: the engine erases its history.
+        #[arg(long = "erase-engine-history")]
+        erase_engine_history: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -236,7 +433,7 @@ async fn run(command: Command) -> anyhow::Result<Report> {
             // A commit the server may lose would later read as a restored database.
             db::check_durability(&pool, storage.allow_unsafe_db).await?;
             let session = Session::open(pool, mark, os_user()).await?;
-            let mut report = run_installed(&session, command, now).await?;
+            let mut report = run_installed(&session, &storage, command, now).await?;
             // While the restored mode is on, every screen says so (C11).
             if let Some(notice) = session
                 .installation()
@@ -273,8 +470,214 @@ async fn serve() -> anyhow::Result<Report> {
     })
 }
 
+/// Opens the master key: the commands of the engine and of the numbers need it.
+async fn vault(storage: &StorageConfig) -> anyhow::Result<Vault> {
+    let data_dir = storage.data_dir.clone();
+    Ok(tokio::task::spawn_blocking(move || Vault::open(&data_dir))
+        .await
+        .context("could not open the master key")??)
+}
+
+/// Reads the key of the engine from the terminal: one line, never an argument, so that it
+/// stays out of the history of the shell.
+fn read_key() -> anyhow::Result<zeroize::Zeroizing<String>> {
+    let mut out = std::io::stdout().lock();
+    write!(
+        out,
+        "Paste the key of the API of the engine and press Enter: "
+    )?;
+    out.flush()?;
+    let mut line = zeroize::Zeroizing::new(String::new());
+    std::io::stdin()
+        .lock()
+        .read_line(&mut line)
+        .context("could not read the key")?;
+    Ok(line)
+}
+
+async fn run_engine(
+    session: &Session,
+    storage: &StorageConfig,
+    command: EngineCommand,
+    now: i64,
+) -> anyhow::Result<Report> {
+    if let EngineCommand::Show = command {
+        return Ok(whatsapp::engine_show(session.engine_show().await?.as_ref()));
+    }
+    let vault = vault(storage).await?;
+    Ok(match command {
+        EngineCommand::Set { url, events_url } => {
+            whatsapp::engine_set(session.engine_set(&vault, &url, &events_url, now).await?)
+        }
+        EngineCommand::SetKey => {
+            let typed = read_key()?;
+            session.engine_set_key(&vault, &typed, now).await?;
+            whatsapp::engine_secret("The key of the engine was set")
+        }
+        EngineCommand::NewEventsSecret => {
+            session.engine_new_events_secret(&vault, now).await?;
+            whatsapp::engine_secret("A new secret of the events was drawn")
+        }
+        EngineCommand::Health => match session.engine_health(&vault).await {
+            Ok(()) => whatsapp::engine_health(Ok(())),
+            Err(admin::AdminError::Engine(error)) => whatsapp::engine_health(Err(error)),
+            Err(other) => return Err(other.into()),
+        },
+        EngineCommand::Version => {
+            whatsapp::engine_version(&session.engine_version(&vault, now).await?)
+        }
+        EngineCommand::Show => whatsapp::engine_show(session.engine_show().await?.as_ref()),
+    })
+}
+
+async fn run_number(
+    session: &Session,
+    storage: &StorageConfig,
+    command: NumberCommand,
+    now: i64,
+) -> anyhow::Result<Report> {
+    let vault = vault(storage).await?;
+    Ok(match command {
+        NumberCommand::Add {
+            alias,
+            phone,
+            command,
+        } => whatsapp::number_added(
+            &session
+                .number_add(&vault, &alias, &phone, command, now)
+                .await?,
+        ),
+        NumberCommand::List { all } => {
+            let mut listed = Vec::new();
+            for number in session.number_list(all).await? {
+                let phone = session.number_phone(&vault, &number).await.ok();
+                listed.push((number, phone));
+            }
+            whatsapp::number_list(&listed)
+        }
+        NumberCommand::Pair { alias, code } => {
+            let method = if code {
+                PairMethod::Code
+            } else {
+                PairMethod::Qr
+            };
+            let outcome = session
+                .number_pair(
+                    &vault,
+                    &alias,
+                    method,
+                    &EngineSettings::default(),
+                    &SystemClock,
+                    |shown| print!("{}", whatsapp::shown(&shown)),
+                )
+                .await?;
+            whatsapp::paired(&alias, &outcome)
+        }
+        NumberCommand::Disconnect { alias } => whatsapp::number_changed(
+            "was disconnected",
+            &session.number_disconnect(&vault, &alias, now).await?,
+        ),
+        NumberCommand::Restart { alias } => whatsapp::number_changed(
+            "was restarted",
+            &session.number_restart(&vault, &alias, now).await?,
+        ),
+        NumberCommand::Confirm { alias } => {
+            whatsapp::number_confirmed(&session.number_confirm(&alias, now).await?)
+        }
+        NumberCommand::Unpair { alias, .. } => whatsapp::number_changed(
+            "left WhatsApp and its pairing was undone",
+            &session.number_unpair(&vault, &alias, now).await?,
+        ),
+        NumberCommand::Remove {
+            alias,
+            erase_engine_history,
+            ..
+        } => {
+            let removal = if erase_engine_history {
+                Removal::EraseEngineHistory
+            } else {
+                Removal::KeepInEngine
+            };
+            whatsapp::number_changed(
+                "was removed",
+                &session.number_remove(&vault, &alias, removal, now).await?,
+            )
+        }
+    })
+}
+
+async fn run_access(
+    session: &Session,
+    storage: &StorageConfig,
+    command: AccessCommand,
+    now: i64,
+) -> anyhow::Result<Report> {
+    Ok(match command {
+        AccessCommand::Grant {
+            hermes,
+            number,
+            scope,
+            verbs,
+            start_chats,
+        } => {
+            let grant = Grant {
+                scope: match scope {
+                    ScopeArg::All => Scope::All,
+                    ScopeArg::List => Scope::List,
+                },
+                verbs: verbs.verbs(),
+                can_start_chats: start_chats,
+            };
+            access::granted(
+                &hermes,
+                &number,
+                &session.access_grant(&hermes, &number, grant, now).await?,
+            )
+        }
+        AccessCommand::Remove { hermes, number } => access::removed(
+            &hermes,
+            &number,
+            session.access_remove(&hermes, &number, now).await?,
+        ),
+        AccessCommand::Chat {
+            hermes,
+            number,
+            chat,
+            verbs,
+        } => {
+            let vault = vault(storage).await?;
+            access::chat_changed(
+                &hermes,
+                &number,
+                &session
+                    .access_chat(&vault, &hermes, &number, &chat, verbs.verbs(), now)
+                    .await?,
+            )
+        }
+        AccessCommand::ChatRemove {
+            hermes,
+            number,
+            chat,
+        } => {
+            let vault = vault(storage).await?;
+            access::chat_changed(
+                &hermes,
+                &number,
+                &session
+                    .access_chat_remove(&vault, &hermes, &number, &chat, now)
+                    .await?,
+            )
+        }
+        AccessCommand::List { hermes } => {
+            let vault = vault(storage).await?;
+            access::list(&session.access_list(&vault, hermes.as_deref()).await?)
+        }
+    })
+}
+
 async fn run_installed(
     session: &Session,
+    storage: &StorageConfig,
     command: InstalledCommand,
     now: i64,
 ) -> anyhow::Result<Report> {
@@ -329,6 +732,9 @@ async fn run_installed(
             )
         }
         InstalledCommand::Audit { tail } => render::audit(&session.audit(tail).await?),
+        InstalledCommand::Engine { command } => run_engine(session, storage, command, now).await?,
+        InstalledCommand::Number { command } => run_number(session, storage, command, now).await?,
+        InstalledCommand::Access { command } => run_access(session, storage, command, now).await?,
     })
 }
 
@@ -439,6 +845,34 @@ mod tests {
             "arauto-hub admin alerts --ack 00000000-0000-0000-0000-000000000001",
             "arauto-hub admin audit",
             "arauto-hub admin audit --tail 20",
+            "arauto-hub admin engine set --url http://192.0.2.10:3000 --events-url http://hub:9000",
+            "arauto-hub admin engine set-key",
+            "arauto-hub admin engine new-events-secret",
+            "arauto-hub admin engine show",
+            "arauto-hub admin engine health",
+            "arauto-hub admin engine version",
+            "arauto-hub admin number add vendas +5511900000000",
+            "arauto-hub admin number add vendas 5511900000000 --command",
+            "arauto-hub admin number list",
+            "arauto-hub admin number list --all",
+            "arauto-hub admin number pair vendas",
+            "arauto-hub admin number pair vendas --code",
+            "arauto-hub admin number disconnect vendas",
+            "arauto-hub admin number restart vendas",
+            "arauto-hub admin number confirm vendas",
+            "arauto-hub admin number unpair vendas --erase-engine-history",
+            "arauto-hub admin number remove vendas --keep-in-engine",
+            "arauto-hub admin number remove vendas --erase-engine-history",
+            "arauto-hub admin access grant vendas balcao --scope all --read --send",
+            "arauto-hub admin access grant vendas balcao --scope all --read --send --start-chats",
+            "arauto-hub admin access grant vendas balcao --scope list",
+            "arauto-hub admin access grant vendas balcao --scope list --read --wake",
+            "arauto-hub admin access remove vendas balcao",
+            "arauto-hub admin access chat vendas balcao +5511900000000 --read",
+            "arauto-hub admin access chat vendas balcao 120363012345678901@g.us",
+            "arauto-hub admin access chat-remove vendas balcao +5511900000000",
+            "arauto-hub admin access list",
+            "arauto-hub admin access list vendas",
             "arauto-hub dev-reset --yes-erase-everything",
         ] {
             let parsed = Cli::try_parse_from(line.split(' '));
@@ -448,7 +882,16 @@ mod tests {
             "arauto-hub admin approve vendas 123456 --recognized --not-recognized",
             "arauto-hub admin wake vendas maybe",
             "arauto-hub admin alerts --ack not-an-id",
+            "arauto-hub admin engine set-key s3cr3t-engine-key",
+            "arauto-hub admin engine set --url http://192.0.2.10:3000",
+            "arauto-hub admin number unpair vendas",
+            "arauto-hub admin number remove vendas",
+            "arauto-hub admin number remove vendas --keep-in-engine --erase-engine-history",
             "arauto-hub admin",
+            "arauto-hub admin access grant vendas balcao --read",
+            "arauto-hub admin access grant vendas balcao --scope some --read",
+            "arauto-hub admin access remove vendas",
+            "arauto-hub admin access chat vendas balcao",
         ] {
             assert!(Cli::try_parse_from(line.split(' ')).is_err(), "{line}");
         }
