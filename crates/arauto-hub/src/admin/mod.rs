@@ -41,6 +41,7 @@ use crate::restore::{self, Evidence, Installation, RestoreError, Standing};
 use crate::vault::{MASTER_KEY_FILE, Vault, VaultError};
 
 pub mod access;
+pub mod link;
 pub mod qr;
 pub mod render;
 pub mod whatsapp;
@@ -202,6 +203,10 @@ pub enum AdminError {
     /// The access asked breaks a rule of `docs/08-permissoes.md`, section 1.
     #[error("{0}")]
     AccessRule(crate::core::access::AccessRuleError),
+
+    /// A link from a Hermes to itself.
+    #[error("a Hermes has no link to itself: name two different Hermes")]
+    LinkToItself,
 
     /// The Hermes has no access to that number.
     #[error(

@@ -9,7 +9,7 @@
 //! | `check_ok` | The reader of the link answers the test of a newer connection itself (step 8); one that reaches here is late, and ignored. |
 //! | `saved` | Only during the 24-hour swap: T2, then `rotated`. Anything else closes (C7, rule 7). |
 //! | `leave` | The device asks for its own closing: `left`, and the connection ends. |
-//! | `notice_ack` | No notice is sent before the second milestone: ignored. |
+//! | `notice_ack` | What the connector did with a notice: confirmed, put back in the queue or discarded ([`crate::repo::peer::acknowledge`]). One about a notice that is not out changes nothing. |
 //!
 //! **The list of tools** follows the matrix of accesses (`docs/09-contrato-mcp.md`): the
 //! `session` carries what the WhatsApp verbs of the Hermes release, and when they change
@@ -35,8 +35,15 @@
 //! The calls go on meanwhile. Without the `saved` in time the connection closes, and on the
 //! way back the usual table holds.
 //!
-//! The tools of the conversation between Hermes come with the second milestone: they are in
-//! the catalog and answer AR-701. `arauto_status` is answered by the hub itself, without the
+//! **The notices** (`docs/13-conversa-entre-hermes.md`, section 5). When the session is
+//! poked (by the message that created a notice, or by the sweep, which finds the Hermes with
+//! a notice that may leave) it takes the notices of its Hermes that may leave now, each with
+//! a lease, and sends them. It never looks at the queue on its own clock: a busy database
+//! must not hold the loop of a session. A notice is a pointer: who sent and how many, never
+//! a text.
+//!
+//! The tools of the conversation between Hermes are answered by `crate::peer`, against the
+//! list of peers of that moment. `arauto_status` is answered by the hub itself, without the
 //! engine, and says no secret.
 
 use std::collections::HashSet;
@@ -48,6 +55,7 @@ use arauto_protocol::message::{
     Call, CallId, CallOutcome, CallResult, Credential, Left, LeftStatus, Message, Payload, Rotated,
     Saved, Session, ToolList, Tools,
 };
+use arauto_protocol::notice::{Notice, NoticeCount, NoticeId, NoticeMsg};
 use arauto_protocol::tools::{self, Grants, ToolCall};
 use serde_json::{Value, json};
 use tokio::sync::watch;
@@ -61,6 +69,7 @@ use super::registry::{Entry, Status};
 use super::settings::duration;
 use crate::audit::AuditError;
 use crate::db::ResolvedOrg;
+use crate::peer::PeerCall;
 use crate::repo::connection::{ChannelConnection, CloseReason};
 use crate::repo::device::Standing;
 use crate::repo::swap::{
@@ -68,15 +77,9 @@ use crate::repo::swap::{
 };
 use crate::repo::{self, RepoError};
 
-/// The names of the tools `grants` release, as `session` and `tools` carry them. The links
-/// between Hermes come with the second milestone: they release nothing here.
+/// The names of the tools `grants` release, as `session` and `tools` carry them.
 fn released_tools(grants: &Grants) -> ToolList {
-    let grants = Grants {
-        peer_any: false,
-        peer_outbound: false,
-        ..*grants
-    };
-    let names = tools::released(&grants)
+    let names = tools::released(grants)
         .map(tools::ToolSpec::tool_name)
         .collect();
     // The catalog has fewer than 64 tools, each once.
@@ -86,7 +89,14 @@ fn released_tools(grants: &Grants) -> ToolList {
 /// The grants of a Hermes now. When the database does not answer, nothing but the status:
 /// the next poke or sweep sends the list again.
 async fn grants_of(hub: &Hub, organization: ResolvedOrg, hermes: Uuid) -> Grants {
-    match crate::whatsapp::grants_now(hub, organization, hermes).await {
+    let whatsapp = match crate::whatsapp::grants_now(hub, organization, hermes).await {
+        Ok(grants) => grants,
+        Err(error) => {
+            tracing::error!(%error, "the grants of a Hermes could not be read");
+            return Grants::default();
+        }
+    };
+    match crate::peer::grants_now(hub, organization, hermes, whatsapp).await {
         Ok(grants) => grants,
         Err(error) => {
             tracing::error!(%error, "the grants of a Hermes could not be read");
@@ -163,6 +173,9 @@ pub(crate) async fn leave(
     }
     CloseReason::DeviceEnded
 }
+
+/// The most notices a session sends in one look at its queue.
+const NOTICES_PER_ROUND: u32 = 16;
 
 /// The identifiers of the calls in progress of one session.
 type InFlight = Arc<Mutex<HashSet<u64>>>;
@@ -307,6 +320,9 @@ impl Serving<'_> {
                     if let Some(reason) = self.read_again().await {
                         return reason;
                     }
+                    if let Some(reason) = self.send_notices().await {
+                        return reason;
+                    }
                 }
                 () = sleep_until(saved_by), if saved_by.is_some() => {
                     // The "saved" of the 24-hour swap did not come in time.
@@ -334,7 +350,23 @@ impl Serving<'_> {
                 self.entry.set_status(Status::Attempt);
                 Some(leave(&self.hub, self.link, self.organization, self.device).await)
             }
-            Message::NoticeAck(_) => None,
+            Message::NoticeAck(ack) => {
+                let now = self.hub.now_ms();
+                if let Err(error) = repo::peer::acknowledge(
+                    self.hub.pool(),
+                    self.organization,
+                    self.hermes,
+                    ack.id.get(),
+                    ack.outcome,
+                    now,
+                )
+                .await
+                {
+                    // Its lease ends and it leaves again.
+                    tracing::error!(%error, "the answer to a notice could not be recorded");
+                }
+                None
+            }
             // Anything else the connector sends belongs before the session.
             _ => {
                 self.close(ErrorCode::Ar204);
@@ -404,6 +436,46 @@ impl Serving<'_> {
                 None
             }
         }
+    }
+
+    /// Sends the notices of the Hermes that may leave now. Each one leaves with a lease: the
+    /// connector confirms it, or it leaves again.
+    async fn send_notices(&mut self) -> Option<CloseReason> {
+        if self.draining {
+            return None;
+        }
+        let now = self.hub.now_ms();
+        let due = match repo::peer::lease(
+            self.hub.pool(),
+            self.organization,
+            self.hermes,
+            now,
+            NOTICES_PER_ROUND,
+        )
+        .await
+        {
+            Ok(due) => due,
+            Err(error) => {
+                tracing::error!(%error, "the queue of notices of a Hermes could not be read");
+                return None;
+            }
+        };
+        for notice in due {
+            let Some(count) = NoticeCount::new(notice.count) else {
+                continue;
+            };
+            let message = Message::Notice(NoticeMsg::new(
+                NoticeId::new(notice.id),
+                &Notice::Peer {
+                    from: notice.from,
+                    count,
+                },
+            ));
+            if self.link.send(&message).await.is_err() {
+                return Some(self.dropped());
+            }
+        }
+        None
     }
 
     /// Sends `tools` when what the Hermes has changed since the list it was given.
@@ -661,12 +733,31 @@ async fn run_call(hub: &Hub, organization: ResolvedOrg, device: Uuid, call: &Cal
                 .await
                 .into()
         }
-        // The links between Hermes come with the second milestone: nothing releases them.
-        ToolCall::HermesListPeers
-        | ToolCall::HermesSendMessage(_)
-        | ToolCall::HermesListThreads(_)
-        | ToolCall::HermesReadThread(_) => refusal(ErrorCode::Ar701).into(),
+        // The list of peers is read again at this call, inside.
+        ToolCall::HermesListPeers => {
+            peer_call(hub, organization, &standing, PeerCall::ListPeers).await
+        }
+        ToolCall::HermesSendMessage(message) => {
+            peer_call(hub, organization, &standing, PeerCall::Send(&message)).await
+        }
+        ToolCall::HermesListThreads(list) => {
+            peer_call(hub, organization, &standing, PeerCall::ListThreads(list)).await
+        }
+        ToolCall::HermesReadThread(read) => {
+            peer_call(hub, organization, &standing, PeerCall::ReadThread(read)).await
+        }
     }
+}
+
+async fn peer_call(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    standing: &Standing,
+    call: PeerCall<'_>,
+) -> Answer {
+    crate::peer::answer(hub, organization, standing.hermes, &standing.name, call)
+        .await
+        .into()
 }
 
 /// `arauto_status`, answered by the hub without the engine. No secret: the name of the

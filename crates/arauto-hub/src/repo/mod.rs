@@ -65,6 +65,7 @@ pub mod enroll;
 pub mod hermes;
 pub mod invite;
 pub mod number;
+pub mod peer;
 pub mod purge;
 pub mod swap;
 pub mod sweep;

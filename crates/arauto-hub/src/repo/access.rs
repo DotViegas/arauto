@@ -274,6 +274,37 @@ pub async fn chat_lines(
         .collect())
 }
 
+/// The numbers the Hermes `name` has an access to, each with the words of its verbs: what
+/// the admin is shown when a link between Hermes is created.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn reach_of(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    name: &HermesName,
+) -> Result<Vec<(String, Vec<&'static str>)>, RepoError> {
+    let rows: Vec<(String, bool, bool, bool, bool)> = sqlx::query_as(
+        "SELECT n.alias, a.can_read, a.can_send, a.can_modify, a.can_wake \
+         FROM access a \
+         JOIN number n ON n.organization_id = a.organization_id AND n.id = a.number_id \
+         JOIN hermes h ON h.organization_id = a.organization_id AND h.id = a.hermes_id \
+         WHERE a.organization_id = $1 AND h.name = $2 AND h.deleted_at IS NULL \
+           AND n.removed_at IS NULL \
+         ORDER BY n.alias",
+    )
+    .bind(organization.id())
+    .bind(name.as_str())
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(alias, read, send, modify, wake)| {
+            (alias, verbs_of(read, send, modify, wake).words())
+        })
+        .collect())
+}
+
 // ---------------------------------------------------------------------------- the admin
 
 /// An access as the admin reads it.

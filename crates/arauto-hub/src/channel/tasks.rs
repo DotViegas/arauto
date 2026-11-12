@@ -106,17 +106,23 @@ async fn sweep(hub: &Hub) {
 /// organization. A session whose device no longer serves gets the `closing` of its code; a
 /// waiting connection whose request was resolved is poked, and tells the connector itself.
 pub(crate) async fn check_standings(hub: &Hub) {
-    let mut by_organization: HashMap<ResolvedOrg, Vec<(Arc<Entry>, Place)>> = HashMap::new();
+    // The phase of each connection is taken BEFORE the database is read: a connection that
+    // becomes a session while the queries run would be judged by the state its device had
+    // before the promotion, and closed. What is read after the phase was taken is at least
+    // as new as the phase.
+    let mut by_organization: HashMap<ResolvedOrg, Vec<(Arc<Entry>, Place, Status)>> =
+        HashMap::new();
     for entry in hub.registry().all() {
         if let Some(place) = entry.place() {
+            let phase = entry.status();
             by_organization
                 .entry(place.organization)
                 .or_default()
-                .push((entry, place));
+                .push((entry, place, phase));
         }
     }
     for (organization, entries) in by_organization {
-        let mut devices: Vec<Uuid> = entries.iter().map(|(_, place)| place.device).collect();
+        let mut devices: Vec<Uuid> = entries.iter().map(|(_, place, _)| place.device).collect();
         devices.sort_unstable();
         devices.dedup();
         let standings: HashMap<Uuid, Standing> =
@@ -130,35 +136,25 @@ pub(crate) async fn check_standings(hub: &Hub) {
                     continue;
                 }
             };
-        let mut serving: Vec<Uuid> = entries
-            .iter()
-            .filter(|(entry, _)| entry.status() == Status::Session)
-            .map(|(_, place)| place.hermes)
-            .collect();
-        serving.sort_unstable();
-        serving.dedup();
-        // The list of tools of each session, against what its Hermes has now: one query.
-        let grants = match repo::access::grants_of(hub.sweep_pool(), organization, &serving).await {
-            Ok(grants) => grants,
-            Err(error) => {
-                tracing::error!(%error, "the grants of the Hermes in session could not be read");
-                HashMap::new()
-            }
-        };
-        for (entry, place) in entries {
+        // First what must not wait: a session whose device no longer serves is closed, and
+        // a waiting connection whose request was resolved is told. Only then the queries of
+        // the lists of tools and of the notices, which may wait for the database.
+        let mut still: Vec<(Arc<Entry>, Place)> = Vec::new();
+        for (entry, place, phase) in entries {
             let standing = standings.get(&place.device);
-            match entry.status() {
+            if entry.status() != phase {
+                // It moved on meanwhile: the next sweep judges it in its new phase.
+                continue;
+            }
+            match phase {
                 Status::Session => {
-                    if !standing.is_some_and(Standing::may_serve) {
+                    if standing.is_some_and(Standing::may_serve) {
+                        still.push((entry, place));
+                    } else {
                         let code = standing
                             .and_then(Standing::ended_code)
                             .unwrap_or(ErrorCode::Ar504);
                         entry.handle().close(code);
-                    } else if let Some(now) = grants.get(&place.hermes)
-                        && entry.grants().is_some_and(|given| given != *now)
-                    {
-                        // The session reads again and sends `tools`.
-                        entry.poke();
                     }
                 }
                 Status::Waiting => {
@@ -170,7 +166,59 @@ pub(crate) async fn check_standings(hub: &Hub) {
                 Status::Attempt => {}
             }
         }
+        let mut serving: Vec<Uuid> = still.iter().map(|(_, place)| place.hermes).collect();
+        serving.sort_unstable();
+        serving.dedup();
+        // The list of tools of each session, against what its Hermes has now: one query.
+        let grants = match grants_of(hub, organization, &serving).await {
+            Ok(grants) => grants,
+            Err(error) => {
+                tracing::error!(%error, "the grants of the Hermes in session could not be read");
+                HashMap::new()
+            }
+        };
+        // The Hermes with a notice that may leave: their sessions look at their queue.
+        let due: Vec<Uuid> =
+            match repo::peer::hermes_with_due_notices(hub.sweep_pool(), organization, hub.now_ms())
+                .await
+            {
+                Ok(due) => due,
+                Err(error) => {
+                    tracing::error!(%error, "the queue of notices could not be read");
+                    Vec::new()
+                }
+            };
+        for (entry, place) in still {
+            if entry.status() != Status::Session {
+                continue;
+            }
+            if let Some(now) = grants.get(&place.hermes)
+                && entry.grants().is_some_and(|given| given != *now)
+            {
+                // The session reads again and sends `tools`.
+                entry.poke();
+            } else if due.contains(&place.hermes) {
+                entry.poke();
+            }
+        }
     }
+}
+
+/// The grants of each of the Hermes `hermes` now: the verbs of WhatsApp and the links with
+/// other Hermes, in two queries for all of them.
+async fn grants_of(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    hermes: &[Uuid],
+) -> Result<HashMap<Uuid, arauto_protocol::tools::Grants>, repo::RepoError> {
+    let mut grants = repo::access::grants_of(hub.sweep_pool(), organization, hermes).await?;
+    let links = repo::peer::links_of(hub.sweep_pool(), organization, hermes).await?;
+    for (id, grants) in &mut grants {
+        let (outbound, inbound) = links.get(id).copied().unwrap_or_default();
+        grants.peer_any = outbound || inbound;
+        grants.peer_outbound = outbound;
+    }
+    Ok(grants)
 }
 
 /// The purge, until the hub stops: one run each interval, the first one an interval after the

@@ -31,6 +31,7 @@ pub mod core;
 pub mod db;
 pub mod engine;
 pub mod mark;
+mod peer;
 pub mod repo;
 pub mod restore;
 pub mod vault;

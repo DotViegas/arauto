@@ -144,6 +144,18 @@ async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
         .wake(&name, true, fixture.now())
         .await
         .unwrap();
+    // The link gives it the tools that read: the hub tells the session.
+    loop {
+        match session
+            .pump(std::time::Duration::from_secs(20))
+            .await
+            .unwrap()
+        {
+            Some(arauto_protocol::message::Message::Tools(_)) => break,
+            Some(other) => panic!("the hub sent {:?}", other.kind()),
+            None => {}
+        }
+    }
     let CallOutcome::Ok(content) = session.call(ARAUTO_STATUS, json!({})).await.unwrap() else {
         panic!("not answered");
     };

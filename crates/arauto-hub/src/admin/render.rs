@@ -26,6 +26,7 @@ use crate::restore::{Installation, Standing};
 use super::{Block, InitOutcome, Status, UNSEEN_COUNT_MAX};
 
 pub mod access;
+pub mod link;
 pub mod whatsapp;
 
 /// What a command has to say, and whether it did what was asked. The program exits with an

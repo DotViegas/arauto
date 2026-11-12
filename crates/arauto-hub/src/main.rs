@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use arauto_hub::admin::render::{self, Report, access, whatsapp};
+use arauto_hub::admin::render::{self, Report, access, link, whatsapp};
 use arauto_hub::admin::whatsapp::{PairMethod, Removal};
 use arauto_hub::admin::{self, Session};
 use arauto_hub::channel::{self, ChannelSettings};
@@ -148,6 +148,40 @@ enum InstalledCommand {
         #[command(subcommand)]
         command: AccessCommand,
     },
+    /// The list of peers: which Hermes may send messages to which.
+    Link {
+        #[command(subcommand)]
+        command: LinkCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum LinkCommand {
+    /// Lets one Hermes send messages to another, or changes the wake mark of the link.
+    Add {
+        /// The Hermes that may send.
+        from: String,
+        /// The Hermes that receives.
+        to: String,
+        /// A message of FROM wakes TO (TO must also be allowed to be woken: `admin wake`).
+        #[arg(long)]
+        wake: bool,
+        /// The link back too, from TO to FROM, with the same wake mark.
+        #[arg(long)]
+        both: bool,
+    },
+    /// Takes the link from one Hermes to another away.
+    Remove {
+        /// The Hermes that could send.
+        from: String,
+        /// The Hermes that received.
+        to: String,
+        /// The link back too.
+        #[arg(long)]
+        both: bool,
+    },
+    /// Lists the links.
+    List,
 }
 
 /// The verbs given on the command line.
@@ -735,6 +769,18 @@ async fn run_installed(
         InstalledCommand::Engine { command } => run_engine(session, storage, command, now).await?,
         InstalledCommand::Number { command } => run_number(session, storage, command, now).await?,
         InstalledCommand::Access { command } => run_access(session, storage, command, now).await?,
+        InstalledCommand::Link { command } => match command {
+            LinkCommand::Add {
+                from,
+                to,
+                wake,
+                both,
+            } => link::linked(&session.link_add(&from, &to, wake, both, now).await?),
+            LinkCommand::Remove { from, to, both } => {
+                link::unlinked(&session.link_remove(&from, &to, both, now).await?)
+            }
+            LinkCommand::List => link::list(&session.link_list().await?),
+        },
     })
 }
 
@@ -873,6 +919,11 @@ mod tests {
             "arauto-hub admin access chat-remove vendas balcao +5511900000000",
             "arauto-hub admin access list",
             "arauto-hub admin access list vendas",
+            "arauto-hub admin link add vendas suporte",
+            "arauto-hub admin link add vendas suporte --wake --both",
+            "arauto-hub admin link remove vendas suporte",
+            "arauto-hub admin link remove vendas suporte --both",
+            "arauto-hub admin link list",
             "arauto-hub dev-reset --yes-erase-everything",
         ] {
             let parsed = Cli::try_parse_from(line.split(' '));
@@ -892,6 +943,10 @@ mod tests {
             "arauto-hub admin access grant vendas balcao --scope some --read",
             "arauto-hub admin access remove vendas",
             "arauto-hub admin access chat vendas balcao",
+            "arauto-hub admin link add vendas",
+            "arauto-hub admin link remove vendas",
+            "arauto-hub admin link list vendas",
+            "arauto-hub admin link",
         ] {
             assert!(Cli::try_parse_from(line.split(' ')).is_err(), "{line}");
         }
