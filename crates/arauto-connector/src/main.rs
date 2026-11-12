@@ -18,7 +18,11 @@ fn main() -> ExitCode {
     };
     let arguments: Vec<std::ffi::OsString> = std::env::args_os().collect();
     let hermes = std::env::var_os("ARAUTO_HERMES_BIN");
-    let exit = runtime.block_on(arauto_connector::cli::run(arguments, hermes));
+    let api_url = std::env::var_os(arauto_connector::wake::URL_VARIABLE);
+    let api_key = std::env::var_os(arauto_connector::wake::KEY_VARIABLE);
+    let exit = runtime.block_on(arauto_connector::cli::run_waking(
+        arguments, hermes, api_url, api_key,
+    ));
     runtime.shutdown_timeout(BLOCKING_PATIENCE);
     ExitCode::from(exit.code())
 }

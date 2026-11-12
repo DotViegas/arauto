@@ -157,6 +157,18 @@ const USAGE: &str = "Usage: arauto-connector [--home FOLDER] <join HUB KEY INVIT
 /// Runs the command line `arguments`, with `hermes` the value of `ARAUTO_HERMES_BIN`, and
 /// returns the exit code.
 pub async fn run(arguments: Vec<OsString>, hermes: Option<OsString>) -> Exit {
+    run_waking(arguments, hermes, None, None).await
+}
+
+/// [`run`], with the values of [`crate::wake::URL_VARIABLE`] and
+/// [`crate::wake::KEY_VARIABLE`]: where the local API of Hermes is, and its key. Only the
+/// command `mcp` uses them.
+pub async fn run_waking(
+    arguments: Vec<OsString>,
+    hermes: Option<OsString>,
+    api_url: Option<OsString>,
+    api_key: Option<OsString>,
+) -> Exit {
     let cli = match Cli::try_parse_from(arguments) {
         Ok(cli) => cli,
         Err(error) => {
@@ -200,7 +212,14 @@ pub async fn run(arguments: Vec<OsString>, hermes: Option<OsString>) -> Exit {
             };
             join(&home, args, &hermes, &settings).await
         }
-        Command::Mcp => mcp(home, settings).await,
+        Command::Mcp => {
+            let url = api_url.as_deref().and_then(std::ffi::OsStr::to_str);
+            let key = api_key.as_deref().and_then(std::ffi::OsStr::to_str);
+            // A value that cannot be used is no waking, never a connector that does not
+            // start: the tools of the Hermes go on.
+            let target = crate::wake::WakeTarget::from_environment(url, key).unwrap_or(None);
+            mcp(home, settings.waking(target)).await
+        }
         Command::Status => {
             let report = crate::report::report(&home, &settings).await;
             print!("{}", crate::report::render(&report));

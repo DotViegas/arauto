@@ -8,7 +8,7 @@
 //! | `rotate`, then `credential` | The 24-hour swap: the credential is written durably and only then `saved` goes; the calls go on meanwhile. A `credential` without `rotate` before it ends the connection. |
 //! | `rotated` | The swap was recorded. |
 //! | `tools` | The list of released tools changed: it is kept in `state.json`. |
-//! | `notice` | Checked; `rejected` when out of format, `failed` otherwise: this connector does not wake the Hermes. |
+//! | `notice` | Checked, and the Hermes is woken through its local API ([`crate::wake`]): `rejected` when out of format, `duplicate`, `throttled`, `accepted` or `failed`. |
 //! | `left` | The answer to the request to leave sent over this channel. |
 //! | anything else | Ends the connection. |
 //!
@@ -26,7 +26,6 @@ use arauto_protocol::limits::CALLS_IN_FLIGHT_MAX;
 use arauto_protocol::message::{
     Call, CallId, CallOutcome, Message, NoticeAck, Payload, Saved, Session,
 };
-use arauto_protocol::notice::AckOutcome;
 use arauto_protocol::tools::ToolName;
 use tokio::sync::{mpsc, oneshot, watch};
 
@@ -224,17 +223,17 @@ pub(crate) async fn serve(mut link: Link, session: Session, around: Around<'_>) 
                     let _ = around.news.send(News::Tools(tools.tools.as_slice().to_vec()));
                 }
                 Ok(Message::Notice(notice)) => {
-                    let outcome = if notice.validate().is_ok() {
-                        AckOutcome::Failed
-                    } else {
-                        AckOutcome::Rejected
-                    };
-                    let ack = Message::NoticeAck(NoticeAck {
-                        id: notice.id,
-                        outcome,
-                    });
+                    // Its own task: the local API of Hermes may take its time, and the loop
+                    // of the session goes on meanwhile.
                     let handle = link.handle();
+                    let home = around.saving.home.clone();
+                    let waker = Arc::clone(&around.saving.settings.waker);
                     tokio::spawn(async move {
+                        let outcome = waker.handle(&home, &notice).await;
+                        let ack = Message::NoticeAck(NoticeAck {
+                            id: notice.id,
+                            outcome,
+                        });
                         let _ = handle.send(&ack).await;
                     });
                 }

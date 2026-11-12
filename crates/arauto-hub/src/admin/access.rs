@@ -174,6 +174,44 @@ impl Session {
         }
     }
 
+    /// `admin access wake-wait HERMES NUMBER SECONDS`: how long the notice of a chat waits,
+    /// after its last message, before it wakes the Hermes. Returns the seconds before, or
+    /// `None` when it already was so.
+    ///
+    /// # Errors
+    /// [`AdminError::WakeWaitRange`]; [`AdminError::NoAccess`]; [`AdminError::NoSuchHermes`];
+    /// [`AdminError::NoSuchNumber`]; [`AdminError::Restored`].
+    pub async fn access_wake_wait(
+        &self,
+        hermes: &str,
+        number: &str,
+        seconds: u32,
+        now: i64,
+    ) -> Result<Option<u32>, AdminError> {
+        if seconds > 60 {
+            return Err(AdminError::WakeWaitRange);
+        }
+        let name = hermes_name(hermes)?;
+        let alias = alias(number)?;
+        let wait_ms = i32::try_from(seconds.saturating_mul(1_000)).unwrap_or(60_000);
+        match repo::access::set_wake_wait(
+            &self.pool,
+            &self.mark,
+            self.organization,
+            &self.admin,
+            &name,
+            &alias,
+            wait_ms,
+            now,
+        )
+        .await?
+        {
+            Changed::Done(before) => Ok(Some(u32::try_from(before / 1_000).unwrap_or(0))),
+            Changed::Unchanged => Ok(None),
+            Changed::Missing(what) => Err(missing(what)),
+        }
+    }
+
     /// The chat the admin names: the identifier the hub gave it, an identifier of the engine
     /// (`...@c.us`, `...@g.us`, `...@lid`), or a telephone, whose exact chat the engine gives
     /// (with or without the ninth digit).

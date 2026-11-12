@@ -204,6 +204,10 @@ pub enum AdminError {
     #[error("{0}")]
     AccessRule(crate::core::access::AccessRuleError),
 
+    /// The wait before waking is out of its range.
+    #[error("the wait before waking goes from 0 to 60 seconds")]
+    WakeWaitRange,
+
     /// A link from a Hermes to itself.
     #[error("a Hermes has no link to itself: name two different Hermes")]
     LinkToItself,

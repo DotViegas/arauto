@@ -5,8 +5,14 @@
 //! A message wakes a Hermes when, at that moment: the number is connected; the Hermes may be
 //! woken and has an active device; and the matrix gives it the verb "be woken" in that chat
 //! (the line of the chat when there is one, which replaces the verbs of the number whole;
-//! otherwise the verbs of the number, with the scope "all"). A message the number itself sent
-//! wakes nobody. An edit, a deletion and a reaction are recorded and wake nobody.
+//! otherwise the verbs of the number, with the scope "all", and only in a chat with one
+//! person: a group wakes only by a line of its own). A message the number itself sent wakes
+//! nobody. An edit, a deletion and a reaction are recorded and wake nobody.
+//!
+//! **The wait.** Whoever writes usually sends a few messages in a row. The notice of a chat
+//! leaves only after the wait of the access (`wake_wait_ms`) passed without a new message
+//! in that chat, and never more than [`WAKE_WAIT_MAX_MS`] after the first one: the Hermes is
+//! woken once, with the whole of what was written.
 //!
 //! The notice is a pointer: the number, the chat and how many. One pending notice per Hermes
 //! and chat: what comes next adds to its count. It is judged again when it leaves
@@ -19,6 +25,12 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use super::peer::{NOTICE_LIFE_MS, NOTICES_PER_HERMES_MAX};
+
+/// The longest a notice waits for the person to stop writing, from its first message.
+pub const WAKE_WAIT_MAX_MS: i64 = 60_000;
+
+/// The wait an access has when the admin set none.
+pub const WAKE_WAIT_DEFAULT_MS: i32 = 6_000;
 use super::{RepoError, chat, engine_event};
 use crate::db::ResolvedOrg;
 use crate::engine::Author;
@@ -75,13 +87,14 @@ async fn notify(
     if connected != Some(true) {
         return Ok(Vec::new());
     }
-    let hermes: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT a.hermes_id FROM access a \
+    let woken: Vec<(Uuid, i32)> = sqlx::query_as(
+        "SELECT a.hermes_id, a.wake_wait_ms FROM access a \
          JOIN hermes h ON h.organization_id = a.organization_id AND h.id = a.hermes_id \
+         JOIN chat ch ON ch.organization_id = a.organization_id AND ch.id = $3 \
          LEFT JOIN access_chat c ON c.access_id = a.id AND c.chat_id = $3 \
          WHERE a.organization_id = $1 AND a.number_id = $2 \
            AND h.deleted_at IS NULL AND h.can_be_woken \
-           AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake) \
+           AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake AND ch.kind = 'contact') \
            AND EXISTS (SELECT 1 FROM device d \
                        WHERE d.organization_id = $1 AND d.hermes_id = a.hermes_id \
                          AND d.state = 'active') \
@@ -92,15 +105,21 @@ async fn notify(
     .bind(chat)
     .fetch_all(&mut *connection)
     .await?;
-    for hermes in &hermes {
+    let hermes: Vec<Uuid> = woken.iter().map(|(hermes, _)| *hermes).collect();
+    for (hermes, wait) in &woken {
+        let leaves_at = now.saturating_add(i64::from(*wait));
+        // One more message: the notice waits again, up to a minute from its first one.
         let grown = sqlx::query(
-            "UPDATE notice SET count = LEAST(count + 1, 9999) \
+            "UPDATE notice SET count = LEAST(count + 1, 9999), \
+                    not_before = LEAST(GREATEST(not_before, $4), created_at + $5) \
              WHERE organization_id = $1 AND kind = 'whatsapp' AND hermes_id = $2 \
                AND chat_id = $3 AND state = 'pending'",
         )
         .bind(organization.id())
         .bind(hermes)
         .bind(chat)
+        .bind(leaves_at)
+        .bind(WAKE_WAIT_MAX_MS)
         .execute(&mut *connection)
         .await?
         .rows_affected();
@@ -124,7 +143,7 @@ async fn notify(
         sqlx::query(
             "INSERT INTO notice (id, organization_id, hermes_id, kind, number_id, chat_id, \
                                  count, state, not_before, created_at, expires_at) \
-             VALUES ($1, $2, $3, 'whatsapp', $4, $5, 1, 'pending', $6, $6, $7)",
+             VALUES ($1, $2, $3, 'whatsapp', $4, $5, 1, 'pending', $8, $6, $7)",
         )
         .bind(Uuid::new_v4())
         .bind(organization.id())
@@ -133,6 +152,7 @@ async fn notify(
         .bind(chat)
         .bind(now)
         .bind(now.saturating_add(NOTICE_LIFE_MS))
+        .bind(leaves_at)
         .execute(&mut *connection)
         .await?;
     }

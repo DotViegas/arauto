@@ -96,6 +96,20 @@ pub fn removed(hermes: &str, number: &str, lines: u64) -> Report {
     ))
 }
 
+/// `admin access wake-wait`.
+#[must_use]
+pub fn wake_wait(hermes: &str, number: &str, seconds: u32, before: Option<u32>) -> Report {
+    let hermes = escape(hermes);
+    let number = escape(number);
+    Report::done(match before {
+        Some(before) => format!(
+            "A message on {number} now wakes {hermes} after {seconds} s without a new message \
+             in that chat (before, {before} s). Never more than 60 s after the first one.\n"
+        ),
+        None => format!("{hermes} already waited {seconds} s on {number}.\n"),
+    })
+}
+
 /// `admin access chat` and `admin access chat-remove`.
 #[must_use]
 pub fn chat_changed(hermes: &str, number: &str, changed: &ChatChanged) -> Report {

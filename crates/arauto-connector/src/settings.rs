@@ -36,6 +36,8 @@ pub struct Settings {
     pub(crate) hermes_ms: i64,
     /// The orderly close of the channel at the end, below the 2 seconds Hermes gives.
     pub(crate) shutdown_ms: i64,
+    /// What wakes the Hermes: one for the whole process, whatever connection is up.
+    pub(crate) waker: std::sync::Arc<crate::wake::Waker>,
     #[cfg(feature = "testing")]
     pub(crate) testing: crate::testing::Testing,
 }
@@ -56,6 +58,7 @@ impl Default for Settings {
             command_lock_ms: 3 * SECOND_MS,
             hermes_ms: 30 * SECOND_MS,
             shutdown_ms: 1_500,
+            waker: std::sync::Arc::default(),
             #[cfg(feature = "testing")]
             testing: crate::testing::Testing::default(),
         }
@@ -67,6 +70,15 @@ impl std::fmt::Debug for Settings {
         f.debug_struct("Settings")
             .field("deadlines", &self.deadlines)
             .finish_non_exhaustive()
+    }
+}
+
+impl Settings {
+    /// These settings, waking the Hermes through `target`. Without one, no notice wakes.
+    #[must_use]
+    pub fn waking(mut self, target: Option<crate::wake::WakeTarget>) -> Self {
+        self.waker = std::sync::Arc::new(crate::wake::Waker::new(target));
+        self
     }
 }
 

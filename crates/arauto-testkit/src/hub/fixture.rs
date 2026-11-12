@@ -235,13 +235,19 @@ impl Fixture {
 
     /// `admin approve NAME CODE`, answering the question of the last use when it comes.
     pub async fn approve(&self, name: &str, code: &str) -> ApproveOutcome {
-        let first = self
+        let mut outcome = self
             .admin
             .approve(name, code, None, self.now())
             .await
             .unwrap();
-        match first {
-            ApproveOutcome::NeedsRecognition(shown) => self
+        // A device that is running keeps using its connection: the last use shown may no
+        // longer be the last when the answer comes, and the hub shows the new one. A person
+        // would answer again; so does this.
+        for _ in 0..10 {
+            let ApproveOutcome::NeedsRecognition(shown) = outcome else {
+                break;
+            };
+            outcome = self
                 .admin
                 .approve(
                     name,
@@ -253,9 +259,9 @@ impl Fixture {
                     self.now(),
                 )
                 .await
-                .unwrap(),
-            other => other,
+                .unwrap();
         }
+        outcome
     }
 
     /// A new Hermes whose device enrolled and was approved, at generation zero.

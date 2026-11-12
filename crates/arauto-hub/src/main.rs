@@ -272,6 +272,16 @@ enum AccessCommand {
         /// Only the accesses of this Hermes.
         hermes: Option<String>,
     },
+    /// How long a chat must be quiet before its messages wake the Hermes: whoever writes
+    /// usually sends a few messages in a row.
+    WakeWait {
+        /// The name of the Hermes.
+        hermes: String,
+        /// The alias of the number.
+        number: String,
+        /// Seconds, from 0 (at once) to 60. An access starts with 6.
+        seconds: u32,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -702,6 +712,18 @@ async fn run_access(
                     .await?,
             )
         }
+        AccessCommand::WakeWait {
+            hermes,
+            number,
+            seconds,
+        } => access::wake_wait(
+            &hermes,
+            &number,
+            seconds,
+            session
+                .access_wake_wait(&hermes, &number, seconds, now)
+                .await?,
+        ),
         AccessCommand::List { hermes } => {
             let vault = vault(storage).await?;
             access::list(&session.access_list(&vault, hermes.as_deref()).await?)
@@ -919,6 +941,8 @@ mod tests {
             "arauto-hub admin access chat-remove vendas balcao +5511900000000",
             "arauto-hub admin access list",
             "arauto-hub admin access list vendas",
+            "arauto-hub admin access wake-wait vendas balcao 0",
+            "arauto-hub admin access wake-wait vendas balcao 10",
             "arauto-hub admin link add vendas suporte",
             "arauto-hub admin link add vendas suporte --wake --both",
             "arauto-hub admin link remove vendas suporte",

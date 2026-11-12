@@ -611,6 +611,7 @@ pub(crate) fn remove_everything(home: &Home) -> Result<(), StoreError> {
         remove_folder(home, folder.id())?;
     }
     remove_file(&home.state_file())?;
+    remove_file(&home.wakes_file())?;
     clean_leftovers(home)
 }
 
@@ -680,6 +681,45 @@ pub(crate) fn write_state(home: &Home, state: &State) -> Result<(), StoreError> 
         file: crate::home::STATE_FILE,
     })?;
     Ok(write_durable(&home.state_file(), &bytes)?)
+}
+
+// ---------------------------------------------------------------------------------- wakes
+
+/// The notices already handled, as `wakes.json` keeps them, the oldest first. A file that is
+/// missing or damaged gives none: at worst the Hermes is woken once more for a notice.
+pub(crate) fn read_handled(home: &Home) -> Vec<uuid::Uuid> {
+    let Ok(Some(bytes)) = read_capped(&home.wakes_file(), STATE_FILE_MAX) else {
+        return Vec::new();
+    };
+    let Ok(Value::Object(object)) = read_strict(&bytes) else {
+        return Vec::new();
+    };
+    if object.get("v").and_then(Value::as_u64) != Some(FORMAT_VERSION) {
+        return Vec::new();
+    }
+    let Some(ids) = object.get("handled").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    ids.iter()
+        .take(crate::wake::HANDLED_MAX)
+        .filter_map(|id| id.as_str().and_then(|id| uuid::Uuid::try_parse(id).ok()))
+        .collect()
+}
+
+/// Writes `wakes.json`, durably.
+pub(crate) fn write_handled(home: &Home, handled: &[uuid::Uuid]) -> Result<(), StoreError> {
+    let ids: Vec<Value> = handled
+        .iter()
+        .map(|id| Value::from(id.as_hyphenated().to_string()))
+        .collect();
+    let mut object = Map::new();
+    object.insert("v".to_owned(), Value::from(FORMAT_VERSION));
+    object.insert("handled".to_owned(), Value::Array(ids));
+    let bytes = serde_json::to_vec(&Value::Object(object)).map_err(|_| StoreError::Damaged {
+        device: String::new(),
+        file: crate::home::WAKES_FILE,
+    })?;
+    Ok(write_durable(&home.wakes_file(), &bytes)?)
 }
 
 // ---------------------------------------------------------------------------------- lock

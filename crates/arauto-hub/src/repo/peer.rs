@@ -1312,10 +1312,12 @@ pub async fn lease(
     let rows: Vec<(Uuid, i32, String, Uuid, bool)> = sqlx::query_as(
         "SELECT n.id, n.count, m.alias, n.chat_id, \
                 (h.can_be_woken AND m.state = 'connected' \
-                 AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake, FALSE)) \
+                 AND COALESCE(c.can_wake, \
+                              a.scope = 'all' AND a.can_wake AND ch.kind = 'contact', FALSE)) \
          FROM notice n \
          JOIN hermes h ON h.id = n.hermes_id \
          JOIN number m ON m.id = n.number_id \
+         JOIN chat ch ON ch.id = n.chat_id \
          LEFT JOIN access a ON a.hermes_id = n.hermes_id AND a.number_id = n.number_id \
          LEFT JOIN access_chat c ON c.access_id = a.id AND c.chat_id = n.chat_id \
          WHERE n.organization_id = $1 AND n.hermes_id = $2 AND n.kind = 'whatsapp' \

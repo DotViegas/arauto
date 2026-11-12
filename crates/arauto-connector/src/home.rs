@@ -33,6 +33,9 @@ pub(crate) const CURRENT_FILE: &str = "current";
 /// The tools of the last session.
 pub(crate) const STATE_FILE: &str = "state.json";
 
+/// The identifiers of the notices this connector already woke its Hermes for.
+pub(crate) const WAKES_FILE: &str = "wakes.json";
+
 /// The lock of the device folders. It is not the lock of the leader: `join` takes it while a
 /// leader runs.
 pub(crate) const DEVICES_LOCK_FILE: &str = "devices.lock";
@@ -117,6 +120,10 @@ impl Home {
 
     pub(crate) fn state_file(&self) -> PathBuf {
         self.root.join(STATE_FILE)
+    }
+
+    pub(crate) fn wakes_file(&self) -> PathBuf {
+        self.root.join(WAKES_FILE)
     }
 
     pub(crate) fn lock_file(&self) -> PathBuf {

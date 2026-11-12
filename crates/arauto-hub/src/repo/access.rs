@@ -595,6 +595,72 @@ pub async fn grant(
     Ok(Changed::Done(old))
 }
 
+/// Sets how long the notice of a chat waits, after its last message, before it wakes the
+/// Hermes `name` on the number `alias`. Returns the wait before.
+///
+/// # Errors
+/// [`RepoError::Restored`] when the database is behind the audit mark: nothing is written.
+#[allow(clippy::too_many_arguments)]
+pub async fn set_wake_wait(
+    pool: &PgPool,
+    mark: &Mark,
+    organization: ResolvedOrg,
+    admin: &Admin,
+    name: &HermesName,
+    alias: &NumberAlias,
+    wait_ms: i32,
+    now: i64,
+) -> Result<Changed<i32>, RepoError> {
+    let mut write = audit::begin_security(pool, mark).await?;
+    let target = match target(write.connection(), organization, name, alias).await? {
+        Ok(target) => target,
+        Err(missing) => {
+            write.rollback().await?;
+            return Ok(Changed::Missing(missing));
+        }
+    };
+    let Some((id, _)) = locked_access(write.connection(), organization, &target).await? else {
+        write.rollback().await?;
+        return Ok(Changed::Missing(Missing::Access));
+    };
+    let before: i32 = sqlx::query_scalar(
+        "SELECT wake_wait_ms FROM access WHERE organization_id = $1 AND id = $2",
+    )
+    .bind(organization.id())
+    .bind(id)
+    .fetch_one(write.connection())
+    .await?;
+    if before == wait_ms {
+        write.rollback().await?;
+        return Ok(Changed::Unchanged);
+    }
+    sqlx::query(
+        "UPDATE access SET wake_wait_ms = $3, changed_at = $4 \
+         WHERE organization_id = $1 AND id = $2",
+    )
+    .bind(organization.id())
+    .bind(id)
+    .bind(wait_ms)
+    .bind(now)
+    .execute(write.connection())
+    .await?;
+    write
+        .record(
+            now,
+            &Event::new(Action::AccessChanged, admin.actor())
+                .in_organization(organization)
+                .about(TargetKind::Access, id)
+                .with(
+                    about(&target)
+                        .number("wake_wait_ms", i64::from(wait_ms))
+                        .number("wake_wait_ms_before", i64::from(before)),
+                ),
+        )
+        .await?;
+    write.commit().await?;
+    Ok(Changed::Done(before))
+}
+
 /// Takes the access of the Hermes `name` to the number `alias` away, with its lines. Returns
 /// how many lines went with it.
 ///

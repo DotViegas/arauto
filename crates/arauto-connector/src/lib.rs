@@ -44,6 +44,7 @@ mod status;
 mod store;
 #[cfg(feature = "testing")]
 pub mod testing;
+pub mod wake;
 mod writes;
 
 pub use address::{AddressError, CHANNEL_PATH, HubAddress};

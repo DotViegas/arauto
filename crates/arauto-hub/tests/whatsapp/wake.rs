@@ -102,6 +102,16 @@ async fn open_events(world: &World) -> i64 {
         .unwrap()
 }
 
+/// The messages of `alias` wake `agent` at once: the tests that do not look at the wait.
+async fn at_once(world: &World, agent: &Agent, alias: &str) {
+    world
+        .fixture
+        .admin
+        .access_wake_wait(&agent.name, alias, 0, world.now())
+        .await
+        .unwrap();
+}
+
 /// A Hermes in session that may be woken.
 async fn wakeable(world: &World) -> Agent {
     let agent = world.agent().await;
@@ -121,6 +131,7 @@ async fn a_message_wakes_with_a_pointer_that_carries_no_text_and_no_telephone() 
     let session = number.session.as_str();
     let mut agent = wakeable(&world).await;
     world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &agent, "balcao").await;
 
     let chat = chat_of(101);
     let received = message(&chat, "3EB0AA0001", now_s(), false, CANARY);
@@ -166,6 +177,7 @@ async fn what_the_number_sent_and_what_is_no_message_wake_nobody() {
     let session = number.session.as_str();
     let mut agent = wakeable(&world).await;
     world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &agent, "balcao").await;
     let chat = chat_of(101);
 
     let own = message(&chat, "3EB0BB0001", now_s(), true, "sent by the number");
@@ -199,12 +211,14 @@ async fn only_who_has_the_verb_in_that_chat_and_may_be_woken_is_woken() {
     // Every verb on the number, and may be woken: woken wherever no line says otherwise.
     let mut whole = wakeable(&world).await;
     world.grant(&whole.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &whole, "balcao").await;
     world
         .line(&whole.name, "balcao", &blocked_chat, READ_SEND)
         .await;
     // Only the chats of its list, and only one of them wakes.
     let mut listed = wakeable(&world).await;
     world.grant(&listed.name, "balcao", list(READ)).await;
+    at_once(&world, &listed, "balcao").await;
     world
         .line(
             &listed.name,
@@ -216,9 +230,11 @@ async fn only_who_has_the_verb_in_that_chat_and_may_be_woken_is_woken() {
     // Reads and sends, without the verb.
     let mut reader = wakeable(&world).await;
     world.grant(&reader.name, "balcao", all(READ_SEND)).await;
+    at_once(&world, &reader, "balcao").await;
     // Every verb, and the Hermes may not be woken.
     let mut asleep = world.agent().await;
     world.grant(&asleep.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &asleep, "balcao").await;
     // No access to the number at all.
     let mut stranger = wakeable(&world).await;
 
@@ -271,6 +287,7 @@ async fn one_pending_notice_per_chat_grows_and_is_judged_again_when_it_leaves() 
     let session = number.session.as_str();
     let mut agent = wakeable(&world).await;
     world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &agent, "balcao").await;
     let chat = chat_of(101);
     let emit = |id: &'static str| {
         let received = message(&chat, id, now_s(), false, "hello");
@@ -321,4 +338,136 @@ async fn one_pending_notice_per_chat_grows_and_is_judged_again_when_it_leaves() 
             ("discarded".to_owned(), 1)
         ]
     );
+}
+
+#[tokio::test]
+async fn the_notice_waits_for_the_chat_to_go_quiet_and_wakes_once() {
+    let clock = Arc::new(ManualClock::new(SystemClock.now_ms()));
+    let world = World::with(|_| {}, clock.clone()).await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    let mut agent = wakeable(&world).await;
+    // The wait of a new access: six seconds.
+    world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    let chat = chat_of(101);
+    let emit = |id: &'static str| {
+        let received = message(&chat, id, now_s(), false, "hello");
+        world.fake.emit(session, "message.any", received)
+    };
+
+    assert_eq!(emit("3EB0EE0001").await.unwrap(), 200);
+    assert_eq!(notices_while_quiet(&mut agent).await, 0, "not at once");
+    clock.advance(4_000);
+    assert_eq!(emit("3EB0EE0002").await.unwrap(), 200);
+    // Seven seconds after the first message, three after the last: it still waits.
+    clock.advance(3_000);
+    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+    clock.advance(3_500);
+    let notice = next_notice(&mut agent).await;
+    assert_eq!(pointer(&notice).2, 2, "one notice, with the two messages");
+    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+
+    // Someone who never stops writing does not hold the notice for ever: a minute at most.
+    acknowledge(&mut agent, &notice, AckOutcome::Accepted).await;
+    clock.advance(11_000);
+    assert_eq!(emit("3EB0EE0003").await.unwrap(), 200);
+    for id in [
+        "3EB0EE0004",
+        "3EB0EE0005",
+        "3EB0EE0006",
+        "3EB0EE0007",
+        "3EB0EE0008",
+    ] {
+        clock.advance(5_000);
+        assert_eq!(emit(id).await.unwrap(), 200);
+    }
+    for id in [
+        "3EB0EE0009",
+        "3EB0EE0010",
+        "3EB0EE0011",
+        "3EB0EE0012",
+        "3EB0EE0013",
+        "3EB0EE0014",
+    ] {
+        clock.advance(5_000);
+        assert_eq!(emit(id).await.unwrap(), 200);
+    }
+    // 55 seconds of messages every five seconds: the wait of six never passed.
+    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+    clock.advance(5_500);
+    let late = next_notice(&mut agent).await;
+    assert_eq!(pointer(&late).2, 12);
+
+    // The wait is of the access, and the admin sets it; out of its range it is refused.
+    assert!(matches!(
+        world
+            .fixture
+            .admin
+            .access_wake_wait(&agent.name, "balcao", 61, world.now())
+            .await,
+        Err(arauto_hub::admin::AdminError::WakeWaitRange)
+    ));
+    assert_eq!(
+        world
+            .fixture
+            .admin
+            .access_wake_wait(&agent.name, "balcao", 0, world.now())
+            .await
+            .unwrap(),
+        Some(6)
+    );
+}
+
+#[tokio::test]
+async fn a_group_wakes_only_by_a_line_of_its_own() {
+    let world = World::new().await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    let group = "120363012345678901@g.us";
+    let in_group = |id: &'static str| {
+        let mut received = message(group, id, now_s(), false, "hello everyone");
+        received["participant"] = json!(chat_of(201));
+        world.fake.emit(session, "message.any", received)
+    };
+
+    // Every verb on the whole number: woken by a person, not by a group.
+    let mut whole = wakeable(&world).await;
+    world.grant(&whole.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &whole, "balcao").await;
+    // The same, and a line for this group that wakes.
+    let mut in_line = wakeable(&world).await;
+    world.grant(&in_line.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &in_line, "balcao").await;
+    world
+        .line(
+            &in_line.name,
+            "balcao",
+            group,
+            verbs(true, false, false, true),
+        )
+        .await;
+
+    assert_eq!(in_group("3EB0FF0001").await.unwrap(), 200);
+    let notice = next_notice(&mut in_line).await;
+    assert_eq!(pointer(&notice).2, 1);
+    assert_eq!(notices_while_quiet(&mut whole).await, 0);
+    let woken: Vec<String> = notices(&world)
+        .await
+        .into_iter()
+        .map(|(name, _, _)| name)
+        .collect();
+    assert_eq!(woken, [in_line.name.clone()]);
+
+    // A person writing to the number still wakes the one without the line.
+    let direct = chat_of(101);
+    let received = message(&direct, "3EB0FF0002", now_s(), false, "hello");
+    assert_eq!(
+        world
+            .fake
+            .emit(session, "message.any", received)
+            .await
+            .unwrap(),
+        200
+    );
+    assert_eq!(pointer(&next_notice(&mut whole).await).2, 1);
 }
