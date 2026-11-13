@@ -176,6 +176,16 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
     ),
     (
         "db.rs",
+        "organization_of_panel_entry",
+        "entry: finds the organization by the digest of an entry code of the panel",
+    ),
+    (
+        "db.rs",
+        "organization_of_panel_session",
+        "entry: finds the organization by the digest of the cookie of a session of the panel",
+    ),
+    (
+        "db.rs",
         "organizations_for_system_task",
         "entry: every organization, for a named task of the hub itself",
     ),

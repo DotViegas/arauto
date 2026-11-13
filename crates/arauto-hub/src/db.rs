@@ -25,6 +25,7 @@ use sqlx::{Executor, PgExecutor, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::config::DatabaseUrl;
+use crate::panel::secret::PanelDigest;
 
 /// The migrations, embedded in the program at build time.
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
@@ -425,8 +426,9 @@ pub async fn require_current_schema(pool: &PgPool, migrator: &Migrator) -> Resul
 ///
 /// Every repository function of business data takes one, so a query cannot be written
 /// without saying whose data it reads. There is no public constructor: the only ways in are
-/// [`organization_of_device`], [`organization_of_invite`] and
-/// [`organizations_for_system_task`].
+/// [`organization_of_device`], [`organization_of_invite`], [`organization_of_engine_events`],
+/// the two of the panel ([`organization_of_panel_entry`] and
+/// [`organization_of_panel_session`]) and [`organizations_for_system_task`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ResolvedOrg {
     id: Uuid,
@@ -466,6 +468,40 @@ pub async fn organization_of_invite<'e>(
 ) -> Result<Option<ResolvedOrg>, DbError> {
     let id: Option<Uuid> =
         sqlx::query_scalar("SELECT organization_id FROM invite WHERE digest = $1")
+            .bind(digest.as_bytes().as_slice())
+            .fetch_optional(executor)
+            .await?;
+    Ok(id.map(|id| ResolvedOrg { id }))
+}
+
+/// The organization of the entry code of the panel with this digest, while it is issued.
+/// Whether it is still in its minutes is judged by the repository, under the lock.
+///
+/// # Errors
+/// [`DbError::Query`] when the database does not answer.
+pub async fn organization_of_panel_entry<'e>(
+    executor: impl PgExecutor<'e>,
+    digest: &PanelDigest,
+) -> Result<Option<ResolvedOrg>, DbError> {
+    let id: Option<Uuid> =
+        sqlx::query_scalar("SELECT organization_id FROM panel_entry WHERE digest = $1")
+            .bind(digest.as_bytes().as_slice())
+            .fetch_optional(executor)
+            .await?;
+    Ok(id.map(|id| ResolvedOrg { id }))
+}
+
+/// The organization of the session of the panel with this digest, while it is open. Whether
+/// it is still in its hours is judged by whoever reads the session.
+///
+/// # Errors
+/// [`DbError::Query`] when the database does not answer.
+pub async fn organization_of_panel_session<'e>(
+    executor: impl PgExecutor<'e>,
+    digest: &PanelDigest,
+) -> Result<Option<ResolvedOrg>, DbError> {
+    let id: Option<Uuid> =
+        sqlx::query_scalar("SELECT organization_id FROM panel_session WHERE digest = $1")
             .bind(digest.as_bytes().as_slice())
             .fetch_optional(executor)
             .await?;

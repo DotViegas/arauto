@@ -23,7 +23,7 @@
 
 pub mod admission;
 mod budget;
-mod client_ip;
+pub(crate) mod client_ip;
 mod enrollment;
 mod exchange;
 mod handshake;
@@ -67,6 +67,7 @@ use crate::config::{ClientIpSource, DatabaseUrl, ServeConfig};
 use crate::db::{self, DbError, PoolOptions, ResolvedOrg, SystemTask};
 use crate::engine::{self, Engines};
 use crate::mark::Mark;
+use crate::panel::PanelState;
 use crate::repo::enroll::RefusedEnrollments;
 use crate::repo::{self, RepoError};
 use crate::restore::{self, EnterOutcome, Evidence, RestoreError, Standing};
@@ -214,6 +215,8 @@ pub struct Hub {
     sweep_now: Notify,
     engines: Engines,
     send_ceiling: SendCeiling,
+    /// The panel of the admin, when the hub was told to listen for it.
+    panel: Option<PanelState>,
 }
 
 impl std::fmt::Debug for Hub {
@@ -446,6 +449,11 @@ impl Hub {
         }
     }
 
+    /// What the panel of the admin keeps in memory. `None` when the hub has no panel.
+    pub(crate) fn panel(&self) -> Option<&PanelState> {
+        self.panel.as_ref()
+    }
+
     /// How many channel connections of each device are in session right now.
     #[must_use]
     pub fn sessions_by_device(&self) -> HashMap<Uuid, usize> {
@@ -489,6 +497,7 @@ pub struct Running {
     hub: Arc<Hub>,
     connectors: SocketAddr,
     internal: SocketAddr,
+    panel: Option<SocketAddr>,
     accept: Vec<JoinHandle<()>>,
     /// The sweep and the listener: aborted at the stop.
     background: Vec<JoinHandle<()>>,
@@ -507,6 +516,12 @@ impl Running {
     #[must_use]
     pub fn internal_addr(&self) -> SocketAddr {
         self.internal
+    }
+
+    /// The address the port of the panel is bound to. `None` when the hub has no panel.
+    #[must_use]
+    pub fn panel_addr(&self) -> Option<SocketAddr> {
+        self.panel
     }
 
     /// What the connections share.
@@ -577,7 +592,8 @@ async fn end_within(mut task: JoinHandle<()>, within: std::time::Duration) {
 
 /// Starts the hub: checks the database and the mark, turns the restored mode on when the
 /// database came back from a copy, closes what the previous run left open, opens the key of
-/// the hub and only then listens on the two ports.
+/// the hub and only then listens on the two ports, and on the one of the panel when the
+/// configuration names it.
 ///
 /// # Errors
 /// [`ServeError`]: the hub does not start.
@@ -624,6 +640,16 @@ pub async fn start<P: Purposes>(
     };
     let connectors_addr = local(&connectors, config.listen)?;
     let internal_addr = local(&internal, config.listen_internal)?;
+    // The panel is closed by default: without its configuration, no port is opened for it.
+    let panel = match &config.panel {
+        Some(panel) => {
+            let listener = listen(panel.listen).await?;
+            let address = local(&listener, panel.listen)?;
+            Some((listener, address))
+        }
+        None => None,
+    };
+    let panel_addr = panel.as_ref().map(|(_, address)| *address);
     let hub = Arc::new(Hub {
         pool,
         sweep_pool,
@@ -652,10 +678,14 @@ pub async fn start<P: Purposes>(
             settings.sends_per_minute,
             arauto_protocol::limits::WHATSAPP_SEND_WINDOW_MS,
         ),
+        panel: config
+            .panel
+            .as_ref()
+            .map(|panel| PanelState::new(&panel.url)),
         settings,
     });
     let purposes = Arc::new(options.purposes);
-    let accept = vec![
+    let mut accept = vec![
         tokio::spawn(http::accept(
             connectors,
             Port::Connectors,
@@ -666,9 +696,17 @@ pub async fn start<P: Purposes>(
             internal,
             Port::Internal,
             Arc::clone(&hub),
-            purposes,
+            Arc::clone(&purposes),
         )),
     ];
+    if let Some((listener, _)) = panel {
+        accept.push(tokio::spawn(http::accept(
+            listener,
+            Port::Panel,
+            Arc::clone(&hub),
+            purposes,
+        )));
+    }
     let background = vec![
         tokio::spawn(tasks::sweeper(Arc::clone(&hub))),
         tokio::spawn(tasks::listener(Arc::clone(&hub))),
@@ -679,6 +717,7 @@ pub async fn start<P: Purposes>(
         hub,
         connectors: connectors_addr,
         internal: internal_addr,
+        panel: panel_addr,
         accept,
         background,
         purger,
@@ -736,10 +775,12 @@ async fn recover(pool: &PgPool, mark: &Mark, now: i64) -> Result<(), ServeError>
 }
 
 /// Closes the channel connections a hub that stopped without warning left open, in every
-/// organization.
+/// organization, and the sessions of the panel: how long each one had been idle was in the
+/// memory of the hub that stopped, so whoever was in the panel signs in again.
 async fn close_left_open(pool: &PgPool, now: i64) -> Result<(), ServeError> {
     for organization in db::organizations_for_system_task(pool, SystemTask::Start).await? {
         repo::connection::close_left_open(pool, organization, now).await?;
+        repo::panel::close_left_open(pool, organization, now).await?;
     }
     Ok(())
 }

@@ -42,6 +42,7 @@ use crate::vault::{MASTER_KEY_FILE, Vault, VaultError};
 
 pub mod access;
 pub mod link;
+pub mod panel;
 pub mod qr;
 pub mod render;
 pub mod whatsapp;

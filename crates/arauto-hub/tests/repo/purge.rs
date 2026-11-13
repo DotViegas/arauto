@@ -371,7 +371,7 @@ async fn the_purge_goes_in_batches_of_at_most_the_size_it_is_given() {
             );
         }
     }
-    assert_eq!(asked, 11, "asked before each batch");
+    assert_eq!(asked, 13, "asked before each batch");
 
     // A batch that finds exactly its size is followed by one more.
     for _ in 0..10 {
@@ -561,7 +561,8 @@ async fn every_table_of_the_retention_is_purged_and_the_days_are_the_documented_
     let world = World::shared().await;
     let retention = purge::retention(world.pool()).await.unwrap();
     // `docs/15-mvp.md`, section 2, rule 11: messages 30 days, tool calls 7, resolved notices
-    // 7, connections and unknown devices 90. The events of the engine come with their table.
+    // 7, connections and unknown devices 90. The events of the engine come with their table,
+    // and so do the entry codes and the sessions of the panel.
     let days: Vec<(&str, Option<i64>)> = retention
         .tables()
         .map(|table| (table, retention.days(table)))
@@ -572,6 +573,8 @@ async fn every_table_of_the_retention_is_purged_and_the_days_are_the_documented_
             ("channel_connection", Some(90)),
             ("engine_event", Some(2)),
             ("notice", Some(7)),
+            ("panel_entry", Some(30)),
+            ("panel_session", Some(30)),
             ("peer_message", Some(30)),
             ("tool_call", Some(7)),
             ("unknown_device", Some(90)),
@@ -583,6 +586,107 @@ async fn every_table_of_the_retention_is_purged_and_the_days_are_the_documented_
         .collect();
     let listed: BTreeSet<&str> = retention.tables().collect();
     assert_eq!(followed, listed, "every row of retention has its target");
+}
+
+// ---------------------------------------------------------------------------- the panel
+
+/// 32 bytes nobody else has: a digest of a row of the panel.
+fn digest() -> Vec<u8> {
+    [Uuid::new_v4().into_bytes(), Uuid::new_v4().into_bytes()].concat()
+}
+
+async fn panel_entry(world: &World, state: &str, expires_at: i64) -> Uuid {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO panel_entry (id, organization_id, digest, state, created_by, created_at, \
+                                  expires_at, used_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    )
+    .bind(id)
+    .bind(world.org.id())
+    .bind((state == "issued").then(digest))
+    .bind(state)
+    .bind(world.admin.id)
+    .bind(expires_at - 600_000)
+    .bind(expires_at)
+    .bind((state == "used").then_some(expires_at - 1))
+    .execute(world.pool())
+    .await
+    .unwrap();
+    id
+}
+
+async fn panel_session(world: &World, open: bool, expires_at: i64) -> Uuid {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO panel_session (id, organization_id, admin_id, digest, state, close_reason, \
+                                    created_at, expires_at, closed_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+    )
+    .bind(id)
+    .bind(world.org.id())
+    .bind(world.admin.id)
+    .bind(open.then(digest))
+    .bind(if open { "open" } else { "closed" })
+    .bind((!open).then_some("signed_out"))
+    .bind(expires_at - 12 * 3_600_000)
+    .bind(expires_at)
+    .bind((!open).then_some(expires_at - 1))
+    .execute(world.pool())
+    .await
+    .unwrap();
+    id
+}
+
+/// The codes and the sessions of the panel go 30 days after the moment they stopped being
+/// accepted, whatever their state says, and never before: what is still accepted is never one
+/// of the rows the purge takes.
+#[tokio::test]
+async fn the_rows_of_the_panel_go_thirty_days_after_they_stopped_being_accepted() {
+    let world = World::own().await;
+    let now = world.now();
+    let reached = now - 30 * DAY_MS;
+
+    let mut due = Vec::new();
+    let mut within = Vec::new();
+    for state in ["used", "cancelled"] {
+        due.push(("panel_entry", panel_entry(&world, state, reached).await));
+        within.push(("panel_entry", panel_entry(&world, state, reached + 1).await));
+    }
+    // A code nobody typed stays `issued` until another is issued: it goes all the same. There
+    // is one issued code at a time, so the one within its days is the one still accepted.
+    due.push((
+        "panel_entry",
+        panel_entry(&world, "cancelled", reached - DAY_MS).await,
+    ));
+    within.push((
+        "panel_entry",
+        panel_entry(&world, "issued", now + 600_000).await,
+    ));
+    for open in [true, false] {
+        due.push(("panel_session", panel_session(&world, open, reached).await));
+        within.push((
+            "panel_session",
+            panel_session(&world, open, reached + 1).await,
+        ));
+        within.push((
+            "panel_session",
+            panel_session(&world, open, now + 3_600_000).await,
+        ));
+    }
+
+    let purged = run(&world, 2).await;
+    assert_eq!(purged.of(Target::PanelEntries).rows, 3);
+    assert_eq!(purged.of(Target::PanelSessions).rows, 2);
+    assert_eq!(left(&world, &due).await, []);
+    assert_eq!(left(&world, &within).await, within);
+
+    // One millisecond later, the ones that were one millisecond short go too.
+    world.clock.advance(1);
+    let purged = run(&world, 500).await;
+    assert_eq!(purged.of(Target::PanelEntries).rows, 2);
+    assert_eq!(purged.of(Target::PanelSessions).rows, 2);
+    assert_eq!(left(&world, &within).await.len(), 3);
 }
 
 // ---------------------------------------------------------------------------- the restored mode

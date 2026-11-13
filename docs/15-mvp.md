@@ -23,16 +23,16 @@ estão em [0031](decisoes/0031-banco-postgresql.md),
 | Pergunta | Resposta |
 |---|---|
 | O que o MVP faz? | Conecta Hermes ao hub, deixa um Hermes mandar recado a outro e usar números de WhatsApp, e acorda o Hermes quando chega algo. |
-| Como se administra? | Por um comando no servidor do hub. O painel, com passkey, vem depois. |
+| Como se administra? | Por um comando no servidor do hub. O painel começou em 12/11/2026, só com telas de leitura ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)); as ações do painel e a passkey vêm depois. |
 | Onde roda em desenvolvimento? | Direto pelo `cargo`, com um PostgreSQL local. Sem container. |
 | Onde roda em produção? | Em container, em Linux, com PostgreSQL, por um arquivo de composição. |
-| O que fica de fora? | O painel, o arquivo de mensagens, a assinatura das versões e o modo blindado. |
+| O que fica de fora? | As ações do painel e a passkey, o arquivo de mensagens, a assinatura das versões e o modo blindado. |
 
 ## 1. O que entra e o que não entra
 
 | Entra | Não entra, e fica para depois |
 |---|---|
-| Convite, inscrição, código digitado, aprovação | Painel no navegador e passkey ([07-telas.md](07-telas.md)) |
+| Convite, inscrição, código digitado, aprovação | As ações do painel e a passkey ([07-telas.md](07-telas.md)). As telas de leitura entraram em 12/11/2026. |
 | Canal Noise, troca da credencial, quarentena, revogar, reconectar, sair | Aviso ao admin por fora ([decisão 0025](decisoes/0025-aviso-por-fora-do-painel.md)) |
 | Modo restaurado ([04](04-seguranca-conexao.md), C11), com a marca fora do banco | O ponto em aberto do C11 (a data de emissão do lacre) |
 | Líder único e repassadoras | Modo blindado |
@@ -43,7 +43,7 @@ estão em [0031](decisoes/0031-banco-postgresql.md),
 | Auditoria que só cresce, e alertas lidos por comando | Tetos ajustáveis |
 | Teto de envio (20 por minuto, por Hermes e por número) e tetos de recado | Autoridade privada no TLS do conector |
 
-**Administração no MVP.** Não existe endereço de administração na rede. Tudo o que o painel faria é
+**Administração no MVP.** Tudo o que muda algo é
 feito por `arauto-hub admin`, rodado por uma pessoa **na máquina do hub**. Quem roda esse comando já
 tem o banco e a chave-mestra nas mãos; ele não cria um caminho mais fraco. O hub e o comando são o
 mesmo programa e usam as mesmas funções de gravação.
@@ -61,9 +61,17 @@ mesmo programa e usam as mesmas funções de gravação.
  arauto-hub admin peers allow|deny|list       a lista de pares (--wake, --both)
  arauto-hub admin threads [NOME]              fios: quem, quando e quanto; nunca o texto
  arauto-hub admin engine|number|access ...    motor, números e matriz de acessos (M3)
- arauto-hub admin alerts [--ack ID]           os alertas que o painel mostraria
+ arauto-hub admin alerts [--ack ID]           os alertas que o painel mostra
  arauto-hub admin audit [--tail N]
+ arauto-hub admin panel code                  emite o código de entrada do painel
 ```
+
+**O painel, no hub, em 12/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta). O hub serve o painel
+numa terceira porta, desligada por padrão. Entra-se com um código de entrada: o comando acima o
+mostra uma vez, ele vale 10 minutos e uma entrada, e é digitado na tela, nunca mostrado por ela. O
+painel tem três telas, só de leitura (Hermes, WhatsApps e Acessos), e a faixa de alertas. Nada muda
+por ele: não existe endereço na rede que mude o estado do hub sem passar pelo comando. Foi testado
+só pelos testes automáticos; nunca rodou num servidor.
 
 - Ao aprovar um reconectar, o comando mostra o último uso do aparelho atual e exige `--recognized`
   ou `--not-recognized` (04, C10). Sem uma das duas, não aprova. No hub, o comando sempre imprime o
@@ -119,7 +127,8 @@ O banco passa a ser o PostgreSQL ([decisão 0031](decisoes/0031-banco-postgresql
 | auditoria | `audit` | Gatilhos proíbem alterar, apagar e truncar. |
 | chamada_ferramenta | `tool_call` | Retenção curta. |
 | instalacao, chave_hub | `installation`, `hub_key` | |
-| (novo) alerta | `alert` | O que o painel mostraria. |
+| (novo) alerta | `alert` | O que o painel mostra na faixa do topo. |
+| (novo) código de entrada, sessao_painel | `panel_entry`, `panel_session` | Só o resumo de cada um. [decisão 0040](decisoes/0040-painel-dentro-do-hub.md). |
 | (novo) ligação | `peer_link` | [13](13-conversa-entre-hermes.md) |
 | (novo) fio, recado | `peer_thread`, `peer_message` | O texto do recado vai cifrado. |
 | (novo) retenção | `retention` | Prazo de guarda por tabela. |
@@ -138,7 +147,8 @@ Regras que valem para o banco:
    código do repositório e falha se aparecer uma função fora da lista sem esse parâmetro. No hub, a
    lista tem a entrada pela identidade e a entrada pelo convite (a do motor vem no M3), e as tarefas
    com nome: instalação, comando de administração, filas, prazos, expurgo, marca, lacre de
-   desconhecido e partida do `serve`. A única função que grava sem organização é a das recusas de
+   desconhecido e partida do `serve`. Em 12/11/2026 entraram as duas entradas do painel: pelo resumo
+   do código de entrada e pelo resumo do identificador da sessão do painel. A única função que grava sem organização é a das recusas de
    convites que ninguém emitiu. O teste lê todo o código do hub que alcança o banco, não só o do
    repositório, e cada exceção da lista diz por que existe.
 3. **Identificadores sorteados no hub** (UUID versão 4). A única sequência é a da auditoria. A
@@ -185,18 +195,20 @@ Regras que valem para o banco:
     por outra identidade,
     inscrição repetida, código errado, aparelho vencido por prazo, troca sem "gravei", os alertas de
     reuso e de lacre sem explicação, conexão tomada, teto de recados, aparelho desconhecido listado e
-    migração. O vencimento por prazo fica fora porque a lista do C11 não o inclui.
+    migração. O vencimento por prazo fica fora porque a lista do C11 não o inclui. Do painel, em
+    12/11/2026: a entrada é evento de segurança; o código de entrada emitido e a saída não são.
 11. **Expurgo.** Uma tarefa do hub apaga em lotes pequenos, com a hora do hub, pelo prazo de cada
     tabela: recados, 30 dias; chamadas de ferramenta, 7; avisos resolvidos, 7; eventos do motor já
     tratados, 1; conexões e aparelhos desconhecidos, 90. Em 11/11/2026 os prazos estão na tabela
     `retention`, mas a tarefa ainda não existe. Ver também o segundo ponto em aberto do
-    [14](14-protocolo-do-canal.md), seção 13.
+    [14](14-protocolo-do-canal.md), seção 13. Em 12/11/2026 entraram os códigos de entrada e as
+    sessões do painel: 30 dias depois do momento em que deixaram de valer.
 12. **O banco é acessado direto**, sem agrupador de conexões em modo de transação. O hub tem dois
     conjuntos de conexões de tamanho fixo: o dos conectores (16 de partida) e um de 2, só da
     varredura. Esperar por uma conexão tem prazo de 5 segundos. O conjunto da varredura existe para o
     revogar valer em menos de 5 segundos mesmo com o dos conectores ocupado, por exemplo numa volta
     em massa. A escuta do `NOTIFY` usa uma terceira conexão, fora dos dois, e o comando de
-    administração abre o seu próprio conjunto, de 2.
+    administração abre o seu próprio conjunto, de 2. O painel usa o conjunto dos conectores.
 
 **Como o hub fica sabendo.** O que o próprio hub enfileira acorda o trabalhador por um sinal em
 memória. O `NOTIFY` do PostgreSQL serve só entre processos: o comando de administração grava, e
@@ -287,13 +299,14 @@ deploy/               Dockerfile e arquivo de composição
 ```
 
 Módulos do hub ([03-arquitetura.md](03-arquitetura.md), seção 3): `enrollment`, `channel`, `vault`,
-`core`, `engine`, e o novo `peers`. O `panel` e o `archive` não existem no MVP. No código, em
+`core`, `engine`, e o novo `peers`. O `archive` não existe no MVP; o `panel` entrou em 12/11/2026, só com telas de leitura. No código, em
 11/11/2026: a inscrição mora dentro de `channel`, e há mais `repo` (os repositórios), `audit`,
 `mark`, `restore`, `admin`, `config` e `db`. `engine` e `peers` vêm no M3 e no M2.
 
 | Peça | Biblioteca |
 |---|---|
 | Servidor e websocket do hub | `axum`, `hyper`, `hyper-util`, `tokio` |
+| Painel | Páginas escritas pelo próprio hub, sem biblioteca de modelos e sem script ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)) |
 | Websocket do conector | `tokio-tungstenite`, com `rustls` e as autoridades públicas embutidas |
 | Banco | `sqlx` (PostgreSQL), consultas em tempo de execução |
 | Noise | `snow` |
@@ -317,6 +330,7 @@ Linux x86_64.
 | hub | `ARAUTO_DATABASE_URL` | O banco. |
 | hub | `ARAUTO_DATA_DIR` | Chave-mestra e marca. Fora do volume do banco. |
 | hub | `ARAUTO_LISTEN`, `ARAUTO_LISTEN_INTERNAL` | A porta dos conectores; a porta interna (saúde e eventos do motor). |
+| hub | `ARAUTO_LISTEN_PANEL`, `ARAUTO_PANEL_URL` | A porta do painel e o endereço que o admin abre no navegador. Sem as duas, o painel fica desligado; uma sem a outra, o `serve` não sobe. |
 | hub | `ARAUTO_PUBLIC_URL` | O endereço que vai no bloco: `https://host[:porta]`, sem caminho, ou `http://` só para 127.0.0.1, `[::1]` e `localhost`. |
 | hub | `ARAUTO_CLIENT_IP_SOURCE`, `ARAUTO_TRUSTED_PROXIES` | De onde vem o endereço do conector: `socket`, ou `forwarded` com a lista de proxies confiáveis. Obrigatória: sem ela o `serve` não sobe. |
 | hub | `ARAUTO_ALLOW_UNSAFE_DB` | `1` deixa o hub subir num banco com `fsync` desligado. Só para teste. |
@@ -400,7 +414,7 @@ Em container ([decisão 0006](decisoes/0006-instalado-no-servidor-de-cada-um.md)
 
 | Serviço | O que é |
 |---|---|
-| `hub` | A imagem do projeto. Publica só a porta dos conectores. |
+| `hub` | A imagem do projeto. Publica a porta dos conectores e a do painel, as duas só em `127.0.0.1` do servidor. |
 | `postgres` | PostgreSQL 16, com volume próprio, que precisa honrar a gravação forçada. |
 | proxy | De quem instala. Termina o TLS da porta dos conectores. |
 | motor | De quem instala, referenciado por endereço. **Não vai na imagem nem na composição.** |
@@ -476,6 +490,7 @@ leituras até quem mantém o projeto decidir. Os pontos do canal estão em
 
 | Ponto | Leitura do texto | Leitura do código |
 |---|---|---|
+| **A entrada do painel sem passkey** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). | O [04](04-seguranca-conexao.md) e a [decisão 0019](decisoes/0019-painel-com-passkey.md): o login do painel é por passkey, e o primeiro admin nasce do código de instalação. | A passkey ainda não existe. Entra-se com um código de entrada de uso único, emitido por comando na máquina do hub, e toda sessão do painel é do "admin local". O painel só lê, o que mantém a regra de que, com a sessão do painel sozinha, só se vê. |
 | **A conferência da marca fora da trava** (seção 2, regra 9). | "Sob uma trava de arquivo entre processos, confere [...] antes de gravar um evento de segurança, e depois avança a marca." | A trava cobre só a leitura e a regravação do arquivo da marca. A conferência lê o arquivo sem trava: ele é trocado inteiro, e qualquer valor que já esteve em disco serve à comparação. Segurar a trava durante a transação do banco poria todo evento de segurança em fila e impediria juntar as gravações. A revisão não achou intercalação ruim; ou o texto passa a dizer isso, ou o código passa a segurar a trava. |
 | **`--recognized` digitado antes de ver o último uso** (seção 1). | O comando mostra o último uso e exige `--recognized` ou `--not-recognized`. | O comando sempre imprime o último uso antes do resultado, mas quem digita `--recognized` por hábito escreve a opção antes de ver a tela. Fechar isso pede mudar a linha de comando, por exemplo exigindo junto a data do último uso mostrada. |
 | **Eventos sem organização no `audit --tail`.** | Toda leitura é filtrada pela organização (seção 2, regra 2). | A leitura de uma organização traz também os eventos sem organização: o início do modo restaurado, que pode ter como alvo um aparelho de outra organização e conta aparelhos de todas, e as recusas agregadas de convites que ninguém emitiu. Com uma organização só, como no MVP, não vaza nada. Com duas, o admin de uma leria identificador e contagens da outra. A saída seria um comando próprio para os eventos da instalação, ou tirar do evento o alvo e as contagens de outras organizações. |

@@ -18,6 +18,7 @@
 //! | [`engine`] | The WhatsApp engine: its interface, the adapter of the WAHA, the inbox of its events and its supervision. |
 //! | [`whatsapp`] | The WhatsApp tools answered in a session: the check of the matrix at every call, the signed identifiers of messages and the send limit. |
 //! | [`channel`] | The port of the connectors: the accept loop, the websocket, the handshake, the frames and their limits, `hello`, `leave`, and the entry point of the other purposes. |
+//! | [`panel`] | The panel of the admin, on a port of its own and off by default: the entry by a code of one use, the session, and the pages that show what the admin command shows. |
 //!
 //! Time is always an `i64` of milliseconds given by the caller, who reads it from an
 //! [`arauto_protocol::clock::Clock`]. No SQL here reads the clock of the database.
@@ -32,6 +33,7 @@ pub mod db;
 pub mod download;
 pub mod engine;
 pub mod mark;
+pub mod panel;
 mod peer;
 pub mod repo;
 pub mod restore;

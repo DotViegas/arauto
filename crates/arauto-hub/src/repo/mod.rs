@@ -5,7 +5,8 @@
 //! 1. **The organization comes resolved.** Every `async` function of this module takes a
 //!    [`ResolvedOrg`], and every statement filters by it. The organization is found from the
 //!    outside only by the entry functions of [`crate::db`]: by the identity of a device, by
-//!    the digest of an invite, or by a named task of the hub itself. The functions here
+//!    the digest of an invite, by the signed events of an engine, by the digest of an entry
+//!    code or of a session of the panel, or by a named task of the hub itself. The functions here
 //!    without the parameter are [`enroll::flush_refused`], which writes what was refused to
 //!    whoever belongs to no organization, and [`purge::retention`], which reads the days of
 //!    each table, the same for every organization. A test reads these files and fails when
@@ -39,6 +40,7 @@
 //! | [`chat`] | The chats of a number, by their identifiers in the engine. |
 //! | [`engine_event`] | The inbox of events of the engine. |
 //! | [`access`] | The matrix of accesses: what each Hermes may do on each number and in each chat. |
+//! | [`panel`] | The entry code and the sessions of the panel of the admin. |
 
 use arauto_protocol::message::DeclaredText;
 use sqlx::postgres::{PgConnection, PgPool};
@@ -65,6 +67,7 @@ pub mod enroll;
 pub mod hermes;
 pub mod invite;
 pub mod number;
+pub mod panel;
 pub mod peer;
 pub mod purge;
 pub mod swap;

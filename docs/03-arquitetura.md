@@ -51,7 +51,7 @@ quem instala.
 
 | Módulo | Responsabilidade |
 |---|---|
-| `panel` | Telas e ações do admin. |
+| `panel` | Telas e ações do admin. No hub, em 12/11/2026: só as telas de leitura ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 | `enrollment` | Recebe pedidos de conexão e serve o download do conector. |
 | `channel` | O websocket com cada conector: aperto de mãos, troca da credencial, chamadas e avisos. |
 | `vault` | A caixa preta: sorteia, lacra e abre credenciais. Único módulo que toca a chave-mestra. |
@@ -80,7 +80,9 @@ A ideia é o isolamento sair da construção, e não de conferências espalhadas
 | **Saúde e métricas** | Monitoramento | Só rede interna. |
 
 Painel e conectores ficam em endereços diferentes. Assim o login do admin nunca viaja para a porta
-dos conectores. O TLS das duas portas é de quem instala.
+dos conectores. O TLS das duas portas é de quem instala. No hub, em 12/11/2026, o painel tem uma
+porta própria, desligada por padrão, e nenhum endereço dele existe nas outras duas
+([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)).
 
 ## 5. O que roda onde
 
@@ -99,7 +101,7 @@ cadastro aberto ao público e limites de uso por organização.
 | Hub | `axum` e `tokio`; PostgreSQL com `sqlx` ([decisão 0031](decisoes/0031-banco-postgresql.md)). |
 | Canal | Websocket com Noise por dentro (`snow`). |
 | Lacre e cifra em repouso | `chacha20poly1305`. |
-| Painel | Páginas geradas no servidor, com modelos de escape automático. Sem framework de frontend. Login por passkey (`webauthn-rs`). |
+| Painel | Páginas geradas no servidor, com modelos de escape automático. Sem framework de frontend. Login por passkey (`webauthn-rs`). No hub, em 12/11/2026: as páginas são escritas pelo próprio programa, com uma função única de escape e sem biblioteca de modelos, e a entrada é por código, enquanto a passkey não existe ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 | Conector | Um binário estático, sem dependência do sistema. |
 | Entrega do hub | Imagem de container e um arquivo de composição com hub e PostgreSQL. O proxy e o motor são de quem instala: referenciados, não embutidos. |
 

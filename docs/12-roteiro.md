@@ -19,6 +19,8 @@ mudar; o critério de pronto de cada fase, não.
 Em 10/11/2026 as fases 2, 4 e 5 foram reunidas no **primeiro MVP**, que também traz a conversa entre
 Hermes ([15-mvp.md](15-mvp.md), [decisão 0033](decisoes/0033-escopo-do-mvp.md)). O painel fica para
 depois dele: no MVP, administra-se por comando. O critério de pronto de cada fase continua valendo.
+Em 12/11/2026, a pedido de quem mantém, o painel começou pelas telas de leitura
+([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)); o resto da Fase 3 continua por fazer.
 
 "Publicação" é abrir o repositório ao público. Até lá o projeto não tem versão em uso por terceiros.
 

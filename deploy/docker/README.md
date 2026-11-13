@@ -67,8 +67,30 @@ docker compose --env-file arauto.env exec hub arauto-hub admin status
 ```
 
 **O registro do hub** sai em `docker compose --env-file arauto.env logs hub`. Ao subir ele diz
-"the hub is up", com os dois endereços. É ali que aparecem os avisos do motor de WhatsApp, a lista
+"the hub is up", com os dois endereços (três, com o painel ligado). É ali que aparecem os avisos do motor de WhatsApp, a lista
 de proxies errada e o modo restaurado. Para mais detalhe, ponha `RUST_LOG=debug` no `arauto.env`.
+
+## Abrir o painel (opcional)
+
+O painel mostra os Hermes, os números e os acessos. Ele **só lê**: tudo o que muda algo continua
+pelo comando. Vem desligado, e **ainda não foi provado num servidor**.
+
+1. No `arauto.env`, tire o comentário de `ARAUTO_LISTEN_PANEL` e de `ARAUTO_PANEL_URL`, e rode
+   `docker compose --env-file arauto.env up -d`.
+2. Do seu computador, abra um túnel até o servidor: `ssh -L 8445:127.0.0.1:8445 SEU-SERVIDOR`.
+3. Emita o código de entrada: `docker compose --env-file arauto.env exec hub arauto-hub admin panel code`.
+   Ele aparece uma vez, vale 10 minutos e uma entrada. É segredo: não o cole em conversa nem em
+   relatório.
+4. Abra `http://localhost:8445` no navegador e digite o código.
+
+O endereço no navegador tem de ser exatamente o do `ARAUTO_PANEL_URL`: com outro nome, o hub
+responde 421. A sessão do painel dura 12 horas, ou 30 minutos sem uso, e acaba quando o hub
+reinicia.
+
+A porta do painel é publicada só em `127.0.0.1` do servidor. Dentro do Docker, quem está numa rede
+do hub (o motor de WhatsApp, por exemplo) alcança a tela de entrada; sem o código, não passa dela.
+Para abrir o painel sem túnel, dê a ele um endereço próprio no seu proxy, com TLS, que não seja o
+dos conectores, e ponha esse endereço no `ARAUTO_PANEL_URL`. O risco de abri-lo é seu.
 
 ## 3. Conectar o primeiro Hermes
 
@@ -191,6 +213,8 @@ Faça a cópia de segurança do banco antes do `migrate`: o nome do argumento é
 | O hub passa na saúde | `docker compose ps` mostra `healthy`. |
 | O banco força a gravação | O hub sobe sem pedir `ARAUTO_ALLOW_UNSAFE_DB`. |
 | A porta interna não é publicada | De fora do servidor, a porta 8444 não responde. |
+| A porta do painel não é publicada | De fora do servidor, a porta 8445 não responde, com o painel ligado ou desligado. |
+| O painel não existe no endereço dos conectores | `curl -I https://SEU-ENDERECO/sign-in` responde 404. |
 | O download funciona | `curl -O https://SEU-ENDERECO/v1/download/arauto-connector-linux-x86_64` e o `sha256sum` bate com o do bloco. |
 | O endereço dos conectores | Em `admin audit`, a conexão de um Hermes mostra o endereço dele, não o do proxy. |
 | A parada em ordem | `docker compose stop hub` termina em menos de 20 segundos, sem ser forçada. |

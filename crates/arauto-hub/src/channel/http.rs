@@ -1,4 +1,4 @@
-//! The accept loop and the addresses of the two ports (`docs/14-protocolo-do-canal.md`,
+//! The accept loop and the addresses of the ports (`docs/14-protocolo-do-canal.md`,
 //! section 1, and `docs/15-mvp.md`, sections 3 and 6).
 //!
 //! The loop is the project's own, over `hyper`: HTTP/1 only, 5 seconds for the headers of
@@ -12,6 +12,10 @@
 //! | internal | `GET /health` | `ok`, without any secret |
 //! | internal | `POST /v1/engine/{engine}/events` | the inbox of the events of the engine |
 //! | either | anything else | 404 |
+//! | panel | everything | the panel of the admin ([`crate::panel`]), when the hub has one |
+//!
+//! An address of one port does not exist on another: the login of the admin never travels
+//! to the port of the connectors, and nothing of the channel is answered by the panel.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -104,13 +108,15 @@ impl Downloads {
     }
 }
 
-/// Which of the two ports a connection came in by.
+/// Which port a connection came in by.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Port {
     /// The port of the connectors, the only one that is published.
     Connectors,
     /// The internal port: health and the events of the engine.
     Internal,
+    /// The port of the panel of the admin. It only exists when the configuration names it.
+    Panel,
 }
 
 /// Accepts connections until the hub stops.
@@ -194,6 +200,10 @@ async fn route<P: Purposes>(
     hub: Arc<Hub>,
     purposes: Arc<P>,
 ) -> Response<Body> {
+    // The panel answers its own port whole, and no other.
+    if port == Port::Panel {
+        return crate::panel::route(request, peer, hub).await;
+    }
     let path = request.uri().path().to_owned();
     // The only address that takes a body, on the internal port only.
     if port == Port::Internal && request.method() == Method::POST {
@@ -222,7 +232,8 @@ async fn route<P: Purposes>(
             );
             response
         }
-        Port::Internal => status(StatusCode::NOT_FOUND),
+        // Answered above; here for the match to name every port.
+        Port::Internal | Port::Panel => status(StatusCode::NOT_FOUND),
     }
 }
 

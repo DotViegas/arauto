@@ -157,6 +157,18 @@ enum InstalledCommand {
         #[command(subcommand)]
         command: LinkCommand,
     },
+    /// The panel of the admin, in the browser.
+    Panel {
+        #[command(subcommand)]
+        command: PanelCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum PanelCommand {
+    /// Issues the entry code of the panel: one use, 10 minutes. It is shown once, and the
+    /// code issued before stops being accepted.
+    Code,
 }
 
 #[derive(Debug, Subcommand)]
@@ -522,6 +534,12 @@ async fn serve() -> anyhow::Result<Report> {
         internal = %running.internal_addr(),
         "the hub is up"
     );
+    match running.panel_addr() {
+        Some(panel) => tracing::info!(%panel, "the panel of the admin is listening"),
+        None => tracing::info!(
+            "the hub has no panel: ARAUTO_LISTEN_PANEL and ARAUTO_PANEL_URL are not set"
+        ),
+    }
     shutdown.await;
     tracing::info!("the hub is stopping");
     running.stop().await;
@@ -879,6 +897,16 @@ async fn run_installed(
             }
             LinkCommand::List => link::list(&session.link_list().await?),
         },
+        InstalledCommand::Panel {
+            command: PanelCommand::Code,
+        } => {
+            // Where the panel is, when this environment says it: only to tell where to type.
+            let address = std::env::var(arauto_hub::config::names::PANEL_URL)
+                .ok()
+                .and_then(|text| PublicUrl::parse(text.trim()).ok())
+                .map(|url| url.origin());
+            render::panel_code(&session.panel_code(now).await?, address.as_deref(), now)
+        }
     })
 }
 
@@ -1024,6 +1052,7 @@ mod tests {
             "arauto-hub admin link remove vendas suporte",
             "arauto-hub admin link remove vendas suporte --both",
             "arauto-hub admin link list",
+            "arauto-hub admin panel code",
             "arauto-hub dev-reset --yes-erase-everything",
         ] {
             let parsed = Cli::try_parse_from(line.split(' '));
@@ -1047,6 +1076,8 @@ mod tests {
             "arauto-hub admin link remove vendas",
             "arauto-hub admin link list vendas",
             "arauto-hub admin link",
+            "arauto-hub admin panel",
+            "arauto-hub admin panel code abcd-efgh",
         ] {
             assert!(Cli::try_parse_from(line.split(' ')).is_err(), "{line}");
         }

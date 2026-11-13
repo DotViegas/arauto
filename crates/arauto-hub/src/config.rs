@@ -10,6 +10,8 @@
 //! | `ARAUTO_CLIENT_IP_SOURCE` | Where the address of a connector comes from: `socket` or `forwarded`. |
 //! | `ARAUTO_TRUSTED_PROXIES` | With `forwarded`: the proxies whose word is taken, as addresses or networks. |
 //! | `ARAUTO_ALLOW_UNSAFE_DB` | `1` lets the hub start on a database with `fsync` off. For tests only. |
+//! | `ARAUTO_LISTEN_PANEL` | Optional: the address of the port of the panel. Without it there is no panel. |
+//! | `ARAUTO_PANEL_URL` | With the panel: the address the admin opens it at, in the browser. |
 //!
 //! Each command asks only for what it uses: [`StorageConfig`] for the commands that open the
 //! database and the data folder, [`PublicUrl`] for the command that shows the block, and
@@ -39,6 +41,10 @@ pub mod names {
     pub const TRUSTED_PROXIES: &str = "ARAUTO_TRUSTED_PROXIES";
     /// Lets the hub start on a database that does not force its writes to disk.
     pub const ALLOW_UNSAFE_DB: &str = "ARAUTO_ALLOW_UNSAFE_DB";
+    /// The address of the port of the panel. Optional: without it the hub has no panel.
+    pub const LISTEN_PANEL: &str = "ARAUTO_LISTEN_PANEL";
+    /// The address the admin opens the panel at.
+    pub const PANEL_URL: &str = "ARAUTO_PANEL_URL";
 }
 
 /// The longest public address accepted.
@@ -219,6 +225,25 @@ impl PublicUrl {
         let scheme = if self.secure { "https" } else { "http" };
         format!("{scheme}://{}/v1/download/{file}", self.authority)
     }
+
+    /// The origin, as a browser writes it in the `Origin` header: `https://host[:port]`.
+    #[must_use]
+    pub fn origin(&self) -> String {
+        let scheme = if self.secure { "https" } else { "http" };
+        format!("{scheme}://{}", self.authority)
+    }
+
+    /// The host and the port, in lowercase, as a browser writes them in the `Host` header.
+    #[must_use]
+    pub fn authority(&self) -> &str {
+        &self.authority
+    }
+
+    /// Whether the address is `https://`. Only `http://` on this machine is not.
+    #[must_use]
+    pub const fn is_secure(&self) -> bool {
+        self.secure
+    }
 }
 
 /// A network of proxies: an address and how many of its leading bits count.
@@ -298,6 +323,19 @@ pub struct ServeConfig {
     /// Where the address of a connector comes from. There is no default: a wrong guess
     /// either lets anyone forge the address or shows the proxy as every connector.
     pub client_ip: ClientIpSource,
+    /// The panel of the admin. `None`, the default: the hub listens on no port for it
+    /// (`docs/decisoes/0028-painel-fechado-por-padrao.md`).
+    pub panel: Option<PanelConfig>,
+}
+
+/// Where the panel of the admin listens and at which address the browser reaches it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanelConfig {
+    /// The address of the port of the panel: never the one of the connectors.
+    pub listen: SocketAddr,
+    /// The address the admin types in the browser. The `Host` and the `Origin` of every
+    /// request are checked against it, and the cookie of the session follows its scheme.
+    pub url: PublicUrl,
 }
 
 impl ServeConfig {
@@ -334,19 +372,29 @@ impl ServeConfig {
         }
         let public_url = read_public_url(env, &mut problems);
         let client_ip = read_client_ip(env, &mut problems);
-        let config = match (storage, listen, listen_internal, public_url, client_ip) {
+        let panel = read_panel(env, listen, listen_internal, &mut problems);
+        let config = match (
+            storage,
+            listen,
+            listen_internal,
+            public_url,
+            client_ip,
+            panel,
+        ) {
             (
                 Some(storage),
                 Some(listen),
                 Some(listen_internal),
                 Some(public_url),
                 Some(client_ip),
+                Some(panel),
             ) => Some(Self {
                 storage,
                 listen,
                 listen_internal,
                 public_url,
                 client_ip,
+                panel,
             }),
             _ => None,
         };
@@ -451,6 +499,84 @@ fn read_listen(
             None
         }
     }
+}
+
+/// The panel: off when neither of its variables is set (`Some(None)`), on when both are and
+/// are right (`Some(Some(..))`), and a problem otherwise (`None`).
+fn read_panel(
+    env: &impl Lookup,
+    listen: Option<SocketAddr>,
+    listen_internal: Option<SocketAddr>,
+    problems: &mut Vec<Problem>,
+) -> Option<Option<PanelConfig>> {
+    let address = value(env, names::LISTEN_PANEL);
+    let url = value(env, names::PANEL_URL);
+    let (address, url) = match (address, url) {
+        (None, None) => return Some(None),
+        (Some(_), None) => {
+            problems.push(Problem {
+                variable: names::PANEL_URL,
+                what: format!(
+                    "is not set, and {} is; it is the address the admin opens the panel at, \
+                     like https://panel.example.com or, through a tunnel, http://localhost:8445",
+                    names::LISTEN_PANEL
+                ),
+            });
+            return None;
+        }
+        (None, Some(_)) => {
+            problems.push(Problem {
+                variable: names::LISTEN_PANEL,
+                what: format!(
+                    "is not set, and {} is; it is the address the port of the panel listens \
+                     on, like 127.0.0.1:8445",
+                    names::PANEL_URL
+                ),
+            });
+            return None;
+        }
+        (Some(address), Some(url)) => (address, url),
+    };
+    let address = match address.parse::<SocketAddr>() {
+        Ok(address) if address.port() != 0 => Some(address),
+        _ => {
+            problems.push(Problem {
+                variable: names::LISTEN_PANEL,
+                what: "is not an address with a port, like 127.0.0.1:8445 or [::]:8445".to_owned(),
+            });
+            None
+        }
+    };
+    // The login of the admin never travels to the port of the connectors, nor to the one
+    // the engine reaches (docs/03-arquitetura.md, section 4).
+    if let Some(address) = address {
+        for (other, name) in [
+            (listen, names::LISTEN),
+            (listen_internal, names::LISTEN_INTERNAL),
+        ] {
+            if other == Some(address) {
+                problems.push(Problem {
+                    variable: names::LISTEN_PANEL,
+                    what: format!("is the same address as {name}; the panel has a port of its own"),
+                });
+                return None;
+            }
+        }
+    }
+    let url = match PublicUrl::parse(&url) {
+        Ok(url) => Some(url),
+        Err(rule) => {
+            problems.push(Problem {
+                variable: names::PANEL_URL,
+                what: format!("is not usable: {rule}"),
+            });
+            None
+        }
+    };
+    Some(Some(PanelConfig {
+        listen: address?,
+        url: url?,
+    }))
 }
 
 fn read_public_url(env: &impl Lookup, problems: &mut Vec<Problem>) -> Option<PublicUrl> {
@@ -642,6 +768,61 @@ mod tests {
             panic!("forwarded was asked for");
         };
         assert_eq!(trusted_proxies.len(), 3);
+        // The panel is closed by default: with no variable of its own, no port.
+        assert_eq!(config.panel, None);
+    }
+
+    #[test]
+    fn the_panel_is_off_until_both_of_its_variables_are_set_and_right() {
+        let mut pairs = FULL.to_vec();
+        pairs.push((names::LISTEN_PANEL, "127.0.0.1:8445"));
+        pairs.push((names::PANEL_URL, "http://localhost:8445"));
+        let panel = ServeConfig::read(&env(&pairs)).unwrap().panel.unwrap();
+        assert_eq!(panel.listen, "127.0.0.1:8445".parse().unwrap());
+        assert_eq!(panel.url.origin(), "http://localhost:8445");
+        assert_eq!(panel.url.authority(), "localhost:8445");
+        assert!(!panel.url.is_secure());
+
+        // One without the other is a mistake, said on the one that is missing.
+        let mut only_port = FULL.to_vec();
+        only_port.push((names::LISTEN_PANEL, "127.0.0.1:8445"));
+        let error = ServeConfig::read(&env(&only_port)).unwrap_err();
+        assert_eq!(variables(&error), [names::PANEL_URL]);
+        let mut only_url = FULL.to_vec();
+        only_url.push((names::PANEL_URL, "https://panel.example.com"));
+        let error = ServeConfig::read(&env(&only_url)).unwrap_err();
+        assert_eq!(variables(&error), [names::LISTEN_PANEL]);
+
+        // The panel never shares a port: the login of the admin does not travel to the port
+        // of the connectors, nor to the one the engine reaches.
+        for taken in ["0.0.0.0:8443", "127.0.0.1:9000"] {
+            let mut pairs = FULL.to_vec();
+            pairs.push((names::LISTEN_PANEL, taken));
+            pairs.push((names::PANEL_URL, "https://panel.example.com"));
+            let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+            assert_eq!(variables(&error), [names::LISTEN_PANEL], "{taken}");
+        }
+
+        // The address of the panel follows the rules of the public address: https, or http
+        // on this machine only, and nothing after the host.
+        for bad in [
+            "http://panel.example.com",
+            "panel.example.com",
+            "https://panel.example.com/admin",
+        ] {
+            let mut pairs = FULL.to_vec();
+            pairs.push((names::LISTEN_PANEL, "127.0.0.1:8445"));
+            pairs.push((names::PANEL_URL, bad));
+            let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+            assert_eq!(variables(&error), [names::PANEL_URL], "{bad}");
+        }
+        for bad in ["8445", "localhost:8445", "0.0.0.0:0"] {
+            let mut pairs = FULL.to_vec();
+            pairs.push((names::LISTEN_PANEL, bad));
+            pairs.push((names::PANEL_URL, "https://panel.example.com"));
+            let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+            assert_eq!(variables(&error), [names::LISTEN_PANEL], "{bad}");
+        }
     }
 
     #[test]

@@ -713,6 +713,41 @@ pub fn audit(rows: &[AuditRow]) -> Report {
     Report::done(text)
 }
 
+/// `admin panel code`: the entry code of the panel. This is the only moment it is shown.
+#[must_use]
+pub fn panel_code(
+    issued: &crate::repo::panel::IssuedEntry,
+    panel: Option<&str>,
+    now: i64,
+) -> Report {
+    let minutes = issued.expires_at.saturating_sub(now).max(0) / 60_000;
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "Entry code of the panel. It is valid for {minutes} minutes and opens one session."
+    );
+    let _ = writeln!(
+        text,
+        "The code issued before, used or not, is no longer accepted."
+    );
+    let _ = writeln!(text);
+    let _ = writeln!(text, "    {}", issued.code.reveal().as_str());
+    let _ = writeln!(text);
+    match panel {
+        Some(address) => {
+            let _ = writeln!(text, "Type it at {}/sign-in.", escape(address));
+        }
+        None => {
+            let _ = writeln!(
+                text,
+                "Type it in the sign-in page of the panel. The hub only has a panel when \
+                 ARAUTO_LISTEN_PANEL and ARAUTO_PANEL_URL are set where `arauto-hub serve` runs."
+            );
+        }
+    }
+    Report::done(text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

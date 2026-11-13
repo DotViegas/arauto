@@ -39,8 +39,10 @@ ENV ARAUTO_DATA_DIR=/var/lib/arauto \
 VOLUME /var/lib/arauto
 
 USER arauto
-# Only the port of the connectors is published. The internal one (health, events of the
-# engine) is reached by the network of the composition, never from outside.
+# The port of the connectors is the one published to the proxy. The internal one (health,
+# events of the engine) is reached by the network of the composition, never from outside.
+# The panel is off in the image: its port only exists when the composition sets
+# ARAUTO_LISTEN_PANEL and ARAUTO_PANEL_URL.
 EXPOSE 8443
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \

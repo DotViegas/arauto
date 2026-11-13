@@ -19,13 +19,14 @@ O conector não se instala por aqui: ele é baixado do próprio hub, pelo bloco 
  CONECTOR ──wss──► PROXY ──http──► HUB :8443 ─────► POSTGRESQL
  (ao lado de                (TLS)   │
   cada Hermes)                      │ :8444 (interna, nunca publicada)
+                                    │ :8445 (painel, desligado por padrão)
                                     ◄──── eventos ──── MOTOR DE WHATSAPP
                                     ────► chamadas ───► (de quem instala)
 ```
 
 | Peça | De quem é | O que precisa |
 |---|---|---|
-| **Hub** | Do projeto: a imagem. | Duas portas: a dos conectores (publicada atrás do proxy) e a interna (saúde e eventos do motor). |
+| **Hub** | Do projeto: a imagem. | Duas portas: a dos conectores (publicada atrás do proxy) e a interna (saúde e eventos do motor). E uma terceira, a do painel, só quando você a liga. |
 | **PostgreSQL 16** | Vem na composição. | Gravação forçada em disco ligada (`fsync`). O hub se recusa a subir sem ela. |
 | **Proxy** | De quem instala. | Terminar o TLS, repassar a troca para websocket, prazo de inatividade acima de 90 segundos. |
 | **Motor de WhatsApp** | De quem instala. O projeto não o embute. | Estar numa rede que alcança a porta interna do hub, e nunca ter porta pública. |
@@ -36,7 +37,9 @@ O conector não se instala por aqui: ele é baixado do próprio hub, pelo bloco 
    auditoria) noutro. A cópia de segurança do banco **não** leva a pasta de dados: quem rouba a
    cópia do banco não leva a chave.
 2. **Só a porta dos conectores é publicada**, e atrás de um proxy com TLS. A porta interna e o motor
-   nunca têm porta pública.
+   nunca têm porta pública. A porta do painel vem desligada; ligada, fica só no próprio servidor,
+   alcançada por túnel, e só vai para fora por escolha sua, com TLS e num endereço que não é o dos
+   conectores.
 3. **O endereço de cada conector.** Atrás de um proxy, o hub lê o endereço do cabeçalho
    `X-Forwarded-For`, e só acredita nele quando a conexão vem de um proxy da lista
    `ARAUTO_TRUSTED_PROXIES`. Lista errada deixa qualquer um forjar o próprio endereço.
@@ -55,6 +58,8 @@ O conector não se instala por aqui: ele é baixado do próprio hub, pelo bloco 
 | `ARAUTO_DATA_DIR` | A pasta da chave-mestra e da marca da auditoria. |
 | `ARAUTO_LISTEN` | O endereço da porta dos conectores. |
 | `ARAUTO_LISTEN_INTERNAL` | O endereço da porta interna. |
+| `ARAUTO_LISTEN_PANEL` | O endereço da porta do painel. Sem ela, o painel fica desligado. |
+| `ARAUTO_PANEL_URL` | O endereço que o admin abre no navegador: `https://` e só o nome (e a porta), ou `http://localhost` com a porta, por túnel. Vem junto com a de cima. |
 | `ARAUTO_PUBLIC_URL` | O endereço que vai no bloco: `https://` e só o nome (e a porta). |
 | `ARAUTO_CLIENT_IP_SOURCE` | De onde vem o endereço de um conector: `socket` ou `forwarded`. |
 | `ARAUTO_TRUSTED_PROXIES` | Com `forwarded`: os proxies em que o hub acredita. |
@@ -67,7 +72,8 @@ arauto-hub init                 cria a chave-mestra, a marca, a organização e 
 arauto-hub serve                roda o hub
 arauto-hub health               pergunta ao hub desta máquina se ele está no ar (0 = está)
 arauto-hub migrate --i-have-a-backup   aplica migrações num banco que já tem dados
-arauto-hub admin ...            o que o painel faria, por comando
+arauto-hub admin ...            a administração, por comando
+arauto-hub admin panel code     emite o código de entrada do painel (10 minutos, uma entrada)
 ```
 
 A sequência de um primeiro uso está no guia de cada pasta. O [roteiro do primeiro teste](primeiro-teste.md) traz, passo a passo, o que conferir numa instalação nova.

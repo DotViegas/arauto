@@ -165,6 +165,13 @@ actions! {
     AccessChatSet => "access_chat.set", true;
     /// The line of a chat was taken away.
     AccessChatRemoved => "access_chat.removed", true;
+    /// An entry code of the panel was issued by the admin command. It opens nothing until it
+    /// is typed.
+    PanelCodeIssued => "panel.code_issued", false;
+    /// An entry code was used: a session of the panel is open.
+    PanelSignedIn => "panel.signed_in", true;
+    /// A session of the panel was closed by whoever held it.
+    PanelSignedOut => "panel.signed_out", false;
 }
 
 impl fmt::Display for Action {
@@ -626,6 +633,8 @@ mod tests {
             "access.removed",
             "access_chat.set",
             "access_chat.removed",
+            // A session of the panel is someone who can ask for all of the above.
+            "panel.signed_in",
         ]
         .into_iter()
         .collect();

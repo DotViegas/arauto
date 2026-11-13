@@ -55,7 +55,10 @@ Todos na porta dos conectores.
   depois do MVP.
 - Saúde e métricas ficam em outra porta, que não é publicada ([15](15-mvp.md), seção 6). No hub, a
   porta interna responde só `GET /health`, com `ok`; a de conectores não responde a ela.
-- No hub, todo outro endereço, e todo método que não seja `GET`, recebe 404.
+- No hub, todo outro endereço, e todo método que não seja `GET`, recebe 404. Isso vale para a
+  porta dos conectores e para a interna. A porta do painel, quando ligada, é uma terceira: os
+  endereços dela não existem nessas duas, nem os delas na do painel
+  ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)).
 - **Download, no hub.** O nome pedido só é comparado com os nomes da lista e nunca vira caminho de
   arquivo: `../`, barra, caractere codificado ou letra trocada de caixa simplesmente não acham nada.
   Um nome da lista tem até 128 letras, dígitos, pontos, hífens e sublinhados, e não começa por ponto.

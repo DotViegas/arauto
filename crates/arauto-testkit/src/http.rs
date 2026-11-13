@@ -21,8 +21,37 @@ const BODY_MAX: usize = 1024 * 1024;
 pub struct Response {
     /// The status code.
     pub status: u16,
+    /// The headers, in the order they came, with their names in lowercase.
+    pub headers: Vec<(String, String)>,
     /// The body, up to 1 MiB.
     pub body: Vec<u8>,
+}
+
+impl Response {
+    /// The value of a header that came once. `None` when it did not come, or came twice.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        let mut found = self.all(name);
+        match (found.next(), found.next()) {
+            (Some(value), None) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Every value of a header.
+    pub fn all<'r>(&'r self, name: &str) -> impl Iterator<Item = &'r str> {
+        let name = name.to_ascii_lowercase();
+        self.headers
+            .iter()
+            .filter(move |(found, _)| *found == name)
+            .map(|(_, value)| value.as_str())
+    }
+
+    /// The body, as text.
+    #[must_use]
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.body).into_owned()
+    }
 }
 
 /// A request to open the websocket, and the TCP connection it went on.
@@ -35,7 +64,18 @@ pub struct Upgrade {
 }
 
 fn request(path: &str, headers: &[(&str, &str)], extra: &str) -> String {
-    let mut text = format!("GET {path} HTTP/1.1\r\nHost: arauto.test\r\n");
+    head("GET", path, headers, extra)
+}
+
+/// The head of a request. `Host: arauto.test` goes unless the test names another.
+fn head(method: &str, path: &str, headers: &[(&str, &str)], extra: &str) -> String {
+    let mut text = format!("{method} {path} HTTP/1.1\r\n");
+    if !headers
+        .iter()
+        .any(|(name, _)| name.eq_ignore_ascii_case("host"))
+    {
+        text.push_str("Host: arauto.test\r\n");
+    }
     for (name, value) in headers {
         text.push_str(name);
         text.push_str(": ");
@@ -49,6 +89,24 @@ fn request(path: &str, headers: &[(&str, &str)], extra: &str) -> String {
 
 /// Reads the head of a response and returns its status and what came after the head.
 async fn read_head(stream: &mut TcpStream, deadline: Instant) -> Result<(u16, Vec<u8>), KitError> {
+    let (status, _, rest) = read_whole_head(stream, deadline).await?;
+    Ok((status, rest))
+}
+
+/// The headers of a head, with their names in lowercase.
+fn headers_of(head: &str) -> Vec<(String, String)> {
+    head.split("\r\n")
+        .skip(1)
+        .filter_map(|line| line.split_once(':'))
+        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_owned()))
+        .collect()
+}
+
+/// Reads the head of a response: its status, its headers and what came after it.
+async fn read_whole_head(
+    stream: &mut TcpStream,
+    deadline: Instant,
+) -> Result<(u16, Vec<(String, String)>, Vec<u8>), KitError> {
     let mut head = Vec::new();
     let mut buffer = [0u8; 4096];
     loop {
@@ -60,7 +118,7 @@ async fn read_head(stream: &mut TcpStream, deadline: Instant) -> Result<(u16, Ve
                 .nth(1)
                 .and_then(|code| code.parse().ok())
                 .ok_or_else(|| KitError::Unexpected("a response without a status".into()))?;
-            return Ok((status, rest));
+            return Ok((status, headers_of(&text), rest));
         }
         if head.len() > HEAD_MAX {
             return Err(KitError::Unexpected("a head of response too long".into()));
@@ -87,12 +145,47 @@ pub async fn get(
     headers: &[(&str, &str)],
     within: Duration,
 ) -> Result<Response, KitError> {
+    send("GET", addr, path, headers, &[], within).await
+}
+
+/// `POST path` with a body. `Content-Length` is added; the type of the body is the test's
+/// to say.
+///
+/// # Errors
+/// The network; [`KitError::TimedOut`].
+pub async fn post(
+    addr: SocketAddr,
+    path: &str,
+    headers: &[(&str, &str)],
+    body: &[u8],
+    within: Duration,
+) -> Result<Response, KitError> {
+    send("POST", addr, path, headers, body, within).await
+}
+
+/// One request with any method, on a connection of its own.
+///
+/// # Errors
+/// The network; [`KitError::TimedOut`].
+pub async fn send(
+    method: &str,
+    addr: SocketAddr,
+    path: &str,
+    headers: &[(&str, &str)],
+    body: &[u8],
+    within: Duration,
+) -> Result<Response, KitError> {
     let deadline = Instant::now() + within;
     let mut stream = TcpStream::connect(addr).await?;
-    stream
-        .write_all(request(path, headers, "Connection: close\r\n").as_bytes())
-        .await?;
-    let (status, mut body) = read_head(&mut stream, deadline).await?;
+    let extra = if body.is_empty() && method == "GET" {
+        "Connection: close\r\n".to_owned()
+    } else {
+        format!("Content-Length: {}\r\nConnection: close\r\n", body.len())
+    };
+    let mut bytes = head(method, path, headers, &extra).into_bytes();
+    bytes.extend_from_slice(body);
+    stream.write_all(&bytes).await?;
+    let (status, headers, mut body) = read_whole_head(&mut stream, deadline).await?;
     let mut buffer = [0u8; 4096];
     while body.len() <= BODY_MAX {
         let read = timeout_at(deadline, stream.read(&mut buffer))
@@ -103,7 +196,11 @@ pub async fn get(
         }
         body.extend_from_slice(buffer.get(..read).unwrap_or_default());
     }
-    Ok(Response { status, body })
+    Ok(Response {
+        status,
+        headers,
+        body,
+    })
 }
 
 /// Asks for the websocket of the channel and leaves the connection as the hub left it: open

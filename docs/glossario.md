@@ -110,6 +110,7 @@
 | **Expurgo** | Apagar o que passou do prazo de guarda. |
 | **Passkey** | A chave de acesso do celular ou do computador, usada no lugar da senha. |
 | **Código de instalação** | Código de uso único que o hub mostra na primeira partida, para criar o primeiro admin. |
+| **Código de entrada** | Código de uso único, emitido por comando na máquina do hub, que abre uma sessão do painel enquanto a passkey não existe. É segredo de curta duração: aparece uma vez, e o hub guarda só o resumo. Nome proposto ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 
 ## A conversa entre Hermes
 

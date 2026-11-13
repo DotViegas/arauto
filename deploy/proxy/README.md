@@ -18,6 +18,11 @@ de um endereço de `ARAUTO_TRUSTED_PROXIES`.
 Só dois caminhos precisam chegar ao hub: `/v1/channel` e `/v1/download/`. O resto pode responder 404
 no próprio proxy.
 
+O painel **não** entra neste site. Ele tem uma porta própria no hub (8445), desligada por padrão, e
+o caminho previsto é um túnel até ela ([guia](../docker/README.md)). Quem quiser abri-lo por um
+proxy dá a ele outro nome, com TLS, apontando para `127.0.0.1:8445`; as três condições acima são do
+canal e não valem para ele.
+
 ## Caddy
 
 ```

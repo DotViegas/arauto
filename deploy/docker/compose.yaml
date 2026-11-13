@@ -28,14 +28,21 @@ services:
       # these proxies. Without a proxy: socket, and remove ARAUTO_TRUSTED_PROXIES.
       ARAUTO_CLIENT_IP_SOURCE: ${ARAUTO_CLIENT_IP_SOURCE:-forwarded}
       ARAUTO_TRUSTED_PROXIES: ${ARAUTO_TRUSTED_PROXIES:?set ARAUTO_TRUSTED_PROXIES}
+      # The panel of the admin: off unless BOTH are set in arauto.env. Inside the container it
+      # listens on every interface, so that the port published below reaches it.
+      ARAUTO_LISTEN_PANEL: ${ARAUTO_LISTEN_PANEL:-}
+      ARAUTO_PANEL_URL: ${ARAUTO_PANEL_URL:-}
       # What the hub says: info by default (its start, the engine, the restored mode).
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       # The master key and the audit mark. NOT the volume of the database, and NOT in its backup.
       - arauto-data:/var/lib/arauto
     ports:
-      # Only the port of the connectors, and only on this machine: the proxy reaches it here.
+      # The port of the connectors, only on this machine: the proxy reaches it here.
       - "127.0.0.1:${ARAUTO_PORT:-8443}:8443"
+      # The port of the panel, only on this machine: reached through a tunnel, or by a proxy
+      # site of its own. With the panel off nothing listens behind it.
+      - "127.0.0.1:${ARAUTO_PANEL_PORT:-8445}:8445"
     networks:
       - internal
       - outside
@@ -77,7 +84,7 @@ networks:
   # The hub and its database, and nothing else.
   internal:
     internal: true
-  # Where the published port of the hub lives. The subnet is fixed: a proxy on the server
+  # Where the published ports of the hub live. The subnet is fixed: a proxy on the server
   # reaches the hub through the gateway of one of these two networks, and that is the address
   # ARAUTO_TRUSTED_PROXIES must name. Change the subnets if they collide with yours.
   outside:

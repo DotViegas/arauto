@@ -2,6 +2,12 @@
 
 **Estado: proposta.** O que cada tela mostra, o que se faz nela e como ela fica vazia ou com erro.
 
+**No hub, em 12/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta): existem
+a T1, a T4 e a T6, **só de leitura**, e a faixa de alertas. As ações descritas nelas, as outras
+telas e a passkey ainda são desenho; onde uma tela vazia manda fazer algo, o hub diz o comando
+`arauto-hub admin` que faz. A T0 não existe: entra-se com um código de entrada, emitido por comando
+na máquina do hub. A sessão do painel já dura 12 horas, ou 30 minutos sem uso.
+
 ## Resumo
 
 ```

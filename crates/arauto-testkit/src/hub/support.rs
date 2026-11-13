@@ -11,7 +11,9 @@ use std::time::Duration;
 
 use arauto_hub::admin::{self, InitOutcome};
 use arauto_hub::channel::{self, ChannelSettings, Downloads, Hub, Options, Purposes, Running};
-use arauto_hub::config::{ClientIpSource, DatabaseUrl, PublicUrl, ServeConfig, StorageConfig};
+use arauto_hub::config::{
+    ClientIpSource, DatabaseUrl, PanelConfig, PublicUrl, ServeConfig, StorageConfig,
+};
 use arauto_hub::db::{PoolOptions, ResolvedOrg};
 use arauto_protocol::clock::SystemClock;
 use arauto_protocol::message::DeclaredText;
@@ -81,7 +83,15 @@ pub fn settings() -> ChannelSettings {
     settings
 }
 
-/// The configuration of a hub of `installation`, on two free ports of this machine.
+/// The address a test names the panel by: what goes in `Host` and, with `http://` before it,
+/// in `Origin`. The panel listens on a free port; it answers to this name.
+pub const PANEL_HOST: &str = "localhost:8445";
+
+/// The origin of the panel of a test hub.
+pub const PANEL_ORIGIN: &str = "http://localhost:8445";
+
+/// The configuration of a hub of `installation`, on free ports of this machine: the two
+/// every hub has, and the one of the panel.
 #[must_use]
 pub fn config(installation: &Installation, client_ip: ClientIpSource) -> ServeConfig {
     let local: SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -95,6 +105,10 @@ pub fn config(installation: &Installation, client_ip: ClientIpSource) -> ServeCo
         listen_internal: local,
         public_url: PublicUrl::parse("http://127.0.0.1:1").unwrap(),
         client_ip,
+        panel: Some(PanelConfig {
+            listen: local,
+            url: PublicUrl::parse(PANEL_ORIGIN).unwrap(),
+        }),
     }
 }
 

@@ -1135,6 +1135,8 @@ fn run(fresh: &Fresh, public_url: Option<&str>, args: &[&str]) -> Ran {
         .env_remove("ARAUTO_CLIENT_IP_SOURCE")
         .env_remove("ARAUTO_TRUSTED_PROXIES")
         .env_remove("ARAUTO_ALLOW_UNSAFE_DB")
+        .env_remove("ARAUTO_LISTEN_PANEL")
+        .env_remove("ARAUTO_PANEL_URL")
         .env("ARAUTO_DATABASE_URL", fresh.db.url().expose())
         .env("ARAUTO_DATA_DIR", fresh.data_dir())
         .env("USER", "tester")

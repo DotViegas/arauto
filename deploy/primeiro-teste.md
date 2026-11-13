@@ -64,8 +64,8 @@ um passo marcado com **[PROVA]**.
 - [ ] **2.1** Configurar o proxy ([proxy/README.md](proxy/README.md)): só `/v1/channel` e
   `/v1/download/` chegam ao hub; websocket; prazo de 120 segundos; o cabeçalho `X-Forwarded-For`
   **substituído** pelo endereço de quem chegou.
-- [ ] **2.2** De fora do servidor: `curl -I https://SEU-ENDERECO/` responde 404; as portas 8443 e
-  8444 não respondem direto.
+- [ ] **2.2** De fora do servidor: `curl -I https://SEU-ENDERECO/` responde 404; as portas 8443,
+  8444 e 8445 não respondem direto; `curl -I https://SEU-ENDERECO/sign-in` responde 404.
 - [ ] **2.3** `curl -fsSLO https://SEU-ENDERECO/v1/download/arauto-connector-linux-x86_64` baixa o
   arquivo. Guarde o `sha256sum` dele para o passo 3.1.
 - [ ] **2.4** `dc logs hub` **não** tem a linha "a connection that is not from a trusted proxy
