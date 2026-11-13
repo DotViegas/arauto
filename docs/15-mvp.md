@@ -1,501 +1,521 @@
-# 15 — O primeiro MVP
+# 15 — The first MVP
 
-**Estado: proposta em construção.** Revisada em 10/11/2026, depois da revisão do desenho, e em
-11/11/2026, com o código do hub das etapas 2 e 2b (o que o hub faz está marcado "no hub"; o
-andamento está na seção 7, e os pontos em aberto na seção 9). O que entra na primeira versão que
-funciona de ponta a ponta, com que tecnologia e em que ordem. As decisões
-estão em [0031](decisoes/0031-banco-postgresql.md),
+**Status: proposal under construction.** Revised on 10/11/2026, after the design review, and on
+11/11/2026, with the hub code of stages 2 and 2b (what the hub does is marked "in the hub"; the
+progress is in section 7, and the open points in section 9). What goes into the first version that
+works end to end, with which technology and in which order. The decisions
+are in [0031](decisoes/0031-banco-postgresql.md),
 [0032](decisoes/0032-conversa-entre-hermes-no-mvp.md), [0033](decisoes/0033-escopo-do-mvp.md),
-[0034](decisoes/0034-nomes-em-ingles.md), [0035](decisoes/0035-pilha-do-websocket.md) e
+[0034](decisoes/0034-nomes-em-ingles.md), [0035](decisoes/0035-pilha-do-websocket.md) and
 [0036](decisoes/0036-windows-so-para-desenvolvimento.md).
 
-## Resumo
+## Summary
 
 ```
- M1 CONEXÃO    convite, código digitado, credencial lacrada, canal cifrado, quarentena,
-               revogar, reconectar, sair, líder único, modo restaurado
- M2 CONVERSA   recados entre Hermes, lista de pares, tetos, fila de avisos
- M3 WHATSAPP   motor (falso e WAHA), números, matriz de acessos, ferramentas
- M4 ACORDAR    o conector inicia uma execução no Hermes a partir de um aviso
- M5 ENTREGA    imagem de container, composição com PostgreSQL, teste de carga completo
+ M1 CONNECTION    invite, typed code, sealed credential, encrypted channel, quarantine,
+                  revoke, reconnect, leave, single leader, restored mode
+ M2 CONVERSATION  notes between Hermes, peer list, ceilings, notice queue
+ M3 WHATSAPP      engine (fake and WAHA), numbers, access matrix, tools
+ M4 WAKE          the connector starts a run in Hermes from a notice
+ M5 DELIVERY      container image, composition with PostgreSQL, full load test
 ```
 
-| Pergunta | Resposta |
+| Question | Answer |
 |---|---|
-| O que o MVP faz? | Conecta Hermes ao hub, deixa um Hermes mandar recado a outro e usar números de WhatsApp, e acorda o Hermes quando chega algo. |
-| Como se administra? | Por um comando no servidor do hub. O painel começou em 12/11/2026: telas de leitura e, desde 13/11/2026, o guia de conectar Hermes ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). Parear, dar acesso e a passkey vêm depois. |
-| Onde roda em desenvolvimento? | Direto pelo `cargo`, com um PostgreSQL local. Sem container. |
-| Onde roda em produção? | Em container, em Linux, com PostgreSQL, por um arquivo de composição. |
-| O que fica de fora? | A passkey e o resto das ações do painel, o arquivo de mensagens, a assinatura das versões e o modo blindado. |
+| What does the MVP do? | It connects Hermes to the hub, lets a Hermes send a note to another and use WhatsApp numbers, and wakes Hermes when something arrives. |
+| How is it administered? | By a command on the hub's server. The panel started on 12/11/2026: read-only screens and, since 13/11/2026, the guide to connect Hermes, the editing of accesses and the revoke ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). Pairing numbers and the passkey come later. |
+| Where does it run in development? | Directly through `cargo`, with a local PostgreSQL. No container. |
+| Where does it run in production? | In a container, on Linux, with PostgreSQL, through a compose file. |
+| What is left out? | The passkey, pairing numbers through the panel, the message archive, the signing of versions and the shielded mode. |
 
-## 1. O que entra e o que não entra
+## 1. What goes in and what does not
 
-| Entra | Não entra, e fica para depois |
+| Goes in | Does not go in, and is left for later |
 |---|---|
-| Convite, inscrição, código digitado, aprovação | A passkey e o resto das ações do painel ([07-telas.md](07-telas.md)). As telas de leitura entraram em 12/11/2026 e o guia de conectar Hermes em 13/11/2026. |
-| Canal Noise, troca da credencial, quarentena, revogar, reconectar, sair | Aviso ao admin por fora ([decisão 0025](decisoes/0025-aviso-por-fora-do-painel.md)) |
-| Modo restaurado ([04](04-seguranca-conexao.md), C11), com a marca fora do banco | O ponto em aberto do C11 (a data de emissão do lacre) |
-| Líder único e repassadoras | Modo blindado |
-| Conversa entre Hermes ([13](13-conversa-entre-hermes.md)) | Observador, salas e leitura do texto pelo admin |
-| Motor falso e adaptador do WAHA; ler, enviar e modificar | Arquivo de mensagens e busca (a leitura depende do motor no ar) |
-| Matriz de acessos, por número e por conversa | Envio de arquivo por endereço |
-| Avisos e acordar, com a frase fixa | Lista de versões do programa, com revogação e assinatura |
-| Auditoria que só cresce, e alertas lidos por comando | Tetos ajustáveis |
-| Teto de envio (20 por minuto, por Hermes e por número) e tetos de recado | Autoridade privada no TLS do conector |
+| Invite, enrollment, typed code, approval | The passkey and pairing numbers through the panel ([07-telas.md](07-telas.md)). The read-only screens went in on 12/11/2026; the guide to connect Hermes, the editing of accesses and the revoke, on 13/11/2026. |
+| Noise channel, swap of the credential, quarantine, revoke, reconnect, leave | Warning to the admin outside the panel ([decision 0025](decisoes/0025-aviso-por-fora-do-painel.md)) |
+| Restored mode ([04](04-seguranca-conexao.md), C11), with the mark outside the database | The open point of C11 (the issue date of the seal) |
+| Single leader and relays | Shielded mode |
+| Conversation between Hermes ([13](13-conversa-entre-hermes.md)) | Observer, rooms and reading of the text by the admin |
+| Fake engine and WAHA adapter; read, send and modify | Message archive and search (reading depends on the engine being up) |
+| Access matrix, by number and by chat | Sending a file by address |
+| Notices and waking, with the fixed sentence | List of versions of the program, with revocation and signature |
+| Audit that only grows, and alerts read by command | Adjustable ceilings |
+| Send ceiling (20 per minute, per Hermes and per number) and note ceilings | Private authority in the connector's TLS |
 
-**Administração no MVP.** Tudo o que muda algo é
-feito por `arauto-hub admin`, rodado por uma pessoa **na máquina do hub**, ou pelo painel, que chama
-as mesmas funções e só é aberto por um código que esse comando emite. Quem roda esse comando já
-tem o banco e a chave-mestra nas mãos; ele não cria um caminho mais fraco. O hub e o comando são o
-mesmo programa e usam as mesmas funções de gravação.
+**Administration in the MVP.** Everything that changes something is
+done by `arauto-hub admin`, run by a person **on the hub's machine**, or by the panel, which calls
+the same functions and is only opened by a code that this command issues. Whoever runs this command
+already has the database and the master key in hand; it does not create a weaker path. The hub and
+the command are the same program and use the same write functions.
 
 ```
- arauto-hub init                              cria chave-mestra, marca, organização e chave do hub
- arauto-hub serve                             o hub
- arauto-hub migrate --i-have-a-backup         aplica migrações num banco que já tem dados
- arauto-hub admin status                      situação, chave pública do hub, modo restaurado
- arauto-hub admin hermes add|list|remove      as linhas de Hermes
- arauto-hub admin invite NOME                 emite o convite e mostra o bloco (conectar ou reconectar)
- arauto-hub admin approve NOME [CODIGO]       o código é DIGITADO; sem ele, o comando pergunta
- arauto-hub admin deny|revoke NOME
- arauto-hub admin wake NOME on|off            pode ser acordado
- arauto-hub admin peers allow|deny|list       a lista de pares (--wake, --both)
- arauto-hub admin threads [NOME]              fios: quem, quando e quanto; nunca o texto
- arauto-hub admin engine|number|access ...    motor, números e matriz de acessos (M3)
- arauto-hub admin alerts [--ack ID]           os alertas que o painel mostra
+ arauto-hub init                              creates master key, mark, organization and hub key
+ arauto-hub serve                             the hub
+ arauto-hub migrate --i-have-a-backup         applies migrations to a database that already has data
+ arauto-hub admin status                      situation, public key of the hub, restored mode
+ arauto-hub admin hermes add|list|remove      the Hermes lines
+ arauto-hub admin invite NAME                 issues the invite and shows the block (connect or reconnect)
+ arauto-hub admin approve NAME [CODE]       the code is TYPED; without it, the command asks
+ arauto-hub admin deny|revoke NAME
+ arauto-hub admin wake NAME on|off            may be woken
+ arauto-hub admin peers allow|deny|list       the peer list (--wake, --both)
+ arauto-hub admin threads [NAME]              threads: who, when and how much; never the text
+ arauto-hub admin engine|number|access ...    engine, numbers and access matrix (M3)
+ arauto-hub admin alerts [--ack ID]           the alerts the panel shows
  arauto-hub admin audit [--tail N]
- arauto-hub admin panel code                  emite o código de entrada do painel
+ arauto-hub admin panel code                  issues the entry code of the panel
 ```
 
-**O painel, no hub, em 12/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta). O hub serve o painel
-numa terceira porta, desligada por padrão. Entra-se com um código de entrada: o comando acima o
-mostra uma vez, ele vale 10 minutos e uma entrada, e é digitado na tela, nunca mostrado por ela. O
-painel tem três telas de leitura (Hermes, WhatsApps e Acessos), a faixa de alertas e, desde
-13/11/2026, o guia de conectar Hermes: nome, bloco, código digitado e aprovação, pelas mesmas funções
-do `hermes add`, do `invite`, do `approve` e do `deny`. Parear e dar acesso continuam só pelo
-comando. Por decisão de quem mantém, a sessão do painel age sem passkey enquanto ela não existir, e
-por isso o painel fica fechado, alcançado por túnel. Foi testado só pelos testes automáticos; nunca
-rodou num servidor nem conectou um Hermes de verdade.
+**The panel, in the hub, on 12/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md), proposal). The hub serves the panel
+on a third port, turned off by default. One enters with an entry code: the command above shows it
+once, it is valid for 10 minutes and for one entry, and it is typed on the screen, never shown by
+it. The panel has three read-only screens (Hermes, WhatsApps and Accesses), the alert banner and, since
+13/11/2026, the guide to connect Hermes: name, block, typed code and approval, through the same
+functions as `hermes add`, `invite`, `approve` and `deny`. On the same day the editing of the access
+of a Hermes on a number (the `access grant`, the `wake-wait` and the `access remove`) and the
+`revoke` went in. Pairing numbers and choosing the chats of an access remain only through the
+command. By decision of the maintainer, the panel session acts without a passkey while it does not exist, and
+for that reason the panel stays closed, reached through a tunnel. It was tested only by the
+automatic tests; it never ran on a server and never connected a real Hermes.
 
-- Ao aprovar um reconectar, o comando mostra o último uso do aparelho atual e exige `--recognized`
-  ou `--not-recognized` (04, C10). Sem uma das duas, não aprova. No hub, o comando sempre imprime o
-  pedido, com o último uso, antes do resultado, e a aprovação repete o último uso. A pergunta vem
-  antes do código: sem resposta, nada é contado, e "não reconheço" só vale junto com o código certo.
-  Ela também é feita quando o aparelho anterior venceu por inatividade; revogado ou substituído não
-  gera pergunta (seção 9).
-- O código de conferência fica em claro na linha do aparelho até o pedido ser resolvido, e depois é
-  apagado. Passado como argumento, fica no histórico do terminal: vale uma vez e morre em 10 minutos.
-  Um código fora do formato de seis dígitos não conta como tentativa.
-- O ator gravado na auditoria é "admin local", com o usuário do sistema que rodou o comando, como
-  texto declarado. Nos demais eventos, o ator é o aparelho (inscrição, ativação, troca confirmada e
-  `leave`) ou o sistema (quarentena, substituição e prazos).
+- When approving a reconnect, the command shows the last use of the current device and requires
+  `--recognized` or `--not-recognized` (04, C10). Without one of the two, it does not approve. In the
+  hub, the command always prints the request, with the last use, before the result, and the approval
+  repeats the last use. The question comes before the code: without an answer, nothing is counted,
+  and "I do not recognize it" only holds together with the right code. It is also asked when the
+  previous device expired by inactivity; revoked or replaced does not raise a question (section 9).
+- The verification code stays in the clear on the device's row until the request is resolved, and is
+  then erased. Passed as an argument, it stays in the terminal history: it is valid once and dies in
+  10 minutes. A code outside the six-digit format does not count as an attempt.
+- The actor recorded in the audit is "local admin", with the system user that ran the command, as
+  declared text. In the other events, the actor is the device (enrollment, activation, confirmed swap
+  and `leave`) or the system (quarantine, replacement and deadlines).
 
-**No hub, em 11/11/2026.** Existem `init`, `serve`, `migrate`, `dev-reset` e, no `admin`, `status`,
-`hermes`, `invite`, `approve`, `deny`, `revoke`, `wake`, `alerts` e `audit`. O `peers` e o `threads`
-vêm no M2; `engine`, `number` e `access`, no M3. O que o comando faz e o texto não dizia:
+**In the hub, on 11/11/2026.** There are `init`, `serve`, `migrate`, `dev-reset` and, in `admin`,
+`status`, `hermes`, `invite`, `approve`, `deny`, `revoke`, `wake`, `alerts` and `audit`. `peers` and
+`threads` come in M2; `engine`, `number` and `access`, in M3. What the command does and the text did
+not say:
 
-- **`deny`** só nega pedido pendente. Um aprovado ainda sem credencial sai por `revoke` ou por um
-  convite novo.
-- **`hermes remove`** encerra tudo o que é do Hermes, como um revogar (aparelho, pedido e convite), e
-  tira as ligações dele. Uma linha excluída com aparelho servindo seria um Hermes que ninguém vê.
-- **`alerts`** lista também os aparelhos desconhecidos do C11, com a hora, o endereço e o que ele
-  declara, escapado. `--all` mostra os alertas já vistos. `audit --tail` mostra os últimos 50 por
-  padrão.
-- **Com o modo restaurado ligado**, todo comando do `admin` começa com o aviso do C11.
-- **Com o banco restaurado e o modo ainda desligado**, o `admin` só recusa: não grava, não mexe na
-  marca e manda subir o `serve`, que liga o modo. O `status` continua lendo e sai com erro.
-- **`status`** com mais de uma organização não lista Hermes nem alertas: os comandos que gravam
-  exigem exatamente uma.
-- **Durabilidade.** Todo comando que grava confere `fsync` antes, como o `init`.
-- **`init`** num banco com dados e sem marca responde "já instalado" e não recria a marca. Num banco
-  vazio com marca acima de zero, recusa.
+- **`deny`** only denies a pending request. An approved one still without a credential leaves
+  through `revoke` or through a new invite.
+- **`hermes remove`** closes everything that belongs to the Hermes, like a revoke (device, request
+  and invite), and removes its links. A deleted line with a device serving would be a Hermes nobody
+  sees.
+- **`alerts`** also lists the unknown devices of C11, with the time, the address and what it
+  declares, escaped. `--all` shows the alerts already seen. `audit --tail` shows the last 50 by
+  default.
+- **With the restored mode on**, every `admin` command starts with the C11 warning.
+- **With the database restored and the mode still off**, `admin` only refuses: it does not write,
+  does not touch the mark and tells you to start `serve`, which turns the mode on. `status` keeps
+  reading and exits with an error.
+- **`status`** with more than one organization lists neither Hermes nor alerts: the commands that
+  write require exactly one.
+- **Durability.** Every command that writes checks `fsync` first, like `init`.
+- **`init`** on a database with data and without a mark answers "already installed" and does not
+  recreate the mark. On an empty database with a mark above zero, it refuses.
 
-## 2. Banco: PostgreSQL
+## 2. Database: PostgreSQL
 
-O banco passa a ser o PostgreSQL ([decisão 0031](decisoes/0031-banco-postgresql.md)). O modelo é o do
-[06-modelo-de-dados.md](06-modelo-de-dados.md), com os nomes em inglês.
+The database becomes PostgreSQL ([decision 0031](decisoes/0031-banco-postgresql.md)). The model is
+that of [06-modelo-de-dados.md](06-modelo-de-dados.md), with the names in English.
 
-| No modelo | No banco | Observação |
+| In the model | In the database | Remark |
 |---|---|---|
 | organizacao | `organization` | |
-| admin | `admin` | No MVP, o "admin local". |
-| hermes | `hermes` | O nome segue o formato restrito ([13](13-conversa-entre-hermes.md), seção 2). |
-| aparelho | `device` | `slot` (`in_use`, `request` ou nulo) e `first_confirmed_at`. Índice único em (Hermes, `slot`). |
+| admin | `admin` | In the MVP, the "local admin". |
+| hermes | `hermes` | The name follows the restricted format ([13](13-conversa-entre-hermes.md), section 2). |
+| aparelho | `device` | `slot` (`in_use`, `request` or null) and `first_confirmed_at`. Unique index on (Hermes, `slot`). |
 | aparelho_desconhecido | `unknown_device` | |
-| convite | `invite` | Só o resumo. |
-| conexao_canal | `channel_connection` | Uma linha por conexão conferida de aparelho conhecido. |
+| convite | `invite` | Only the digest. |
+| conexao_canal | `channel_connection` | One row per checked connection of a known device. |
 | motor, numero, conversa | `engine`, `number`, `chat` | |
 | acesso, acesso_conversa | `access`, `access_chat` | |
-| evento_motor | `engine_event` | Caixa de entrada. |
-| aviso | `notice` | Caixa de saída, com `kind` (`whatsapp` ou `peer`), o alvo de cada tipo, `not_before` e `leased_until`. |
-| auditoria | `audit` | Gatilhos proíbem alterar, apagar e truncar. |
-| chamada_ferramenta | `tool_call` | Retenção curta. |
+| evento_motor | `engine_event` | Inbox. |
+| aviso | `notice` | Outbox, with `kind` (`whatsapp` or `peer`), the target of each type, `not_before` and `leased_until`. |
+| auditoria | `audit` | Triggers forbid altering, deleting and truncating. |
+| chamada_ferramenta | `tool_call` | Short retention. |
 | instalacao, chave_hub | `installation`, `hub_key` | |
-| (novo) alerta | `alert` | O que o painel mostra na faixa do topo. |
-| (novo) código de entrada, sessao_painel | `panel_entry`, `panel_session` | Só o resumo de cada um. [decisão 0040](decisoes/0040-painel-dentro-do-hub.md). |
-| (novo) ligação | `peer_link` | [13](13-conversa-entre-hermes.md) |
-| (novo) fio, recado | `peer_thread`, `peer_message` | O texto do recado vai cifrado. |
-| (novo) retenção | `retention` | Prazo de guarda por tabela. |
+| (new) alert | `alert` | What the panel shows in the strip at the top. |
+| (new) entry code, sessao_painel | `panel_entry`, `panel_session` | Only the digest of each one. [decision 0040](decisoes/0040-painel-dentro-do-hub.md). |
+| (new) link | `peer_link` | [13](13-conversa-entre-hermes.md) |
+| (new) thread, note | `peer_thread`, `peer_message` | The text of the note goes encrypted. |
+| (new) retention | `retention` | Retention period per table. |
 
-O `slot` do aparelho: `request` enquanto ele não confirmou a primeira credencial e o estado não é
-final; `in_use` depois da primeira confirmação, em ativo, suspenso ou quarentena; nulo em estado
-final. No reconectar, o antigo sai do `slot` antes de o novo entrar, na mesma gravação.
+The `slot` of the device: `request` while it has not confirmed the first credential and the state is
+not final; `in_use` after the first confirmation, in active, suspended or quarantine; null in a
+final state. On a reconnect, the old one leaves the `slot` before the new one enters, in the same
+write.
 
-Regras que valem para o banco:
+Rules that hold for the database:
 
-1. **Um banco só.** Os dois arquivos do desenho anterior existiam porque o SQLite tem um escritor.
-2. **A organização vem resolvida.** Só uma lista fechada de funções acha a organização a partir de
-   fora: pela identidade do aparelho, pelo resumo do convite e pelo segredo de eventos do motor. As
-   tarefas do sistema que atravessam organizações (filas, prazos, expurgo, marca) têm nome e também
-   estão na lista. Toda outra função do repositório exige a organização já resolvida. Um teste lê o
-   código do repositório e falha se aparecer uma função fora da lista sem esse parâmetro. No hub, a
-   lista tem a entrada pela identidade e a entrada pelo convite (a do motor vem no M3), e as tarefas
-   com nome: instalação, comando de administração, filas, prazos, expurgo, marca, lacre de
-   desconhecido e partida do `serve`. Em 12/11/2026 entraram as duas entradas do painel: pelo resumo
-   do código de entrada e pelo resumo do identificador da sessão do painel. A única função que grava sem organização é a das recusas de
-   convites que ninguém emitiu. O teste lê todo o código do hub que alcança o banco, não só o do
-   repositório, e cada exceção da lista diz por que existe.
-3. **Identificadores sorteados no hub** (UUID versão 4). A única sequência é a da auditoria. A
-   migração 0002 trocou o identificador inteiro de `tool_call` por um UUID, para cumprir esta regra.
-4. **O tempo é do hub.** Colunas de tempo são inteiros, em milissegundos UTC. Nenhuma coluna tem
-   valor padrão de tempo e nenhum SQL usa `now()`: um teste varre as migrações. Toda conexão define
-   `lock_timeout` (5 s) e `idle_in_transaction_session_timeout` (30 s). A única exceção é a tabela
-   de controle que a biblioteca de migrações cria, `_sqlx_migrations`, cuja coluna `installed_on`
-   tem a hora do banco como padrão. Nenhuma regra a lê, e os testes do relógio a deixam de fora.
-5. **As filas ficam no banco.** Pegar um item é um `UPDATE` curto, sobre uma seleção com
-   `FOR UPDATE SKIP LOCKED`, que marca o item como enviado com um prazo de posse, e é confirmado
-   antes do envio. Posse vencida volta a pendente. Nenhuma trava espera a confirmação do conector. O
-   trabalhador só busca avisos de Hermes com sessão aberta.
-6. **Gravação que muda aparelho relê antes.** Aprovar, julgar, promover, substituir e revogar abrem
-   transação, travam a linha do Hermes e depois as dos aparelhos dele, releem e só então gravam
-   ([14](14-protocolo-do-canal.md), seção 6). Nenhuma transação fica aberta durante espera de rede.
-7. **Durabilidade.** As transações de evento de segurança e as da troca rodam com
-   `SET LOCAL synchronous_commit = on`. Na partida, o hub confere `fsync` e `full_page_writes` e
-   recusa subir com eles desligados, salvo com uma opção explícita de teste
-   (`ARAUTO_ALLOW_UNSAFE_DB=1`). Um commit perdido da troca pareceria restauração e suspenderia todos.
-   Os metadados de `tool_call` podem ir sem espera.
-8. **Migrações embutidas no programa**, só para a frente. `init` aplica tudo num banco vazio. Num
-   banco com dados, `serve` não sobe com migração pendente: quem instala tira a cópia de segurança e
-   roda `migrate --i-have-a-backup`. O `admin` recusa rodar contra um banco de outra versão. No hub,
-   em 11/11/2026, há duas: a 0001, do núcleo, e a 0002, da revisão da conexão (prova pendente de
-   aparelho desconhecido, `tool_call` com UUID, chaves compostas por organização e índices). As
-   tabelas do WhatsApp, que a 0001 anunciava para a 0002, vêm numa posterior. Um banco de
-   desenvolvimento criado só com a 0001 precisa de `migrate --i-have-a-backup` ou de `dev-reset`.
-9. **A marca fica fora do banco**, ao lado da chave-mestra (04, C11). Uma função única, usada pelo hub
-   e pelo comando de administração, cuida dela: sob uma trava de arquivo entre processos, confere que
-   o banco não está atrás da marca antes de gravar um evento de segurança, e depois avança a marca.
-   A marca só aumenta. Gravações que esperam se juntam numa só. O hub repete a conferência na partida
-   e a cada varredura: um banco restaurado com o hub no ar é percebido em segundos, e um `admin`
-   rodado antes do `serve` não apaga a prova. No hub, a trava cobre só a leitura e a regravação do
-   arquivo da marca, e não a conferência (seção 9). Uma marca estragada é erro, e não "ausente".
-   "Banco com dados" quer dizer: existe linha em `installation`, ou qualquer linha em `audit`.
-10. **A auditoria só cresce**, e guarda só o que muda quem pode o quê. Os gatilhos protegem contra
-    erro do programa; quem tem o banco consegue apagar. Recusas repetidas e recados não geram um
-    evento cada ([13](13-conversa-entre-hermes.md), seção 7). No hub, cada evento diz se é de
-    segurança, e a lista é fechada e tem teste. São de segurança: a instalação, a organização, a
-    chave do hub, os admins, criar e excluir Hermes, mudar o "pode ser acordado", convite usado ou
-    cancelado, aprovar e negar, ativar, quarentena, substituição, revogação, troca confirmada, as
-    ligações da lista de pares e o modo restaurado. Não são: convite emitido, vencido, recusado ou usado
-    por outra identidade,
-    inscrição repetida, código errado, aparelho vencido por prazo, troca sem "gravei", os alertas de
-    reuso e de lacre sem explicação, conexão tomada, teto de recados, aparelho desconhecido listado e
-    migração. O vencimento por prazo fica fora porque a lista do C11 não o inclui. Do painel, em
-    12/11/2026: a entrada é evento de segurança; o código de entrada emitido e a saída não são.
-11. **Expurgo.** Uma tarefa do hub apaga em lotes pequenos, com a hora do hub, pelo prazo de cada
-    tabela: recados, 30 dias; chamadas de ferramenta, 7; avisos resolvidos, 7; eventos do motor já
-    tratados, 1; conexões e aparelhos desconhecidos, 90. Em 11/11/2026 os prazos estão na tabela
-    `retention`, mas a tarefa ainda não existe. Ver também o segundo ponto em aberto do
-    [14](14-protocolo-do-canal.md), seção 13. Em 12/11/2026 entraram os códigos de entrada e as
-    sessões do painel: 30 dias depois do momento em que deixaram de valer.
-12. **O banco é acessado direto**, sem agrupador de conexões em modo de transação. O hub tem dois
-    conjuntos de conexões de tamanho fixo: o dos conectores (16 de partida) e um de 2, só da
-    varredura. Esperar por uma conexão tem prazo de 5 segundos. O conjunto da varredura existe para o
-    revogar valer em menos de 5 segundos mesmo com o dos conectores ocupado, por exemplo numa volta
-    em massa. A escuta do `NOTIFY` usa uma terceira conexão, fora dos dois, e o comando de
-    administração abre o seu próprio conjunto, de 2. O painel usa o conjunto dos conectores.
+1. **One database only.** The two files of the previous design existed because SQLite has one writer.
+2. **The organization comes resolved.** Only a closed list of functions finds the organization from
+   the outside: by the device identity, by the digest of the invite and by the engine's event
+   secret. The system tasks that cross organizations (queues, deadlines, purge, mark) have a name
+   and are also on the list. Every other function of the repository requires the organization
+   already resolved. A test reads the repository code and fails if a function outside the list
+   appears without this parameter. In the hub, the list has the entry by the identity and the entry
+   by the invite (the engine's comes in M3), and the named tasks: installation, administration
+   command, queues, deadlines, purge, mark, seal of an unknown device and start of `serve`. On
+   12/11/2026 the two entries of the panel went in: by the digest of the entry code and by the
+   digest of the identifier of the panel session. The only function that writes without an organization is that of the refusals of
+   invites nobody issued. The test reads all the hub code that reaches the database, not only that
+   of the repository, and each exception on the list says why it exists.
+3. **Identifiers drawn in the hub** (UUID version 4). The only sequence is that of the audit.
+   Migration 0002 replaced the integer identifier of `tool_call` with a UUID, to comply with this
+   rule.
+4. **Time belongs to the hub.** Time columns are integers, in UTC milliseconds. No column has a
+   default time value and no SQL uses `now()`: a test sweeps the migrations. Every connection sets
+   `lock_timeout` (5 s) and `idle_in_transaction_session_timeout` (30 s). The only exception is the
+   control table the migrations library creates, `_sqlx_migrations`, whose `installed_on` column
+   has the database time as default. No rule reads it, and the clock tests leave it out.
+5. **The queues stay in the database.** Taking an item is a short `UPDATE`, over a selection with
+   `FOR UPDATE SKIP LOCKED`, which marks the item as sent with a lease deadline, and is committed
+   before the sending. An expired lease goes back to pending. No lock waits for the connector's
+   confirmation. The worker only fetches notices of Hermes with an open session.
+6. **A write that changes a device rereads first.** Approving, judging, promoting, replacing and
+   revoking open a transaction, lock the row of the Hermes and then those of its devices, reread
+   and only then write ([14](14-protocolo-do-canal.md), section 6). No transaction stays open
+   during a network wait.
+7. **Durability.** The security event transactions and those of the swap run with
+   `SET LOCAL synchronous_commit = on`. At start, the hub checks `fsync` and `full_page_writes` and
+   refuses to come up with them off, except with an explicit test option
+   (`ARAUTO_ALLOW_UNSAFE_DB=1`). A lost commit of the swap would look like a restoration and would
+   suspend everyone. The metadata of `tool_call` may go without waiting.
+8. **Migrations embedded in the program**, forward only. `init` applies everything on an empty
+   database. On a database with data, `serve` does not come up with a pending migration: whoever
+   installs takes the backup and runs `migrate --i-have-a-backup`. `admin` refuses to run against a
+   database of another version. In the hub, on 11/11/2026, there are two: 0001, of the core, and
+   0002, of the connection review (pending proof of an unknown device, `tool_call` with UUID,
+   keys composed with the organization, and indexes). The WhatsApp tables, which 0001 announced for
+   0002, come in a later one. A development database created only with 0001 needs
+   `migrate --i-have-a-backup` or `dev-reset`.
+9. **The mark stays outside the database**, beside the master key (04, C11). A single function, used
+   by the hub and by the admin command, takes care of it: under a file lock between
+   processes, it checks that the database is not behind the mark before writing a security event,
+   and then advances the mark. The mark only increases. Writes that wait are joined into one. The
+   hub repeats the check at start and at every sweep: a database restored with the hub up is noticed
+   in seconds, and an `admin` run before `serve` does not erase the proof. In the hub, the lock
+   covers only the reading and the rewriting of the mark file, and not the check (section 9). A
+   damaged mark is an error, and not "absent". "Database with data" means: there is a row in
+   `installation`, or any row in `audit`.
+10. **The audit only grows**, and keeps only what changes who may do what. The triggers protect
+    against a program error; whoever has the database manages to delete. Repeated refusals and notes
+    do not generate one event each ([13](13-conversa-entre-hermes.md), section 7). In the hub, each
+    event says whether it is a security one, and the list is closed and has a test. Security events
+    are: the installation, the organization, the hub key, the admins, creating and deleting Hermes,
+    changing the "may be woken", invite used or cancelled, approving and denying, activating,
+    quarantine, replacement, revocation, confirmed swap, the links of the peer list and the restored
+    mode. Not security events: invite issued, expired, refused or used
+    by another identity,
+    repeated enrollment, wrong code, device expired by deadline, swap without "saved", the alerts of
+    reuse and of a seal without explanation, connection taken over, note ceiling, unknown device
+    listed and migration. Expiry by deadline stays out because the C11 list does not include it.
+    From the panel, on 12/11/2026: the entry is a security event; the entry code issued and the
+    exit are not.
+11. **Purge.** A task of the hub deletes in small batches, with the hub's time, by the period of
+    each table: notes, 30 days; tool calls, 7; resolved notices, 7; engine events already handled,
+    1; connections and unknown devices, 90. On 11/11/2026 the periods are in the `retention` table,
+    but the task does not exist yet. See also the second open point of
+    [14](14-protocolo-do-canal.md), section 13. On 12/11/2026 the entry codes and the panel
+    sessions went in: 30 days after the moment they stopped being valid.
+12. **The database is accessed directly**, with no connection pooler in transaction mode. The hub
+    has two connection pools of fixed size: that of the connectors (16 to start with) and one of 2,
+    only for the sweep. Waiting for a connection has a deadline of 5 seconds. The sweep pool exists
+    so that the revoke holds in under 5 seconds even with that of the connectors busy, for example
+    in a mass return. The `NOTIFY` listener uses a third connection, outside the two, and the
+    admin command opens its own pool, of 2. The panel uses the pool of the connectors.
 
-**Como o hub fica sabendo.** O que o próprio hub enfileira acorda o trabalhador por um sinal em
-memória. O `NOTIFY` do PostgreSQL serve só entre processos: o comando de administração grava, e
-avisa o hub com um texto curto, do tipo `revoked:{id}`. O hub escuta numa conexão própria, fora do
-conjunto. Como esse aviso não é guardado, o hub também **varre a cada 2 segundos** e toda vez que a
-escuta reconecta: relê o estado dos aparelhos com conexão aberta, a lista de ferramentas de cada
-sessão e as filas. É a varredura, não o aviso, que garante o revogar em menos de 5 segundos.
+**How the hub finds out.** What the hub itself enqueues wakes the worker by an in-memory signal.
+PostgreSQL's `NOTIFY` serves only between processes: the admin command writes, and
+notifies the hub with a short text, of the kind `revoked:{id}`. The hub listens on a connection of
+its own, outside the pool. As this notification is not kept, the hub also **sweeps every 2 seconds**
+and every time the listener reconnects: it rereads the state of the devices with an open connection,
+the tool list of each session and the queues. It is the sweep, not the notification, that
+guarantees the revoke in under 5 seconds.
 
-No hub, em 11/11/2026, o canal do `NOTIFY` é `arauto_admin`, e o texto é `tipo:id`, de um aparelho
-ou de um Hermes: as conexões dele releem o estado na hora. Cada varredura, nesta ordem: confere a
-marca (banco restaurado liga o modo restaurado); aplica os prazos de cada organização; relê o estado
-de todo aparelho com conexão, numa consulta por organização, fecha com o código do estado a sessão
-que não serve mais e cutuca a conexão em espera cujo pedido saiu de pendente; grava as recusas de
-inscrição dos minutos que fecharam; e, só com o modo ligado, confere se ele terminou. Ainda não há
-lista de ferramentas que mude nem fila de avisos (M2). Um prazo vencido também é aplicado na hora
-por quem o encontra antes da varredura: a inscrição, a aprovação, T1 e T2, que aplicam também os 30
-dias de inatividade. Na partida, o `serve` fecha as conexões que a execução anterior deixou abertas.
+In the hub, on 11/11/2026, the `NOTIFY` channel is `arauto_admin`, and the text is `type:id`, of a
+device or of a Hermes: its connections reread the state at once. Each sweep, in this order: checks
+the mark (a restored database turns the restored mode on); applies the deadlines of each
+organization; rereads the state of every device with a connection, in one query per organization,
+closes with the code of the state the session that no longer serves and nudges the waiting
+connection whose request left pending; writes the enrollment refusals of the minutes that closed;
+and, only with the mode on, checks whether it has ended. There is not yet a tool list that changes
+nor a notice queue (M2). An expired deadline is also applied at once by whoever finds it before the
+sweep: the enrollment, the approval, T1 and T2, which also apply the 30 days of inactivity. At
+start, `serve` closes the connections the previous run left open.
 
-Um segundo hub servindo a mesma organização não é tratado no MVP: o registro de conexões vive na
-memória de um processo.
+A second hub serving the same organization is not handled in the MVP: the connection registry lives
+in the memory of one process.
 
-## 3. Websocket: como se busca desempenho
+## 3. Websocket: how performance is sought
 
-A escolha está na [decisão 0035](decisoes/0035-pilha-do-websocket.md). O que pesa no hub não é o
-websocket: é a cifra de cada quadro e o banco.
+The choice is in [decision 0035](decisoes/0035-pilha-do-websocket.md). What weighs on the hub is not
+the websocket: it is the cipher of each frame and the database.
 
-| Cuidado | Como |
+| Care | How |
 |---|---|
-| Servidor | `axum` sobre `hyper`, no `tokio` com vários núcleos. O laço que aceita conexões é do projeto: tem prazo para os cabeçalhos, teto de conexões e um sinal de cancelamento por conexão. No hub, o laço e as rotas são do projeto, sobre o HTTP/1 do `hyper`; do `axum` vêm o websocket e os tipos de HTTP. O teto de conexões sem sessão é conferido antes de abrir o websocket. |
-| Uma conexão, duas tarefas | Uma lê, outra escreve. Só a que escreve cifra ([14](14-protocolo-do-canal.md), seção 3). |
-| Duas filas de saída | Controle (16 quadros) e dados (64 quadros). A tarefa que escreve olha o controle antes de cada quadro. |
-| Contrapressão | Quem produz dado espera lugar na fila. A conexão só é fechada quando um quadro fica 30 segundos sem sair, ou quando a fila de controle enche. Rede lenta não expulsa ninguém. Quem envia dado não pode desistir no meio de uma mensagem: o fluxo ficaria incompleto e o conector fecharia a conexão pelo prazo de fluxo parado. |
-| Cifra sem trava | O Noise é usado no modo em que o contador é passado à mão, um por sentido. A recusa de quadro repetido ou fora de ordem é código do projeto, com teste. |
-| Memória | Limites por fase e um orçamento do hub inteiro para mensagens em remontagem ([14](14-protocolo-do-canal.md), seção 4). Mensagem acima de 256 KiB é interpretada fora das tarefas de rede. |
-| Sem compressão | O conteúdo já vai cifrado. |
-| Sem espera no envio | `TCP_NODELAY` ligado em cada conexão aceita. |
-| Tabela de conexões | Um mapa repartido, por identidade do aparelho. |
-| Banco | Conjuntos de tamanho fixo, um para os conectores e um para a varredura; consultas curtas, por índice. |
-| Prazos de remontagem | Medidos num relógio que só anda para a frente, e não no relógio do hub: um salto do relógio do hub não corta uma mensagem que está chegando. |
-| Autorização a cada chamada | Uma consulta por índice, sem memória intermediária. É a regra 9 do projeto; mede-se antes de otimizar. |
-| Volta em massa | O teto de conexões sem sessão segura a primeira onda; quem é recusado volta com espera sorteada. As gravações da marca se juntam. |
-| Parada em ordem | O hub para de aceitar, manda `closing` às conexões sem sessão, deixa cada sessão responder às chamadas em andamento e fechar, espera até 8 segundos, fecha à força o que sobrou e sai ([14](14-protocolo-do-canal.md), seção 7). O sinal é SIGTERM, ou Ctrl+C no desenvolvimento. |
+| Server | `axum` over `hyper`, on `tokio` with several cores. The loop that accepts connections belongs to the project: it has a deadline for the headers, a connection ceiling and a cancellation signal per connection. In the hub, the loop and the routes belong to the project, over the HTTP/1 of `hyper`; from `axum` come the websocket and the HTTP types. The ceiling of connections without a session is checked before opening the websocket. |
+| One connection, two tasks | One reads, the other writes. Only the one that writes encrypts ([14](14-protocolo-do-canal.md), section 3). |
+| Two output queues | Control (16 frames) and data (64 frames). The task that writes looks at control before each frame. |
+| Backpressure | Whoever produces data waits for room in the queue. The connection is only closed when a frame stays 30 seconds without going out, or when the control queue fills up. A slow network expels nobody. Whoever sends data cannot give up in the middle of a message: the stream would be left incomplete and the connector would close the connection by the stalled stream deadline. |
+| Cipher without a lock | Noise is used in the mode in which the counter is passed by hand, one per direction. The refusal of a repeated or out-of-order frame is project code, with a test. |
+| Memory | Limits per phase and a budget of the whole hub for messages being reassembled ([14](14-protocolo-do-canal.md), section 4). A message above 256 KiB is parsed outside the network tasks. |
+| No compression | The content already goes encrypted. |
+| No waiting on send | `TCP_NODELAY` on in each accepted connection. |
+| Connection table | A sharded map, by device identity. |
+| Database | Pools of fixed size, one for the connectors and one for the sweep; short queries, by index. |
+| Reassembly deadlines | Measured on a clock that only moves forward, and not on the hub's clock: a jump of the hub's clock does not cut a message that is arriving. |
+| Authorization on every call | One query by index, with no cache. It is rule 9 of the project; one measures before optimizing. |
+| Mass return | The ceiling of connections without a session holds the first wave; whoever is refused comes back with a drawn wait. The writes of the mark are joined. |
+| Orderly stop | The hub stops accepting, sends `closing` to the connections without a session, lets each session answer the calls in progress and close, waits up to 8 seconds, closes by force what is left and exits ([14](14-protocolo-do-canal.md), section 7). The signal is SIGTERM, or Ctrl+C in development. |
 
-**Meta e teste de carga.** "Ferramenta local" é a que o hub responde sem falar com o motor.
+**Target and load test.** A "local tool" is one the hub answers without talking to the engine.
 
-| Item | Cenário e critério |
+| Item | Scenario and criterion |
 |---|---|
-| Carga | 2.000 conectores simulados, em outro processo, cada um com a própria identidade. |
-| Regime | Batimento; uma chamada de leitura local a cada 10 segundos por conector; um em cada dez manda um recado por minuto. |
-| Volta em massa | O hub reinicia e todos reconectam. |
-| Aprovado quando | Leitura local: 95% em até 20 ms e 99% em até 100 ms. Recado: 95% em até 50 ms. As 2.000 sessões de volta em até 60 segundos, sem nenhuma quarentena. Até 100 KiB de memória por sessão parada. |
+| Load | 2,000 simulated connectors, in another process, each with its own identity. |
+| Steady state | Heartbeat; one local read call every 10 seconds per connector; one in ten sends a note per minute. |
+| Mass return | The hub restarts and all reconnect. |
+| Approved when | Local read: 95% within 20 ms and 99% within 100 ms. Note: 95% within 50 ms. The 2,000 sessions back within 60 seconds, with no quarantine. Up to 100 KiB of memory per idle session. |
 
-São metas: só viram dado quando o teste rodar, e o resultado vale para a máquina em que rodou. O M1
-já roda uma versão menor (500 conectores: volta em massa, batimento e leitura local).
+They are targets: they only become data when the test runs, and the result holds for the machine it
+ran on. M1 already runs a smaller version (500 connectors: mass return, heartbeat and local read).
 
-**A versão menor, rodada uma vez em 11/11/2026.** Num computador de desenvolvimento com Windows, em
-compilação de desenvolvimento, com o hub e os 500 conectores de teste no mesmo processo, todos vindos
-de 127.0.0.1 (então o teto de 16 conexões sem sessão por origem valeu para todos), conjunto de 16
-conexões e `ping` a cada segundo. Fica marcado para não rodar com a suíte normal, e não foi repetido
-depois da última rodada de correções do canal, que acrescentou o conjunto da varredura.
+**The smaller version, run once on 11/11/2026.** On a development computer with Windows, in a
+development build, with the hub and the 500 test connectors in the same process, all coming from
+127.0.0.1 (so the ceiling of 16 connections without a session per origin held for all), a pool of 16
+connections and a `ping` every second. It is marked not to run with the normal suite, and it was not
+repeated after the last round of channel fixes, which added the sweep pool.
 
-| Medida | Resultado |
+| Measure | Result |
 |---|---|
-| Preparar 500 aparelhos (inscrição, aprovação, sessão) | 9,1 s |
-| Volta em massa | 500 sessões em 5,4 s; 648 tentativas recusadas (429 ou AR-205) e repetidas; nenhuma falha |
-| `arauto_status`, 5.000 chamadas | p50 7,1 ms; p95 30,5 ms; p99 42,1 ms; máximo 72,0 ms; nenhuma falha |
-| Quarentenas | Nenhuma |
+| Preparing 500 devices (enrollment, approval, session) | 9.1 s |
+| Mass return | 500 sessions in 5.4 s; 648 attempts refused (429 or AR-205) and repeated; no failure |
+| `arauto_status`, 5,000 calls | p50 7.1 ms; p95 30.5 ms; p99 42.1 ms; maximum 72.0 ms; no failure |
+| Quarantines | None |
 
-O p95 ficou acima da meta de 20 ms; o p99 e a volta em massa, dentro. O cenário não é o da meta:
-2.000 conectores em outro processo, numa compilação de produção, não foram medidos, nem a memória por
-sessão parada.
+The p95 stayed above the target of 20 ms; the p99 and the mass return, within. The scenario is not
+that of the target: 2,000 connectors in another process, in a production build, were not measured,
+nor the memory per idle session.
 
-## 4. O código
+## 4. The code
 
-Um espaço de trabalho em Rust, com o `Cargo.lock` versionado.
+A workspace in Rust, with the `Cargo.lock` versioned.
 
 ```
 crates/
-  arauto-protocol/    o que os dois programas compartilham: quadros, mensagens, Noise,
-                      convite, código de conferência, formato de nome, limites e prazos,
-                      catálogo de erros e catálogo de ferramentas
-  arauto-platform/    o que muda de um sistema para outro: gravação durável, trava de
-                      arquivo, soquete local, sinais de parada
-  arauto-hub/         o hub: servidor e comando de administração
-  arauto-connector/   o conector
-  arauto-testkit/     só para testes: motor falso, Hermes falso, gerador de carga
-deploy/               Dockerfile e arquivo de composição
+  arauto-protocol/    what the two programs share: frames, messages, Noise,
+                      invite, verification code, name format, limits and deadlines,
+                      error catalog and tool catalog
+  arauto-platform/    what changes from one system to another: durable write, file
+                      lock, local socket, stop signals
+  arauto-hub/         the hub: server and admin command
+  arauto-connector/   the connector
+  arauto-testkit/     for tests only: fake engine, fake Hermes, load generator
+deploy/               Dockerfile and compose file
 ```
 
-Módulos do hub ([03-arquitetura.md](03-arquitetura.md), seção 3): `enrollment`, `channel`, `vault`,
-`core`, `engine`, e o novo `peers`. O `archive` não existe no MVP; o `panel` entrou em 12/11/2026, com as telas de leitura, e ganhou o guia de conectar Hermes em 13/11/2026. No código, em
-11/11/2026: a inscrição mora dentro de `channel`, e há mais `repo` (os repositórios), `audit`,
-`mark`, `restore`, `admin`, `config` e `db`. `engine` e `peers` vêm no M3 e no M2.
+Modules of the hub ([03-arquitetura.md](03-arquitetura.md), section 3): `enrollment`, `channel`, `vault`,
+`core`, `engine`, and the new `peers`. `archive` does not exist in the MVP; `panel` went in on 12/11/2026, with the read-only screens, and gained the guide to connect Hermes, the editing of accesses and the revoke on 13/11/2026. In the code, on
+11/11/2026: the enrollment lives inside `channel`, and there are also `repo` (the repositories), `audit`,
+`mark`, `restore`, `admin`, `config` and `db`. `engine` and `peers` come in M3 and in M2.
 
-| Peça | Biblioteca |
+| Piece | Library |
 |---|---|
-| Servidor e websocket do hub | `axum`, `hyper`, `hyper-util`, `tokio` |
-| Painel | Páginas escritas pelo próprio hub, sem biblioteca de modelos; um arquivo de script do próprio painel, e nenhum script dentro de página ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)) |
-| Websocket do conector | `tokio-tungstenite`, com `rustls` e as autoridades públicas embutidas |
-| Banco | `sqlx` (PostgreSQL), consultas em tempo de execução |
+| Server and websocket of the hub | `axum`, `hyper`, `hyper-util`, `tokio` |
+| Panel | Pages written by the hub itself, with no template library; one script file of the panel itself, and no script inside a page ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)) |
+| Websocket of the connector | `tokio-tungstenite`, with `rustls` and the public authorities embedded |
+| Database | `sqlx` (PostgreSQL), queries at run time |
 | Noise | `snow` |
-| Lacre e cifra em repouso | `chacha20poly1305` |
-| Resumo e derivação | `sha2`, `hkdf` |
-| Sorteio | `getrandom` (gerador do sistema) |
-| Segredo em memória | `zeroize`; comparação com `subtle` |
-| Mensagens | `serde`, `serde_json`; base32 e base64 com `data-encoding` |
-| Servidor MCP por stdio | Escrito no projeto: é pequeno e é o texto que a LLM lê |
-| Soquete local e trava | `tokio` e a biblioteca padrão, dentro de `arauto-platform` |
-| Cliente do motor e da API local | `reqwest` |
-| Linha de comando e registro | `clap`, `tracing` |
+| Seal and encryption at rest | `chacha20poly1305` |
+| Digest and derivation | `sha2`, `hkdf` |
+| Random draw | `getrandom` (system generator) |
+| Secret in memory | `zeroize`; comparison with `subtle` |
+| Messages | `serde`, `serde_json`; base32 and base64 with `data-encoding` |
+| MCP server over stdio | Written in the project: it is small and it is the text the LLM reads |
+| Local socket and lock | `tokio` and the standard library, inside `arauto-platform` |
+| Client of the engine and of the local API | `reqwest` |
+| Command line and logging | `clap`, `tracing` |
 
-A versão mínima do Rust é a fixada no repositório. Em produção o conector é um binário estático para
-Linux x86_64.
+The minimum Rust version is the one pinned in the repository. In production the connector is a
+static binary for Linux x86_64.
 
-**Configuração**, por variáveis de ambiente:
+**Configuration**, by environment variables:
 
-| Programa | Variável | Para quê |
+| Program | Variable | What for |
 |---|---|---|
-| hub | `ARAUTO_DATABASE_URL` | O banco. |
-| hub | `ARAUTO_DATA_DIR` | Chave-mestra e marca. Fora do volume do banco. |
-| hub | `ARAUTO_LISTEN`, `ARAUTO_LISTEN_INTERNAL` | A porta dos conectores; a porta interna (saúde e eventos do motor). |
-| hub | `ARAUTO_LISTEN_PANEL`, `ARAUTO_PANEL_URL` | A porta do painel e o endereço que o admin abre no navegador. Sem as duas, o painel fica desligado; uma sem a outra, o `serve` não sobe. |
-| hub | `ARAUTO_PUBLIC_URL` | O endereço que vai no bloco: `https://host[:porta]`, sem caminho, ou `http://` só para 127.0.0.1, `[::1]` e `localhost`. |
-| hub | `ARAUTO_CLIENT_IP_SOURCE`, `ARAUTO_TRUSTED_PROXIES` | De onde vem o endereço do conector: `socket`, ou `forwarded` com a lista de proxies confiáveis. Obrigatória: sem ela o `serve` não sobe. |
-| hub | `ARAUTO_ALLOW_UNSAFE_DB` | `1` deixa o hub subir num banco com `fsync` desligado. Só para teste. |
+| hub | `ARAUTO_DATABASE_URL` | The database. |
+| hub | `ARAUTO_DATA_DIR` | Master key and mark. Outside the database volume. |
+| hub | `ARAUTO_LISTEN`, `ARAUTO_LISTEN_INTERNAL` | The port of the connectors; the internal port (health and engine events). |
+| hub | `ARAUTO_LISTEN_PANEL`, `ARAUTO_PANEL_URL` | The port of the panel and the address the admin opens in the browser. Without the two, the panel stays off; one without the other, `serve` does not come up. |
+| hub | `ARAUTO_PUBLIC_URL` | The address that goes in the block: `https://host[:port]`, with no path, or `http://` only for 127.0.0.1, `[::1]` and `localhost`. |
+| hub | `ARAUTO_CLIENT_IP_SOURCE`, `ARAUTO_TRUSTED_PROXIES` | Where the connector's address comes from: `socket`, or `forwarded` with the list of trusted proxies. Mandatory: without it `serve` does not come up. |
+| hub | `ARAUTO_ALLOW_UNSAFE_DB` | `1` lets the hub come up on a database with `fsync` off. For tests only. |
 
-**O endereço do conector, no hub.** Com `socket`, vale o endereço da conexão, e qualquer cabeçalho de
-encaminhamento é ignorado. Com `forwarded`, o hub só lê o `X-Forwarded-For`, e só quando a conexão
-vem de um proxy da lista (endereços ou redes, até 64). A lista do cabeçalho é lida da direita para a
-esquerda, até 32 endereços: o primeiro que não é proxy confiável é o conector, e o que está à
-esquerda dele foi escrito pelo próprio conector. Um proxy confiável que não diz quem é o conector
-(sem o cabeçalho, com ele inválido ou só com endereços de proxies) recebe 400: tomar o endereço do
-proxy poria todos os conectores atrás dele numa origem só, e um encheria o teto de todos.
-| conector | `ARAUTO_HOME` | A pasta do conector. Padrão: `~/.arauto`. |
-| conector | `ARAUTO_HERMES_BIN` | O comando do Hermes usado no registro. Padrão: `hermes`. |
+**The connector's address, in the hub.** With `socket`, the address of the connection holds, and any
+forwarding header is ignored. With `forwarded`, the hub only reads `X-Forwarded-For`, and only when
+the connection comes from a proxy on the list (addresses or networks, up to 64). The list in the
+header is read from right to left, up to 32 addresses: the first that is not a trusted proxy is the
+connector, and what is to its left was written by the connector itself. A trusted proxy that does
+not say who the connector is (without the header, with it invalid or with only proxy addresses) gets
+400: taking the proxy's address would put all the connectors behind it in a single origin, and one
+would fill the ceiling of all.
+| connector | `ARAUTO_HOME` | The connector's folder. Default: `~/.arauto`. |
+| connector | `ARAUTO_HERMES_BIN` | The Hermes command used in the registration. Default: `hermes`. |
 
-Quando a pasta não é a padrão, o registro no Hermes leva `--home` nos argumentos: o Hermes inicia o
-conector com um ambiente filtrado, e a variável não chegaria.
+When the folder is not the default one, the registration in Hermes carries `--home` in the
+arguments: Hermes starts the connector with a filtered environment, and the variable would not
+arrive.
 
-## 5. Como rodar em desenvolvimento
+## 5. How to run in development
 
-Sem container. O que é preciso: o Rust da versão fixada e um PostgreSQL 16 local.
+No container. What is needed: Rust at the pinned version and a local PostgreSQL 16.
 
 ```
- 1 subir o PostgreSQL local e criar o banco de desenvolvimento
- 2 cargo run -p arauto-hub -- init            não refaz o que já existe
- 3 cargo run -p arauto-hub -- serve           o hub
- 4 cargo run -p arauto-hub -- admin ...       cria Hermes, emite convite, aprova, liga os pares
- 5 cargo run -p arauto-connector -- join ...  uma pasta por Hermes de teste, com ARAUTO_HOME
- 6 cargo test --workspace --locked            a suíte
+ 1 start the local PostgreSQL and create the development database
+ 2 cargo run -p arauto-hub -- init            does not redo what already exists
+ 3 cargo run -p arauto-hub -- serve           the hub
+ 4 cargo run -p arauto-hub -- admin ...       creates Hermes, issues invite, approves, links the peers
+ 5 cargo run -p arauto-connector -- join ...  one folder per test Hermes, with ARAUTO_HOME
+ 6 cargo test --workspace --locked            the suite
 ```
 
-- **Dois conectores na mesma máquina:** cada um com a sua `ARAUTO_HOME`. A pasta define o soquete
-  local e a trava do líder.
-- **Sem Hermes de verdade:** o `arauto-testkit` traz um Hermes falso, que aceita o registro, inicia
-  o conector por stdio em quantas cópias se pedir e tem a API local que acorda. `ARAUTO_HERMES_BIN`
-  aponta para ele. O `join --no-register` pula o registro.
-- **Zerar o ambiente:** `arauto-hub dev-reset` apaga o banco de desenvolvimento **e** a marca,
-  juntos. Apagar só um dos dois ligaria o modo restaurado, que é o comportamento certo. No hub, ele
-  pede `--yes-erase-everything`, só roda num banco cujo nome termina em `_dev` (ou num banco da
-  suíte), apaga o esquema `public` e não o banco, e deixa a chave-mestra. Apaga o banco primeiro: uma
-  parada entre os dois deixa a marca à frente de um banco vazio, que o `init` recusa e um segundo
-  `dev-reset` resolve.
-- **Windows** é plataforma de desenvolvimento do hub e do conector
-  ([decisão 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). O que muda:
+- **Two connectors on the same machine:** each with its own `ARAUTO_HOME`. The folder defines the
+  local socket and the leader's lock.
+- **Without a real Hermes:** `arauto-testkit` brings a fake Hermes, which accepts the registration,
+  starts the connector over stdio in as many copies as asked and has the local API that wakes.
+  `ARAUTO_HERMES_BIN` points to it. `join --no-register` skips the registration.
+- **Resetting the environment:** `arauto-hub dev-reset` erases the development database **and** the
+  mark, together. Erasing only one of the two would turn the restored mode on, which is the right
+  behavior. In the hub, it asks for `--yes-erase-everything`, only runs on a database whose name
+  ends in `_dev` (or on a database of the suite), erases the `public` schema and not the database,
+  and leaves the master key. It erases the database first: a stop between the two leaves the mark
+  ahead of an empty database, which `init` refuses and a second `dev-reset` solves.
+- **Windows** is a development platform for the hub and the connector
+  ([decision 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). What changes:
 
-| Peça | No Linux | No Windows de desenvolvimento |
+| Piece | On Linux | On development Windows |
 |---|---|---|
-| Gravação durável | Temporário, gravação forçada do arquivo, troca de nome, gravação forçada da pasta | O mesmo, sem a gravação da pasta |
-| Trocar o programa em uso | Troca de nome por cima | Renomeia antes o que está em uso |
-| Soquete local | Soquete de domínio, só do dono, com conferência do usuário | Canal nomeado, primeira instância, sem cliente remoto |
-| Trava do líder | Trava de arquivo | Trava de arquivo, num arquivo vazio só para isso |
-| Pasta só do dono | Modo 0700 | A permissão herdada do perfil do usuário |
-| Parada | SIGTERM | Ctrl+C |
+| Durable write | Temporary file, forced write of the file, rename, forced write of the folder | The same, without the write of the folder |
+| Replacing the program in use | Rename over it | Renames first the one in use |
+| Local socket | Domain socket, owner only, with a check of the user | Named pipe, first instance, no remote client |
+| Leader's lock | File lock | File lock, on an empty file only for this |
+| Owner-only folder | Mode 0700 | The permission inherited from the user's profile |
+| Stop | SIGTERM | Ctrl+C |
 
-**A suíte.**
+**The suite.**
 
-- Os testes com banco usam o endereço em `ARAUTO_TEST_DATABASE_URL`. Sem ela **falham**, com uma
-  mensagem que diz o que falta: não são pulados em silêncio.
-- As migrações rodam uma vez, num banco-modelo. Cada teste que precisa de banco próprio cria o seu a
-  partir do modelo; os demais dividem um banco e se isolam por organização. O usuário do banco de
-  teste precisa poder criar banco. Bancos de teste antigos são apagados na partida. No hub, os bancos
-  próprios de cada teste ficam até a execução seguinte, em vez de serem apagados ao fim do teste.
-  Os testes de prazo em segundos ficam num binário de teste próprio, porque a criação de bancos a
-  partir do modelo trava o servidor por segundos.
-- **O kit de teste** (`arauto-testkit`, no M1) traz um conector de teste de alto nível, com falhas
-  sob comando (cair em cada passo da troca, segurar o `check_ok`, apresentar outra credencial, não
-  mandar o "gravei", copiar os arquivos), um conector hostil, com um método por abuso dos limites, e o
-  gerador da volta em massa e das leituras medidas. O motor falso e o Hermes falso vêm depois.
-- **O canário de segredo** roda um fluxo inteiro (convite recusado e válido, código errado, sessão,
-  troca de 24 horas, saída, cópia em quarentena) e procura cada segredo, em várias escritas, no
-  registro do processo e nas tabelas de auditoria, alertas, desconhecidos, conexões e convites.
-- Cada teste tem a sua pasta temporária de chave-mestra e marca, e um conjunto de 2 ou 3 conexões.
-- **A regra da troca é uma função pura**: o estado do aparelho mais um evento dão a decisão e as
-  gravações. É ela que passa por dezenas de milhares de rodadas sorteadas, em memória, com relógio e
-  rede simulados. A semente sai na falha. Algumas centenas de rodadas contra o PostgreSQL de verdade
-  conferem que o SQL segue o mesmo modelo.
-- Todo prazo vem de configuração e de um relógio que o teste controla.
+- The tests with a database use the address in `ARAUTO_TEST_DATABASE_URL`. Without it they **fail**,
+  with a message that says what is missing: they are not skipped in silence.
+- The migrations run once, on a template database. Each test that needs its own database creates
+  its own from the template; the others share a database and isolate themselves by organization.
+  The user of the test database needs to be able to create a database. Old test databases are
+  erased at start. In the hub, the databases of each test stay until the next run, instead of being
+  erased at the end of the test. The tests of deadlines in seconds stay in a test binary of their
+  own, because creating databases from the template locks the server for seconds.
+- **The test kit** (`arauto-testkit`, in M1) brings a high-level test connector, with failures on
+  command (dropping at each step of the swap, holding the `check_ok`, presenting another credential,
+  not sending the "saved", copying the files), a hostile connector, with one method per abuse of the
+  limits, and the generator of the mass return and of the measured reads. The fake engine and the
+  fake Hermes come later.
+- **The secret canary** runs a whole flow (invite refused and valid, wrong code, session, 24-hour
+  swap, leave, copy in quarantine) and looks for each secret, in several encodings, in the process
+  log and in the tables of audit, alerts, unknown devices, connections and invites.
+- Each test has its own temporary folder of master key and mark, and a pool of 2 or 3 connections.
+- **The swap rule is a pure function**: the state of the device plus an event give the decision and
+  the writes. It is the one that goes through tens of thousands of randomized rounds, in memory,
+  with simulated clock and network. The seed comes out on failure. A few hundred rounds against the
+  real PostgreSQL check that the SQL follows the same model.
+- Every deadline comes from configuration and from a clock the test controls.
 
-## 6. Como entregar em produção
+## 6. How to deliver in production
 
-Em container ([decisão 0006](decisoes/0006-instalado-no-servidor-de-cada-um.md)).
+In a container ([decision 0006](decisoes/0006-instalado-no-servidor-de-cada-um.md)).
 
-| Serviço | O que é |
+| Service | What it is |
 |---|---|
-| `hub` | A imagem do projeto. Publica a porta dos conectores e a do painel, as duas só em `127.0.0.1` do servidor. |
-| `postgres` | PostgreSQL 16, com volume próprio, que precisa honrar a gravação forçada. |
-| proxy | De quem instala. Termina o TLS da porta dos conectores. |
-| motor | De quem instala, referenciado por endereço. **Não vai na imagem nem na composição.** |
+| `hub` | The project's image. It publishes the port of the connectors and that of the panel, both only on `127.0.0.1` of the server. |
+| `postgres` | PostgreSQL 16, with its own volume, which needs to honor the forced write. |
+| proxy | From whoever installs. It terminates the TLS of the port of the connectors. |
+| engine | From whoever installs, referenced by address. **It goes neither in the image nor in the composition.** |
 
-- A chave-mestra e a marca ficam num volume **separado** do volume do banco e fora da cópia de
-  segurança dele.
-- **Cópia de segurança:** a do PostgreSQL, contínua (arquivamento do registro de transações) ou, no
-  mínimo, diária. Restaurar liga o modo restaurado, e todos os Hermes reconectam (C11).
-- **O proxy precisa:** repassar a troca para websocket, ter prazo de inatividade acima de 90
-  segundos e não segurar dados em memória. O hub é configurado com a lista de proxies confiáveis
-  para ler o endereço de cada conector.
-- **Os eventos do motor** chegam pela porta interna, que não é publicada: o motor alcança o hub por
-  uma rede compartilhada da composição, e cada evento traz o segredo de eventos.
-- A composição declara o limite de arquivos abertos do hub e o prazo de parada.
-- A imagem traz o conector para Linux x86_64, servido no endereço de download, com o resumo SHA-256
-  calculado na construção.
+- The master key and the mark stay in a volume **separate** from the database volume and outside its
+  backup.
+- **Backup:** that of PostgreSQL, continuous (archiving of the transaction log) or, at the least,
+  daily. Restoring turns the restored mode on, and all Hermes reconnect (C11).
+- **The proxy needs to:** pass on the upgrade to websocket, have an inactivity deadline above 90
+  seconds and not hold data in memory. The hub is configured with the list of trusted proxies to
+  read the address of each connector.
+- **The engine events** arrive through the internal port, which is not published: the engine
+  reaches the hub through a shared network of the composition, and each event brings the event
+  secret.
+- The composition declares the hub's limit of open files and the stop deadline.
+- The image brings the connector for Linux x86_64, served at the download address, with the SHA-256
+  digest computed at build time.
 
-## 7. Marcos e como cada um se verifica
+## 7. Milestones and how each one is verified
 
-O critério de pronto de cada fase do [roteiro](12-roteiro.md) continua valendo. O MVP os reagrupa.
+The done criterion of each phase of the [roadmap](12-roteiro.md) still holds. The MVP regroups them.
 
-| Marco | Entra | Pronto quando |
+| Milestone | Goes in | Done when |
 |---|---|---|
-| **M1 Conexão** | Quadros, fluxos e limites; aperto de mãos; inscrição e código; aprovar por comando; a troca; sessão, batimento e troca de 24 horas; quarentena, revogar, reconectar e sair; os prazos (convite, pendente, aprovado, inatividade); auditoria, marca e modo restaurado; alertas; líder, repassadoras e soquete local; servidor MCP com `arauto_status`; o comando `status`; Hermes falso; carga reduzida. | Um conector entra com convite e código. A troca passa pelas rodadas sorteadas sem trancar de fora um aparelho legítimo, sem aceitar credencial reusada e sem deixar uma cópia passar despercebida quando o verdadeiro volta. Têm teste: a resposta atrasada de uma tentativa abandonada; revogar entre a credencial e o "gravei"; os limites de antes da sessão; revogar em menos de 5 segundos com o aviso perdido; banco restaurado com o hub no ar; `admin` antes do `serve` depois de restaurar. |
-| **M2 Conversa** | Lista de pares; fios e recados; os tetos; as quatro ferramentas; a fila de avisos, com posse, agrupamento e reavaliação; `notice` e `notice_ack` contra um destino de teste; a lista de ferramentas que muda com a lista de pares. | Têm teste: sem ligação não manda, e a resposta é a mesma de nome inexistente; não lê nem lista fio de outros; não responde sem a ligação de volta; tirar a ligação corta o não lido; o laço sem `thread` para no teto; cada teto; o aviso não carrega texto; o conector recusa `from` fora do formato. |
-| **M3 WhatsApp** | A interface do motor, o motor falso e o adaptador do WAHA; números; matriz de acessos; as ferramentas de WhatsApp; teto de envio; caixa de entrada de eventos; avisos de mensagem. | Têm teste: um Hermes não alcança o número de outro; `to` e `message_id` maliciosos são recusados; tirar um acesso vale na chamada seguinte. Tudo contra o motor falso. |
-| **M4 Acordar** | A chamada à API local do Hermes; a memória de avisos tratados; o teto de acordadas do conector. | Com quedas sorteadas do hub e do conector, nenhum aviso some antes de expirar e nenhum aviso repetido inicia uma segunda execução. |
-| **M5 Entrega** | Dockerfile, composição, endereço de download, guia de instalação e o teste de carga completo. | A imagem sobe com a composição, o hub passa na conferência de saúde e o teste de carga atinge os critérios da seção 3, ou o resultado fica registrado com o que faltou. |
+| **M1 Connection** | Frames, streams and limits; handshake; enrollment and code; approving by command; the swap; session, heartbeat and 24-hour swap; quarantine, revoke, reconnect and leave; the deadlines (invite, pending, approved, inactivity); audit, mark and restored mode; alerts; leader, relays and local socket; MCP server with `arauto_status`; the `status` command; fake Hermes; reduced load. | A connector enters with invite and code. The swap goes through the randomized rounds without locking out a legitimate device, without accepting a reused credential and without letting a copy go unnoticed when the real one comes back. These have a test: the late answer of an abandoned attempt; revoking between the credential and the "saved"; the limits of before the session; revoking in under 5 seconds with the notification lost; database restored with the hub up; `admin` before `serve` after restoring. |
+| **M2 Conversation** | Peer list; threads and notes; the ceilings; the four tools; the notice queue, with lease, grouping and re-evaluation; `notice` and `notice_ack` against a test destination; the tool list that changes with the peer list. | These have a test: without a link it does not send, and the answer is the same as for a nonexistent name; it neither reads nor lists a thread of others; it does not reply without the link back; removing the link cuts off the unread; the loop without `thread` stops at the ceiling; each ceiling; the notice carries no text; the connector refuses a `from` outside the format. |
+| **M3 WhatsApp** | The engine interface, the fake engine and the WAHA adapter; numbers; access matrix; the WhatsApp tools; send ceiling; inbox of events; message notices. | These have a test: a Hermes does not reach the number of another; malicious `to` and `message_id` are refused; removing an access holds on the next call. All against the fake engine. |
+| **M4 Wake** | The call to Hermes's local API; the memory of handled notices; the connector's ceiling of wakes. | With randomized drops of the hub and of the connector, no notice disappears before expiring and no repeated notice starts a second run. |
+| **M5 Delivery** | Dockerfile, composition, download address, installation guide and the full load test. | The image comes up with the composition, the hub passes the health check and the load test meets the criteria of section 3, or the result is recorded with what was missing. |
 
-Valem as regras de verificação do roteiro: motor falso e Hermes falso, rodadas sorteadas, mutantes
-nas regras de segurança e o canário de segredo.
+The verification rules of the roadmap hold: fake engine and fake Hermes, randomized rounds, mutants
+in the security rules and the secret canary.
 
-**Andamento do M1, 11/11/2026.** O lado do hub está escrito e tem teste, em Windows:
+**Progress of M1, 11/11/2026.** The hub side is written and has tests, on Windows:
 
-| Etapa | O que entrou |
+| Stage | What went in |
 |---|---|
-| 1 | O protocolo comum e o que muda de um sistema para outro. |
-| 2 | O banco e as migrações; a caixa preta; a marca e o modo restaurado; a regra da troca como função pura, com rodadas sorteadas; os repositórios; o comando de administração. |
-| 2b | O canal no hub: o laço que aceita conexões, o aperto de mãos, os quadros e os limites, a inscrição, a espera, a troca, a sessão com `arauto_status`, a troca de 24 horas, a varredura, a escuta do `NOTIFY` e a parada em ordem. O kit de teste: conector de teste, conector hostil e gerador de carga. |
+| 1 | The common protocol and what changes from one system to another. |
+| 2 | The database and the migrations; the vault; the mark and the restored mode; the swap rule as a pure function, with randomized rounds; the repositories; the admin command. |
+| 2b | The channel in the hub: the loop that accepts connections, the handshake, the frames and the limits, the enrollment, the waiting, the swap, the session with `arauto_status`, the 24-hour swap, the sweep, the `NOTIFY` listener and the orderly stop. The test kit: test connector, hostile connector and load generator. |
 
-Falta, para o M1: o conector (com o líder, as repassadoras, o soquete local e o servidor MCP), o
-Hermes falso, o expurgo e a carga reduzida contra o conector de verdade. Dos itens do critério de
-pronto, o hub já tem teste para: a resposta atrasada de uma tentativa abandonada; revogar entre a
-credencial e o "gravei"; os limites de antes da sessão; revogar em menos de 5 segundos sem o aviso,
-inclusive com o conjunto dos conectores ocupado; banco restaurado com o hub no ar; e `admin` antes
-do `serve` depois de restaurar. As rodadas sorteadas do canal (120 por execução, com a semente
-impressa) derrubam a conexão de cada lado em cada passo da troca e usam uma cópia dos arquivos em um
-terço delas.
+Missing, for M1: the connector (with the leader, the relays, the local socket and the MCP server),
+the fake Hermes, the purge and the reduced load against the real connector. Of the items of the done
+criterion, the hub already has a test for: the late answer of an abandoned attempt; revoking between
+the credential and the "saved"; the limits of before the session; revoking in under 5 seconds
+without the notification, including with the pool of the connectors busy; database restored with the
+hub up; and `admin` before `serve` after restoring. The randomized rounds of the channel (120 per
+run, with the seed printed) drop the connection from each side at each step of the swap and use a
+copy of the files in a third of them.
 
-## 8. O que o MVP não prova
+## 8. What the MVP does not prove
 
-- **As provas "no Hermes".** O registro pelo comando oficial, quantas cópias do conector ele inicia,
-  se ele atualiza a lista de ferramentas quando ela muda, e a chave e o formato da API local
-  dependem de um Hermes de verdade. Até lá o conector segue o que está em
-  [hermes-fatos](../referencia/hermes-fatos.md), e "ser acordado" só é dado como funcionando contra
-  o Hermes falso.
-- **O caminho de Linux.** Enquanto o desenvolvimento for só em Windows, o código específico de Linux
-  é conferido pelo compilador e nunca executado. Ele precisa rodar em Linux, com a suíte inteira,
-  antes de qualquer uso de verdade.
-- **O container.** A imagem e a composição são escritas no M5; só valem depois de construídas e
-  testadas num servidor.
-- **O motor de verdade.** O adaptador do WAHA é testado contra o comportamento registrado em
-  [waha-fatos](../referencia/waha-fatos.md). Não há teste automático em número real.
-- **A escuta do `NOTIFY` reconectando** depois de uma queda do banco. Só foi lida no código da
-  biblioteca; nenhum teste derruba o banco. O revogar não depende dela, e sim da varredura.
-- **Um proxy de verdade** na frente do hub, e a carga completa em outro processo.
+- **The proofs "in Hermes".** The registration by the official command, how many copies of the
+  connector it starts, whether it updates the tool list when it changes, and the key and the format
+  of the local API depend on a real Hermes. Until then the connector follows what is in
+  [hermes-fatos](../referencia/hermes-fatos.md), and "being woken" is only taken as working against
+  the fake Hermes.
+- **The Linux path.** While development is only on Windows, the Linux-specific code is checked by
+  the compiler and never executed. It needs to run on Linux, with the whole suite, before any real
+  use.
+- **The container.** The image and the composition are written in M5; they only hold after being
+  built and tested on a server.
+- **The real engine.** The WAHA adapter is tested against the behavior recorded in
+  [waha-fatos](../referencia/waha-fatos.md). There is no automatic test on a real number.
+- **The `NOTIFY` listener reconnecting** after a drop of the database. It was only read in the
+  library's code; no test brings the database down. The revoke does not depend on it, but on the
+  sweep.
+- **A real proxy** in front of the hub, and the full load in another process.
 
-## 9. Pontos em aberto
+## 9. Open points
 
-Escolhas do código do hub que contrariam este documento, ou que não são melhora clara. Ficam as duas
-leituras até quem mantém o projeto decidir. Os pontos do canal estão em
-[14](14-protocolo-do-canal.md), seção 13, e os que pedem mudança no 04, na seção 12 do 14.
+Choices of the hub code that contradict this document, or that are not a clear improvement. Both
+readings stay until the maintainer decides. The points of the channel are in
+[14](14-protocolo-do-canal.md), section 13, and those that ask for a change in 04, in section 12 of 14.
 
-| Ponto | Leitura do texto | Leitura do código |
+| Point | Reading of the text | Reading of the code |
 |---|---|---|
-| **A entrada do painel sem passkey** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). | O [04](04-seguranca-conexao.md) e a [decisão 0019](decisoes/0019-painel-com-passkey.md): o login do painel é por passkey, e o primeiro admin nasce do código de instalação. | A passkey ainda não existe. Entra-se com um código de entrada de uso único, emitido por comando na máquina do hub, e toda sessão do painel é do "admin local". Desde 13/11/2026 essa sessão também conecta Hermes, sem passkey: é a mudança de 12/11/2026 na decisão 0019, a pedido de quem mantém, com o painel fechado enquanto durar. |
-| **A conferência da marca fora da trava** (seção 2, regra 9). | "Sob uma trava de arquivo entre processos, confere [...] antes de gravar um evento de segurança, e depois avança a marca." | A trava cobre só a leitura e a regravação do arquivo da marca. A conferência lê o arquivo sem trava: ele é trocado inteiro, e qualquer valor que já esteve em disco serve à comparação. Segurar a trava durante a transação do banco poria todo evento de segurança em fila e impediria juntar as gravações. A revisão não achou intercalação ruim; ou o texto passa a dizer isso, ou o código passa a segurar a trava. |
-| **`--recognized` digitado antes de ver o último uso** (seção 1). | O comando mostra o último uso e exige `--recognized` ou `--not-recognized`. | O comando sempre imprime o último uso antes do resultado, mas quem digita `--recognized` por hábito escreve a opção antes de ver a tela. Fechar isso pede mudar a linha de comando, por exemplo exigindo junto a data do último uso mostrada. |
-| **Eventos sem organização no `audit --tail`.** | Toda leitura é filtrada pela organização (seção 2, regra 2). | A leitura de uma organização traz também os eventos sem organização: o início do modo restaurado, que pode ter como alvo um aparelho de outra organização e conta aparelhos de todas, e as recusas agregadas de convites que ninguém emitiu. Com uma organização só, como no MVP, não vaza nada. Com duas, o admin de uma leria identificador e contagens da outra. A saída seria um comando próprio para os eventos da instalação, ou tirar do evento o alvo e as contagens de outras organizações. |
-| **Duas partidas ao mesmo tempo com a marca ausente.** | Ligar o modo é uma gravação só. | Duas entradas simultâneas podem ligar o modo duas vezes. A segunda não suspende ninguém novo e só gera mais um evento. |
+| **The panel entry without a passkey** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). | [04](04-seguranca-conexao.md) and [decision 0019](decisoes/0019-painel-com-passkey.md): the panel login is by passkey, and the first admin is born from the installation code. | The passkey does not exist yet. One enters with a single-use entry code, issued by a command on the hub's machine, and every panel session belongs to the "local admin". Since 13/11/2026 this session also connects Hermes, without a passkey: it is the change of 12/11/2026 in decision 0019, at the maintainer's request, with the panel closed while it lasts. |
+| **The check of the mark outside the lock** (section 2, rule 9). | "Under a file lock between processes, it checks [...] before writing a security event, and then advances the mark." | The lock covers only the reading and the rewriting of the mark file. The check reads the file without a lock: it is replaced whole, and any value that has already been on disk serves the comparison. Holding the lock during the database transaction would put every security event in a queue and would prevent joining the writes. The review found no bad interleaving; either the text comes to say this, or the code comes to hold the lock. |
+| **`--recognized` typed before seeing the last use** (section 1). | The command shows the last use and requires `--recognized` or `--not-recognized`. | The command always prints the last use before the result, but whoever types `--recognized` out of habit writes the option before seeing the screen. Closing this asks for a change to the command line, for example requiring along with it the date of the last use shown. |
+| **Events without an organization in `audit --tail`.** | Every read is filtered by the organization (section 2, rule 2). | The read of one organization also brings the events without an organization: the start of the restored mode, which may have as its target a device of another organization and counts devices of all of them, and the aggregated refusals of invites nobody issued. With a single organization, as in the MVP, nothing leaks. With two, the admin of one would read the identifier and counts of the other. The way out would be a command of its own for the events of the installation, or removing from the event the target and the counts of other organizations. |
+| **Two starts at the same time with the mark absent.** | Turning the mode on is a single write. | Two simultaneous entries may turn the mode on twice. The second suspends nobody new and only generates one more event. |

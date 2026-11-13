@@ -1,46 +1,46 @@
-# Decisões
+# Decisions
 
-**Estado: MVP em construção.** Uma decisão por arquivo. Cada uma está **decidida**, é uma **proposta** a validar no
-protótipo, ou está **pendente**.
+**Status: MVP under construction.** One decision per file. Each one is **decided**, is a **proposal** to be validated in the
+prototype, or is **pending**.
 
-| Nº | Decisão | Estado |
+| No. | Decision | Status |
 |---|---|---|
-| 0001 | [Gratuito e de código aberto](0001-gratuito-e-de-codigo-aberto.md) | decidida |
-| 0002 | [Rust nos dois programas](0002-rust-nos-dois-programas.md) | decidida |
-| 0003 | [Hub e motor são processos separados](0003-hub-e-motor-separados.md) | decidida |
-| 0004 | [O hub só isola](0004-o-hub-so-isola.md) | decidida |
-| 0005 | [Comando e dado são separados](0005-comando-e-dado-sao-separados.md) | decidida |
-| 0006 | [Instalado no servidor de cada um](0006-instalado-no-servidor-de-cada-um.md) | decidida |
-| 0007 | [Convite de uso único, executado pela LLM do Hermes](0007-convite-de-uso-unico.md) | decidida |
-| 0008 | [O admin digita o código de conferência](0008-codigo-digitado.md) | decidida |
-| 0009 | [Caixa preta no hub e credencial lacrada](0009-caixa-preta-e-credencial-lacrada.md) | decidida |
-| 0010 | [Identidade criada no aparelho](0010-identidade-criada-no-aparelho.md) | decidida |
-| 0011 | [Conector por stdio e canal de saída](0011-conector-por-stdio-e-canal-de-saida.md) | proposta |
-| 0012 | [Canal cifrado por dentro do websocket](0012-canal-cifrado-por-dentro.md) | proposta |
-| 0013 | [Um líder por Hermes](0013-um-lider-por-hermes.md) | proposta |
-| 0014 | [Traga o seu motor](0014-traga-o-seu-motor.md) | proposta |
-| 0015 | [Licença do projeto](0015-licenca.md) | decidida |
-| 0016 | [Idioma do projeto](0016-idioma.md) | decidida |
-| 0017 | [Bloco sem script da internet](0017-bloco-sem-script-da-internet.md) | decidida |
-| 0018 | [O aviso é um ponteiro, com frase fixa no conector](0018-aviso-e-ponteiro.md) | decidida |
-| 0019 | [Painel com passkey em toda ação que muda algo](0019-painel-com-passkey.md) | decidida |
-| 0020 | [Teto técnico de envio](0020-teto-de-envio.md) | decidida |
-| 0021 | [Prazo de inatividade](0021-prazo-de-inatividade.md) | decidida |
-| 0022 | [Motor sem porta pública, vigiado pelo hub](0022-motor-sem-porta-publica.md) | decidida |
-| 0023 | [Como o conector obtém a chave da API local do Hermes](0023-chave-da-api-local.md) | decidida |
-| 0024 | [Envio de arquivo por endereço](0024-envio-de-arquivo-por-endereco.md) | decidida |
-| 0025 | [Aviso ao admin por fora do painel](0025-aviso-por-fora-do-painel.md) | pendente |
-| 0026 | [Nome do projeto](0026-nome-do-projeto.md) | decidida |
-| 0027 | [Canal para relato de falha](0027-canal-de-relato-de-falha.md) | decidida |
-| 0028 | [Painel fechado por padrão; quem instala escolhe](0028-painel-fechado-por-padrao.md) | decidida |
-| 0029 | [Hub restaurado de cópia: todos reconectam](0029-hub-restaurado-todos-reconectam.md) | decidida |
-| 0030 | [Conector desatualizado: o hub confere a credencial antes de recusar](0030-conector-desatualizado.md) | decidida |
-| 0031 | [Banco: PostgreSQL](0031-banco-postgresql.md) | decidida |
-| 0032 | [Conversa entre Hermes no primeiro MVP: recados com lista](0032-conversa-entre-hermes-no-mvp.md) | decidida |
-| 0033 | [Escopo do primeiro MVP: conversa e WhatsApp juntos](0033-escopo-do-mvp.md) | decidida |
-| 0034 | [Nomes em inglês nos comandos, arquivos, módulos e ferramentas](0034-nomes-em-ingles.md) | proposta |
-| 0035 | [Pilha do websocket e formato das mensagens](0035-pilha-do-websocket.md) | proposta |
-| 0036 | [Windows só para desenvolvimento; Linux na produção](0036-windows-so-para-desenvolvimento.md) | proposta |
-| 0038 | [O motor e os números no primeiro MVP](0038-motor-e-numeros-no-mvp.md) | proposta |
-| 0039 | [A matriz de acessos e as ferramentas de WhatsApp no primeiro MVP](0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md) | proposta |
-| 0040 | [O painel dentro do hub: porta própria, entrada por código e as primeiras telas](0040-painel-dentro-do-hub.md) | proposta |
+| 0001 | [Free and open source](0001-gratuito-e-de-codigo-aberto.md) | decided |
+| 0002 | [Rust in both programs](0002-rust-nos-dois-programas.md) | decided |
+| 0003 | [Hub and engine are separate processes](0003-hub-e-motor-separados.md) | decided |
+| 0004 | [The hub only isolates](0004-o-hub-so-isola.md) | decided |
+| 0005 | [Command and data are separate](0005-comando-e-dado-sao-separados.md) | decided |
+| 0006 | [Installed on each one's own server](0006-instalado-no-servidor-de-cada-um.md) | decided |
+| 0007 | [Single-use invite, run by Hermes's LLM](0007-convite-de-uso-unico.md) | decided |
+| 0008 | [The admin types the verification code](0008-codigo-digitado.md) | decided |
+| 0009 | [Vault in the hub and sealed credential](0009-caixa-preta-e-credencial-lacrada.md) | decided |
+| 0010 | [Identity created on the device](0010-identidade-criada-no-aparelho.md) | decided |
+| 0011 | [Connector over stdio and outbound channel](0011-conector-por-stdio-e-canal-de-saida.md) | proposal |
+| 0012 | [Channel encrypted inside the websocket](0012-canal-cifrado-por-dentro.md) | proposal |
+| 0013 | [One leader per Hermes](0013-um-lider-por-hermes.md) | proposal |
+| 0014 | [Bring your own engine](0014-traga-o-seu-motor.md) | proposal |
+| 0015 | [License of the project](0015-licenca.md) | decided |
+| 0016 | [Language of the project](0016-idioma.md) | decided |
+| 0017 | [Block with no script from the internet](0017-bloco-sem-script-da-internet.md) | decided |
+| 0018 | [The notice is a pointer, with a fixed sentence in the connector](0018-aviso-e-ponteiro.md) | decided |
+| 0019 | [Panel with passkey on every action that changes something](0019-painel-com-passkey.md) | decided |
+| 0020 | [Technical send ceiling](0020-teto-de-envio.md) | decided |
+| 0021 | [Inactivity deadline](0021-prazo-de-inatividade.md) | decided |
+| 0022 | [Engine with no public port, watched by the hub](0022-motor-sem-porta-publica.md) | decided |
+| 0023 | [How the connector gets the key of Hermes's local API](0023-chave-da-api-local.md) | decided |
+| 0024 | [Sending a file by address](0024-envio-de-arquivo-por-endereco.md) | decided |
+| 0025 | [Warning the admin outside the panel](0025-aviso-por-fora-do-painel.md) | pending |
+| 0026 | [Name of the project](0026-nome-do-projeto.md) | decided |
+| 0027 | [Channel for reporting a flaw](0027-canal-de-relato-de-falha.md) | decided |
+| 0028 | [Panel closed by default; whoever installs chooses](0028-painel-fechado-por-padrao.md) | decided |
+| 0029 | [Hub restored from a backup: everyone reconnects](0029-hub-restaurado-todos-reconectam.md) | decided |
+| 0030 | [Outdated connector: the hub checks the credential before refusing](0030-conector-desatualizado.md) | decided |
+| 0031 | [Database: PostgreSQL](0031-banco-postgresql.md) | decided |
+| 0032 | [Conversation between Hermes in the first MVP: notes with a list](0032-conversa-entre-hermes-no-mvp.md) | decided |
+| 0033 | [Scope of the first MVP: conversation and WhatsApp together](0033-escopo-do-mvp.md) | decided |
+| 0034 | [Names in English in the commands, files, modules and tools](0034-nomes-em-ingles.md) | proposal |
+| 0035 | [Websocket stack and message format](0035-pilha-do-websocket.md) | proposal |
+| 0036 | [Windows only for development; Linux in production](0036-windows-so-para-desenvolvimento.md) | proposal |
+| 0038 | [The engine and the numbers in the first MVP](0038-motor-e-numeros-no-mvp.md) | proposal |
+| 0039 | [The access matrix and the WhatsApp tools in the first MVP](0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md) | proposal |
+| 0040 | [The panel inside the hub: its own port, entry by code and the first screens](0040-painel-dentro-do-hub.md) | proposal |

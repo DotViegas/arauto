@@ -1,78 +1,78 @@
-# Fatos conferidos no Hermes
+# Facts checked on Hermes
 
-**Estado: fatos conferidos**, com a origem de cada afirmação. O que o desenho do Arauto assume
-sobre o Hermes Agent.
+**Status: checked facts**, with the origin of each statement. What the design of Arauto assumes
+about Hermes Agent.
 
-**Conferido em 09/11/2026, no Hermes Agent v0.22.5 (2026.9.24), em container Linux x86_64.** A versão
-0.23.0 também é alvo e ainda não foi conferida ponto a ponto.
+**Checked on 09/11/2026, on Hermes Agent v0.22.5 (2026.9.24), in a Linux x86_64 container.** Version
+0.23.0 is also a target and has not been checked point by point yet.
 
-Marcação: **[código]** lido no código instalado; **[observado]** visto num Hermes em funcionamento;
-**[a conferir]** suposição ainda sem teste.
+Marking: **[code]** read in the installed code; **[observed]** seen in a running Hermes;
+**[to check]** an assumption with no test yet.
 
-## Servidores de ferramentas (MCP)
+## Tool servers (MCP)
 
-| Fato | Origem |
+| Fact | Origin |
 |---|---|
-| O cliente MCP fala stdio, HTTP e SSE. Não há websocket como transporte. | [código] `tools/mcp_tool.py` |
-| Há OAuth para servidores MCP, inclusive o fluxo de aparelho (RFC 8628), iniciado só por `hermes mcp login`. | [código] `tools/mcp_oauth_device.py` |
-| Comando oficial: `hermes mcp add NOME --command PROGRAMA --args ...` ou `--url ENDERECO --auth oauth\|header`. Também `remove`, `list`, `test`. | [observado] ajuda do comando |
-| A lista de servidores é reconciliada sozinha, em menos de um minuto, sem reiniciar. | [observado] |
-| Um servidor MCP aparece em todos os meios de conversa do Hermes, salvo configuração por meio. | [observado] |
-| Toda entrada de servidor é conferida ao salvar e ao iniciar. É recusada a que usa interpretador de comandos com chamada de rede ou com indício de envio de dados. | [código] `hermes_cli/mcp_security.py` |
-| O servidor stdio recebe um ambiente **filtrado**: pasta do usuário, caminho de programas, pastas temporárias e as variáveis da própria entrada. Não herda o ambiente do Hermes. | [código] `_build_safe_env`; [observado] num servidor em uso |
-| Ao encerrar, o Hermes fecha a entrada do servidor, espera 2 segundos, pede o término e só depois força. Um supervisor encerra os servidores se o Hermes morrer. | [código] SDK do MCP e `tools/mcp_death_supervisor.py` |
-| O servidor stdio vive enquanto vive o processo do Hermes que o iniciou. | [observado] 10 dias sem reinício |
-| Há tratamento para o aviso de que a lista de ferramentas mudou. | [código] `tools/mcp_tool_health.py` |
+| The MCP client speaks stdio, HTTP and SSE. There is no websocket as a transport. | [code] `tools/mcp_tool.py` |
+| There is OAuth for MCP servers, including the device flow (RFC 8628), started only by `hermes mcp login`. | [code] `tools/mcp_oauth_device.py` |
+| Official command: `hermes mcp add NAME --command PROGRAM --args ...` or `--url ADDRESS --auth oauth\|header`. Also `remove`, `list`, `test`. | [observed] help of the command |
+| The list of servers is reconciled by itself, in less than a minute, without restarting. | [observed] |
+| An MCP server appears on all of Hermes's conversation platforms, unless configured per platform. | [observed] |
+| Every server entry is checked on saving and on starting. One that uses a command interpreter with a network call or with a sign of data being sent out is refused. | [code] `hermes_cli/mcp_security.py` |
+| The stdio server receives a **filtered** environment: the user's folder, the program path, temporary folders and the variables of the entry itself. It does not inherit Hermes's environment. | [code] `_build_safe_env`; [observed] on a server in use |
+| On shutting down, Hermes closes the server's input, waits 2 seconds, asks for termination and only then forces it. A supervisor shuts the servers down if Hermes dies. | [code] MCP SDK and `tools/mcp_death_supervisor.py` |
+| The stdio server lives as long as the Hermes process that started it lives. | [observed] 10 days without a restart |
+| There is handling for the notice that the list of tools changed. | [code] `tools/mcp_tool_health.py` |
 
-## Terminal da LLM
+## The LLM's terminal
 
-| Fato | Origem |
+| Fact | Origin |
 |---|---|
-| O terminal roda na própria máquina, com o **mesmo usuário** do Hermes. | [observado] configuração e processos |
-| A pasta do usuário é o volume de dados do Hermes, com leitura, escrita e execução. | [observado] |
-| Cada comando tem limite de 180 segundos. | [observado] configuração |
-| Antes de rodar, o Hermes pede aprovação humana para: conteúdo da internet enviado direto ao interpretador (`curl ... \| sh`), acesso ao arquivo de segredos do Hermes, arquivos de credencial conhecidos e variáveis com nome de segredo. | [código] `tools/approval_detection.py` |
-| A saída das ferramentas tem segredos mascarados, por padrão de formato e por nome de variável. | [código] `agent/redact.py` |
-| `curl`, `sha256sum`, `flock` e `tar` existem na imagem. | [observado] |
-| Um processo não lê a memória de outro que não seja seu descendente. | [observado] no servidor conferido; depende do sistema |
+| The terminal runs on the machine itself, with the **same user** as Hermes. | [observed] configuration and processes |
+| The user's folder is Hermes's data volume, with read, write and execute. | [observed] |
+| Each command has a limit of 180 seconds. | [observed] configuration |
+| Before running, Hermes asks for human approval for: content from the internet sent straight to the interpreter (`curl ... \| sh`), access to Hermes's secrets file, known credential files and variables with a secret's name. | [code] `tools/approval_detection.py` |
+| The output of the tools has secrets masked, by format pattern and by variable name. | [code] `agent/redact.py` |
+| `curl`, `sha256sum`, `flock` and `tar` exist in the image. | [observed] |
+| A process does not read the memory of another that is not its descendant. | [observed] on the server checked; depends on the system |
 
-Consequência para o projeto: tudo o que o conector gravar na pasta do usuário, a LLM consegue ler.
+Consequence for the project: everything the connector writes in the user's folder, the LLM can read.
 
-## Processos
+## Processes
 
-| Fato | Origem |
+| Fact | Origin |
 |---|---|
-| Os serviços do container são supervisionados com privilégio de administrador. O usuário do Hermes não registra um serviço novo que sobreviva a reinício. | [observado] |
-| Num Hermes com um servidor stdio configurado havia **uma** cópia dele, filha do processo de mensagens. | [observado] |
+| The services of the container are supervised with administrator privilege. Hermes's user does not register a new service that survives a restart. | [observed] |
+| On a Hermes with one stdio server configured there was **one** copy of it, a child of the messaging process. | [observed] |
 
-## API local
+## Local API
 
-| Fato | Origem |
+| Fact | Origin |
 |---|---|
-| `POST /v1/runs` inicia uma execução. Exige chave própria. Por padrão escuta só no endereço local. | [observado] |
-| A chave da API não fica no ambiente do processo: o Hermes a lê do arquivo de segredos. | [observado] só nomes de variáveis |
-| Existe suporte a identificador de repetição na API. | [código] `gateway/platforms/api_server.py` |
-| O contexto de cada conversa informa a origem: a plataforma e com quem. | [código] `gateway/session.py` |
+| `POST /v1/runs` starts a run. It requires a key of its own. By default it listens only on the local address. | [observed] |
+| The API key does not stay in the environment of the process: Hermes reads it from the secrets file. | [observed] variable names only |
+| There is support for a repetition identifier in the API. | [code] `gateway/platforms/api_server.py` |
+| The context of each conversation tells the origin: the platform and with whom. | [code] `gateway/session.py` |
 
-## Canal nativo de WhatsApp
+## Native WhatsApp channel
 
-| Fato | Origem |
+| Fact | Origin |
 |---|---|
-| Conversa direta aceita as políticas pareamento, lista, aberta e desligada. Só a política de lista restringe a quem está na lista. | [código] `gateway/platforms/access_policy_mixin.py` |
-| Grupo só é encaminhado ao Hermes com política de lista ou aberta. | [código] idem |
+| A direct conversation accepts the policies pairing, list, open and off. Only the list policy restricts to whoever is on the list. | [code] `gateway/platforms/access_policy_mixin.py` |
+| A group is only forwarded to Hermes with the list or the open policy. | [code] same |
 
-## A conferir
+## To check
 
-A lista única do que precisa ser provado está em [docs/12-roteiro.md](../docs/12-roteiro.md), Fase 1.
-Estas são as suposições sobre o Hermes:
+The single list of what needs to be proved is in [docs/12-roteiro.md](../docs/12-roteiro.md), Phase 1.
+These are the assumptions about Hermes:
 
-| Suposição | Por que importa |
+| Assumption | Why it matters |
 |---|---|
-| O registro do conector pelo comando oficial passa pela conferência de entradas. | Sem isso não há modo rápido. |
-| Quantos processos do Hermes iniciam o servidor quando painel e rotinas agendadas estão ativos. | Define o trabalho do líder. |
-| A entrada do servidor aceita referência a uma variável do Hermes no campo de ambiente. | É o caminho mais limpo para a chave da API local. |
-| O bloco dispara ou não o pedido de aprovação do terminal. | O fluxo funciona nos dois casos; a tela precisa dizer o que esperar. |
-| O Hermes guarda procedimentos em memória ou skill a partir do que executa. | O bloco pede que não guarde. |
-| Endereço, corpo e identificador de repetição da chamada à API local. | É por ela que o Hermes é acordado. |
-| O Hermes reinicia um servidor de ferramentas que encerra. | É como o conector troca de versão num reconectar. |
-| O comportamento da versão 0.23.0 em cada linha deste arquivo. | A 0.23 abre mais ferramentas por padrão. |
+| The registration of the connector through the official command passes the check of entries. | Without this there is no quick mode. |
+| How many Hermes processes start the server when panel and scheduled routines are active. | It defines the work of the leader. |
+| The server entry accepts a reference to a Hermes variable in the environment field. | It is the cleanest path to the key of the local API. |
+| Whether the block triggers the terminal's approval request or not. | The flow works in both cases; the screen needs to say what to expect. |
+| Hermes keeps procedures in memory or as a skill from what it executes. | The block asks it not to keep them. |
+| Address, body and repetition identifier of the call to the local API. | It is through it that Hermes is woken. |
+| Hermes restarts a tool server that exits. | It is how the connector changes version on a reconnect. |
+| The behavior of version 0.23.0 on each line of this file. | 0.23 opens more tools by default. |

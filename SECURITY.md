@@ -1,84 +1,88 @@
-# Segurança
+# Security
 
-> **Estado: primeiro MVP em construção.** Ainda não há versão para uso. Este arquivo descreve o que o desenho se propõe a
-> garantir, o que ele não garante e como relatar uma falha.
+> **Status: first MVP under construction.** There is no version for use yet. This file describes what the design sets out to
+> guarantee, what it does not guarantee and how to report a flaw.
 
-## Como relatar uma falha
+## How to report a flaw
 
-**Não abra uma issue pública para falha de segurança.**
+**Do not open a public issue for a security flaw.**
 
-O canal será o relato privado de falha do GitHub, na aba de segurança do repositório
-([decisão 0027](docs/decisoes/0027-canal-de-relato-de-falha.md)). Ele passa a existir quando o
-repositório for aberto ao público. Até lá, o projeto não tem versão em uso por terceiros.
+The channel will be GitHub's private vulnerability reporting, in the security tab of the repository
+([decision 0027](docs/decisoes/0027-canal-de-relato-de-falha.md)). It comes into existence when the
+repository is opened to the public. Until then, the project has no version in use by third parties.
 
-Ao relatar, inclua: o que você conseguiu, os passos para repetir, a versão do hub e do conector e o
-que um invasor ganharia.
+When reporting, include: what you achieved, the steps to repeat it, the version of the hub and of
+the connector and what an attacker would gain.
 
-## O que o desenho se propõe a garantir
+## What the design sets out to guarantee
 
-São metas. Só viram garantia depois dos testes previstos no [roteiro](docs/12-roteiro.md). Valem
-enquanto o hub, a conta do admin e o gerador aleatório do sistema estiverem íntegros.
+These are goals. They only become guarantees after the tests foreseen in the
+[roadmap](docs/12-roteiro.md). They hold while the hub, the admin's account and the system's random
+generator are intact.
 
-1. A conversa em que você colou o bloco de conexão, se vazar **depois** do uso, não contém nada que
-   conecte.
-2. Se vazar **antes** do uso, quem a leu não consegue acesso sem um admin autenticado digitar o
-   código dele.
-3. Nenhum segredo duradouro passa pelo chat, aparece em tela ou entra em registro.
-4. Quem leva para fora uma cópia dos arquivos de um Hermes e a usa é descoberto quando o aparelho
-   verdadeiro volta a apresentar a credencial dele: em segundos, se ele está ligado, em versão que o
-   hub aceita, e alcança o hub (no pior caso, 90 segundos); na volta, se estava desligado ou com a
-   rede segurada por quem copiou. O hub alerta e o aparelho fica parado.
-5. Um Hermes só alcança os números que lhe foram dados.
-6. Revogar um Hermes ou tirar um acesso vale na chamada seguinte.
-7. Quem só lê o banco do hub não consegue se passar por um Hermes.
+1. The chat in which you pasted the connection block, if it leaks **after** the use, contains
+   nothing that connects.
+2. If it leaks **before** the use, whoever read it does not get access without an authenticated
+   admin typing their code.
+3. No long-lived secret passes through the chat, appears on a screen or enters a log.
+4. Whoever takes a copy of the files of a Hermes outside and uses it is discovered when the real
+   device presents its credential again: in seconds, if it is on, in a version the hub accepts, and
+   reaches the hub (in the worst case, 90 seconds); on its return, if it was off or with its network
+   held by whoever copied. The hub alerts and the device stays stopped.
+5. A Hermes only reaches the numbers that were given to it.
+6. Revoking a Hermes or removing an access holds on the next call.
+7. Whoever only reads the hub's database cannot pass for a Hermes.
 
-O detalhe está em [docs/04-seguranca-conexao.md](docs/04-seguranca-conexao.md).
+The detail is in [docs/04-seguranca-conexao.md](docs/04-seguranca-conexao.md).
 
-## O que o projeto não garante
+## What the project does not guarantee
 
-Dizemos isto antes para ninguém descobrir depois.
+We say this beforehand so that nobody finds out afterwards.
 
-1. **A LLM do Hermes alcança os arquivos do conector** quando é o próprio Hermes que o instala. Ela
-   não consegue abrir a credencial, mas o arquivo está ao alcance dela, para ler e para gravar. Um
-   processo que continue na máquina, com o mesmo usuário, consegue usar uma cópia fora sem deixar
-   sinal. Quem precisa que ela não alcance usa o modo blindado, que ainda não existe.
-2. **Uma cópia da credencial, usada com o Hermes verdadeiro desligado, funciona até ele voltar.** Não
-   há limite de tempo. Se ele nunca voltar, a cópia nunca é descoberta. O mesmo vale enquanto quem
-   copiou segurar a rede do Hermes verdadeiro. E um Hermes com o conector abaixo da versão mínima
-   do hub conta como desligado: a cópia funciona até o admin reconectá-lo, e o uso dela pode não
-   aparecer como cópia. Está decidido que o hub vai conferir a credencial desse conector antes de
-   recusá-lo ([decisão 0030](docs/decisoes/0030-conector-desatualizado.md)); enquanto isso não
-   estiver provado, vale este limite.
-3. **Quem tem uma cópia antiga dos arquivos do conector, ou só a identidade, consegue tirar o Hermes
-   do ar.** Não ganha acesso, mas provoca a quarentena ou o encerramento.
-4. **Uma LLM manipulada usa as ferramentas que o Hermes já tem.** Se um Hermes pode enviar num
-   número, uma instrução maliciosa que ele obedeça consegue enviar por ele. O projeto limita o
-   alcance e registra tudo; não impede.
-5. **Conta de admin tomada ou servidor do hub invadido derrubam tudo.**
-6. **Quem tem o volume de sessões do motor tem o WhatsApp.** O motor precisa ficar sem porta pública.
-7. **Restaurar o hub de uma cópia antiga desfaz** o que foi revogado, trocado ou retirado depois
-   dela. O hub suspende os aparelhos ativos e avisa; cada Hermes precisa ser reconectado. Se o
-   servidor inteiro voltar de uma imagem, o hub só percebe quando conectar um aparelho que trocou de
-   credencial, ou foi conectado, depois dela; até lá, o que foi revogado volta a valer. Em qualquer
-   restauração, um admin removido depois da cópia volta a ter acesso até ser removido de novo.
-8. **Em toda instalação pelo bloco, o resumo do conector vem do painel.** Um hub invadido indica
-   um programa falso. Confira com o resumo publicado nas versões do projeto.
-9. **O WhatsApp pode bloquear o número.** O motor é um cliente não oficial.
+1. **Hermes's LLM reaches the files of the connector** when it is Hermes itself that installs it. It
+   cannot open the credential, but the file is within its reach, to read and to write. A process
+   that stays on the machine, with the same user, can use a copy outside without leaving a sign.
+   Whoever needs it not to reach them uses the shielded mode, which does not exist yet.
+2. **A copy of the credential, used with the real Hermes off, works until it comes back.** There is
+   no time limit. If it never comes back, the copy is never discovered. The same holds while whoever
+   copied holds the network of the real Hermes. And a Hermes with the connector below the hub's
+   minimum version counts as off: the copy works until the admin reconnects it, and its use may not
+   show up as a copy. It is decided that the hub will check the credential of that connector before
+   refusing it ([decision 0030](docs/decisoes/0030-conector-desatualizado.md)); while this is not
+   proved, this limit holds.
+3. **Whoever has an old copy of the files of the connector, or only the identity, can take Hermes
+   down.** They gain no access, but cause the quarantine or the closing.
+4. **A manipulated LLM uses the tools Hermes already has.** If a Hermes may send on a number, a
+   malicious instruction it obeys can send through it. The project limits the reach and records
+   everything; it does not prevent it.
+5. **An admin account taken over or a hub server broken into brings everything down.**
+6. **Whoever has the volume of the engine sessions has the WhatsApp.** The engine needs to stay
+   without a public port.
+7. **Restoring the hub from an old backup undoes** what was revoked, swapped or removed after it.
+   The hub suspends the active devices and warns; each Hermes needs to be reconnected. If the whole
+   server comes back from an image, the hub only notices when a device that swapped its credential,
+   or was connected, after it connects; until then, what was revoked holds again. In any
+   restoration, an admin removed after the backup has access again until removed again.
+8. **In every installation through the block, the digest of the connector comes from the panel.** A
+   hub that was broken into points to a fake program. Check it against the digest published in the
+   project's versions.
+9. **WhatsApp may block the number.** The engine is an unofficial client.
 
-O projeto nunca vai dizer que "fecha todas as brechas".
+The project will never say that it "closes every gap".
 
-## Raízes de confiança
+## Roots of trust
 
-Três coisas, se comprometidas, dão acesso a tudo de uma instalação. Proteja-as nesta ordem:
+Three things, if compromised, give access to everything in an installation. Protect them in this
+order:
 
-| Raiz | Como proteger |
+| Root | How to protect |
 |---|---|
-| A conta do admin | Passkey. O painel vem fechado, em rede privada, por padrão; sempre com TLS. |
-| O servidor do hub | Atualizações em dia, acesso restrito, chave-mestra fora do banco e fora da cópia comum. |
-| O motor de WhatsApp | Só na rede interna, com chave própria da instalação. |
+| The admin's account | Passkey. The panel comes closed, on a private network, by default; always with TLS. |
+| The hub's server | Updates up to date, restricted access, master key outside the database and outside the ordinary backup. |
+| The WhatsApp engine | Only on the internal network, with a key of its own for the installation. |
 
-## Versões do conector
+## Versions of the connector
 
-O desenho prevê que toda versão publicada do conector seja assinada com a chave de versões do
-projeto, que não fica em hub nenhum, e que o resumo SHA-256 de cada versão fique publicado no
-repositório. O bloco de conexão traz esse resumo: confira com o publicado.
+The design foresees that every published version of the connector is signed with the project's
+release key, which stays in no hub, and that the SHA-256 digest of each version stays published in
+the repository. The connection block carries that digest: check it against the published one.

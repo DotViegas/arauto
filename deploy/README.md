@@ -1,79 +1,79 @@
-# Como instalar o Arauto
+# How to install Arauto
 
-Cada pasta daqui é uma forma de instalar o hub, com os arquivos e um guia próprio. O que vale para
-todas está nesta página.
+Each folder here is a way to install the hub, with the files and a guide of its own. What applies
+to all of them is on this page.
 
-| Pasta | Para quem | Estado |
+| Folder | For whom | Status |
 |---|---|---|
-| [`docker/`](docker/README.md) | Um servidor com Docker e Docker Compose. É o caminho recomendado. | Escrito. **Ainda não construído nem testado num servidor**: veja "O que falta provar", no guia. |
-| [`proxy/`](proxy/README.md) | Quem precisa de um exemplo de proxy na frente do hub (Caddy ou NGINX). | Exemplos escritos, não testados. |
-| [`kubernetes/`](kubernetes/README.md) | Quem roda em Kubernetes. | Só a lista do que os manifestos precisam garantir. Os manifestos não foram escritos. |
+| [`docker/`](docker/README.md) | A server with Docker and Docker Compose. It is the recommended path. | Written. **Not yet built or tested on a server**: see "What is left to prove", in the guide. |
+| [`proxy/`](proxy/README.md) | Whoever needs an example of a proxy in front of the hub (Caddy or NGINX). | Examples written, not tested. |
+| [`kubernetes/`](kubernetes/README.md) | Whoever runs on Kubernetes. | Only the list of what the manifests need to guarantee. The manifests have not been written. |
 
-O conector não se instala por aqui: ele é baixado do próprio hub, pelo bloco que o comando
-`admin invite` mostra ([docs/02-como-funciona.md](../docs/02-como-funciona.md)).
+The connector is not installed from here: it is downloaded from the hub itself, through the block
+that the command `admin invite` shows ([docs/02-como-funciona.md](../docs/02-como-funciona.md)).
 
-## As peças
+## The parts
 
 ```
-                 internet                         rede interna do servidor
- CONECTOR ──wss──► PROXY ──http──► HUB :8443 ─────► POSTGRESQL
- (ao lado de                (TLS)   │
-  cada Hermes)                      │ :8444 (interna, nunca publicada)
-                                    │ :8445 (painel, desligado por padrão)
-                                    ◄──── eventos ──── MOTOR DE WHATSAPP
-                                    ────► chamadas ───► (de quem instala)
+                 internet                         internal network of the server
+ CONNECTOR ─wss──► PROXY ──http──► HUB :8443 ─────► POSTGRESQL
+ (beside each               (TLS)   │
+  Hermes)                           │ :8444 (internal, never published)
+                                    │ :8445 (panel, off by default)
+                                    ◄──── events ───── WHATSAPP ENGINE
+                                    ────► calls ──────► (of whoever installs)
 ```
 
-| Peça | De quem é | O que precisa |
+| Part | Whose it is | What it needs |
 |---|---|---|
-| **Hub** | Do projeto: a imagem. | Duas portas: a dos conectores (publicada atrás do proxy) e a interna (saúde e eventos do motor). E uma terceira, a do painel, só quando você a liga. |
-| **PostgreSQL 16** | Vem na composição. | Gravação forçada em disco ligada (`fsync`). O hub se recusa a subir sem ela. |
-| **Proxy** | De quem instala. | Terminar o TLS, repassar a troca para websocket, prazo de inatividade acima de 90 segundos. |
-| **Motor de WhatsApp** | De quem instala. O projeto não o embute. | Estar numa rede que alcança a porta interna do hub, e nunca ter porta pública. |
+| **Hub** | The project's: the image. | Two ports: that of the connectors (published behind the proxy) and the internal one (health and events of the engine). And a third, that of the panel, only when you turn it on. |
+| **PostgreSQL 16** | It comes in the composition. | Forced write to disk turned on (`fsync`). The hub refuses to start without it. |
+| **Proxy** | Of whoever installs. | Terminate the TLS, pass on the switch to websocket, idle timeout above 90 seconds. |
+| **WhatsApp engine** | Of whoever installs. The project does not embed it. | To be on a network that reaches the internal port of the hub, and never have a public port. |
 
-## O que toda instalação precisa garantir
+## What every installation needs to guarantee
 
-1. **Dois volumes separados.** O banco num, a pasta de dados do hub (a chave-mestra e a marca da
-   auditoria) noutro. A cópia de segurança do banco **não** leva a pasta de dados: quem rouba a
-   cópia do banco não leva a chave.
-2. **Só a porta dos conectores é publicada**, e atrás de um proxy com TLS. A porta interna e o motor
-   nunca têm porta pública. A porta do painel vem desligada; ligada, fica só no próprio servidor,
-   alcançada por túnel, e só vai para fora por escolha sua, com TLS e num endereço que não é o dos
-   conectores.
-3. **O endereço de cada conector.** Atrás de um proxy, o hub lê o endereço do cabeçalho
-   `X-Forwarded-For`, e só acredita nele quando a conexão vem de um proxy da lista
-   `ARAUTO_TRUSTED_PROXIES`. Lista errada deixa qualquer um forjar o próprio endereço.
-4. **Cópia de segurança do banco**, contínua ou, no mínimo, diária. Restaurar uma cópia liga o modo
-   restaurado: todos os Hermes precisam reconectar
+1. **Two separate volumes.** The database in one, the data folder of the hub (the master key and
+   the audit mark) in another. The backup of the database does **not** carry the data folder:
+   whoever steals the copy of the database does not take the key.
+2. **Only the port of the connectors is published**, and behind a proxy with TLS. The internal port
+   and the engine never have a public port. The port of the panel comes off; turned on, it stays
+   only on the server itself, reached by tunnel, and only goes outside by your choice, with TLS and
+   on an address that is not that of the connectors.
+3. **The address of each connector.** Behind a proxy, the hub reads the address from the header
+   `X-Forwarded-For`, and only believes it when the connection comes from a proxy of the list
+   `ARAUTO_TRUSTED_PROXIES`. A wrong list lets anyone forge their own address.
+4. **Backup of the database**, continuous or, at least, daily. Restoring a copy turns on the
+   restored mode: every Hermes needs to reconnect
    ([docs/04-seguranca-conexao.md](../docs/04-seguranca-conexao.md), C11).
-5. **Limite de arquivos abertos** alto para o hub: cada conector mantém uma conexão.
-6. **Prazo de parada** de pelo menos 20 segundos: o hub deixa as chamadas em andamento responderem
-   antes de sair.
+5. **Limit of open files** high for the hub: each connector keeps one connection.
+6. **Stop timeout** of at least 20 seconds: the hub lets the calls in progress answer before
+   leaving.
 
-## As variáveis do hub
+## The variables of the hub
 
-| Variável | Para quê |
+| Variable | What for |
 |---|---|
-| `ARAUTO_DATABASE_URL` | O banco PostgreSQL. Leva a senha: nunca aparece em registro. |
-| `ARAUTO_DATA_DIR` | A pasta da chave-mestra e da marca da auditoria. |
-| `ARAUTO_LISTEN` | O endereço da porta dos conectores. |
-| `ARAUTO_LISTEN_INTERNAL` | O endereço da porta interna. |
-| `ARAUTO_LISTEN_PANEL` | O endereço da porta do painel. Sem ela, o painel fica desligado. |
-| `ARAUTO_PANEL_URL` | O endereço que o admin abre no navegador: `https://` e só o nome (e a porta), ou `http://localhost` com a porta, por túnel. Vem junto com a de cima. |
-| `ARAUTO_PUBLIC_URL` | O endereço que vai no bloco: `https://` e só o nome (e a porta). |
-| `ARAUTO_CLIENT_IP_SOURCE` | De onde vem o endereço de um conector: `socket` ou `forwarded`. |
-| `ARAUTO_TRUSTED_PROXIES` | Com `forwarded`: os proxies em que o hub acredita. |
-| `ARAUTO_DOWNLOAD_DIR` | A pasta com os conectores servidos em `/v1/download/`. A imagem já traz. |
+| `ARAUTO_DATABASE_URL` | The PostgreSQL database. It carries the password: it never appears in a log. |
+| `ARAUTO_DATA_DIR` | The folder of the master key and of the audit mark. |
+| `ARAUTO_LISTEN` | The address of the port of the connectors. |
+| `ARAUTO_LISTEN_INTERNAL` | The address of the internal port. |
+| `ARAUTO_LISTEN_PANEL` | The address of the port of the panel. Without it, the panel stays off. |
+| `ARAUTO_PANEL_URL` | The address the admin opens in the browser: `https://` and only the name (and the port), or `http://localhost` with the port, by tunnel. It comes together with the one above. |
+| `ARAUTO_PUBLIC_URL` | The address that goes in the block: `https://` and only the name (and the port). |
+| `ARAUTO_CLIENT_IP_SOURCE` | Where the address of a connector comes from: `socket` or `forwarded`. |
+| `ARAUTO_TRUSTED_PROXIES` | With `forwarded`: the proxies the hub believes. |
+| `ARAUTO_DOWNLOAD_DIR` | The folder with the connectors served at `/v1/download/`. The image already brings it. |
 
-## Os comandos, em qualquer instalação
+## The commands, in any installation
 
 ```
-arauto-hub init                 cria a chave-mestra, a marca, a organização e a chave do hub
-arauto-hub serve                roda o hub
-arauto-hub health               pergunta ao hub desta máquina se ele está no ar (0 = está)
-arauto-hub migrate --i-have-a-backup   aplica migrações num banco que já tem dados
-arauto-hub admin ...            a administração, por comando
-arauto-hub admin panel code     emite o código de entrada do painel (10 minutos, uma entrada)
+arauto-hub init                 creates the master key, the mark, the organization and the hub key
+arauto-hub serve                runs the hub
+arauto-hub health               asks the hub of this machine whether it is up (0 = it is)
+arauto-hub migrate --i-have-a-backup   applies migrations to a database that already has data
+arauto-hub admin ...            the administration, by command
+arauto-hub admin panel code     issues the entry code of the panel (10 minutes, one entry)
 ```
 
-A sequência de um primeiro uso está no guia de cada pasta. O [roteiro do primeiro teste](primeiro-teste.md) traz, passo a passo, o que conferir numa instalação nova.
+The sequence of a first use is in the guide of each folder. The [walkthrough of the first test](primeiro-teste.md) brings, step by step, what to check in a new installation.

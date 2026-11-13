@@ -1,25 +1,26 @@
-# Arauto em Kubernetes
+# Arauto on Kubernetes
 
-**Os manifestos ainda não foram escritos.** O projeto não publica um arquivo que ninguém rodou. Esta
-página lista o que eles precisam garantir, para quem quiser escrevê-los a partir da imagem de
+**The manifests have not been written yet.** The project does not publish a file that nobody ran.
+This page lists what they need to guarantee, for whoever wants to write them from the image of
 [`../docker/`](../docker/README.md).
 
-## O que os manifestos precisam garantir
+## What the manifests need to guarantee
 
-| Ponto | Como fica em Kubernetes |
+| Point | How it is on Kubernetes |
 |---|---|
-| **Uma cópia do hub.** | `replicas: 1`, com estratégia `Recreate`. O teto de envio e os contadores vivem na memória do processo; duas cópias do hub na mesma organização não são tratadas no primeiro MVP ([docs/15-mvp.md](../../docs/15-mvp.md), seção 2). |
-| **A pasta de dados num volume próprio.** | Um `PersistentVolumeClaim` só para `/var/lib/arauto`, fora da cópia de segurança do banco. Ele tem a chave-mestra. |
-| **O banco com gravação forçada.** | PostgreSQL 16 com `fsync` ligado e disco que honre a gravação. O hub se recusa a subir sem isso. |
-| **O `init` uma vez.** | Um `Job` que roda `arauto-hub init` antes do primeiro `Deployment`. |
-| **Só a porta dos conectores sai.** | Um `Service` e um `Ingress` para a porta 8443, com websocket e prazo de inatividade acima de 90 segundos. A porta 8444 fica num `Service` interno, com `NetworkPolicy` que só deixa o motor de WhatsApp entrar. A porta do painel (8445), se você a ligar, fica num `Service` interno, sem `Ingress`, alcançada por `kubectl port-forward`. |
-| **O endereço dos conectores.** | `ARAUTO_CLIENT_IP_SOURCE=forwarded` e `ARAUTO_TRUSTED_PROXIES` com a rede do controlador de entrada. |
-| **A saúde.** | `exec` com `arauto-hub health`, como prontidão e como vida. |
-| **A parada.** | `terminationGracePeriodSeconds` de 20 ou mais. |
-| **A senha do banco.** | Num `Secret`, lida para montar `ARAUTO_DATABASE_URL`. |
-| **O usuário.** | A imagem roda como o usuário 10001. `fsGroup: 10001` no volume da pasta de dados. |
+| **One copy of the hub.** | `replicas: 1`, with strategy `Recreate`. The send ceiling and the counters live in the memory of the process; two copies of the hub in the same organization are not handled in the first MVP ([docs/15-mvp.md](../../docs/15-mvp.md), section 2). |
+| **The data folder on a volume of its own.** | A `PersistentVolumeClaim` only for `/var/lib/arauto`, outside the backup of the database. It has the master key. |
+| **The database with forced write.** | PostgreSQL 16 with `fsync` on and a disk that honors the write. The hub refuses to start without this. |
+| **The `init` once.** | A `Job` that runs `arauto-hub init` before the first `Deployment`. |
+| **Only the port of the connectors goes out.** | A `Service` and an `Ingress` for port 8443, with websocket and idle timeout above 90 seconds. Port 8444 stays on an internal `Service`, with a `NetworkPolicy` that only lets the WhatsApp engine in. The port of the panel (8445), if you turn it on, stays on an internal `Service`, with no `Ingress`, reached by `kubectl port-forward`. |
+| **The address of the connectors.** | `ARAUTO_CLIENT_IP_SOURCE=forwarded` and `ARAUTO_TRUSTED_PROXIES` with the network of the ingress controller. |
+| **The health.** | `exec` with `arauto-hub health`, as readiness and as liveness. |
+| **The stop.** | `terminationGracePeriodSeconds` of 20 or more. |
+| **The password of the database.** | In a `Secret`, read to build `ARAUTO_DATABASE_URL`. |
+| **The user.** | The image runs as user 10001. `fsGroup: 10001` on the volume of the data folder. |
 
-## O que conferir
+## What to check
 
-As mesmas conferências do fim do [guia do Docker](../docker/README.md): saúde, porta interna
-fechada para fora, download com o SHA-256 do bloco, endereço dos conectores e parada em ordem.
+The same checks as at the end of the [Docker guide](../docker/README.md): health, internal port
+closed to the outside, download with the SHA-256 of the block, address of the connectors and
+orderly stop.

@@ -1,21 +1,21 @@
-# 0019 — Painel com passkey em toda ação que muda algo
+# 0019 — Panel with passkey on every action that changes something
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-A conta do admin é a raiz de tudo: quem entra nela cria convites, aprova aparelhos e concede acessos. Senha com código de seis dígitos cai em phishing em tempo real.
+The admin's account is the root of everything: whoever gets into it creates invites, approves devices and grants accesses. A password with a six-digit code falls to real-time phishing.
 
-## Decisão
+## Decision
 
-O login do painel é por passkey, e não há senha. Toda ação que muda algo pede a passkey de novo, naquele momento: com a sessão do painel, sozinha, só se vê. O primeiro admin só é criado com o código de instalação, que o hub mostra na primeira partida.
+The login of the panel is by passkey, and there is no password. Every action that changes something asks for the passkey again, at that moment: with the panel session alone, one can only look. The first admin is only created with the installation code, which the hub shows on its first start.
 
-## Consequências
+## Consequences
 
-- Uma sessão do painel roubada não basta para agir.
-- O banco guarda só chaves públicas dos admins.
-- Quem perde a passkey recebe outra de um segundo admin; sem segundo admin, um comando no servidor emite novo código de instalação.
-- O painel fica em endereço separado da porta dos conectores e, por padrão, só em rede privada ([0028](0028-painel-fechado-por-padrao.md)).
-- Todo texto vindo de aparelho ou do WhatsApp é escapado na tela.
-- O painel continua dependendo do TLS de quem instala.
-- **Mudança de 12/11/2026, a pedido de quem mantém:** enquanto a passkey não existir, entra-se no painel com um código de entrada, e a sessão do painel aberta por ele pode agir (conectar Hermes, parear, dar acesso). Nesse período o painel fica fechado: a porta dele só é alcançada na própria máquina do hub, por túnel. A passkey, no login e em toda ação que muda algo, volta a valer antes de o painel ser aberto à internet. O que isso deixa sem proteção está na [0040](0040-painel-dentro-do-hub.md).
+- A stolen panel session is not enough to act.
+- The database keeps only public keys of the admins.
+- Whoever loses the passkey receives another from a second admin; with no second admin, a command on the server issues a new installation code.
+- The panel stays at an address separate from the port of the connectors and, by default, only on a private network ([0028](0028-painel-fechado-por-padrao.md)).
+- Every text coming from a device or from WhatsApp is escaped on screen.
+- The panel still depends on the TLS of whoever installs.
+- **Change of 12/11/2026, at the maintainer's request:** while the passkey does not exist, the panel is entered with an entry code, and the panel session opened by it can act (connect Hermes, pair, give access). In that period the panel stays closed: its port is only reached on the hub's own machine, by tunnel. The passkey, at login and on every action that changes something, comes back into force before the panel is opened to the internet. What this leaves unprotected is in [0040](0040-painel-dentro-do-hub.md).

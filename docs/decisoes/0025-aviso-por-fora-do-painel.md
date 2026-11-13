@@ -1,16 +1,16 @@
-# 0025 — Aviso ao admin por fora do painel
+# 0025 — Warning the admin outside the panel
 
-**Estado:** pendente · **Data:** 09/11/2026
+**Status:** pending · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Se alguém agir no painel em nome do admin, o próprio painel é o último lugar onde o admin vai ver. Um aviso por outro meio a cada aprovação e a cada concessão mostraria o que ele não fez.
+If someone acts in the panel in the admin's name, the panel itself is the last place where the admin will see it. A warning by another means at each approval and at each grant would show what the admin did not do.
 
-## Decisão
+## Decision
 
-**A decidir.** Por qual meio o hub avisa (e-mail ou um endereço configurado por quem instala) e se isso entra na primeira versão.
+**To be decided.** By which means the hub warns (e-mail or an address configured by whoever installs) and whether this goes into the first version.
 
-## Consequências
+## Consequences
 
-- **Trava:** nada. É uma camada a mais sobre a passkey.
-- O aviso nunca leva segredo nem conteúdo de mensagem.
+- **Blocks:** nothing. It is one more layer on top of the passkey.
+- The warning never carries a secret or message content.

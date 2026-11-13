@@ -1,675 +1,693 @@
-# 14 — Protocolo do canal
+# 14 — Channel protocol
 
-**Estado: proposta**, a validar no primeiro MVP ([15-mvp.md](15-mvp.md)). Revisada em 10/11/2026,
-depois da revisão do desenho. É o formato do que passa entre o conector e o hub: a parte que
-[04-seguranca-conexao.md](04-seguranca-conexao.md), seção 7, deixava para o protótipo.
+**Status: proposal**, to be validated in the first MVP ([15-mvp.md](15-mvp.md)). Revised on 10/11/2026,
+after the design review. It is the format of what passes between the connector and the hub: the part
+that [04-seguranca-conexao.md](04-seguranca-conexao.md), section 7, left for the prototype.
 
-Este documento não muda nenhuma regra do [04](04-seguranca-conexao.md). Onde os dois divergirem, vale
-o 04, e o erro é daqui. O que a revisão achou e que pede mudança no 04 está na seção 12.
+This document changes no rule of [04](04-seguranca-conexao.md). Where the two diverge, 04 holds,
+and the error is here. What the review found that asks for a change in 04 is in section 12.
 
-**O lado do hub já existe no código** (etapas 2 e 2b do MVP, 11/11/2026). Onde este texto era omisso,
-o código escolheu uma leitura, e ela está escrita aqui com a marca "no hub". É fato só no sentido de
-que a suíte do hub a confere, em Windows, contra um PostgreSQL de teste e um conector de teste: o
-conector de verdade ainda não existe, e nada foi executado em Linux. Os pontos em que o código e o
-texto ainda não se acertaram estão na seção 13.
+**The hub side already exists in the code** (stages 2 and 2b of the MVP, 11/11/2026). Where this text
+was silent, the code chose a reading, and it is written here with the mark "in the hub". It is fact
+only in the sense that the hub's suite checks it, on Windows, against a test PostgreSQL and a test
+connector: the real connector does not exist yet, and nothing was run on Linux. The points where the
+code and the text have not agreed yet are in section 13.
 
-## Resumo
+## Summary
 
 ```
- websocket (binário)
-   └─ Noise XK            aperto de mãos em 3 mensagens; depois, quadros cifrados
-        └─ quadro         1 byte de marcas + 4 bytes do fluxo + pedaço
-             └─ mensagem  JSON com o campo "t" (o tipo)
+ websocket (binary)
+   └─ Noise XK            handshake in 3 messages; after that, encrypted frames
+        └─ frame          1 byte of flags + 4 bytes of the stream + chunk
+             └─ message   JSON with the field "t" (the type)
 ```
 
-| Camada | Escolha | Por quê |
+| Layer | Choice | Why |
 |---|---|---|
-| Transporte | Websocket, só mensagens binárias, sem compressão | Passa por proxy comum. O conteúdo já vai cifrado: comprimir não rende e abre um canal lateral. |
-| Cifra | Noise `XK_25519_ChaChaPoly_BLAKE2s`, prólogo `arauto/1` | Decisão 0012. |
-| Mensagem | JSON em UTF-8 | As chamadas e respostas das ferramentas já nascem e terminam em JSON. |
+| Transport | Websocket, binary messages only, no compression | It passes through an ordinary proxy. The content already goes encrypted: compressing gains nothing and opens a side channel. |
+| Cipher | Noise `XK_25519_ChaChaPoly_BLAKE2s`, prologue `arauto/1` | Decision 0012. |
+| Message | JSON in UTF-8 | The tool calls and responses are already born and end in JSON. |
 
-Três regras atravessam o documento:
+Three rules run through the document:
 
-1. **Antes da sessão, quase nada é aceito.** Quem ainda não provou que é um aparelho ativo só manda
-   mensagens pequenas, uma de cada vez, com prazo.
-2. **Só a conexão mais nova de um aparelho é julgada.** Uma tentativa abandonada que chega atrasada
-   pela rede nunca decide nada.
-3. **Tamanho nunca derruba quem recebe.** Quem envia confere antes; o que não cabe vira erro da
-   chamada, não fechamento da conexão.
+1. **Before the session, almost nothing is accepted.** Whoever has not yet proved to be an active
+   device only sends small messages, one at a time, with a deadline.
+2. **Only the newest connection of a device is judged.** An abandoned attempt that arrives late
+   through the network never decides anything.
+3. **Size never brings down the receiver.** The sender checks first; what does not fit becomes an
+   error of the call, not a closing of the connection.
 
-## 1. Endereços do hub
+## 1. Hub addresses
 
-Todos na porta dos conectores.
+All on the port of the connectors.
 
-| Endereço | Para quê |
+| Address | What for |
 |---|---|
-| `GET /v1/channel` | O websocket. Serve à inscrição, ao canal e ao pedido de encerramento. |
-| `GET /v1/download/{arquivo}` | O conector, numa versão exata. Público e sem segredo. Só serve nomes de uma lista fixa, montada na partida. |
+| `GET /v1/channel` | The websocket. It serves the enrollment, the channel and the closing request. |
+| `GET /v1/download/{file}` | The connector, in an exact version. Public and with no secret. It only serves names from a fixed list, built at startup. |
 
-- Requisição de leitura não muda estado: abrir qualquer um deles não gasta convite.
-- **Não existe endereço que entregue a chave do hub.** O conector só aceita a chave que veio no
-  bloco, e só descobre as versões pelo `hello`. Quem instala lê a chave pública no comando de
-  administração.
-- O conector valida o certificado TLS do endereço pelas autoridades públicas. Endereço `ws://`, sem
-  TLS, só é aceito para `127.0.0.1` e `localhost`, em desenvolvimento. Autoridade privada fica para
-  depois do MVP.
-- Saúde e métricas ficam em outra porta, que não é publicada ([15](15-mvp.md), seção 6). No hub, a
-  porta interna responde só `GET /health`, com `ok`; a de conectores não responde a ela.
-- No hub, todo outro endereço, e todo método que não seja `GET`, recebe 404. Isso vale para a
-  porta dos conectores e para a interna. A porta do painel, quando ligada, é uma terceira: os
-  endereços dela não existem nessas duas, nem os delas na do painel
-  ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)).
-- **Download, no hub.** O nome pedido só é comparado com os nomes da lista e nunca vira caminho de
-  arquivo: `../`, barra, caractere codificado ou letra trocada de caixa simplesmente não acham nada.
-  Um nome da lista tem até 128 letras, dígitos, pontos, hífens e sublinhados, e não começa por ponto.
-  No M1 a lista é vazia: todo download é 404.
+- A read request does not change state: opening either of them does not spend an invite.
+- **There is no address that hands over the hub key.** The connector only accepts the key that came
+  in the block, and only discovers the versions through the `hello`. Whoever installs reads the
+  public key in the admin command.
+- The connector validates the TLS certificate of the address against the public authorities. A
+  `ws://` address, without TLS, is only accepted for `127.0.0.1` and `localhost`, in development. A
+  private authority is left for after the MVP.
+- Health and metrics stay on another port, which is not published ([15](15-mvp.md), section 6). In
+  the hub, the internal port answers only `GET /health`, with `ok`; the connectors' port does not
+  answer it.
+- In the hub, every other address, and every method other than `GET`, receives 404. This holds for
+  the port of the connectors and for the internal one. The panel port, when turned on, is a third
+  one: its addresses do not exist on those two, nor theirs on the panel's
+  ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)).
+- **Download, in the hub.** The requested name is only compared with the names of the list and never
+  becomes a file path: `../`, a slash, an encoded character or a letter with its case changed simply
+  find nothing. A name of the list has up to 128 letters, digits, dots, hyphens and underscores, and
+  does not start with a dot. In M1 the list is empty: every download is 404.
 
-Regras do websocket:
+Rules of the websocket:
 
-- Só mensagem binária. Mensagem de texto fecha a conexão.
-- Cada mensagem tem no máximo 65.535 bytes. O hub configura esse teto na própria biblioteca: uma
-  mensagem maior nem chega a ser montada.
-- A extensão de compressão não é negociada.
-- O hub dá 5 segundos para os cabeçalhos da requisição chegarem. No hub, o prazo vale também entre
-  duas requisições da mesma conexão: a conexão HTTP fica aberta entre elas, porque fechá-la quebraria
-  a troca para websocket na biblioteca usada.
-- Os `ping` do próprio websocket são respondidos pela biblioteca e não contam como sinal de vida. O
-  batimento que conta é o do protocolo (seção 4).
+- Binary messages only. A text message closes the connection.
+- Each message has at most 65,535 bytes. The hub sets this ceiling in the library itself: a larger
+  message is not even assembled.
+- The compression extension is not negotiated.
+- The hub gives 5 seconds for the request headers to arrive. In the hub, the deadline also holds
+  between two requests of the same connection: the HTTP connection stays open between them, because
+  closing it would break the switch to websocket in the library used.
+- The `ping`s of the websocket itself are answered by the library and do not count as a sign of
+  life. The heartbeat that counts is the protocol's (section 4).
 
-## 2. Aperto de mãos
+## 2. Handshake
 
-O conector é quem inicia. A chave estática dele é a identidade do aparelho; a do hub veio no bloco.
+The connector is the one that starts. Its static key is the device identity; the hub's came in the
+block.
 
 ```
- conector -> hub   e, es            48 bytes
- hub -> conector   e, ee            48 bytes
- conector -> hub   s, se            64 bytes
+ connector -> hub   e, es            48 bytes
+ hub -> connector   e, ee            48 bytes
+ connector -> hub   s, se            64 bytes
 ```
 
-- As três mensagens vão sem carga e têm tamanho exato. Outro tamanho fecha a conexão.
-- O prólogo é `arauto/1` e **não muda** com a versão do protocolo.
-- Um hub que não tem a chave do bloco não conclui: o conector fecha com AR-202.
-- Uma chave que não é de ninguém (um ponto de ordem baixa, com o qual toda conta dá zero) é recusada
-  dos dois lados: nem identidade de aparelho, nem chave de hub.
-- O hub dá 10 segundos, contados da abertura do websocket, para o aperto de mãos terminar. Passou
-  disso, fecha sem responder.
-- O **resumo do aperto de mãos** é o valor `h` do Noise ao fim da terceira mensagem (32 bytes). Os
-  dois lados o leem antes de passar aos quadros. Ele entra no código de conferência (seção 8).
-- O padrão XK não barra identidade desconhecida: qualquer um que tenha a chave pública do hub conclui
-  o aperto de mãos. Por isso os limites da seção 4 valem para toda conexão.
+- The three messages go without payload and have an exact size. Another size closes the connection.
+- The prologue is `arauto/1` and **does not change** with the protocol version.
+- A hub that does not have the key of the block does not conclude: the connector closes with AR-202.
+- A key that belongs to no one (a low-order point, with which every computation gives zero) is
+  refused on both sides: neither device identity, nor hub key.
+- The hub gives 10 seconds, counted from the opening of the websocket, for the handshake to finish.
+  Past that, it closes without answering.
+- The **handshake digest** is the value `h` of Noise at the end of the third message (32 bytes).
+  Both sides read it before moving on to the frames. It goes into the verification code (section 8).
+- The XK pattern does not bar an unknown identity: anyone who has the hub's public key concludes the
+  handshake. That is why the limits of section 4 hold for every connection.
 
-## 3. Quadros
+## 3. Frames
 
-Depois do aperto de mãos, cada mensagem binária do websocket é uma mensagem Noise de transporte.
+After the handshake, each binary message of the websocket is a Noise transport message.
 
-- Cada sentido tem um contador, que começa em zero e sobe um a cada quadro. O contador **não viaja**:
-  quem recebe usa o próprio. Um quadro repetido, faltando ou fora de ordem não decifra, e a conexão é
-  fechada.
-- **Só a tarefa que escreve no websocket cifra**, na hora de escrever, depois de escolher entre a fila
-  de controle e a de dados. Cifrar ao enfileirar quebraria o contador no primeiro quadro que passasse
-  na frente.
+- Each direction has a counter, which starts at zero and goes up by one at each frame. The counter
+  **does not travel**: the receiver uses its own. A frame that is repeated, missing or out of order
+  does not decrypt, and the connection is closed.
+- **Only the task that writes to the websocket encrypts**, at the time of writing, after choosing
+  between the control queue and the data queue. Encrypting when enqueueing would break the counter on
+  the first frame that jumped ahead.
 
-O conteúdo decifrado de um quadro:
+The decrypted content of a frame:
 
 ```
- byte 0      marcas: bit 0 = FIM (último pedaço da mensagem); bit 1 = CONTROLE
- bytes 1-4   número do fluxo, sem sinal, do byte mais significativo para o menos
- bytes 5...  pedaço da mensagem
+ byte 0      flags: bit 0 = END (last chunk of the message); bit 1 = CONTROL
+ bytes 1-4   stream number, unsigned, from the most significant byte to the least
+ bytes 5...  chunk of the message
 ```
 
-| Regra | Detalhe |
+| Rule | Detail |
 |---|---|
-| Bits 2 a 7 | Sempre zero. Outro valor fecha a conexão. |
-| Mensagem de um quadro só | Vai no **fluxo 0**, com FIM. Não conta como fluxo aberto. |
-| Mensagem maior | É cortada em pedaços de até 60.000 bytes, todos com o mesmo número de fluxo; o último leva FIM. |
-| Pedaço vazio | Erro: fecha a conexão. |
-| Numeração | O conector usa os ímpares e o hub os pares a partir de 2, sempre crescendo. Número de paridade errada, repetido ou menor que o último aberto por aquele lado fecha a conexão. |
-| Intercalação | Fluxos diferentes podem se intercalar. A mensagem é entregue quando chega o quadro com FIM. |
-| CONTROLE | Batimento e conferência. Sempre um quadro só, no fluxo 0, com FIM. Passa na frente da fila de dados. |
-| Quem envia | Só abre um fluxo com a mensagem inteira pronta, e espera lugar se já tem 8 abertos. Nunca estoura o limite de propósito. |
-| Fim dos números | Quando os números de fluxo de um lado acabam, ele fecha a conexão com AR-205 e reconecta. |
+| Bits 2 to 7 | Always zero. Another value closes the connection. |
+| Single-frame message | It goes in **stream 0**, with END. It does not count as an open stream. |
+| Larger message | It is cut into chunks of up to 60,000 bytes, all with the same stream number; the last one carries END. |
+| Empty chunk | Error: closes the connection. |
+| Numbering | The connector uses the odd numbers and the hub the even ones from 2 on, always growing. A number of the wrong parity, repeated or smaller than the last one opened by that side closes the connection. |
+| Interleaving | Different streams may interleave. The message is delivered when the frame with END arrives. |
+| CONTROL | Heartbeat and check. Always a single frame, in stream 0, with END. It jumps ahead of the data queue. |
+| The sender | Only opens a stream with the whole message ready, and waits for room if it already has 8 open. It never exceeds the limit on purpose. |
+| End of the numbers | When the stream numbers of one side run out, it closes the connection with AR-205 and reconnects. |
 
-Uma mensagem é interpretada uma vez só. Nenhum lado repassa adiante os bytes como recebeu: o hub
-monta o que manda ao motor a partir dos argumentos já validados.
+A message is interpreted only once. Neither side passes the bytes on as it received them: the hub
+builds what it sends to the engine from the already validated arguments.
 
-## 4. Limites e prazos
+## 4. Limits and deadlines
 
-Os limites existem porque a conexão é aberta a qualquer um até a sessão começar.
+The limits exist because the connection is open to anyone until the session starts.
 
-| Fase | O que vale |
+| Phase | What holds |
 |---|---|
-| Websocket | Mensagem de até 65.535 bytes; só binária. |
-| Aperto de mãos | Tamanhos exatos (48, 48, 64); 10 segundos. |
-| Antes de `session` | Só o fluxo 0. Mensagem de até 4.096 bytes. O `hello` em 5 segundos. Cada resposta do conector em 10 segundos; o `saved`, em 60. Fora a espera do pedido, a conexão inteira tem 90 segundos para virar sessão. |
-| Em espera | O aparelho pendente só manda `check_ok`, `ping`, `pong` e `leave`. |
-| Em sessão | Do conector para o hub, mensagem de até 6 MiB. Do hub para o conector, até 16 MiB. Oito fluxos abertos **por sentido**, contados por quem recebe. Um fluxo aberto que fica 60 segundos sem pedaço novo fecha a conexão. |
-| Chamadas | Até 32 em andamento por conexão. A seguinte é recusada com AR-710, sem fechar. |
-| Conteúdo de uma mensagem | No máximo 100.000 valores JSON e 64 níveis de aninhamento. Sem isso, uma mensagem de poucos MiB feita só de zeros custaria dezenas de vezes o tamanho em memória. Quem envia confere antes: vira AR-709 da chamada. |
-| O hub inteiro | Um orçamento de bytes para mensagens em remontagem (256 MiB de partida). Sem espaço, a conexão que pede mais é fechada com AR-205. |
-| Conexões sem sessão | No máximo 1.024 no hub e 16 por origem, fora as que estão em espera. Acima disso o hub responde 503 ou 429 antes de abrir o websocket. |
+| Websocket | Message of up to 65,535 bytes; binary only. |
+| Handshake | Exact sizes (48, 48, 64); 10 seconds. |
+| Before `session` | Only stream 0. Message of up to 4,096 bytes. The `hello` in 5 seconds. Each response of the connector in 10 seconds; the `saved`, in 60. Apart from the waiting of the request, the whole connection has 90 seconds to become a session. |
+| Waiting | The pending device only sends `check_ok`, `ping`, `pong` and `leave`. |
+| In session | From the connector to the hub, message of up to 6 MiB. From the hub to the connector, up to 16 MiB. Eight open streams **per direction**, counted by the receiver. An open stream that stays 60 seconds without a new chunk closes the connection. |
+| Calls | Up to 32 in progress per connection. The next one is refused with AR-710, without closing. |
+| Content of a message | At most 100,000 JSON values and 64 levels of nesting. Without this, a message of a few MiB made only of zeros would cost dozens of times its size in memory. The sender checks first: it becomes AR-709 of the call. |
+| The whole hub | A budget of bytes for messages in reassembly (256 MiB to start with). With no room, the connection that asks for more is closed with AR-205. |
+| Connections without a session | At most 1,024 in the hub and 16 per origin, apart from those that are waiting. Above that the hub answers 503 or 429 before opening the websocket. |
 
-Como o hub aplica a tabela:
+How the hub applies the table:
 
-- **Os 90 segundos** contam desde a abertura do websocket, com o aperto de mãos dentro, e param
-  enquanto a conexão está em espera.
-- **A origem** é o endereço IPv4, ou os primeiros 64 bits do endereço IPv6 (uma rede de uma casa ou
-  de uma operadora). Um IPv4 escrito como IPv6 vale como o IPv4. De onde vem o endereço está em
-  [15](15-mvp.md), seção 4.
-- **Fora do teto**: a conexão em espera e a que está em sessão. Uma conexão TCP que ainda não mandou
-  os cabeçalhos também não conta: só o prazo de 5 segundos a limita.
-- **Mensagem que só o hub envia**, vinda do conector, fecha a conexão, antes ou depois da sessão.
-- **O orçamento do hub inteiro**: o espaço que uma conexão tomou dele volta quando ela termina.
-- **Mensagens grandes**: acima de 256 KiB, o hub interpreta o JSON fora das tarefas de rede.
-- **Escrita.** Cada conexão tem duas filas de saída: controle, com 16 quadros, e dados, com 64. Quem
-  produz dado espera lugar. A fila de controle cheia fecha a conexão sem `closing`. Um quadro que não
-  sai em 30 segundos também fecha: o prazo é por quadro, e não "nenhum byte andou em 30 segundos".
-- **O código.** Silêncio de 90 segundos, `hello` fora do prazo, resposta fora do prazo e `ping` ou
-  `pong` antes do `hello_ok` fecham com AR-204.
+- **The 90 seconds** count from the opening of the websocket, with the handshake inside, and stop
+  while the connection is waiting.
+- **The origin** is the IPv4 address, or the first 64 bits of the IPv6 address (the network of a
+  home or of a carrier). An IPv4 written as IPv6 counts as the IPv4. Where the address comes from is
+  in [15](15-mvp.md), section 4.
+- **Outside the ceiling**: the waiting connection and the one that is in session. A TCP connection
+  that has not sent the headers yet does not count either: only the 5-second deadline limits it.
+- **A message that only the hub sends**, coming from the connector, closes the connection, before or
+  after the session.
+- **The budget of the whole hub**: the room a connection took from it comes back when it ends.
+- **Large messages**: above 256 KiB, the hub interprets the JSON outside the network tasks.
+- **Writing.** Each connection has two output queues: control, with 16 frames, and data, with 64.
+  Whoever produces data waits for room. A full control queue closes the connection without
+  `closing`. A frame that does not go out in 30 seconds also closes it: the deadline is per frame,
+  and not "no byte moved in 30 seconds".
+- **The code.** Silence of 90 seconds, `hello` past the deadline, response past the deadline and
+  `ping` or `pong` before the `hello_ok` close with AR-204.
 
-O que não cabe:
+What does not fit:
 
-- Quem monta uma mensagem confere o tamanho antes de enviar.
-- Uma resposta que não cabe vira `result` com `ok: false` e AR-709. As leituras têm orçamento em
-  bytes e cortam a lista em itens inteiros ([09](09-contrato-mcp.md), [13](13-conversa-entre-hermes.md)),
-  então o AR-709 só aparece num item sozinho grande demais.
-- O conector recusa localmente, com AR-709, a chamada cujos argumentos não cabem.
+- Whoever builds a message checks the size before sending.
+- A response that does not fit becomes `result` with `ok: false` and AR-709. The reads have a budget
+  in bytes and cut the list at whole items ([09](09-contrato-mcp.md), [13](13-conversa-entre-hermes.md)),
+  so AR-709 only appears for a single item that is too large by itself.
+- The connector refuses locally, with AR-709, the call whose arguments do not fit.
 
-Prazos do lado do conector, sempre maiores do que a soma dos do hub:
+Deadlines on the connector's side, always larger than the sum of the hub's:
 
-| Espera | Prazo |
+| Wait | Deadline |
 |---|---|
-| `hello_ok` e `state` | 10 segundos cada |
-| `check`, depois do `present` | 15 segundos |
-| `credential`, depois do `check_ok` | 20 segundos |
-| `session`, depois do `saved` | 20 segundos |
-| `enrolled` | 15 segundos |
-| `left` | 10 segundos |
+| `hello_ok` and `state` | 10 seconds each |
+| `check`, after the `present` | 15 seconds |
+| `credential`, after the `check_ok` | 20 seconds |
+| `session`, after the `saved` | 20 seconds |
+| `enrolled` | 15 seconds |
+| `left` | 10 seconds |
 
-**O conector encerra uma tentativa antes de abrir outra** e, depois de fechar uma tentativa em que já
-mandou `present` ou `enroll`, espera 6 segundos para abrir a seguinte com a mesma identidade. O `join`
-segura uma trava da pasta enquanto roda: dois ao mesmo tempo não acontecem.
+**The connector ends one attempt before opening another** and, after closing an attempt in which it
+already sent `present` or `enroll`, waits 6 seconds to open the next one with the same identity. The
+`join` holds a lock on the folder while it runs: two at the same time do not happen.
 
-Batimento: cada lado manda `ping` a cada 30 segundos, desde o `hello_ok`, inclusive na espera.
-Qualquer quadro válido recebido conta como sinal de vida. Noventa segundos sem receber nada encerram
-a conexão, com AR-204.
+Heartbeat: each side sends `ping` every 30 seconds, from the `hello_ok` on, including while waiting.
+Any valid frame received counts as a sign of life. Ninety seconds without receiving anything end
+the connection, with AR-204.
 
-Reconexão: depois de uma queda, a primeira tentativa é na hora (C9). As seguintes esperam um tempo
-sorteado entre zero e o teto, que dobra a cada falha, de 1 a 60 segundos. Sem o sorteio, os
-conectores recusados numa volta em massa tentariam de novo todos juntos.
+Reconnection: after a drop, the first attempt is immediate (C9). The following ones wait a time
+drawn at random between zero and the ceiling, which doubles at each failure, from 1 to 60 seconds.
+Without the random draw, the connectors refused in a mass return would all try again together.
 
-Todo prazo desta seção vem de uma configuração e de um relógio que os testes controlam.
+Every deadline of this section comes from a configuration and from a clock that the tests control.
 
-## 5. Mensagens
+## 5. Messages
 
-Toda mensagem é um objeto JSON com `"t"`. Campo desconhecido é ignorado. Chave repetida é erro.
-Dados binários vão em base64 padrão, com preenchimento.
+Every message is a JSON object with `"t"`. An unknown field is ignored. A repeated key is an error.
+Binary data goes in standard base64, with padding.
 
-Mensagem de tipo desconhecido: antes da sessão, fecha a conexão; depois, é ignorada, e a centésima
-fecha com AR-204.
+A message of unknown type: before the session, it closes the connection; after, it is ignored, and
+the hundredth closes with AR-204.
 
-### 5.1 A primeira mensagem, e o que nunca muda
+### 5.1 The first message, and what never changes
 
-A primeira mensagem é do conector:
+The first message is the connector's:
 
 ```json
 {"t":"hello","proto":[1,1],"connector":"0.1.0","purpose":"channel"}
 ```
 
-| Campo | Conteúdo |
+| Field | Content |
 |---|---|
-| `proto` | A menor e a maior versão de protocolo que o conector fala. |
-| `connector` | A versão do programa. É texto declarado: aparece na tela e não decide nada. |
-| `purpose` | `enroll` (inscrição), `channel` (canal) ou `leave` (pedido de encerramento). Outro valor: `closing` com AR-204. |
+| `proto` | The lowest and the highest protocol version the connector speaks. |
+| `connector` | The version of the program. It is declared text: it appears on the screen and decides nothing. |
+| `purpose` | `enroll` (enrollment), `channel` (channel) or `leave` (closing request). Another value: `closing` with AR-204. |
 
-O hub responde `hello_ok`:
+The hub answers `hello_ok`:
 
-| Caso | Resposta |
+| Case | Response |
 |---|---|
-| Há versão em comum | `{"t":"hello_ok","proto":N}`, com a **maior** versão comum. |
-| O conector é antigo demais | Em `channel`: `{"t":"hello_ok","proto":0,"outdated":true}` e segue a apresentação sem troca (5.3). Em `enroll`: `closing` com AR-401. Em `leave`: atende. |
-| O conector é novo demais | `closing` com AR-402, em qualquer `purpose`, inclusive `leave`. |
+| There is a version in common | `{"t":"hello_ok","proto":N}`, with the **highest** common version. |
+| The connector is too old | In `channel`: `{"t":"hello_ok","proto":0,"outdated":true}` and the presentation without swap follows (5.3). In `enroll`: `closing` with AR-401. In `leave`: it serves it. |
+| The connector is too new | `closing` with AR-402, in any `purpose`, including `leave`. |
 
-No hub, o `leave` de um conector novo demais também recebe AR-402: não existe `hello_ok` válido para
-uma faixa de versões toda acima da do hub. O C8 diz que o `leave` é aceito "em qualquer versão"; a
-leitura do hub é que a exceção vale para o conector antigo demais (seção 12).
+In the hub, the `leave` of a connector that is too new also receives AR-402: there is no valid
+`hello_ok` for a range of versions entirely above the hub's. C8 says that the `leave` is accepted
+"in any version"; the hub's reading is that the exception holds for the connector that is too old
+(section 12).
 
-Quem decide o AR-401 é a versão do **protocolo**. A lista de versões do programa, com revogação,
-fica para depois do MVP.
+What decides AR-401 is the version of the **protocol**. The list of versions of the program, with
+revocation, is left for after the MVP.
 
-**Congelado para sempre**, para um conector de qualquer idade ainda receber o erro certo: o aperto de
-mãos e o prólogo, o cabeçalho do quadro, e as mensagens `hello`, `hello_ok`, `state`, `present`,
-`check`, `check_ok`, `closing`, `leave` e `left`.
+**Frozen forever**, so that a connector of any age still receives the right error: the handshake
+and the prologue, the frame header, and the messages `hello`, `hello_ok`, `state`, `present`,
+`check`, `check_ok`, `closing`, `leave` and `left`.
 
-### 5.2 Inscrição (`purpose: enroll`)
+### 5.2 Enrollment (`purpose: enroll`)
 
-| De | Mensagem | Campos |
+| From | Message | Fields |
 |---|---|---|
-| conector | `enroll` | `invite`; `declared`, com `hostname`, `os` e `hermes_version` (texto não confiável, de uma linha, até 128 caracteres cada, sem caractere de controle nem de direção) |
-| hub | `enrolled` | `nonce` (32 bytes), `confirm_within_s`, `enrollment` (de 1 a 5) |
-| hub | `closing` | `code`: AR-101, AR-102, AR-104, AR-301, AR-302 ou AR-303 |
+| connector | `enroll` | `invite`; `declared`, with `hostname`, `os` and `hermes_version` (untrusted text, of one line, up to 128 characters each, with no control or direction character) |
+| hub | `enrolled` | `nonce` (32 bytes), `confirm_within_s`, `enrollment` (from 1 to 5) |
+| hub | `closing` | `code`: AR-101, AR-102, AR-104, AR-301, AR-302 or AR-303 |
 
-- O `enroll` só é mandado depois do `hello_ok`. Antes disso, ou repetido, fecha a conexão.
-- Depois de `enrolled`, o conector calcula o código, mostra e fecha. É uma conexão curta.
-- As recusas de inscrição são registradas **agregadas**: uma linha por origem, organização, código e
-  minuto, com a contagem. Uma linha por tentativa deixaria qualquer um encher uma tabela que não se
-  apaga. No hub vale para toda recusa, e não só para o AR-101 de quem não tem aparelho: o AR-102
-  repetido também é contado assim. A contagem fica em memória até o minuto fechar, e a varredura a
-  grava. **Limite:** o que foi contado no minuto em que o hub para se perde.
-- O convite sem organização (resumo que ninguém emitiu) recebe AR-101 e entra na contagem sem
-  organização.
-- No hub, um convite vencido que a inscrição encontra é encerrado ali mesmo, com o evento
-  `invite.expired`, sem esperar a varredura.
-- Um convite ainda não usado, apresentado por uma identidade que já tem linha de aparelho, de
-  qualquer Hermes, recebe AR-101 e não é gasto: identidade velha não abre pedido novo.
-- Pedido já resolvido responde AR-104 em todo estado que só existe depois de uma aprovação: ativo,
-  quarentena, revogado, substituído e vencido por inatividade.
+- The `enroll` is only sent after the `hello_ok`. Before that, or repeated, it closes the connection.
+- After `enrolled`, the connector computes the code, shows it and closes. It is a short connection.
+- The enrollment refusals are recorded **aggregated**: one row per origin, organization, code and
+  minute, with the count. One row per attempt would let anyone fill a table that is not erased. In
+  the hub this holds for every refusal, and not only for the AR-101 of whoever has no device: the
+  repeated AR-102 is also counted this way. The count stays in memory until the minute closes, and
+  the sweep writes it. **Limit:** what was counted in the minute in which the hub stops is lost.
+- The invite with no organization (a digest that no one issued) receives AR-101 and enters the count
+  with no organization.
+- In the hub, an expired invite that the enrollment finds is closed right there, with the event
+  `invite.expired`, without waiting for the sweep.
+- An invite not yet used, presented by an identity that already has a device row, of any Hermes,
+  receives AR-101 and is not spent: an old identity does not open a new request.
+- A request already resolved answers AR-104 in every state that only exists after an approval:
+  active, quarantine, revoked, replaced and expired by inactivity.
 
-### 5.3 Canal (`purpose: channel`)
+### 5.3 Channel (`purpose: channel`)
 
-Depois do `hello_ok` **o hub sempre fala primeiro**, com `state`.
+After the `hello_ok` **the hub always speaks first**, with `state`.
 
-| `state` | Quando | O que segue |
+| `state` | When | What follows |
 |---|---|---|
-| `waiting` | Aparelho pendente. | O hub manda `check`. Respondido, a conexão fica **em espera**. Quando o pedido é resolvido, o hub manda outro `state` ou um `closing`. |
-| `approved` | Aparelho aprovado, na geração zero. | A troca (seção 6). |
-| `active` | Aparelho ativo. | A troca (seção 6). |
-| `ended`, com `code` | Qualquer outro estado, identidade desconhecida, ou conector antigo demais. | A **apresentação sem troca**: o conector apresenta o que tem, responde à conferência e recebe `closing` com o código. O hub nunca emite credencial aqui. |
+| `waiting` | Pending device. | The hub sends `check`. Once answered, the connection is **waiting**. When the request is resolved, the hub sends another `state` or a `closing`. |
+| `approved` | Approved device, at generation zero. | The swap (section 6). |
+| `active` | Active device. | The swap (section 6). |
+| `ended`, with `code` | Any other state, unknown identity, or connector that is too old. | The **presentation without swap**: the connector presents what it has, answers the check and receives `closing` with the code. The hub never issues a credential here. |
 
-A apresentação sem troca existe porque o 04 manda olhar o que um aparelho encerrado apresenta (C7:
-"reuso depois do encerramento"; C11: lacre que o banco não explica) e porque a decisão 0030 manda
-conferir a credencial do conector antigo antes de recusar a versão. Um conector antigo demais se
-apresenta assim na partida do líder e, depois, uma vez a cada 24 horas.
+The presentation without swap exists because 04 requires looking at what a closed device presents
+(C7: "reuse after closing"; C11: a seal the database does not explain) and because decision 0030
+requires checking the credential of the old connector before refusing the version. A connector that
+is too old presents itself this way at the leader's startup and, after that, once every 24 hours.
 
-| De | Mensagem | Campos | Quando |
+| From | Message | Fields | When |
 |---|---|---|---|
-| hub | `state` | `state`, e `code` em `ended` | Sempre a primeira depois do `hello_ok`; de novo quando a espera termina. |
-| conector | `present` | `credential` (até 1.024 bytes) ou `null` | Em `approved`, `active` e `ended`. `null` quando não tem credencial. Fora dessa ordem, fecha. |
-| hub | `check` | `nonce` (16 bytes) | A conferência da regra 3 do C7. Marca CONTROLE. |
-| conector | `check_ok` | `nonce` | A mesma. Marca CONTROLE. |
-| hub | `credential` | `generation`, `sealed` | A credencial nova, já gravada como pendente. |
-| conector | `saved` | `generation`, `digest` (SHA-256 do bloco recebido) | O "gravei", depois de a gravação estar garantida em disco. |
-| hub | `session` | `hermes` (nome), `tools` (nomes liberados), `wake` (pode ser acordado) | A promoção foi gravada. A sessão do canal começa aqui. |
-| hub | `tools` | `tools` | A lista de ferramentas liberadas mudou. |
-| conector | `call` | `id`, `tool`, `args` | Chamada de ferramenta. |
-| hub | `result` | `id`, `ok`, e `content` ou `code`; `retry_after_s` opcional | Resposta. Recusa leva só o código; a frase fica no conector. |
-| hub | `notice` | `id`, `kind`, e os campos do tipo | Aviso: ponteiro, sem texto de terceiros. |
-| conector | `notice_ack` | `id`, `outcome` | Depois de a API local do Hermes aceitar. |
-| hub | `rotate` | | Começa a troca de 24 horas. |
-| hub | `rotated` | `generation` | A troca de 24 horas foi gravada. |
-| os dois | `ping`, `pong` | `n` | Batimento. O `pong` devolve o `n`. Marca CONTROLE. |
-| conector | `leave` | | Pedido de encerramento pelo canal aberto, em espera ou em sessão. |
-| hub | `left` | `status` | Resposta ao `leave`. |
-| hub | `closing` | `code` | O motivo do fechamento (seção 7). |
+| hub | `state` | `state`, and `code` in `ended` | Always the first after the `hello_ok`; again when the waiting ends. |
+| connector | `present` | `credential` (up to 1,024 bytes) or `null` | In `approved`, `active` and `ended`. `null` when it has no credential. Out of this order, it closes. |
+| hub | `check` | `nonce` (16 bytes) | The check of rule 3 of C7. CONTROL flag. |
+| connector | `check_ok` | `nonce` | The same one. CONTROL flag. |
+| hub | `credential` | `generation`, `sealed` | The new credential, already written as pending. |
+| connector | `saved` | `generation`, `digest` (SHA-256 of the block received) | The "saved", after the write is guaranteed on disk. |
+| hub | `session` | `hermes` (name), `tools` (names released), `wake` (may be woken) | The promotion was written. The channel session starts here. |
+| hub | `tools` | `tools` | The list of released tools changed. |
+| connector | `call` | `id`, `tool`, `args` | Tool call. |
+| hub | `result` | `id`, `ok`, and `content` or `code`; optional `retry_after_s` | Response. A refusal carries only the code; the sentence stays in the connector. |
+| hub | `notice` | `id`, `kind`, and the fields of the kind | Notice: a pointer, with no third-party text. |
+| connector | `notice_ack` | `id`, `outcome` | After Hermes's local API accepts. |
+| hub | `rotate` | | The 24-hour swap starts. |
+| hub | `rotated` | `generation` | The 24-hour swap was written. |
+| both | `ping`, `pong` | `n` | Heartbeat. The `pong` returns the `n`. CONTROL flag. |
+| connector | `leave` | | Closing request through the open channel, waiting or in session. |
+| hub | `left` | `status` | Response to the `leave`. |
+| hub | `closing` | `code` | The reason for the closing (section 7). |
 
-**Chamadas.**
+**Calls.**
 
-- `call` antes de `session` é erro de protocolo: a conexão é fechada. É a regra 4 do C7.
-- O `id` é um inteiro positivo, do conector, único entre as chamadas em andamento daquela conexão.
-  Repetido, fecha a conexão.
-- O hub valida de novo o nome da ferramenta e todos os argumentos: o conector pode ser hostil.
-  Ferramenta que não existe ou argumento malformado: AR-711. Ferramenta não liberada: AR-701.
-- `retry_after_s` é um inteiro de 1 a 86.400. O conector o valida e o encaixa na frase fixa do erro.
-- Uma chamada que não chegou a sair quando o canal cai volta à LLM com AR-203: pode repetir. Uma
-  chamada que saiu e ficou sem resposta volta com AR-207: o resultado é desconhecido, e a frase manda
-  conferir antes de repetir. O hub não reconhece chamada repetida.
+- `call` before `session` is a protocol error: the connection is closed. It is rule 4 of C7.
+- The `id` is a positive integer, from the connector, unique among the calls in progress of that
+  connection. Repeated, it closes the connection.
+- The hub validates again the name of the tool and all the arguments: the connector may be hostile.
+  A tool that does not exist or a malformed argument: AR-711. A tool not released: AR-701.
+- `retry_after_s` is an integer from 1 to 86,400. The connector validates it and fits it into the
+  fixed sentence of the error.
+- A call that did not get to go out when the channel drops goes back to the LLM with AR-203: it may
+  be repeated. A call that went out and was left without a response goes back with AR-207: the
+  result is unknown, and the sentence says to check before repeating. The hub does not recognize a
+  repeated call.
 
-**Como o hub atende a sessão:**
+**How the hub serves the session:**
 
-- **Mensagem mandada antes de ler o `session`.** Toda mensagem que o conector mandou antes de o
-  `session` sair do hub (um `call`, um `leave`, qualquer outra) fecha a conexão com AR-204, depois
-  do `session`. O hub sabe a ordem exata: a conexão passa à sessão no instante em que o `session`
-  sai da fila de envio. A promoção já está gravada, e o conector volta com a credencial nova.
-- **A ordem de cada chamada:** primeiro o hub relê o estado do aparelho (C8). Se ele não serve
-  mais, a resposta é `result` com o código do estado (por exemplo, AR-502), seguido de `closing`
-  com o mesmo código. Só depois vêm o nome e os argumentos (AR-711), a liberação (AR-701) e o
-  tamanho da resposta (AR-709).
-- **O identificador repetido** fecha com AR-204. Um identificador sai das chamadas em andamento
-  antes de o `result` dela ser mandado.
-- **A 33ª chamada em andamento** recebe AR-710, mandado pelo próprio laço da sessão: um conector
-  que insiste espera as recusas saírem, e a espera chega à conexão dele. Essa recusa **não relê o
-  estado do aparelho** (seção 12).
-- **No M1** só `arauto_status` é liberada, e o hub a responde sem o motor. Os campos estão em
-  [09](09-contrato-mcp.md), seção 3. As `hermes_*` existem no catálogo e recebem AR-701; as
-  `whatsapp_*` ainda não estão no catálogo e recebem AR-711. A mensagem `tools` nunca é mandada,
-  porque a lista não muda, e nenhum `notice` sai; um `notice_ack` é ignorado.
-- **`saved` fora da troca de 24 horas** fecha a sessão com AR-204 (C7, regra 7).
-- **O `leave` pelo canal aberto** recebe `left` e a conexão termina.
+- **A message sent before reading the `session`.** Every message the connector sent before the
+  `session` left the hub (a `call`, a `leave`, any other) closes the connection with AR-204, after
+  the `session`. The hub knows the exact order: the connection moves to the session at the instant
+  the `session` leaves the send queue. The promotion is already written, and the connector comes
+  back with the new credential.
+- **The order of each call:** first the hub rereads the state of the device (C8). If it no longer
+  serves, the response is `result` with the code of the state (for example, AR-502), followed by
+  `closing` with the same code. Only then come the name and the arguments (AR-711), the release
+  (AR-701) and the size of the response (AR-709).
+- **The repeated identifier** closes with AR-204. An identifier leaves the calls in progress before
+  its `result` is sent.
+- **The 33rd call in progress** receives AR-710, sent by the session's own loop: a connector that
+  insists waits for the refusals to go out, and the wait reaches its connection. This refusal
+  **does not reread the state of the device** (section 12).
+- **In M1** only `arauto_status` is released, and the hub answers it without the engine. The fields
+  are in [09](09-contrato-mcp.md), section 3. The `hermes_*` ones exist in the catalog and receive
+  AR-701; the `whatsapp_*` ones are not in the catalog yet and receive AR-711. The `tools` message
+  is never sent, because the list does not change, and no `notice` goes out; a `notice_ack` is
+  ignored.
+- **`saved` outside the 24-hour swap** closes the session with AR-204 (C7, rule 7).
+- **The `leave` through the open channel** receives `left` and the connection ends.
 
-**Avisos.**
+**Notices.**
 
-| `kind` | Campos | Validação no conector, antes de montar a frase fixa |
+| `kind` | Fields | Validation in the connector, before building the fixed sentence |
 |---|---|---|
-| `whatsapp` | `number` (apelido), `chat` (identificador opaco), `count`; o `id` de todo aviso é um UUID | `number` no formato de nome; `chat` com até 64 caracteres de `A-Z a-z 0-9 _ -`; `count` de 1 a 9.999 |
-| `peer` | `from` (nome do Hermes), `count` | `from` no formato de nome; `count` de 1 a 9.999 |
+| `whatsapp` | `number` (alias), `chat` (opaque identifier), `count`; the `id` of every notice is a UUID | `number` in the name format; `chat` with up to 64 characters of `A-Z a-z 0-9 _ -`; `count` from 1 to 9,999 |
+| `peer` | `from` (name of the Hermes), `count` | `from` in the name format; `count` from 1 to 9,999 |
 
-O formato de nome é `^[a-z0-9][a-z0-9_-]{0,31}$`, e vale para o nome do Hermes e para o apelido do
-número. A validação fica **compilada no conector**: mesmo um hub invadido só consegue pôr na frase
-um nome nesse formato e dois números.
+The name format is `^[a-z0-9][a-z0-9_-]{0,31}$`, and it holds for the name of the Hermes and for the
+alias of the number. The validation is **compiled into the connector**: even an invaded hub only
+manages to put into the sentence a name in this format and two numbers.
 
-| `outcome` | Quando | O que o hub faz |
+| `outcome` | When | What the hub does |
 |---|---|---|
-| `accepted` | A API local aceitou. | Dá o aviso por confirmado. |
-| `duplicate` | O conector já tinha tratado aquele `id`. | Dá por confirmado. |
-| `failed` | A API local não respondeu ou recusou. | Tenta de novo, com espera crescente, até o aviso expirar. |
-| `throttled` | O conector atingiu o próprio teto de acordadas. | Tenta de novo em 5 minutos. |
-| `rejected` | Tipo desconhecido ou campo fora do formato. | Descarta o aviso. Nunca tenta de novo. |
+| `accepted` | The local API accepted. | Takes the notice as confirmed. |
+| `duplicate` | The connector had already handled that `id`. | Takes it as confirmed. |
+| `failed` | The local API did not answer or refused. | Tries again, with a growing wait, until the notice expires. |
+| `throttled` | The connector reached its own ceiling of wakes. | Tries again in 5 minutes. |
+| `rejected` | Unknown kind or field out of format. | Discards the notice. Never tries again. |
 
-### 5.4 Pedido de encerramento
+### 5.4 Closing request
 
-| De | Mensagem | Campos |
+| From | Message | Fields |
 |---|---|---|
-| conector | `leave` | |
+| connector | `leave` | |
 | hub | `left` | `status`: `closed`, `already_closed`, `unknown` |
 
-- Com o canal aberto, o pedido vai por ele (C10). Sem canal, vai por uma conexão curta com
-  `purpose: leave`, uma por identidade. Conexão curta não apresenta credencial e não conta como
-  conexão dupla.
-- Os três valores valem como confirmação para o conector apagar a pasta daquela identidade.
-- Um pedido pendente que pede o encerramento vira negado.
-- No hub, um aparelho ativo que sai fica revogado, com o alerta de encerramento pedido pelo aparelho
-  e o endereço de onde veio (C10).
-- **Se o banco voltou de uma cópia** e o hub descobre isso no meio do `leave`, nada é gravado: o hub
-  liga o modo restaurado (seção 6, "Modo restaurado com o hub no ar"), e a conexão curta fecha com
-  AR-205, sem `left`.
-- **Se a marca da auditoria não avançou** depois de o encerramento estar gravado, o hub grava o
-  alerta `mark_not_advanced` para o admin e só então responde `left` com `closed`, porque o
-  encerramento está no banco. O alerta vem antes para não se perder se o hub cair entre os dois:
-  depois do `left`, o conector apaga a pasta.
+- With the channel open, the request goes through it (C10). With no channel, it goes through a short
+  connection with `purpose: leave`, one per identity. A short connection does not present a
+  credential and does not count as a double connection.
+- The three values count as confirmation for the connector to erase the folder of that identity.
+- A pending request that asks for the closing becomes denied.
+- In the hub, an active device that leaves becomes revoked, with the alert of closing requested by
+  the device and the address it came from (C10).
+- **If the database came back from a backup** and the hub discovers this in the middle of the
+  `leave`, nothing is written: the hub turns on the restored mode (section 6, "Restored mode with
+  the hub running"), and the short connection closes with AR-205, without `left`.
+- **If the audit mark did not advance** after the closing is written, the hub writes the alert
+  `mark_not_advanced` for the admin and only then answers `left` with `closed`, because the closing
+  is in the database. The alert comes first so that it is not lost if the hub goes down between the
+  two: after the `left`, the connector erases the folder.
 
-## 6. A troca, passo a passo
+## 6. The swap, step by step
 
-O hub mantém, em memória, o registro das conexões de canal de cada aparelho. Cada conexão recebe um
-**número de ordem** ao fim do aperto de mãos. Uma conexão está **estabelecida** quando está em espera
-ou em sessão.
+The hub keeps, in memory, the registry of the channel connections of each device. Each connection
+receives an **order number** at the end of the handshake. A connection is **established** when it is
+waiting or in session.
 
 ```
- 1 hub       state
- 2 conector  present                       (em espera não há present)
- 3 hub       check        prazo: 5 s       sem resposta: fecha, sem consequência
- 4 conector  check_ok
- 5 hub       esta é a conexão mais nova do aparelho?   não -> fecha com AR-206, sem consequência
- 6 hub       fecha com AR-206 as mais antigas que ainda não estão estabelecidas
- 7 hub       pré-julgamento, só de leitura (tabela abaixo)
- 8 hub       se a apresentação seria aceita e há uma conexão estabelecida:
-             manda check a ela e espera 3 s
-               respondeu      -> conexão dupla (C9; no pendente, C6)
-               não respondeu  -> fecha a antiga com AR-208; a nova segue
- 9 hub       T1: trava, relê, julga de novo, grava a pendente e a maior geração
-10 hub       credential
-11 conector  grava em disco e manda saved  prazo: 60 s
-12 hub       T2: trava, relê, confere e grava a promoção
-13 hub       session
+ 1 hub        state
+ 2 connector  present                       (while waiting there is no present)
+ 3 hub        check        deadline: 5 s    no response: closes, with no consequence
+ 4 connector  check_ok
+ 5 hub        is this the newest connection of the device?   no -> closes with AR-206, with no consequence
+ 6 hub        closes with AR-206 the older ones that are not established yet
+ 7 hub        pre-judgment, read-only (table below)
+ 8 hub        if the presentation would be accepted and there is an established connection:
+              sends check to it and waits 3 s
+                answered        -> double connection (C9; on the pending one, C6)
+                did not answer  -> closes the old one with AR-208; the new one goes on
+ 9 hub        T1: locks, rereads, judges again, writes the pending one and the highest generation
+10 hub        credential
+11 connector  writes to disk and sends saved  deadline: 60 s
+12 hub        T2: locks, rereads, checks and writes the promotion
+13 hub        session
 ```
 
-- **Nenhuma transação fica aberta durante a rede.** As esperas dos passos 3, 8 e 11 acontecem sem
-  trava e sem conexão do banco. T1 e T2 são transações curtas.
-- **Toda gravação que muda um aparelho relê o estado antes.** T1 e T2 travam primeiro a linha do
-  Hermes e depois as dos aparelhos dele, e só gravam se o aparelho continua aprovado ou ativo. Em T2,
-  só se o resumo recebido no `saved` é o da pendente emitida **naquela conexão**. O comando de
-  administração trava na mesma ordem. Assim um aparelho revogado entre o passo 10 e o 12 não volta a
-  ativo.
-- Os passos 5 e 6 fecham a corrida da tentativa abandonada: se a resposta de uma tentativa antiga
-  chega depois de o conector já ter aberto outra, ela é ignorada.
-- Um `saved` que não se refere à pendente daquela conexão fecha a conexão (C7, regra 7).
-- Se o passo 8 fechou uma sessão que estava servindo, sai o alerta "a conexão de {nome} foi tomada
-  por outra" (C9).
-- Uma conexão que recebeu `credential` e terminou sem `saved` fica registrada. Três em 24 horas geram
-  alerta (C7).
+- **No transaction stays open during the network.** The waits of steps 3, 8 and 11 happen with no
+  lock and no database connection. T1 and T2 are short transactions.
+- **Every write that changes a device rereads the state first.** T1 and T2 lock first the row of
+  the Hermes and then those of its devices, and only write if the device is still approved or
+  active. In T2, only if the digest received in the `saved` is that of the pending one issued **on
+  that connection**. The admin command locks in the same order. This way a device revoked
+  between step 10 and step 12 does not go back to active.
+- Steps 5 and 6 close the race of the abandoned attempt: if the response of an old attempt arrives
+  after the connector has already opened another, it is ignored.
+- A `saved` that does not refer to the pending one of that connection closes the connection (C7,
+  rule 7).
+- If step 8 closed a session that was serving, the alert "the connection of {name} was taken by
+  another" goes out (C9).
+- A connection that received `credential` and ended without `saved` is recorded. Three in 24 hours
+  generate an alert (C7).
 
-**Como o hub faz os passos:**
+**How the hub does the steps:**
 
-- **O registro** é um mapa repartido por identidade do aparelho, na memória de um processo. Cada
-  conexão tem o seu número de ordem e o seu estado: tentativa, em espera ou em sessão.
-- **Uma tentativa por vez.** Cada identidade tem a sua vez de ser julgada, do passo 5 ao fim de T1.
-  Logo antes de T1 o hub confere de novo que aquela conexão continua a mais nova e aberta; se não,
-  ela fecha com AR-206 e não recebe nada. Sem isso, uma tentativa abandonada que passou do passo 5
-  podia rodar T1 depois de uma mais nova já ter trocado a credencial, e mandar o aparelho legítimo à
-  quarentena por reuso. Foram as rodadas sorteadas que acharam esse caso.
-- **O pré-julgamento** (passo 7) só lê. Se o banco falha nele, a conexão fecha com AR-205 e não
-  chega a T1.
-- **O teste do passo 8** é respondido pela tarefa que lê da conexão antiga: um `check_ok` com o
-  nonce do teste não espera a sessão, que pode estar ocupada com o banco. Uma conexão antiga que já
-  está terminando não é testada. Se a antiga responde, as duas recebem AR-501 e o aparelho vai à
-  quarentena; no pendente, o pedido é negado (AR-301) e sai o alerta de identidade copiada. Se não
-  responde, só a antiga recebe AR-208. O alerta de conexão tomada só sai se ela servia uma sessão no
-  momento do teste e continuava aberta ao fim do prazo.
-- **O `state` sai antes do `check`.** O `check` é de controle e passa na frente da fila de dados;
-  por isso o hub espera o `state` sair antes de mandá-lo.
-- **A prova de restauração** é olhada antes de qualquer prazo vencido, para o prazo não esconder a
-  prova.
-- **Na primeira confirmação**, o aparelho substituído (o antigo do mesmo Hermes) recebe AR-503, se
-  tiver conexão aberta.
-- **Promoção pela apresentação da pendente.** Um aparelho aprovado que volta apresentando a
-  pendente (caiu depois de gravar, antes de o hub ouvir o "gravei") passa a ativo já em T1, e essa é
-  a primeira confirmação. A sessão continua só depois do "gravei" da credencial seguinte (seção 12).
-- **Falhas na gravação de segurança.** Se T1 ou T2 descobrem um banco restaurado, o hub liga o modo
-  restaurado. Se a marca da auditoria não avançou depois de T2, a promoção fica gravada, mas o hub
-  não abre a sessão: fecha a conexão e grava o alerta `mark_not_advanced`; na volta o conector
-  apresenta o que tem, e ninguém fica trancado. Se a conexão já fechou quando T1 ou T2 rodam, nada é
-  gravado.
-- **Nenhuma espera de rede segura transação ou conexão do banco**, inclusive a espera do pendente.
+- **The registry** is a map partitioned by device identity, in the memory of one process. Each
+  connection has its order number and its state: attempt, waiting or in session.
+- **One attempt at a time.** Each identity has its turn to be judged, from step 5 to the end of T1.
+  Right before T1 the hub checks again that that connection is still the newest and open; if not,
+  it closes with AR-206 and receives nothing. Without this, an abandoned attempt that got past step
+  5 could run T1 after a newer one had already swapped the credential, and send the legitimate
+  device to quarantine for reuse. It was the randomized rounds that found this case.
+- **The pre-judgment** (step 7) only reads. If the database fails in it, the connection closes with
+  AR-205 and does not reach T1.
+- **The test of step 8** is answered by the task that reads from the old connection: a `check_ok`
+  with the nonce of the test does not wait for the session, which may be busy with the database. An
+  old connection that is already ending is not tested. If the old one answers, both receive AR-501
+  and the device goes to quarantine; on the pending one, the request is denied (AR-301) and the
+  alert of copied identity goes out. If it does not answer, only the old one receives AR-208. The
+  alert of taken connection only goes out if it was serving a session at the moment of the test and
+  was still open at the end of the deadline.
+- **The `state` goes out before the `check`.** The `check` is a control one and jumps ahead of the
+  data queue; that is why the hub waits for the `state` to go out before sending it.
+- **The proof of restoration** is looked at before any expired deadline, so that the deadline does
+  not hide the proof.
+- **On the first confirmation**, the replaced device (the old one of the same Hermes) receives
+  AR-503, if it has an open connection.
+- **Promotion by the presentation of the pending one.** An approved device that comes back
+  presenting the pending one (it went down after writing, before the hub heard the "saved") becomes
+  active already in T1, and that is the first confirmation. The session goes on only after the
+  "saved" of the following credential (section 12).
+- **Failures in the security write.** If T1 or T2 discover a restored database, the hub turns on
+  the restored mode. If the audit mark did not advance after T2, the promotion stays written, but
+  the hub does not open the session: it closes the connection and writes the alert
+  `mark_not_advanced`; on the way back the connector presents what it has, and no one is locked
+  out. If the connection has already closed when T1 or T2 run, nothing is written.
+- **No network wait holds a transaction or a database connection**, including the waiting of the
+  pending one.
 
-**A espera do pendente.** O hub manda `state` `waiting` e `check`; respondido, a conexão fica em
-espera e sai do teto de conexões sem sessão. O hub a cutuca quando chega um aviso do comando de
-administração ou quando a varredura vê que o pedido saiu de pendente. Aprovado: novo `state` e a
-troca. Negado ou vencido: `closing` com o código. Um `leave` é aceito durante a espera.
+**The waiting of the pending one.** The hub sends `state` `waiting` and `check`; once answered, the
+connection is waiting and leaves the ceiling of connections without a session. The hub nudges it
+when a notice from the admin command arrives or when the sweep sees that the request left
+pending. Approved: a new `state` and the swap. Denied or expired: `closing` with the code. A `leave`
+is accepted during the waiting.
 
-**Modo restaurado com o hub no ar.** Venha a prova de onde vier (a varredura, T1, a apresentação de
-um desconhecido, um `leave`), o hub liga o modo e fecha as sessões e as conexões em espera com o
-código do novo estado do aparelho (suspenso: AR-506). As demais conexões recebem AR-205.
+**Restored mode with the hub running.** Wherever the proof comes from (the sweep, T1, the
+presentation of an unknown one, a `leave`), the hub turns on the mode and closes the sessions and
+the waiting connections with the code of the new state of the device (suspended: AR-506). The other
+connections receive AR-205.
 
-**O julgamento**, para aparelho aprovado ou ativo (é a tabela do C7):
+**The judgment**, for an approved or active device (it is the table of C7):
 
-| O conector apresenta | O hub |
+| The connector presents | The hub |
 |---|---|
-| A vigente, ou `null` na geração zero | Aceita. Emite uma nova, que passa a ser a pendente; a pendente anterior é descartada. |
-| A pendente | Aceita. Promove a pendente a vigente, a vigente anterior morre, e emite outra. |
-| Outra já emitida, ou `null` depois da geração zero | Quarentena e alerta: "reuso". |
-| Um lacre que não abre, ou de outro aparelho | Quarentena e alerta: "credencial ilegível". |
-| Um lacre válido de geração maior que todas as conhecidas | Prova de restauração: liga o modo restaurado (C11). |
+| The current one, or `null` at generation zero | Accepts. Issues a new one, which becomes the pending one; the previous pending one is discarded. |
+| The pending one | Accepts. Promotes the pending one to current, the previous current one dies, and it issues another. |
+| Another one already issued, or `null` after generation zero | Quarantine and alert: "reuse". |
+| A seal that does not open, or of another device | Quarantine and alert: "unreadable credential". |
+| A valid seal of a generation higher than all the known ones | Proof of restoration: turns on the restored mode (C11). |
 
-Na apresentação sem troca o hub só olha, nunca emite:
+In the presentation without swap the hub only looks, never issues:
 
-| Situação | O hub |
+| Situation | The hub |
 |---|---|
-| Conector antigo demais, aparelho aprovado ou ativo | Aplica as três últimas linhas da tabela acima. Depois, `closing` com AR-401. |
-| Aparelho revogado, substituído ou vencido por inatividade, com lacre válido mais antigo do que a última vigente e a última pendente | Alerta "reuso depois do encerramento" (C7). Depois, o código do estado. |
-| Qualquer estado, lacre válido de geração maior que todas as conhecidas | C11: prova de restauração, a não ser que o aparelho já esteja marcado. |
-| Identidade desconhecida com lacre válido | C11: entra na lista de aparelhos desconhecidos e é prova de restauração, a não ser que já esteja listada. AR-504. No hub, com o modo restaurado ligado, ela é listada e não é prova (seção 13). |
-| Identidade desconhecida com `null` ou com lacre que não abre | AR-504. Nada é gravado por tentativa. |
+| Connector that is too old, approved or active device | Applies the last three rows of the table above. Then, `closing` with AR-401. |
+| Device revoked, replaced or expired by inactivity, with a valid seal older than the last current one and the last pending one | Alert "reuse after closing" (C7). Then, the code of the state. |
+| Any state, valid seal of a generation higher than all the known ones | C11: proof of restoration, unless the device is already marked. |
+| Unknown identity with a valid seal | C11: it enters the list of unknown devices and is proof of restoration, unless it is already listed. AR-504. In the hub, with the restored mode on, it is listed and is not proof (section 13). |
+| Unknown identity with `null` or with a seal that does not open | AR-504. Nothing is written per attempt. |
 
-Mais quatro leituras do hub para esta tabela:
+Four more readings of the hub for this table:
 
-- O lacre do desconhecido é tentado com a chave de cada organização.
-- A prova de um desconhecido fica guardada na linha da lista, como **prova pendente**, até o modo
-  restaurado ser ligado. Um hub que para entre a listagem e o modo encontra a prova de novo na
-  apresentação seguinte, e ligar o modo trata de uma vez todas as provas pendentes.
-- Um aparelho aprovado ou ativo, já marcado por restauração, que apresenta um lacre de geração maior
-  vai à quarentena por reuso; nos outros estados, isso só gera registro. Pelo C11 essa combinação
-  nem deveria existir.
-- O código de um aparelho vencido sem motivo que o explique é AR-507: é o único que nunca leva o
-  conector a descartar nada.
+- The seal of the unknown one is tried with the key of each organization.
+- The proof of an unknown one stays kept in the row of the list, as **pending proof**, until the
+  restored mode is turned on. A hub that stops between the listing and the mode finds the proof
+  again at the next presentation, and turning on the mode handles all the pending proofs at once.
+- An approved or active device, already marked by restoration, that presents a seal of a higher
+  generation goes to quarantine for reuse; in the other states, this only generates a record. By
+  C11 this combination should not even exist.
+- The code of a device expired with no reason that explains it is AR-507: it is the only one that
+  never leads the connector to discard anything.
 
-**A troca de 24 horas.** O hub manda `rotate`, faz T1 como se a vigente tivesse sido apresentada,
-manda `credential`, espera o `saved` por 60 segundos, faz T2 e responde `rotated`. As chamadas seguem
-durante a troca. Sem o `saved` no prazo, o hub fecha a conexão, e na volta vale a tabela de sempre.
-No hub, cada sessão confere a hora da troca no mesmo intervalo da varredura (2 segundos), contando
-desde a última troca confirmada daquela conexão. O `saved` que não chega no prazo e o `saved` de
-outra credencial fecham com AR-204.
+**The 24-hour swap.** The hub sends `rotate`, does T1 as if the current one had been presented,
+sends `credential`, waits for the `saved` for 60 seconds, does T2 and answers `rotated`. The calls
+go on during the swap. Without the `saved` within the deadline, the hub closes the connection, and
+on the way back the usual table holds. In the hub, each session checks the time of the swap at the
+same interval as the sweep (2 seconds), counting from the last confirmed swap of that connection.
+The `saved` that does not arrive within the deadline and the `saved` of another credential close
+with AR-204.
 
-## 7. Fechamentos
+## 7. Closings
 
-O hub manda `closing` com o código antes de fechar, sempre que consegue. No hub, o `closing` não
-passa na frente da fila de dados: sai depois do que já estava na fila, para manter a ordem (por
-exemplo, o `hello_ok` antes do AR-205), e nada do que for enfileirado depois dele sai. A escrita da
-fila toda tem o mesmo prazo de 30 segundos. Só os quadros de controle passam na frente. Uma conexão
-ainda no aperto de mãos, ou com a fila de controle cheia, fecha sem `closing`.
+The hub sends `closing` with the code before closing, whenever it can. In the hub, the `closing`
+does not jump ahead of the data queue: it goes out after what was already in the queue, to keep the
+order (for example, the `hello_ok` before the AR-205), and nothing enqueued after it goes out. The
+writing of the whole queue has the same deadline of 30 seconds. Only the control frames jump ahead.
+A connection still in the handshake, or with the control queue full, closes without `closing`.
 
-| Código | Quando | O que o conector faz |
+| Code | When | What the connector does |
 |---|---|---|
-| AR-204 | Erro de protocolo, limite estourado ou mensagem inválida. | Reconecta com espera crescente. Não repete a mesma mensagem. |
-| AR-205 | O hub está parando ou sem recursos. | Reconecta depois de 1 a 10 segundos, sorteados. |
-| AR-206 | Esta tentativa foi trocada por outra mais nova do mesmo aparelho, antes de virar canal. | Espera de 5 a 15 segundos, sorteados, e tenta de novo. |
-| AR-208 | Dada por morta: não respondeu ao teste, e outra conexão do mesmo aparelho entrou no lugar. | Reconecta na hora (C9). Se alguém tomou o lugar dele, é aí que aparece. |
-| AR-301, AR-302, AR-303 | O pedido foi negado ou venceu. | [10](10-maquinas-de-estado.md), seção 6: só descarta pasta sem credencial. |
-| AR-401, AR-402 | Versão de protocolo sem acordo. | Para de usar o canal e mostra o erro em toda ferramenta. |
-| AR-501, AR-506 | Quarentena; suspenso. | Para de usar o canal. Não apaga nada. |
-| AR-502 | Revogado. | Para de usar o canal. Não apaga nada. |
-| AR-503 | Substituído. | Passa a usar a pasta do aparelho novo, se houver. |
-| AR-504 | O hub não reconhece o aparelho. | Para de usar o canal. Não apaga nada. |
-| AR-507 | Vencido por inatividade. | Para de usar o canal. Não apaga nada. |
+| AR-204 | Protocol error, limit exceeded or invalid message. | Reconnects with a growing wait. Does not repeat the same message. |
+| AR-205 | The hub is stopping or out of resources. | Reconnects after 1 to 10 seconds, drawn at random. |
+| AR-206 | This attempt was replaced by a newer one of the same device, before becoming a channel. | Waits from 5 to 15 seconds, drawn at random, and tries again. |
+| AR-208 | Taken for dead: it did not answer the test, and another connection of the same device took its place. | Reconnects immediately (C9). If someone took its place, that is where it shows. |
+| AR-301, AR-302, AR-303 | The request was denied or expired. | [10](10-maquinas-de-estado.md), section 6: only discards a folder with no credential. |
+| AR-401, AR-402 | Protocol version with no agreement. | Stops using the channel and shows the error in every tool. |
+| AR-501, AR-506 | Quarantine; suspended. | Stops using the channel. Erases nothing. |
+| AR-502 | Revoked. | Stops using the channel. Erases nothing. |
+| AR-503 | Replaced. | Starts using the folder of the new device, if there is one. |
+| AR-504 | The hub does not recognize the device. | Stops using the channel. Erases nothing. |
+| AR-507 | Expired by inactivity. | Stops using the channel. Erases nothing. |
 
-"Parar de usar o canal" não encerra o conector ([10](10-maquinas-de-estado.md), seção 6).
+"Stopping using the channel" does not end the connector ([10](10-maquinas-de-estado.md), section 6).
 
-Parada em ordem do hub, na leitura que não perde resultado:
+Orderly stop of the hub, in the reading that loses no result:
 
-1. Deixa de aceitar conexões. Um pedido de websocket que ainda chegue recebe 503, e as conexões que
-   ainda estão em HTTP ou no aperto de mãos são cortadas.
-2. Manda `closing` com AR-205, na hora, a cada conexão que não está em sessão.
-3. Cada sessão recusa chamada nova com AR-205, manda o `result` das chamadas em andamento e só então
-   manda `closing` com AR-205.
-4. Passados 8 segundos, fecha à força o que sobrou, com AR-205, e espera mais 2 segundos para o
-   `closing` sair. A parada pode levar, então, até 10 segundos.
+1. It stops accepting connections. A websocket request that still arrives receives 503, and the
+   connections that are still in HTTP or in the handshake are cut.
+2. It sends `closing` with AR-205, immediately, to each connection that is not in session.
+3. Each session refuses a new call with AR-205, sends the `result` of the calls in progress and only
+   then sends `closing` with AR-205.
+4. After 8 seconds, it closes by force what is left, with AR-205, and waits 2 more seconds for the
+   `closing` to go out. The stop may take, then, up to 10 seconds.
 
-## 8. Código de conferência
+## 8. Verification code
 
 ```
- material = HKDF-SHA-256( sal   = nonce do hub (32 bytes),
-                          chave = resumo do aperto de mãos (32 bytes),
-                          info  = "arauto/code/1" ),  com 64 bytes de saída
- código   = seis dígitos tirados do material, sem viés
+ material = HKDF-SHA-256( salt = nonce of the hub (32 bytes),
+                          key  = handshake digest (32 bytes),
+                          info = "arauto/code/1" ),  with 64 bytes of output
+ code     = six digits taken from the material, without bias
 ```
 
-"Sem viés": o material é lido em 16 palavras de 4 bytes, do byte mais significativo para o menos. A
-primeira palavra menor que 4.000.000.000 é reduzida módulo 1.000.000; as outras são descartadas. Se
-nenhuma servir, o hub sorteia outro nonce antes de mandar o `enrolled`. O código é mostrado como
-`000-000`.
+"Without bias": the material is read in 16 words of 4 bytes, from the most significant byte to the
+least. The first word smaller than 4,000,000,000 is reduced modulo 1,000,000; the others are
+discarded. If none serves, the hub draws another nonce before sending the `enrolled`. The code is
+shown as `000-000`.
 
-O nonce só sai do hub depois da terceira mensagem do aperto de mãos, pelo canal já cifrado (C4).
+The nonce only leaves the hub after the third message of the handshake, through the already
+encrypted channel (C4).
 
-Vetores de teste, para duas implementações baterem sem depender da mesma biblioteca:
+Test vectors, for two implementations to match without depending on the same library:
 
-| Nonce (hex) | Resumo (hex) | Código |
+| Nonce (hex) | Digest (hex) | Code |
 |---|---|---|
 | `00` × 32 | `00` × 32 | `028-213` |
 | `000102…1f` | `202122…3f` | `935-415` |
 
-A suíte de `crates/arauto-protocol` guarda os dois e os confere com uma segunda implementação.
+The suite of `crates/arauto-protocol` keeps both and checks them with a second implementation.
 
-## 9. O lacre
+## 9. The seal
 
-A credencial lacrada é um bloco de bytes que só o hub abre.
+The sealed credential is a block of bytes that only the hub opens.
 
 ```
- lacre       = versão (1 byte, valor 1) || nonce (24 bytes) || XChaCha20-Poly1305( conteúdo )
- chave       = HKDF-SHA-256( chave da organização, info = "arauto/seal/1" ), 32 bytes
- dado        = "arauto/seal/1" || versão (1 byte) || id da organização (16 bytes)
- autenticado    || identidade pública do aparelho (32 bytes)
- conteúdo    = JSON: v, org, device (a identidade pública), generation,
-               id (16 bytes sorteados), issued_at
+ seal          = version (1 byte, value 1) || nonce (24 bytes) || XChaCha20-Poly1305( content )
+ key           = HKDF-SHA-256( key of the organization, info = "arauto/seal/1" ), 32 bytes
+ authenticated = "arauto/seal/1" || version (1 byte) || id of the organization (16 bytes)
+ data             || public identity of the device (32 bytes)
+ content       = JSON: v, org, device (the public identity), generation,
+                 id (16 random bytes), issued_at
 ```
 
-- Continua sendo "lacrado com a chave da organização" (04): cada uso deriva a própria chave dela, e a
-  dos recados é outra ([13](13-conversa-entre-hermes.md), seção 6).
-- O dado autenticado amarra o lacre à versão, à organização e ao aparelho: um lacre levado a outro
-  aparelho não abre.
-- O hub guarda só a geração e o **resumo SHA-256 do bloco inteiro** da vigente e da pendente, e a
-  maior geração.
-- `issued_at` é a hora de emissão. Nenhuma regra do MVP o lê: fica gravado para o ponto em aberto do
-  C11.
-- O conector guarda o bloco como recebeu, em `credential.seal`, e nunca o interpreta. Só calcula o
-  resumo para o `saved`.
+- It is still "sealed with the key of the organization" (04): each use derives its own key from it,
+  and the one of the notes is another ([13](13-conversa-entre-hermes.md), section 6).
+- The authenticated data ties the seal to the version, to the organization and to the device: a
+  seal taken to another device does not open.
+- The hub keeps only the generation and the **SHA-256 digest of the whole block** of the current one
+  and of the pending one, and the highest generation.
+- `issued_at` is the time of issue. No rule of the MVP reads it: it stays written for the open point
+  of C11.
+- The connector keeps the block as received, in `credential.seal`, and never interprets it. It only
+  computes the digest for the `saved`.
 
-## 10. Convite e chave do hub
+## 10. Invite and hub key
 
-**Convite:** 32 bytes sorteados, escritos como `arc1` seguido do base32 sem preenchimento, em
-minúsculas: 56 caracteres. O hub guarda só o resumo SHA-256 dos 32 bytes. O conector recusa
-localmente, com AR-101, um convite fora desse formato.
+**Invite:** 32 random bytes, written as `arc1` followed by the base32 without padding, in lowercase:
+56 characters. The hub keeps only the SHA-256 digest of the 32 bytes. The connector refuses locally,
+with AR-101, an invite outside this format.
 
-**Chave pública do hub**, como vai no bloco: `arh1` seguido dos 32 bytes na mesma escrita, também 56
-caracteres. Só existe um texto para cada chave. O conector recusa texto fora do formato e chave que
-não é de ninguém.
+**Public key of the hub**, as it goes in the block: `arh1` followed by the 32 bytes in the same
+writing, also 56 characters. There is only one text for each key. The connector refuses text outside
+the format and a key that belongs to no one.
 
-## 11. O soquete local
+## 11. The local socket
 
-Entre as cópias do conector na mesma máquina ([11-conector.md](11-conector.md), seção 3).
+Between the copies of the connector on the same machine ([11-conector.md](11-conector.md), section 3).
 
-| Sistema | Como |
+| System | How |
 |---|---|
-| Linux e macOS | Soquete de domínio em `channel.sock`, dentro da pasta do conector. A pasta e o soquete só o dono lê e escreve, e o líder confere que o outro lado é o mesmo usuário. |
-| Windows | Canal nomeado, com o nome derivado do caminho da pasta. O líder exige ser a primeira instância e recusa cliente remoto. É plataforma só de desenvolvimento ([decisão 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). |
+| Linux and macOS | Domain socket at `channel.sock`, inside the connector's folder. Only the owner reads and writes the folder and the socket, and the leader checks that the other side is the same user. |
+| Windows | Named pipe, with the name derived from the path of the folder. The leader requires being the first instance and refuses a remote client. It is a development-only platform ([decision 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). |
 
-O líder só cria o soquete depois de pegar a trava, e apaga o que sobrou de um líder morto.
+The leader only creates the socket after taking the lock, and erases what was left of a dead leader.
 
-Cada mensagem é um objeto JSON numa linha, com `"v": 1`. Versão ou operação desconhecida recebe
+Each message is a JSON object on one line, with `"v": 1`. An unknown version or operation receives
 `{"ok":false,"error":"unsupported"}`.
 
-| De | Operação | Resposta |
+| From | Operation | Response |
 |---|---|---|
-| repassadora | `call`, com `id`, `tool`, `args` | `{"id":1,"ok":true,"content":{}}` ou `{"id":1,"ok":false,"code":"AR-..."}` |
-| repassadora | `tools` | A lista de ferramentas liberadas. |
-| repassadora | `watch` | A ligação fica aberta, e o líder manda uma linha a cada vez que a lista de ferramentas muda. |
-| `status` | `status` | A situação do aparelho e do canal, sem segredo. |
-| `join` | `new_request` | O líder passa a acompanhar o pedido novo. |
-| `leave` | `leave` | O líder pede o encerramento de cada identidade da pasta e devolve uma resposta por identidade. |
-| `join` | `restart` | O líder encerra, para o Hermes iniciá-lo de novo na versão nova. |
+| relay | `call`, with `id`, `tool`, `args` | `{"id":1,"ok":true,"content":{}}` or `{"id":1,"ok":false,"code":"AR-..."}` |
+| relay | `tools` | The list of released tools. |
+| relay | `watch` | The connection stays open, and the leader sends a line each time the list of tools changes. |
+| `status` | `status` | The situation of the device and of the channel, with no secret. |
+| `join` | `new_request` | The leader starts following the new request. |
+| `leave` | `leave` | The leader asks for the closing of each identity of the folder and returns one response per identity. |
+| `join` | `restart` | The leader ends, for Hermes to start it again in the new version. |
 
-Nenhuma operação do soquete devolve a identidade ou a credencial. No modo blindado, `leave` e
-`restart` ficam fora do alcance da LLM.
+No operation of the socket returns the identity or the credential. In shielded mode, `leave` and
+`restart` stay out of the LLM's reach.
 
-## 12. Limites conhecidos e o que falta provar
+## 12. Known limits and what is left to prove
 
-Pontos que a revisão levantou e que pedem mudança no [04](04-seguranca-conexao.md). Ficam aqui até
-quem mantém o projeto aprovar a redação:
+Points the review raised and that ask for a change in [04](04-seguranca-conexao.md). They stay here
+until the maintainer approves the wording:
 
-| Ponto | Onde entraria |
+| Point | Where it would go |
 |---|---|
-| O teste de 3 segundos da conexão antiga pode falhar durante uma transferência grande em rede lenta: a resposta espera atrás do que já está na fila de envio do sistema. A conexão antiga é dada por morta e a nova entra, com o alerta de conexão tomada. | C9, como limite. |
-| Um lacre válido, de resumo desconhecido e geração já conhecida, é tratado como reuso (quarentena). Também pode ser sinal de restauração. Guardar o resumo de toda credencial emitida distinguiria os dois. | C7 e C11. |
-| As recusas de inscrição são registradas agregadas, uma linha por origem, organização, código e minuto, e não uma por tentativa. No hub isso vale para toda recusa, inclusive o AR-102 repetido; o C3 fala em "registro na auditoria" a cada recusa. A contagem do minuto em que o hub para se perde. | C3. |
-| A regra que usaria a data de emissão do lacre continua em aberto. | C11. |
-| A primeira reconexão é "na hora". Uma espera sorteada de poucos segundos aliviaria a volta em massa depois de o hub reiniciar; hoje quem alivia é o teto de conexões sem sessão. | C9. |
-| O texto ainda fala em "cópia contínua do banco de controle", do desenho com dois arquivos. | C11. |
+| The 3-second test of the old connection may fail during a large transfer on a slow network: the response waits behind what is already in the system's send queue. The old connection is taken for dead and the new one comes in, with the alert of taken connection. | C9, as a limit. |
+| A valid seal, of unknown digest and already known generation, is treated as reuse (quarantine). It may also be a sign of restoration. Keeping the digest of every credential issued would tell the two apart. | C7 and C11. |
+| The enrollment refusals are recorded aggregated, one row per origin, organization, code and minute, and not one per attempt. In the hub this holds for every refusal, including the repeated AR-102; C3 speaks of a "record in the audit" at each refusal. The count of the minute in which the hub stops is lost. | C3. |
+| The rule that would use the date of issue of the seal is still open. | C11. |
+| The first reconnection is "immediate". A random wait of a few seconds would ease the mass return after the hub restarts; today what eases it is the ceiling of connections without a session. | C9. |
+| The text still speaks of a "continuous backup of the control database", from the design with two files. | C11. |
 
-Pontos que vieram do código do hub (etapas 2 e 2b, 11/11/2026). Cada um diz o que mudaria no 04 e
-por quê; até a aprovação, o 04 continua valendo como está:
+Points that came from the hub's code (stages 2 and 2b, 11/11/2026). Each one says what would change
+in 04 and why; until the approval, 04 still holds as it is:
 
-| Ponto | Onde entraria |
+| Point | Where it would go |
 |---|---|
-| **Conector antigo demais.** O C8 diz que ele "recebe AR-401 e nada mais". Pela decisão 0030, já decidida, o hub primeiro faz a apresentação sem troca (seção 5.3) e só depois manda AR-401. O hub faz assim. O C8 passaria a descrever essa ordem. | C8, e seção 6, item 3. |
-| **`leave` de conector novo demais.** O C8 aceita o `leave` "em qualquer versão". O hub responde AR-402 ao conector novo demais, também no `leave`, porque não existe `hello_ok` válido para uma faixa toda acima da do hub. O C8 passaria a dizer "em qualquer versão abaixo da máxima do hub". | C8. |
-| **A recusa AR-710 não relê o estado do aparelho.** O C8 manda conferir o estado "em toda chamada". O hub relê em toda chamada que roda, antes de qualquer outra conferência; a 33ª chamada em andamento é recusada sem tocar o banco. Reler ali faria cada recusa disputar o conjunto de conexões com as 32 chamadas em andamento e quebraria o teto. A varredura fecha em até 2 segundos o aparelho que deixou de servir. Ou o C8 passa a dizer "em toda chamada que roda", ou o hub passa a reler também na recusa: decisão de quem mantém. | C8. |
-| **O resumo do convite também é apagado ao cancelar.** O 04 manda apagá-lo quando o convite vence. O hub apaga também quando o convite é cancelado: por convite novo, por revogar ou pelo modo restaurado. Um resumo guardado sem uso só serve a quem lê o banco. | C1 e seção 4. |
-| **Em qual gravação o aprovado vira ativo.** O 04 não diz. No hub, quando um aprovado volta apresentando a pendente, a promoção em T1 já é a primeira confirmação, e o aparelho passa a ativo ali; a sessão só começa depois do "gravei" da credencial seguinte. | C5 e C7. |
-| **A ordem entre prova e prazo.** O 04 não fixa. O hub olha a prova de restauração antes de aplicar um prazo vencido, para o prazo não esconder a prova. | C7 e C11. |
+| **Connector that is too old.** C8 says that it "receives AR-401 and nothing else". By decision 0030, already decided, the hub first does the presentation without swap (section 5.3) and only then sends AR-401. The hub does it this way. C8 would come to describe this order. | C8, and section 6, item 3. |
+| **`leave` of a connector that is too new.** C8 accepts the `leave` "in any version". The hub answers AR-402 to the connector that is too new, also in the `leave`, because there is no valid `hello_ok` for a range entirely above the hub's. C8 would come to say "in any version below the hub's maximum". | C8. |
+| **The AR-710 refusal does not reread the state of the device.** C8 requires checking the state "on every call". The hub rereads on every call that runs, before any other check; the 33rd call in progress is refused without touching the database. Rereading there would make each refusal compete for the pool of connections with the 32 calls in progress and would break the ceiling. The sweep closes within 2 seconds the device that no longer serves. Either C8 comes to say "on every call that runs", or the hub comes to reread on the refusal too: a decision of the maintainer. | C8. |
+| **The digest of the invite is also erased on cancelling.** 04 requires erasing it when the invite expires. The hub also erases it when the invite is cancelled: by a new invite, by revoking or by the restored mode. A digest kept without use only serves whoever reads the database. | C1 and section 4. |
+| **In which write the approved one becomes active.** 04 does not say. In the hub, when an approved one comes back presenting the pending one, the promotion in T1 is already the first confirmation, and the device becomes active there; the session only starts after the "saved" of the following credential. | C5 and C7. |
+| **The order between proof and deadline.** 04 does not fix it. The hub looks at the proof of restoration before applying an expired deadline, so that the deadline does not hide the proof. | C7 and C11. |
 
-A provar no MVP, pela suíte: a troca com quedas, atrasos e repetições sorteados; a resposta atrasada
-de uma tentativa abandonada; o revogar entre a credencial e o "gravei"; os limites de antes da sessão;
-a mensagem cortada em pedaços; e o soquete local nos dois sistemas. A lista única continua em
-[12-roteiro.md](12-roteiro.md).
+To be proved in the MVP, by the suite: the swap with random drops, delays and repetitions; the late
+response of an abandoned attempt; the revoking between the credential and the "saved"; the limits of
+before the session; the message cut into chunks; and the local socket on both systems. The single
+list is still in [12-roteiro.md](12-roteiro.md).
 
-**Andamento, 11/11/2026.** Do lado do hub, a suíte já tem teste para a troca com quedas sorteadas dos
-dois lados (com e sem cópia dos arquivos), a resposta atrasada de uma tentativa abandonada, o revogar
-entre a credencial e o "gravei", os limites de antes da sessão e a mensagem cortada em pedaços. Os
-testes rodam contra um conector de teste, não contra o conector do projeto, que ainda não existe, e
-só em Windows. Falta tudo do lado do conector, inclusive o soquete local.
+**Progress, 11/11/2026.** On the hub's side, the suite already has a test for the swap with random
+drops on both sides (with and without a copy of the files), the late response of an abandoned
+attempt, the revoking between the credential and the "saved", the limits of before the session and
+the message cut into chunks. The tests run against a test connector, not against the project's
+connector, which does not exist yet, and only on Windows. Everything is missing on the connector's
+side, including the local socket.
 
-**Limites conhecidos do hub, 11/11/2026:**
+**Known limits of the hub, 11/11/2026:**
 
-- Antes dos cabeçalhos, as conexões TCP não têm teto: só o prazo de 5 segundos as limita.
-- O hub dos testes não teve um proxy de verdade na frente; a leitura do endereço encaminhado foi
-  testada com um proxy confiável na própria máquina.
-- O registro das conexões e a conferência da troca de 24 horas não têm índice por aparelho: cada
-  aviso percorre todas as conexões. O custo não foi medido além de 500 conectores.
-- A tentativa abandonada é coberta por um teste dirigido e pelas rodadas sorteadas; a janela entre a
-  última conferência e o início de T1 não tem teste que a force.
+- Before the headers, the TCP connections have no ceiling: only the 5-second deadline limits them.
+- The hub of the tests did not have a real proxy in front of it; the reading of the forwarded
+  address was tested with a trusted proxy on the machine itself.
+- The registry of the connections and the check of the 24-hour swap have no index per device: each
+  notice goes through all the connections. The cost was not measured beyond 500 connectors.
+- The abandoned attempt is covered by a directed test and by the randomized rounds; the window
+  between the last check and the start of T1 has no test that forces it.
 
-## 13. Pontos em aberto
+## 13. Open points
 
-O código escolheu uma leitura onde o texto diverge dele, ou onde a escolha não é melhora clara. Ficam
-aqui as duas leituras, até quem mantém o projeto decidir.
+The code chose a reading where the text diverges from it, or where the choice is not a clear
+improvement. The two readings stay here, until the maintainer decides.
 
-| Ponto | Leitura do texto | Leitura do código |
+| Point | Reading of the text | Reading of the code |
 |---|---|---|
-| **Desconhecido com o modo restaurado ligado.** | A tabela da seção 6: um desconhecido com lacre válido é prova de restauração, a não ser que já esteja listado. Com o modo ligado, isso recomeçaria o modo. | Com o modo ligado, o desconhecido é listado e não é prova. Pelo C11, só três coisas recomeçam o modo, e o desconhecido não está entre elas. Evita recomeçar o modo a cada aparelho da linha do tempo perdida. O custo: uma segunda restauração por imagem, feita com o modo ligado, não é percebida por um aparelho que o banco não conhece. Uma saída seria usar a hora de início do modo para separar os dois casos. |
-| **Desconhecido de novo depois do expurgo.** | A lista de aparelhos desconhecidos tem guarda de 90 dias ([15](15-mvp.md), seção 2, regra 11). | Depois do expurgo, a mesma identidade volta a ser "listada agora" e, com o modo desligado, vira prova outra vez. É o mesmo ponto em aberto do C11: falta como distinguir a sobra da linha do tempo perdida de uma restauração nova. Hoje o expurgo ainda não existe no hub. |
+| **Unknown one with the restored mode on.** | The table of section 6: an unknown one with a valid seal is proof of restoration, unless it is already listed. With the mode on, this would restart the mode. | With the mode on, the unknown one is listed and is not proof. By C11, only three things restart the mode, and the unknown one is not among them. It avoids restarting the mode at each device of the lost timeline. The cost: a second restoration by image, done with the mode on, is not noticed through a device the database does not know. A way out would be to use the start time of the mode to separate the two cases. |
+| **Unknown one again after the purge.** | The list of unknown devices has a retention of 90 days ([15](15-mvp.md), section 2, rule 11). | After the purge, the same identity goes back to being "listed now" and, with the mode off, becomes proof again. It is the same open point of C11: what is missing is how to tell the leftover of the lost timeline from a new restoration. Today the purge does not exist in the hub yet. |

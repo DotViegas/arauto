@@ -1,234 +1,240 @@
-# 07 — Telas do painel
+# 07 — Screens of the panel
 
-**Estado: proposta.** O que cada tela mostra, o que se faz nela e como ela fica vazia ou com erro.
+**Status: proposal.** What each screen shows, what is done on it and how it looks empty or with an
+error.
 
-**No hub, em 13/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta): existem
-a T1, a T4 e a T6, de leitura, a faixa de alertas, e a T2 com a T3, num guia só, em janela sobre a
-lista: nome, bloco, código e pronto. Na T1 cada linha tem um botão (conectar, continuar ou
-reconectar); revogar, excluir e "pode ser acordado" ainda são só do comando. As outras telas e a
-passkey ainda são desenho. A T0 não existe: entra-se com um código de entrada, emitido por comando
-na máquina do hub. A sessão do painel já dura 12 horas, ou 30 minutos sem uso, e, enquanto a passkey
-não existe, é ela que autoriza as ações.
+**In the hub, on 13/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md), proposal):
+there are T1, T4 and T6, read-only, the alert banner, and T2 with T3, in a single guide, in a window
+over the list: name, block, code and done. In T1 each line has the buttons to connect, continue or
+reconnect, and the one to revoke, which asks first; delete and "can be woken" are still only in the
+command. In T6 each cell opens the access editor, in a window; choosing the chats of the scope
+"only chosen chats" is still only in the command. The other screens and the passkey are still
+design. T0 does not exist: one gets in with an entry code, issued by a command
+on the hub's machine. The panel session already lasts 12 hours, or 30 minutes without use, and,
+while the passkey does not exist, it is the session that authorizes the actions.
 
-## Resumo
+## Summary
 
 ```
-Menu:  Hermes · WhatsApps · Acessos · Auditoria · Configurações
+Menu:  Hermes · WhatsApps · Accesses · Audit · Settings
 
-T0 Primeiro acesso      criar o primeiro admin e apontar o motor
-T1 Hermes               a lista, com o estado de cada um
-T2 Conectar Hermes      o bloco e a espera
-T3 Confirmar conexão    digitar o código de conferência
-T4 WhatsApps            a lista de números
-T5 Parear WhatsApp      código de pareamento ou QR
-T6 Acessos              a matriz Hermes x número
-T7 Auditoria            o que aconteceu, sem conteúdo de mensagem
-T8 Admins               quem tem login no painel (em Configurações)
+T0 First access         create the first admin and point to the engine
+T1 Hermes               the list, with the state of each one
+T2 Connect Hermes       the block and the wait
+T3 Confirm connection   type the verification code
+T4 WhatsApps            the list of numbers
+T5 Pair WhatsApp        pairing code or QR
+T6 Accesses             the Hermes x number matrix
+T7 Audit                what happened, with no message content
+T8 Admins               who has a login in the panel (in Settings)
 ```
 
-## Regras que valem para todas as telas
+## Rules that apply to all screens
 
-| Regra | Motivo |
+| Rule | Reason |
 |---|---|
-| **O painel é a fonte da verdade, não a fala da LLM.** Cada etapa acende por um fato que o hub observou. | Um Hermes pode dizer "feito" sem ter feito. |
-| **Todo texto vindo de aparelho ou do WhatsApp é tratado como hostil**: validado na entrada, escapado na saída. | Nome de máquina, nome de contato e assunto de grupo são escritos por terceiros. |
-| **O painel diz o limite da proteção.** Cada Hermes mostra "Proteção básica: a LLM alcança o arquivo da credencial" ou "Proteção blindada". | No modo rápido a LLM alcança o arquivo da credencial. |
-| **Toda ação que muda algo pede a passkey na hora.** Com a sessão do painel, sozinha, só se vê. | Uma sessão roubada do navegador não pode bastar para agir. |
-| **Convite, QR e código de pareamento aparecem uma vez** e nunca entram em registro. | São segredos de curta duração. |
-| **O painel lista o que passa pelo hub.** Outros dispositivos conectados ao mesmo número só aparecem no celular. | O hub não enxerga o que não passa por ele. |
+| **The panel is the source of truth, not what the LLM says.** Each step lights up by a fact the hub observed. | A Hermes may say "done" without having done it. |
+| **Every text coming from a device or from WhatsApp is treated as hostile**: validated on the way in, escaped on the way out. | Machine name, contact name and group subject are written by third parties. |
+| **The panel states the limit of the protection.** Each Hermes shows "Basic protection: the LLM reaches the credential file" or "Shielded protection". | In quick mode the LLM reaches the credential file. |
+| **Every action that changes something asks for the passkey on the spot.** With the panel session, alone, one only sees. | A session stolen from the browser cannot be enough to act. |
+| **Invite, QR and pairing code appear once** and never go into a log. | They are short-lived secrets. |
+| **The panel lists what goes through the hub.** Other linked devices on the same number only appear on the phone. | The hub does not see what does not go through it. |
 
-Previsto, com o meio ainda por definir ([decisoes/0025](decisoes/0025-aviso-por-fora-do-painel.md)):
-toda aprovação e toda concessão avisarem o admin por fora do painel.
+Planned, with the means still to be defined ([decisoes/0025](decisoes/0025-aviso-por-fora-do-painel.md)):
+every approval and every grant notifying the admin outside the panel.
 
-Acima do menu há uma faixa de alertas, visível em qualquer tela: outro aparelho tentou usar um
-convite, identidade copiada antes da aprovação, Hermes em quarentena, conexão tomada por outra,
-encerramento pedido pelo aparelho, reuso depois do encerramento, três trocas sem confirmação em 24
-horas, rede ou país novo, pedido aguardando código, motor indisponível, configuração do motor
-corrigida pelo hub, número desconectado, hub restaurado de cópia.
+Above the menu there is an alert banner, visible on any screen: another device tried to use an
+invite, identity copied before the approval, Hermes in quarantine, connection taken by another,
+closing requested by the device, reuse after the closing, three swaps without confirmation in 24
+hours, new network or country, request waiting for the code, engine unavailable, engine
+configuration corrected by the hub, number disconnected, hub restored from a backup.
 
-A sessão do painel dura 12 horas, ou 30 minutos sem uso. A tela de espera se atualiza sozinha, por
-consulta periódica ao hub.
+The panel session lasts 12 hours, or 30 minutes without use. The waiting screen updates by itself,
+by periodic query to the hub.
 
-## T0. Primeiro acesso
+## T0. First access
 
-- **Mostra:** três passos. (1) O código de instalação, que o hub mostra no registro do sistema na
-  primeira partida, e o cadastro da passkey do primeiro admin. (2) Os endereços do hub: o do painel e
-  o dos conectores, que vai em todo bloco. (3) O motor: endereço e chave da API, com botão "Testar".
-- **Regra:** sem o código de instalação ninguém cria o primeiro admin. Ele vale uma vez e por pouco
-  tempo. Criado o admin, o código deixa de valer; um novo só sai por comando no servidor, para
-  quando o único admin perde a passkey.
-- **Erros:** código de instalação errado; motor não responde, chave recusada ou versão não testada. O
-  passo 3 pode ficar para depois.
+- **Shows:** three steps. (1) The installation code, which the hub shows in the system log on the
+  first start, and the registration of the passkey of the first admin. (2) The addresses of the hub:
+  the panel's and the connectors', which goes in every block. (3) The engine: address and API key,
+  with a "Test" button.
+- **Rule:** without the installation code nobody creates the first admin. It is valid once and for a
+  short time. Once the admin is created, the code is no longer valid; a new one only comes out by a
+  command on the server, for when the only admin loses the passkey.
+- **Errors:** wrong installation code; engine does not answer, key refused or version not tested.
+  Step 3 may be left for later.
 
 ## T1. Hermes
 
-- **Mostra:** contadores ("5 conectados, 1 aguardando, 0 em alerta") e uma linha por Hermes: nome,
-  estado ([10](10-maquinas-de-estado.md), seção 3), números com acesso, se pode ser acordado, versão
-  do conector, visto por último.
-- **Ficha do Hermes:** o limite da proteção; endereço observado, atual e anterior; o que o aparelho
-  declarou, marcado como não verificado; data da conexão; avisos na fila; últimos eventos. Texto
-  fixo: "As ferramentas aparecem em todos os meios de conversa deste Hermes. Quem pode dar ordens a
-  ele pode usar os números concedidos."
-- **Ações:** Conectar Hermes; Acessos; Reconectar; Renomear; Revogar (pede o nome digitado);
-  Excluir (só sem convite emitido e sem aparelho pendente, aprovado, ativo, suspenso ou em
-  quarentena).
-- **Vazio:** "Nenhum Hermes conectado. Você cola um bloco no canal de comando do Hermes e digita aqui
-  o código de conferência que ele responder."
-- **Quarentena:** "O hub deixou de confiar na credencial de {nome}. Motivo: uma credencial já
-  trocada foi apresentada | duas conexões ao mesmo tempo | credencial ilegível | o último uso não
-  foi reconhecido no reconectar. O acesso está parado." Saídas: Reconectar ou Revogar. Não existe "liberar".
-- **Conexão tomada:** "A conexão de {nome} foi tomada por outra, vinda de {endereço}." Aparece
-  sempre que o hub dá por morta uma sessão que estava servindo e outra entra no lugar.
-- **Encerrado pelo próprio aparelho:** "{nome} pediu o próprio encerramento, de {endereço}. Último
-  uso: {data e hora}, de {endereço}."
-- **Reuso depois do encerramento:** para aparelho revogado, substituído ou vencido por inatividade
-  que apresenta uma credencial antiga: "Uma cópia de {nome} foi usada antes do encerramento."
-- **Hub restaurado:** uma faixa em todas as telas: "O hub voltou de uma cópia de {data}. O que foi
-  aprovado, revogado, reconectado ou mudado nos acessos depois disso se perdeu. Reconecte cada Hermes
-  e confira os acessos e a lista de admins." Os Hermes com aparelho ativo aparecem como suspensos,
-  cada um com "Reconectar" e "Revogar". Não existe "reativar". Os aparelhos que apresentaram um
-  lacre válido que o banco não explica aparecem numa lista à parte, com hora, endereço e o que
-  declararam.
+- **Shows:** counters ("5 connected, 1 waiting, 0 in alert") and one line per Hermes: name,
+  state ([10](10-maquinas-de-estado.md), section 3), numbers with access, whether it can be woken,
+  connector version, last seen.
+- **Hermes card:** the limit of the protection; observed address, current and previous; what the
+  device declared, marked as not verified; date of the connection; notices in the queue; latest
+  events. Fixed text: "The tools appear on all of this Hermes's conversation platforms. Whoever can
+  give it orders can use the granted numbers."
+- **Actions:** Connect Hermes; Accesses; Reconnect; Rename; Revoke (asks for the name typed);
+  Delete (only with no invite issued and no device pending, approved, active, suspended or in
+  quarantine).
+- **Empty:** "No Hermes connected. You paste a block into Hermes's command channel and type here
+  the verification code it answers."
+- **Quarantine:** "The hub no longer trusts the credential of {name}. Reason: a credential already
+  swapped was presented | two connections at the same time | unreadable credential | the last use
+  was not recognized on reconnecting. The access is stopped." Ways out: Reconnect or Revoke. There
+  is no "release".
+- **Connection taken:** "The connection of {name} was taken by another, coming from {address}." It
+  appears whenever the hub takes for dead a session that was serving and another comes in its place.
+- **Closed by the device itself:** "{name} asked for its own closing, from {address}. Last
+  use: {date and time}, from {address}."
+- **Reuse after the closing:** for a device that was revoked, replaced or expired by inactivity
+  and that presents an old credential: "A copy of {name} was used before the closing."
+- **Hub restored:** a banner on all screens: "The hub came back from a backup of {date}. What was
+  approved, revoked, reconnected or changed in the accesses after that was lost. Reconnect each
+  Hermes and check the accesses and the list of admins." The Hermes with an active device appear as
+  suspended, each one with "Reconnect" and "Revoke". There is no "reactivate". The devices that
+  presented a valid seal the database does not explain appear in a separate list, with time, address
+  and what they declared.
 
-## T2. Conectar Hermes
+## T2. Connect Hermes
 
 ```
-Conectar Hermes: Ana                  O convite vale por mais 14:32 · uso único
+Connect Hermes: Ana                   The invite is valid for 14:32 more · single use
 ┌──────────────────────────────────────────────────────────────────┐
-│ (o bloco, somente leitura)                                         │
+│ (the block, read-only)                                             │
 └──────────────────────────────────────────────────────────────────┘
-[ Copiar bloco ]    O que este bloco faz?    Cancelar convite
+[ Copy block ]    What does this block do?    Cancel invite
 
-1. Cole no canal de comando do Hermes "Ana". Em nenhum outro lugar.
-2. Ele vai responder um código de conferência de 6 dígitos. Volte aqui.
+1. Paste it into the command channel of Hermes "Ana". Nowhere else.
+2. It will answer a 6-digit verification code. Come back here.
 
-[x] Convite emitido               14:02:11
-[ ] Um aparelho usou o convite    aguardando...
-[ ] Conector no ar
-[ ] Código confirmado por você
-[ ] Primeira credencial confirmada
+[x] Invite issued                 14:02:11
+[ ] A device used the invite      waiting...
+[ ] Connector up
+[ ] Code confirmed by you
+[ ] First credential confirmed
 ```
 
-- **As etapas:** "Conector no ar" acende na primeira conexão de canal do aparelho, em espera ou já
-  na troca. Ela e a do código acendem em qualquer ordem.
-- **Nome:** único, 3 a 32 caracteres, só letras, números, espaço e hífen. Nome curto e sem símbolos
-  reduz o que ele consegue carregar para dentro do bloco.
-- **O bloco só existe nesta tela e nesta aba.** O hub não guarda o convite. Recarregar mostra "O
-  convite vale por mais mm:ss, mas o bloco não pode ser exibido de novo".
-- **Não existe "enviar por e-mail" nem "enviar pelo WhatsApp".** Um bloco que chegasse ao Hermes por
-  um número do hub chegaria como dado, e deve ser recusado.
-- **Se o Hermes pedir aprovação para rodar o comando,** quem aprova é você, no canal de comando.
-- **Ajuda por tempo:** 90 segundos sem inscrição abrem "Nada chegou ainda", com as três causas: o
-  Hermes está esperando a sua aprovação; o Hermes não alcança o hub; o bloco foi colado em outro
-  lugar.
+- **The steps:** "Connector up" lights up on the first channel connection of the device, waiting or
+  already in the swap. It and the one for the code light up in any order.
+- **Name:** unique, 3 to 32 characters, only letters, numbers, space and hyphen. A short name with no
+  symbols reduces what it manages to carry into the block.
+- **The block only exists on this screen and in this tab.** The hub does not keep the invite.
+  Reloading shows "The invite is valid for mm:ss more, but the block cannot be shown again".
+- **There is no "send by e-mail" or "send by WhatsApp".** A block that reached Hermes through
+  a number of the hub would arrive as data, and must be refused.
+- **If Hermes asks for approval to run the command,** the one who approves is you, in the command
+  channel.
+- **Timed help:** 90 seconds without an enrollment open "Nothing has arrived yet", with the three
+  causes: Hermes is waiting for your approval; Hermes does not reach the hub; the block was pasted
+  somewhere else.
 
-## T3. Confirmar conexão
+## T3. Confirm connection
 
 ```
-Um aparelho usou o convite de "Ana"                   confirme em 09:41
+A device used the invite of "Ana"                     confirm within 09:41
 
-Visto pelo hub        endereço 203.0.113.7 · 14:03:02
-Dito pelo aparelho    máquina hermes-ana · conector 1.0.0 · Hermes 0.22.5
-                      (o aparelho pode mentir aqui; o que decide é o código)
+Seen by the hub       address 203.0.113.7 · 14:03:02
+Said by the device    machine hermes-ana · connector 1.0.0 · Hermes 0.22.5
+                      (the device may lie here; what decides is the code)
 
-Digite o código de conferência que o Hermes respondeu no canal de comando:
+Type the verification code Hermes answered in the command channel:
         [ _ _ _ ] - [ _ _ _ ]
 
-[ Aprovar ]      [ Negar ]      Não recebi código nenhum
+[ Approve ]      [ Deny ]      I received no code at all
 ```
 
-- **O painel não exibe o código de conferência.**
-- **Aprovar** só com o código certo, e pede a passkey.
-- **"Não recebi código nenhum":** "Se o Hermes não respondeu um código, não aprove. Se ele respondeu
-  AR-102, outro aparelho usou o convite: negue e gere outro."
-- **Estados:** código errado ("tentativa 2 de 5"); prazo de 10 minutos esgotado; outro aparelho
-  tentou o mesmo convite (alerta, e o pedido atual continua valendo); o Hermes rodou o comando de
-  novo ("vale o último código que ele respondeu").
-- **No reconectar,** antes do código: "Último uso do aparelho atual: {data e hora}, do endereço
-  {endereço}. Você reconhece?" Se o Hermes esteve desligado e houve uso, alguém usou uma cópia.
-  "Não reconheço" gera o alerta de cópia, põe o aparelho antigo em quarentena se ele estava ativo
-  (suspenso ou em quarentena, fica como está), mostra as chamadas dele desde então e deixa a
-  aprovação seguir.
-- **Depois de aprovar:** "Ana foi aprovado. Assim que o conector confirmar, aparece como conectado."
-  Numa primeira conexão, segue "Ele ainda não tem acesso a número nenhum", com o botão "Dar acesso".
-  Num reconectar, segue "Os acessos que Ana já tinha voltam a valer para este aparelho", com o botão
-  "Ver acessos".
+- **The panel does not display the verification code.**
+- **Approve** only with the right code, and it asks for the passkey.
+- **"I received no code at all":** "If Hermes did not answer a code, do not approve. If it answered
+  AR-102, another device used the invite: deny and generate another."
+- **States:** wrong code ("attempt 2 of 5"); 10-minute deadline run out; another device
+  tried the same invite (alert, and the current request stays valid); Hermes ran the command
+  again ("the last code it answered is the one that counts").
+- **On reconnecting,** before the code: "Last use of the current device: {date and time}, from
+  address {address}. Do you recognize it?" If Hermes was off and there was use, someone used a copy.
+  "I do not recognize it" raises the copy alert, puts the old device in quarantine if it was active
+  (suspended or in quarantine, it stays as it is), shows its calls since then and lets the
+  approval go on.
+- **After approving:** "Ana was approved. As soon as the connector confirms, it appears as
+  connected." On a first connection, it is followed by "It has no access to any number yet", with
+  the button "Give access". On a reconnect, it is followed by "The accesses Ana already had are
+  valid again for this device", with the button "See accesses".
 
 ## T4. WhatsApps
 
-- **Mostra:** uma linha por número: apelido, número pareado, estado, se é "de comando", Hermes com
-  acesso, hora da última mensagem recebida (sem conteúdo).
-- **Ações:** Adicionar; Parear de novo; Reiniciar a sessão do motor; Desconectar do WhatsApp; Marcar
-  como "de comando"; Remover (pergunta o destino do arquivo de mensagens: manter por 30 dias ou
-  apagar agora). Desconectar e Remover pedem o apelido digitado, além da passkey.
-- **Primeiro número:** aceite registrado na auditoria: "O motor é um cliente não oficial do
-  WhatsApp. O WhatsApp pode bloquear o número. Use números que você pode perder."
-- **Erros:** "Motor indisponível: o hub não fala com o motor desde HH:MM. Os Hermes continuam
-  conectados e leem o que já está no arquivo de mensagens; não enviam nem recebem mensagens novas.";
-  "Desconectado: o dispositivo conectado foi removido no celular"; "Este número envia, mas o hub não
-  está recebendo as mensagens dele",
-  com o botão Reconfigurar.
+- **Shows:** one line per number: alias, paired number, state, whether it is "command", Hermes with
+  access, time of the last message received (no content).
+- **Actions:** Add; Pair again; Restart the engine session; Disconnect from WhatsApp; Mark
+  as "command"; Remove (asks the destination of the message archive: keep for 30 days or
+  erase now). Disconnect and Remove ask for the alias typed, besides the passkey.
+- **First number:** acceptance recorded in the audit: "The engine is an unofficial WhatsApp
+  client. WhatsApp may block the number. Use numbers you can afford to lose."
+- **Errors:** "Engine unavailable: the hub has not talked to the engine since HH:MM. The Hermes stay
+  connected and read what is already in the message archive; they do not send or receive new
+  messages."; "Disconnected: the linked device was removed on the phone"; "This number sends, but
+  the hub is not receiving its messages",
+  with the Reconfigure button.
 
-## T5. Parear WhatsApp
+## T5. Pair WhatsApp
 
-- **Passo 1:** apelido e número com código do país.
-- **Passo 2:** código de pareamento (com o caminho no celular e a validade) ou QR (que se renova
-  sozinho).
-- **Passo 3:** "Pareado: +00 00 00000-0000." Se o número pareado for outro: "O celular que pareou é
-  de um número diferente do informado. Manter este | Desfazer." Enquanto o admin não decide, o estado
-  é "número trocado" e os acessos ficam parados.
+- **Step 1:** alias and number with country code.
+- **Step 2:** pairing code (with the path on the phone and the validity) or QR (which renews
+  itself).
+- **Step 3:** "Paired: +00 00 00000-0000." If the paired number is another one: "The phone that
+  paired belongs to a number different from the one given. Keep this one | Undo." While the admin
+  does not decide, the state is "number swapped" and the accesses stay stopped.
 
-## T6. Acessos
+## T6. Accesses
 
-Nas linhas ficam os Hermes; nas colunas, os números.
+The Hermes are in the rows; the numbers, in the columns.
 
 ```
-Acessos           [ por Hermes | por número ]          filtro: ________
+Accesses          [ by Hermes | by number ]            filter: ________
 
-                  Balcão            Compras           Portaria
+                  Counter           Purchasing        Front desk
                   +00 ..0001        +00 ..0002        +00 ..0003
-Hermes Ana        L E - A  todas    - - - -           L E - A  todas
-Hermes Bento      L - - -  3 conv.  L E M A  todas    - - - -
-Hermes Antigo     em quarentena (acessos preservados)
+Hermes Ana        R S - W  all      - - - -           R S - W  all
+Hermes Bento      R - - -  3 chats  R S M W  all      - - - -
+Hermes Old        in quarantine (accesses preserved)
 
-L ler · E enviar · M modificar · A ser acordado
-(!) Balcão: 2 Hermes são acordados nas mesmas conversas
+R read · S send · M modify · W be woken
+(!) Counter: 2 Hermes are woken in the same chats
 ```
 
-- **Célula:** escopo (todas | somente conversas escolhidas), os quatro verbos, "pode iniciar
-  conversa", linhas de conversa. A tela escreve a frase resultante: "O Hermes Bento pode ler em 3
-  conversas do número Balcão. Não envia, não modifica e não é acordado."
-- **Salvar** vale na chamada seguinte, sem reiniciar nada.
-- **Avisos que não bloqueiam:** dois Hermes acordados ou enviando nas mesmas conversas; linha de
-  conversa restritiva sob o escopo "todas"; **enviar** concedido num número marcado como "de
-  comando".
-- **Vazios:** "Conecte um Hermes primeiro"; "Adicione um WhatsApp primeiro"; "Ninguém tem acesso a
-  nada. Clique numa célula para conceder."
+- **Cell:** scope (all | only chosen chats), the four verbs, "may start
+  chats", chat lines. The screen writes the resulting sentence: "Hermes Bento may read in 3
+  chats of the number Counter. It does not send, does not modify and is not woken."
+- **Save** applies on the next call, without restarting anything.
+- **Warnings that do not block:** two Hermes woken or sending in the same chats; a restrictive chat
+  line under the scope "all"; **send** granted on a number marked as "command".
+- **Empty:** "Connect a Hermes first"; "Add a WhatsApp first"; "Nobody has access to
+  anything. Click a cell to grant."
 
-## T7. Auditoria
+## T7. Audit
 
-- **Mostra:** linha do tempo, da mais recente para a mais antiga: quando, quem (admin, Hermes,
-  sistema), o quê, onde (Hermes, número, conversa), resultado, código AR, endereço.
-- **Eventos:** convite emitido, usado, vencido, cancelado e recusado (AR-101); tentativa de outro
-  aparelho; código de
-  conferência certo e errado; aprovação e negação; conexão aberta e fechada; credencial trocada;
-  conexão que terminou sem confirmar a troca; conexão tomada por outra; quarentena; revogação;
-  encerramento pedido pelo aparelho; reuso depois do encerramento; uso não reconhecido;
-  duas conexões em espera com a mesma identidade; rede ou país novo; aparelho substituído; acesso
-  alterado, com antes e depois; login; admin adicionado e removido; passkey criada e removida;
-  número adicionado, pareado,
-  removido; chamada de ferramenta; negação por falta de verbo; aviso confirmado, expirado e
-  descartado; configuração do motor corrigida pelo hub; hub restaurado de cópia; aparelho suspenso;
-  aparelho desconhecido com lacre válido.
-- **Nunca contém:** conteúdo de mensagem, convite, credencial, QR, código de pareamento.
-- **Ações:** filtrar, abrir o detalhe, exportar (pede a passkey). Não há editar nem apagar.
+- **Shows:** timeline, from the most recent to the oldest: when, who (admin, Hermes,
+  system), what, where (Hermes, number, chat), result, AR code, address.
+- **Events:** invite issued, used, expired, cancelled and refused (AR-101); attempt by another
+  device; verification code right and wrong; approval and denial; connection opened and closed;
+  credential swapped;
+  connection that ended without confirming the swap; connection taken by another; quarantine;
+  revocation; closing requested by the device; reuse after the closing; use not recognized;
+  two waiting connections with the same identity; new network or country; device replaced; access
+  changed, with before and after; login; admin added and removed; passkey created and removed;
+  number added, paired,
+  removed; tool call; denial for lack of a verb; notice confirmed, expired and
+  discarded; engine configuration corrected by the hub; hub restored from a backup; device
+  suspended; unknown device with a valid seal.
+- **Never contains:** message content, invite, credential, QR, pairing code.
+- **Actions:** filter, open the detail, export (asks for the passkey). There is no edit or delete.
 
 ## T8. Admins
 
-Fica em Configurações.
+It is in Settings.
 
-- **Mostra:** os admins e as passkeys de cada um, com a data de criação e a do último uso.
-- **Ações:** adicionar admin (o novo cadastra a própria passkey), remover admin, remover passkey.
-  Todas pedem a passkey de quem faz. O último admin não pode ser removido.
-- **Depois de o hub voltar de uma cópia,** a faixa manda conferir esta lista: um admin removido
-  depois da cópia volta a aparecer aqui.
+- **Shows:** the admins and the passkeys of each one, with the date of creation and that of the last
+  use.
+- **Actions:** add admin (the new one registers their own passkey), remove admin, remove passkey.
+  All ask for the passkey of whoever does it. The last admin cannot be removed.
+- **After the hub comes back from a backup,** the banner tells to check this list: an admin removed
+  after the backup appears here again.

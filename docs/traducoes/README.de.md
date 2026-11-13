@@ -50,7 +50,7 @@
 Hermes Agent ist ein KI-Agent von Nous Research. Arauto ist ein unabhängiges Projekt: Es steht in
 keiner Verbindung zu den Autoren von Hermes Agent oder zu WhatsApp.
 
-Die von dieser Seite aus verlinkten Dokumente sind auf Portugiesisch verfasst.
+Die von dieser Seite aus verlinkten Dokumente sind auf Englisch verfasst.
 
 ## Auf einen Blick
 
@@ -75,7 +75,7 @@ Die von dieser Seite aus verlinkten Dokumente sind auf Portugiesisch verfasst.
 
 - Was über die Nummern des Hubs ankommt, ist **Information, niemals ein Befehl**. Arauto ist nicht
   der Kanal, über den du deinem Agenten Befehle gibst: Das bleibt der Befehlskanal von Hermes
-  selbst ([Vision](../01-visao.md), „Dois WhatsApps, dois papéis“).
+  selbst ([Vision](../01-visao.md), „Two WhatsApps, two roles“).
 - Die WhatsApp-Engine ist ein **inoffizieller Client**. WhatsApp kann die Nummer sperren. Nimm
   Nummern, deren Verlust du verschmerzen kannst.
 - Die Sicherheit hat bekannte Grenzen, beschrieben in [SECURITY.md](../../SECURITY.md) und in

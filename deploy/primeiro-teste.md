@@ -1,217 +1,223 @@
-# Roteiro do primeiro teste num servidor
+# Walkthrough of the first test on a server
 
-Para quem instala o Arauto pela primeira vez com um Hermes de verdade e um motor de WhatsApp de
-verdade. Cada passo diz o que fazer e o que tem de acontecer. Onde o resultado for outro, **pare e
-anote**: o que saiu na tela, o registro do hub e a hora.
+For whoever installs Arauto for the first time with a real Hermes and a real WhatsApp engine. Each
+step says what to do and what has to happen. Where the result is another, **stop and write it
+down**: what came out on the screen, the log of the hub and the time.
 
-O guia de instalação é o [docker/README.md](docker/README.md); este roteiro segue a mesma ordem e
-acrescenta as conferências.
+The installation guide is the [docker/README.md](docker/README.md); this walkthrough follows the
+same order and adds the checks.
 
 ```
- FASE 0  antes de começar          FASE 5  o número de WhatsApp
- FASE 1  subir o hub               FASE 6  acordar o Hermes
- FASE 2  o proxy                   FASE 7  recados entre dois Hermes
- FASE 3  o primeiro Hermes         FASE 8  o que não pode acontecer
- FASE 4  o motor de WhatsApp       FASE 9  quedas, cópia e fechamento
+ PHASE 0  before starting          PHASE 5  the WhatsApp number
+ PHASE 1  start the hub            PHASE 6  wake Hermes
+ PHASE 2  the proxy                PHASE 7  notes between two Hermes
+ PHASE 3  the first Hermes         PHASE 8  what cannot happen
+ PHASE 4  the WhatsApp engine      PHASE 9  outages, backup and closing
 ```
 
-Nos comandos, `dc` é `docker compose --env-file arauto.env`, e `adm` é
+In the commands, `dc` is `docker compose --env-file arauto.env`, and `adm` is
 `dc exec hub arauto-hub admin`.
 
-## O que este teste precisa responder
+## What this test needs to answer
 
-Cinco coisas nunca rodaram fora dos testes automáticos. Elas são a razão do teste, e cada uma tem
-um passo marcado com **[PROVA]**.
+Five things never ran outside the automatic tests. They are the reason for the test, and each one
+has a step marked with **[PROOF]**.
 
-| # | O que nunca foi provado | Passo |
+| # | What was never proven | Step |
 |---|---|---|
-| 1 | A imagem constrói e a composição sobe. | 1.2 a 1.5 |
-| 2 | O conector para Linux roda na máquina do Hermes e fala `wss://` (TLS). | 3.2 e 3.3 |
-| 3 | O `join` registra o conector no Hermes, e o Hermes o inicia. | 3.4 a 3.6 |
-| 4 | O hub fala com o WAHA de verdade: parear, receber e enviar. | 4 e 5 |
-| 5 | O conector acorda o Hermes pela API local. | 6 |
+| 1 | The image builds and the composition starts. | 1.2 to 1.5 |
+| 2 | The connector for Linux runs on Hermes's machine and speaks `wss://` (TLS). | 3.2 and 3.3 |
+| 3 | The `join` registers the connector in Hermes, and Hermes starts it. | 3.4 to 3.6 |
+| 4 | The hub talks to the real WAHA: pair, receive and send. | 4 and 5 |
+| 5 | The connector wakes Hermes through the local API. | 6 |
 
-## Fase 0: antes de começar
+## Phase 0: before starting
 
-- [ ] **0.1** Servidor Linux x86_64 com Docker e Compose; um nome de domínio apontando para ele; um
-  proxy com TLS e certificado de autoridade pública (autoassinado não serve: o conector recusa).
-- [ ] **0.2** Na máquina do Hermes, como o usuário do Hermes: `uname -m` responde `x86_64`;
-  `ldd --version` mostra glibc 2.36 ou mais nova; `which hermes` responde um caminho. Anote os três.
-  Se `which hermes` não responder, você vai precisar de `ARAUTO_HERMES_BIN` no passo 3.3.
-- [ ] **0.3** Os relógios do servidor, da máquina do Hermes e do motor estão certos (NTP). O hub
-  recusa evento do motor com hora fora da janela.
-- [ ] **0.4** Um número de WhatsApp de teste, que possa ser desconectado e reconectado, e um segundo
-  celular para mandar mensagens a ele. Nunca um número de uso real.
+- [ ] **0.1** Linux x86_64 server with Docker and Compose; a domain name pointing to it; a proxy
+  with TLS and a certificate from a public authority (self-signed will not do: the connector
+  refuses).
+- [ ] **0.2** On Hermes's machine, as Hermes's user: `uname -m` answers `x86_64`;
+  `ldd --version` shows glibc 2.36 or newer; `which hermes` answers a path. Write down the three.
+  If `which hermes` does not answer, you will need `ARAUTO_HERMES_BIN` in step 3.3.
+- [ ] **0.3** The clocks of the server, of Hermes's machine and of the engine are right (NTP). The
+  hub refuses an event of the engine with a time outside the window.
+- [ ] **0.4** A test WhatsApp number, which can be disconnected and reconnected, and a second
+  phone to send messages to it. Never a number in real use.
 
-## Fase 1: subir o hub
+## Phase 1: start the hub
 
-- [ ] **1.1** `cp arauto.env.example arauto.env` e preencher. Senha do banco só em hexadecimal
-  (`openssl rand -hex 32`): ela vai dentro de um endereço, e `@`, `/`, `#` ou `%` quebram a conexão.
-  `git status` não mostra o `arauto.env`.
-- [ ] **1.2 [PROVA]** `dc build` termina sem erro. Anote o tempo. É a primeira vez que a imagem é
-  construída, e a primeira vez que o conector é compilado com TLS.
-- [ ] **1.3** De propósito, `dc up -d` **antes** do `init`. Esperado: o hub fica reiniciando, e
-  `dc logs hub` diz que o banco não está instalado e manda rodar o `init`. Nada é criado.
-- [ ] **1.4** `dc run --rm hub init`. Esperado: "The hub is installed." e a chave pública do hub.
-  Rodar de novo: "already installed", com a mesma chave.
-- [ ] **1.5 [PROVA]** `dc up -d` e `dc ps`. Esperado: `hub` como `healthy` em até um minuto.
-  `dc logs hub` mostra "the hub is up" com os dois endereços.
-- [ ] **1.6** `adm status`. Esperado: banco atual, marca consistente, modo restaurado desligado.
-- [ ] **1.7** `dc exec hub ls /usr/share/arauto/download`. Esperado: só `arauto-connector-linux-x86_64`.
+- [ ] **1.1** `cp arauto.env.example arauto.env` and fill it in. Database password only in
+  hexadecimal (`openssl rand -hex 32`): it goes inside an address, and `@`, `/`, `#` or `%` break
+  the connection. `git status` does not show the `arauto.env`.
+- [ ] **1.2 [PROOF]** `dc build` ends without error. Write down the time. It is the first time the
+  image is built, and the first time the connector is compiled with TLS.
+- [ ] **1.3** On purpose, `dc up -d` **before** the `init`. Expected: the hub keeps restarting, and
+  `dc logs hub` says the database is not installed and says to run the `init`. Nothing is created.
+- [ ] **1.4** `dc run --rm hub init`. Expected: "The hub is installed." and the public key of the
+  hub. Running it again: "already installed", with the same key.
+- [ ] **1.5 [PROOF]** `dc up -d` and `dc ps`. Expected: `hub` as `healthy` within one minute.
+  `dc logs hub` shows "the hub is up" with the two addresses.
+- [ ] **1.6** `adm status`. Expected: database current, mark consistent, restored mode off.
+- [ ] **1.7** `dc exec hub ls /usr/share/arauto/download`. Expected: only `arauto-connector-linux-x86_64`.
 
-## Fase 2: o proxy
+## Phase 2: the proxy
 
-- [ ] **2.1** Configurar o proxy ([proxy/README.md](proxy/README.md)): só `/v1/channel` e
-  `/v1/download/` chegam ao hub; websocket; prazo de 120 segundos; o cabeçalho `X-Forwarded-For`
-  **substituído** pelo endereço de quem chegou.
-- [ ] **2.2** De fora do servidor: `curl -I https://SEU-ENDERECO/` responde 404; as portas 8443,
-  8444 e 8445 não respondem direto; `curl -I https://SEU-ENDERECO/sign-in` responde 404.
-- [ ] **2.3** `curl -fsSLO https://SEU-ENDERECO/v1/download/arauto-connector-linux-x86_64` baixa o
-  arquivo. Guarde o `sha256sum` dele para o passo 3.1.
-- [ ] **2.4** `dc logs hub` **não** tem a linha "a connection that is not from a trusted proxy
-  brought X-Forwarded-For". Se tiver, o endereço que ela mostra é o que falta em
-  `ARAUTO_TRUSTED_PROXIES`: acerte, `dc up -d` e repita o 2.3.
+- [ ] **2.1** Configure the proxy ([proxy/README.md](proxy/README.md)): only `/v1/channel` and
+  `/v1/download/` reach the hub; websocket; timeout of 120 seconds; the header `X-Forwarded-For`
+  **replaced** by the address of whoever arrived.
+- [ ] **2.2** From outside the server: `curl -I https://YOUR-ADDRESS/` answers 404; ports 8443,
+  8444 and 8445 do not answer directly; `curl -I https://YOUR-ADDRESS/sign-in` answers 404.
+- [ ] **2.3** `curl -fsSLO https://YOUR-ADDRESS/v1/download/arauto-connector-linux-x86_64` downloads
+  the file. Keep its `sha256sum` for step 3.1.
+- [ ] **2.4** `dc logs hub` does **not** have the line "a connection that is not from a trusted
+  proxy brought X-Forwarded-For". If it does, the address it shows is the one missing in
+  `ARAUTO_TRUSTED_PROXIES`: fix it, `dc up -d` and repeat 2.3.
 
-## Fase 3: o primeiro Hermes
+## Phase 3: the first Hermes
 
-- [ ] **3.1** `adm hermes add atendimento` e `adm invite atendimento`. Esperado: o bloco com o
-  endereço do hub (`wss://...`), a chave do hub, o convite, **uma** linha `connector:`, o `sha256:`
-  igual ao do passo 2.3, e um comando só, encadeado. O convite é segredo: não o cole em relatório.
-- [ ] **3.2 [PROVA]** Na máquina do Hermes, como o usuário do Hermes, antes de colar o bloco:
-  baixe o arquivo à mão e rode `./arauto-connector-linux-x86_64 --version`. Esperado: a versão.
-  Erro de GLIBC ou "not found" quer dizer que o programa não serve para essa máquina: pare.
-- [ ] **3.3 [PROVA]** Cole o comando encadeado do bloco (pelo canal de comando do Hermes, ou no
-  terminal do usuário dele). Esperado: o arquivo baixa, o resumo confere, e o `join` mostra
-  "VERIFICATION CODE: NNN-NNN". É a primeira conexão `wss://` de verdade. Se sair `AR-601`, veja a
-  tabela do guia; o pedido continua aberto.
-- [ ] **3.4 [PROVA]** `hermes mcp list` mostra a entrada `arauto`, com o programa
-  `~/.arauto/arauto-connector` e o argumento `mcp`, sem nenhum segredo. Anote o texto exato da
-  entrada.
-- [ ] **3.5** No servidor: `adm approve atendimento NNN-NNN`. Depois `adm hermes list`. Esperado:
-  aprovado e, em até um minuto, ativo.
-- [ ] **3.6 [PROVA]** Na máquina do Hermes: `~/.arauto/arauto-connector status`. Esperado: canal em
-  sessão, nenhum segredo na tela. No Hermes, a ferramenta `arauto_status` aparece e responde.
-- [ ] **3.7** `ls -la ~/.arauto ~/.arauto/devices/*`. Esperado: pastas só do dono (700) e os
-  arquivos `identity.key`, `credential.seal` e `hub.json` só do dono (600).
-- [ ] **3.8** `adm audit --tail 20`. Esperado: a conexão do Hermes aparece com o endereço **de
-  fora** da máquina dele, nunca `172.x` nem o do proxy.
+- [ ] **3.1** `adm hermes add atendimento` and `adm invite atendimento`. Expected: the block with
+  the address of the hub (`wss://...`), the hub key, the invite, **one** line `connector:`, the
+  `sha256:` equal to that of step 2.3, and one command only, chained. The invite is a secret: do
+  not paste it in a report.
+- [ ] **3.2 [PROOF]** On Hermes's machine, as Hermes's user, before pasting the block: download
+  the file by hand and run `./arauto-connector-linux-x86_64 --version`. Expected: the version.
+  A GLIBC error or "not found" means the program does not work on that machine: stop.
+- [ ] **3.3 [PROOF]** Paste the chained command of the block (through Hermes's command channel, or
+  in the terminal of its user). Expected: the file downloads, the digest matches, and the `join`
+  shows "VERIFICATION CODE: NNN-NNN". It is the first real `wss://` connection. If `AR-601` comes
+  out, see the table of the guide; the request remains open.
+- [ ] **3.4 [PROOF]** `hermes mcp list` shows the entry `arauto`, with the program
+  `~/.arauto/arauto-connector` and the argument `mcp`, with no secret at all. Write down the exact
+  text of the entry.
+- [ ] **3.5** On the server: `adm approve atendimento NNN-NNN`. Then `adm hermes list`. Expected:
+  approved and, within one minute, active.
+- [ ] **3.6 [PROOF]** On Hermes's machine: `~/.arauto/arauto-connector status`. Expected: channel in
+  session, no secret on the screen. In Hermes, the tool `arauto_status` appears and answers.
+- [ ] **3.7** `ls -la ~/.arauto ~/.arauto/devices/*`. Expected: folders of the owner only (700) and
+  the files `identity.key`, `credential.seal` and `hub.json` of the owner only (600).
+- [ ] **3.8** `adm audit --tail 20`. Expected: the connection of the Hermes appears with the
+  **outside** address of its machine, never `172.x` or that of the proxy.
 
-## Fase 4: o motor de WhatsApp
+## Phase 4: the WhatsApp engine
 
-- [ ] **4.1** Subir o WAHA na rede `arauto-engine`, **sem porta pública**. Anote a versão.
+- [ ] **4.1** Start WAHA on the network `arauto-engine`, **with no public port**. Write down the
+  version.
 - [ ] **4.2** `docker run --rm --network arauto-engine curlimages/curl -s http://hub:8444/health`
-  responde `ok`. Sem isso as mensagens chegam com minutos de atraso e nada acusa.
-- [ ] **4.3** `adm engine set --url http://waha:3000 --events-url http://hub:8444`, depois
-  `dc exec -it hub arauto-hub admin engine set-key` e colar a chave da API do motor.
-- [ ] **4.4 [PROVA]** `adm engine health` e `adm engine version`. Esperado: saudável, e a versão.
-  Se a versão não for uma das conferidas, o hub avisa e cria um alerta: seguir é um risco sabido.
-- [ ] **4.5** Mandar um evento sem assinatura ao hub, de dentro da rede do motor. Esperado: recusa,
-  e `dc logs hub` mostra "an event of the engine was refused" com o motivo.
+  answers `ok`. Without this the messages arrive minutes late and nothing reports it.
+- [ ] **4.3** `adm engine set --url http://waha:3000 --events-url http://hub:8444`, then
+  `dc exec -it hub arauto-hub admin engine set-key` and paste the API key of the engine.
+- [ ] **4.4 [PROOF]** `adm engine health` and `adm engine version`. Expected: healthy, and the
+  version. If the version is not one of the checked ones, the hub warns and creates an alert:
+  going on is a known risk.
+- [ ] **4.5** Send an event without a signature to the hub, from inside the network of the engine.
+  Expected: refusal, and `dc logs hub` shows "an event of the engine was refused" with the reason.
 
-## Fase 5: o número de WhatsApp
+## Phase 5: the WhatsApp number
 
-- [ ] **5.1** `adm number add balcao +55DDDNUMERO`. Esperado: adicionado, sem parear, com a sessão
-  já criada no motor.
-- [ ] **5.2 [PROVA]** Antes de parear, guarde a resposta crua de `GET /api/sessions/NOME` do WAHA.
-  Depois, `dc exec -it hub arauto-hub admin number pair balcao` num terminal de fundo escuro com
-  80 colunas por 40 linhas. Esperado: o QR aparece; ao escanear, "is connected". Se o QR não ler,
-  repita com `--code`.
-- [ ] **5.3** Logo depois, `adm number list`. Esperado: `connected`. Se a tela disser "another
-  telephone" com o telefone certo, **não rode `number confirm`**: rode `adm number unpair balcao --erase-engine-history`, guarde a
-  resposta crua da sessão (o campo `me`) e pare este número. O hub espera `me.id` como
-  `digitos@c.us`.
-- [ ] **5.4 [PROVA]** `adm wake atendimento on` e
-  `adm access grant atendimento balcao --scope all --read --send --wake`. Pelo Hermes:
-  `whatsapp_list_chats` e `whatsapp_read_chat`. Esperado: as conversas e as mensagens do número.
-- [ ] **5.5 [PROVA]** Pelo Hermes, `whatsapp_send_text` para o segundo celular. Esperado: a
-  mensagem chega **uma vez**, e a resposta traz `message_id`. Anote quanto demorou.
-- [ ] **5.6 [PROVA]** Do segundo celular, mande uma mensagem ao número. No banco, conte as
-  conversas dessa pessoa (`SELECT id, hidden_id FROM chat`). Esperado: **uma** conversa. Se
-  aparecerem duas, ou uma com `hidden_id` verdadeiro, o motor nomeia a mesma pessoa de dois
-  jeitos: anote. Nesse caso um acesso que tenha linhas de conversa não lê nem é acordado por essa
-  conversa até ela ganhar uma linha própria, e o registro do hub não acusa erro.
+- [ ] **5.1** `adm number add balcao +55DDDNUMERO`. Expected: added, not paired, with the session
+  already created in the engine.
+- [ ] **5.2 [PROOF]** Before pairing, keep the raw answer of `GET /api/sessions/NAME` of WAHA.
+  Then, `dc exec -it hub arauto-hub admin number pair balcao` in a terminal with a dark background
+  with 80 columns by 40 lines. Expected: the QR appears; on scanning, "is connected". If the QR
+  does not read, repeat with `--code`.
+- [ ] **5.3** Right after, `adm number list`. Expected: `connected`. If the screen says "another
+  telephone" with the right phone, **do not run `number confirm`**: run `adm number unpair balcao --erase-engine-history`, keep the
+  raw answer of the session (the field `me`) and stop this number. The hub expects `me.id` as
+  `digits@c.us`.
+- [ ] **5.4 [PROOF]** `adm wake atendimento on` and
+  `adm access grant atendimento balcao --scope all --read --send --wake`. Through Hermes:
+  `whatsapp_list_chats` and `whatsapp_read_chat`. Expected: the chats and the messages of the
+  number.
+- [ ] **5.5 [PROOF]** Through Hermes, `whatsapp_send_text` to the second phone. Expected: the
+  message arrives **once**, and the answer brings `message_id`. Write down how long it took.
+- [ ] **5.6 [PROOF]** From the second phone, send a message to the number. In the database, count
+  the chats of that person (`SELECT id, hidden_id FROM chat`). Expected: **one** chat. If two
+  appear, or one with `hidden_id` true, the engine names the same person in two ways: write it
+  down. In that case an access that has chat lines does not read and is not woken by that chat
+  until it gains a line of its own, and the log of the hub reports no error.
 
-## Fase 6: acordar o Hermes
+## Phase 6: wake Hermes
 
-- [ ] **6.1** Sem mexer em nada: `~/.arauto/arauto-connector status`. Esperado: "Waking allowed by
-  the admin: yes" e "Key of the local API of Hermes: not configured". Mande uma mensagem do segundo
-  celular. Esperado: o Hermes **não** acorda. É a linha de base.
-- [ ] **6.2 [PROVA]** Ponha na entrada `arauto` do Hermes as variáveis `ARAUTO_HERMES_API_KEY` e
-  `ARAUTO_HERMES_API_URL` (com o número da máquina, como `http://127.0.0.1:8642/v1/runs`) e reinicie
-  o servidor de ferramentas. `status` passa a dizer "configured". Anote **como** a chave ficou na
-  entrada: em claro ou por referência a uma variável do Hermes.
-- [ ] **6.3 [PROVA]** Mande **uma** mensagem do segundo celular. Esperado: cerca de 6 segundos
-  depois, o Hermes inicia uma execução e lê a mensagem pela ferramenta. Se não acordar, guarde o
-  que a API do Hermes respondeu: o formato da chamada é a suposição que este passo prova.
-- [ ] **6.4** Mande 4 mensagens seguidas, com 2 segundos entre elas. Esperado: **uma** execução, com
-  as quatro, cerca de 6 segundos depois da última.
-- [ ] **6.5** Mande uma mensagem **pelo celular pareado** (o próprio número). Esperado: não acorda.
-- [ ] **6.6** Num grupo em que o número está: mensagem de um participante. Esperado: não acorda.
-  Depois `adm access chat atendimento balcao ID-DO-GRUPO --read --wake` e repita: acorda.
-- [ ] **6.7** Reinicie o conector depois de uma execução. Esperado: o Hermes não é acordado de novo
-  pela mesma mensagem.
+- [ ] **6.1** Without touching anything: `~/.arauto/arauto-connector status`. Expected: "Waking
+  allowed by the admin: yes" and "Key of the local API of Hermes: not configured". Send a message
+  from the second phone. Expected: Hermes does **not** wake. It is the baseline.
+- [ ] **6.2 [PROOF]** Put in the entry `arauto` of Hermes the variables `ARAUTO_HERMES_API_KEY` and
+  `ARAUTO_HERMES_API_URL` (with the number of the machine, like `http://127.0.0.1:8642/v1/runs`)
+  and restart the tool server. `status` now says "configured". Write down **how** the key ended up
+  in the entry: in the clear or by reference to a variable of Hermes.
+- [ ] **6.3 [PROOF]** Send **one** message from the second phone. Expected: about 6 seconds later,
+  Hermes starts a run and reads the message through the tool. If it does not wake, keep what the
+  API of Hermes answered: the format of the call is the assumption this step proves.
+- [ ] **6.4** Send 4 messages in a row, with 2 seconds between them. Expected: **one** run, with
+  the four, about 6 seconds after the last.
+- [ ] **6.5** Send a message **from the paired phone** (the number itself). Expected: it does not
+  wake.
+- [ ] **6.6** In a group the number is in: a message from a participant. Expected: it does not wake.
+  Then `adm access chat atendimento balcao GROUP-ID --read --wake` and repeat: it wakes.
+- [ ] **6.7** Restart the connector after a run. Expected: Hermes is not woken again by the same
+  message.
 
-## Fase 7: recados entre dois Hermes
+## Phase 7: notes between two Hermes
 
-- [ ] **7.1** Um segundo Hermes, `financeiro`, pelos passos 3.1 a 3.6. Antes de qualquer ligação,
-  nenhum dos dois tem ferramentas `hermes_`.
-- [ ] **7.2** `adm link add atendimento financeiro --wake --both`. Esperado: o aviso de risco na
-  tela, e os dois Hermes passam a ter as quatro ferramentas sem reiniciar nada.
-- [ ] **7.3** `atendimento` chama `hermes_send_message` para `financeiro`. Esperado: `financeiro`
-  acorda (se tiver a chave), lista o fio com um não lido, lê e responde no mesmo fio.
-- [ ] **7.4** `adm link remove atendimento financeiro --both`, com um recado ainda não lido. Esperado:
-  `financeiro` não lê mais esse recado; `atendimento` recebe `AR-707` ao mandar outro.
+- [ ] **7.1** A second Hermes, `financeiro`, through steps 3.1 to 3.6. Before any link, neither of
+  the two has `hermes_` tools.
+- [ ] **7.2** `adm link add atendimento financeiro --wake --both`. Expected: the risk warning on
+  the screen, and the two Hermes now have the four tools without restarting anything.
+- [ ] **7.3** `atendimento` calls `hermes_send_message` to `financeiro`. Expected: `financeiro`
+  wakes (if it has the key), lists the thread with one unread, reads and answers in the same
+  thread.
+- [ ] **7.4** `adm link remove atendimento financeiro --both`, with a note still unread. Expected:
+  `financeiro` no longer reads that note; `atendimento` receives `AR-707` on sending another.
 
-## Fase 8: o que não pode acontecer
+## Phase 8: what cannot happen
 
-- [ ] **8.1** Antes do passo 7.4, um Hermes pede um fio por um identificador inventado. Esperado:
-  `AR-708`. Com um terceiro Hermes à mão, ele pede o fio dos outros dois pelo identificador certo:
-  a mesma resposta.
-- [ ] **8.2** `adm access chat atendimento balcao +55...` sem verbos (bloquear uma pessoa) e essa
-  pessoa manda mensagem. Esperado: o Hermes não acorda e a leitura dessa conversa responde `AR-705`.
-  Depois, `adm access chat-remove atendimento balcao +55...` desfaz o bloqueio.
-- [ ] **8.3** 21 `whatsapp_send_text` em um minuto na conversa de teste. Esperado: a 21ª recusada
-  com `AR-704` e o tempo de espera.
-- [ ] **8.4** `adm access remove atendimento balcao` com o Hermes em sessão. Esperado: a chamada
-  seguinte de leitura responde `AR-701`, e a lista de ferramentas perde as de WhatsApp. Conceda o
-  acesso de novo (passo 5.4) antes de seguir.
-- [ ] **8.5** `adm revoke financeiro` com esse Hermes em sessão. Esperado: o canal dele cai em menos
-  de 5 segundos, e as ferramentas passam a responder o código do aparelho encerrado. O `atendimento`
-  segue ligado, para a fase 9.
-- [ ] **8.6** `dc logs hub` de todo o teste: nenhuma linha com a senha do banco, o convite, a chave
-  do motor ou o texto de uma mensagem.
+- [ ] **8.1** Before step 7.4, a Hermes asks for a thread by an invented identifier. Expected:
+  `AR-708`. With a third Hermes at hand, it asks for the thread of the other two by the right
+  identifier: the same answer.
+- [ ] **8.2** `adm access chat atendimento balcao +55...` without verbs (blocking a person) and that
+  person sends a message. Expected: Hermes does not wake and the read of that chat answers
+  `AR-705`. Then, `adm access chat-remove atendimento balcao +55...` undoes the block.
+- [ ] **8.3** 21 `whatsapp_send_text` in one minute in the test chat. Expected: the 21st refused
+  with `AR-704` and the waiting time.
+- [ ] **8.4** `adm access remove atendimento balcao` with the Hermes in session. Expected: the next
+  read call answers `AR-701`, and the list of tools loses the WhatsApp ones. Grant the access
+  again (step 5.4) before going on.
+- [ ] **8.5** `adm revoke financeiro` with that Hermes in session. Expected: its channel drops in
+  less than 5 seconds, and the tools start answering the code of the closed device. The
+  `atendimento` stays linked, for phase 9.
+- [ ] **8.6** `dc logs hub` of the whole test: no line with the password of the database, the
+  invite, the key of the engine or the text of a message.
 
-## Fase 9: quedas, cópia e fechamento
+## Phase 9: outages, backup and closing
 
-- [ ] **9.1** `time dc stop hub` com um Hermes conectado. Esperado: menos de 20 segundos, saída 0.
-  `dc up -d`: os Hermes voltam a ativo sozinhos.
-- [ ] **9.2 [PROVA]** Pare o hub por 6 minutos; nesse tempo mande 3 mensagens numa conversa e 3
-  noutra; suba o hub e mande mais uma na primeira logo em seguida. Esperado: o Hermes é acordado
-  pelas duas conversas, com todas as mensagens, em até 6 minutos.
-- [ ] **9.3** Reinicie a sessão do número no WAHA e mande 3 mensagens enquanto ela volta. Esperado:
-  o Hermes acorda uma vez, com as três, quando o número volta a conectado.
-- [ ] **9.4** Pare o WAHA logo depois de um `whatsapp_send_text` sair. Esperado: o Hermes recebe
-  `AR-713` (resultado desconhecido), nunca "motor indisponível", e não manda a mesma mensagem duas
-  vezes.
-- [ ] **9.5** Cópia: `dc exec postgres pg_dump -U arauto -Fc arauto > copia.dump`, e a cópia do
-  volume `arauto-data` para outro lugar, separada.
-- [ ] **9.6** Ensaio da pasta errada: pare o hub, suba-o com o volume `arauto-data` vazio. Esperado:
-  o hub **não sobe**, por falta da chave-mestra, e `adm status` (com a pasta certa de volta) mostra
-  o modo restaurado **desligado**.
-- [ ] **9.7** Ensaio de restauração, só se o resto passou: restaure a cópia do passo 9.5 por cima do
-  banco. Esperado: `adm status` mostra o modo restaurado, os Hermes param de ser atendidos, e cada
-  um volta com um convite novo. Confira os números e os acessos antes de emitir os convites.
-- [ ] **9.8** Fechamento: `adm alerts` sem alerta que você não saiba explicar; `adm audit --tail 50`
-  conta a história do teste.
+- [ ] **9.1** `time dc stop hub` with a Hermes connected. Expected: less than 20 seconds, exit 0.
+  `dc up -d`: the Hermes come back to active by themselves.
+- [ ] **9.2 [PROOF]** Stop the hub for 6 minutes; in that time send 3 messages in one chat and 3
+  in another; start the hub and send one more in the first right after. Expected: Hermes is woken
+  by the two chats, with all the messages, within 6 minutes.
+- [ ] **9.3** Restart the session of the number in WAHA and send 3 messages while it comes back.
+  Expected: Hermes wakes once, with the three, when the number comes back to connected.
+- [ ] **9.4** Stop WAHA right after a `whatsapp_send_text` goes out. Expected: Hermes receives
+  `AR-713` (unknown result), never "engine unavailable", and does not send the same message twice.
+- [ ] **9.5** Backup: `dc exec postgres pg_dump -U arauto -Fc arauto > backup.dump`, and the copy of
+  the volume `arauto-data` to another place, separate.
+- [ ] **9.6** Rehearsal of the wrong folder: stop the hub, start it with the volume `arauto-data`
+  empty. Expected: the hub **does not start**, for lack of the master key, and `adm status` (with
+  the right folder back) shows the restored mode **off**.
+- [ ] **9.7** Restoration rehearsal, only if the rest passed: restore the copy of step 9.5 over the
+  database. Expected: `adm status` shows the restored mode, the Hermes stop being served, and each
+  one comes back with a new invite. Check the numbers and the accesses before issuing the invites.
+- [ ] **9.8** Closing: `adm alerts` with no alert you cannot explain; `adm audit --tail 50` tells
+  the story of the test.
 
-## O que anotar, mesmo que tudo passe
+## What to write down, even if everything passes
 
-| O quê | Para quê |
+| What | What for |
 |---|---|
-| A versão do WAHA e a do Hermes | A lista de versões conferidas do projeto. |
-| O texto da entrada `arauto` no Hermes, com e sem as variáveis de acordar | O registro automático das variáveis ainda não existe. |
-| O que a API local do Hermes respondeu à chamada de acordar | O formato da chamada é suposição. |
-| A resposta crua da sessão do WAHA no primeiro "conectado" (o campo `me`) | O formato do telefone no pareamento. |
-| Se a mesma pessoa virou duas conversas (passo 5.6) | Decide a correção definitiva do identificador oculto. |
-| O tempo de cada envio (texto, imagem, documento) | O prazo de envio do hub é de 15 segundos. |
-| O tempo do `dc build` e a memória usada | O guia de instalação. |
+| The version of WAHA and that of Hermes | The list of checked versions of the project. |
+| The text of the entry `arauto` in Hermes, with and without the waking variables | The automatic registration of the variables does not exist yet. |
+| What the local API of Hermes answered to the waking call | The format of the call is an assumption. |
+| The raw answer of the WAHA session at the first "connected" (the field `me`) | The format of the phone in the pairing. |
+| Whether the same person became two chats (step 5.6) | It decides the definitive fix of the hidden identifier. |
+| The time of each send (text, image, document) | The send deadline of the hub is 15 seconds. |
+| The time of the `dc build` and the memory used | The installation guide. |

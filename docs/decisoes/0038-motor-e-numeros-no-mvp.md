@@ -1,81 +1,86 @@
-# 0038 — O motor e os números no primeiro MVP
+# 0038 — The engine and the numbers in the first MVP
 
-**Estado:** proposta · **Data:** 11/11/2026, com o código do motor e dos números no hub (M3, primeira
-parte)
+**Status:** proposal · **Date:** 11/11/2026, with the code of the engine and of the numbers in the
+hub (M3, first part)
 
-## Contexto
+## Context
 
-O [15-mvp.md](../15-mvp.md) pede, no M3, a interface do motor, o adaptador do WAHA, o motor falso,
-a caixa de entrada de eventos e os números. O [06-modelo-de-dados.md](../06-modelo-de-dados.md),
-seções 4 e 6, o [10-maquinas-de-estado.md](../10-maquinas-de-estado.md), seção 4, e as armadilhas
-de [waha-fatos](../../referencia/waha-fatos.md) dizem o que cada peça faz, mas deixam escolhas de
-código em aberto. Esta decisão registra as escolhas e as leituras feitas onde o texto é omisso ou
-diverge. Os formatos da API do WAHA estão em waha-fatos, seção "Os formatos que o hub usa", lidos
-na documentação pública do autor e ainda não conferidos contra um motor de verdade.
+The [15-mvp.md](../15-mvp.md) asks, in M3, for the engine interface, the WAHA adapter, the fake
+engine, the event inbox and the numbers. The [06-modelo-de-dados.md](../06-modelo-de-dados.md),
+sections 4 and 6, the [10-maquinas-de-estado.md](../10-maquinas-de-estado.md), section 4, and the
+pitfalls of [waha-fatos](../../referencia/waha-fatos.md) say what each piece does, but leave code
+choices open. This decision records the choices and the readings made where the text is silent or
+diverges. The formats of the WAHA API are in waha-fatos, section "The formats the hub uses", read
+in the author's public documentation and not yet checked against a real engine.
 
-## Decisão
+## Decision
 
-- **O cliente do motor é o HTTP/1.1 do `hyper`**, uma conexão por chamada, com prazo para abrir e
-  prazo para a chamada inteira, teto de tamanho conferido no tamanho declarado e de novo na leitura,
-  e o tipo de conteúdo conferido. O 15, seção 4, dizia `reqwest`; ele traria pacotes novos ao
-  `Cargo.lock`. Não há TLS até o motor: ele só fica na rede interna
-  ([0022](0022-motor-sem-porta-publica.md)).
-- **Um motor por organização** (`engine.organization_id` único). O endereço e o endereço dos
-  eventos ficam em claro; a chave da API e o segredo dos eventos ficam lacrados pela caixa preta,
-  com a chave-mestra, nas colunas `api_key_enc` e `events_secret_enc` (o 06 diz `_cifrado`; o código
-  já usava `_enc` desde a 0001). Mudar qualquer um aumenta `config_version`, e o hub refaz o cliente
-  e reaplica a configuração de cada sessão do motor.
-- **O segredo dos eventos é sorteado pelo hub** (32 bytes) e nunca mostrado: o hub o põe ele mesmo
-  na configuração de cada sessão do motor, como o texto hexadecimal. A assinatura é HMAC-SHA-512 do
-  corpo cru, em hexadecimal, no `X-Webhook-Hmac`, conferida em tempo constante. Trocar o segredo é
-  `admin engine new-events-secret`; a supervisão leva o novo a todas as sessões.
-- **A caixa de entrada** é `POST /v1/engine/{motor}/events`, só na porta interna. O motor nomeado
-  no endereço é a entrada da organização "pelo segredo de eventos do motor" (15, seção 2, regra 2):
-  nada da organização é usado antes de a assinatura conferir, e motor desconhecido recebe a mesma
-  resposta que assinatura errada. Ordem: tamanho declarado, tipo de conteúdo, corpo lido com teto e
-  prazo, assinatura, formato estrito, janela de 12 horas, gravação. O evento é gravado antes da
-  resposta.
-- **Um evento é uma linha.** Uma mensagem é identificada pelo identificador dela, não pelo do
-  evento: a mesma mensagem vinda pela caixa e pela busca da partida é uma linha só. Os outros tipos,
-  pelo identificador do evento. A chave fica como resumo com chave da organização, e o corpo,
-  cifrado com a chave da organização. A janela de 12 horas fica abaixo do prazo de guarda do evento
-  tratado (1 dia): um evento gravado por alguém não volta a valer depois de expurgado.
-- **Telefones e identificadores de conversa são dado pessoal de terceiros.** O 06 lista `telefone`
-  como coluna comum; o hub o guarda cifrado, com um resumo com chave para achar o número, e faz o
-  mesmo com os identificadores de conversa (`chat_engine_id`) e com o nome mostrado da conversa.
-- **Os estados do número** são os do 10, seção 4. A leitura do código: o estado da sessão do motor
-  mais antigo que chega depois de um mais novo é ignorado (`status_at`); um pareamento tem prazo
-  (`pairing_until`, 3 minutos); "pareando" com uma conta que não é o telefone esperado, ou que o
-  motor não nomeia, vai a "número trocado".
-- **Remover e desfazer o pareamento sem arquivo de mensagens.** As armadilhas mandam importar o
-  histórico antes de sair do WhatsApp, e o arquivo de mensagens não está no MVP. Por isso o comando
-  exige uma de duas palavras: `--keep-in-engine` (a sessão é parada e fica no motor, com o
-  histórico; o número sai do hub) ou `--erase-engine-history` (sai do WhatsApp e o motor apaga o
-  histórico). Desfazer o pareamento de um número trocado exige a segunda.
-- **A auditoria de segurança** ganha, além da lista do 15, seção 2, regra 10: configurar o motor,
-  trocar a chave, trocar o segredo dos eventos, adicionar, remover e confirmar um número. São o que
-  muda quem pode o quê no WhatsApp. Pedir pareamento, a mudança de estado vinda do motor e a correção
-  de uma sessão pela supervisão não são.
-- **A supervisão**, na partida e a cada 5 minutos: confere a versão (alerta uma vez quando muda para
-  uma que não está na lista testada, hoje só `2026.10.1` com GOWS), cria ou corrige a sessão de cada
-  número (alerta quando corrige algo posto por fora), religa a sessão parada de número conectado,
-  encerra pareamento vencido e, para cada número conectado, busca no motor as mensagens das últimas
-  24 horas (no máximo 50 conversas e 100 mensagens por conversa) que a caixa não recebeu.
-- **O limite do WhatsApp** (um 429 do motor) é lido como AR-704. O 08 reserva o AR-704 para o teto
-  de envio do hub; as duas situações pedem ao Hermes a mesma coisa (esperar).
-- **O QR do pareamento** é desenhado no terminal da máquina do hub por um codificador escrito no
-  projeto (`admin/qr.rs`), sem dependência nova. O QR e o código aparecem uma vez e não são
-  guardados nem registrados.
+- **The engine client is the HTTP/1.1 of `hyper`**, one connection per call, with a deadline to
+  open and a deadline for the whole call, a size ceiling checked on the declared size and again on
+  the read, and the content type checked. The 15, section 4, said `reqwest`; it would bring new
+  packages to the `Cargo.lock`. There is no TLS up to the engine: it only stays on the internal
+  network ([0022](0022-motor-sem-porta-publica.md)).
+- **One engine per organization** (`engine.organization_id` unique). The address and the address of
+  the events stay in the clear; the API key and the events secret stay sealed by the vault, with
+  the master key, in the columns `api_key_enc` and `events_secret_enc` (the 06 says `_cifrado`; the
+  code already used `_enc` since 0001). Changing any of them increases `config_version`, and the
+  hub rebuilds the client and reapplies the configuration of each engine session.
+- **The events secret is drawn by the hub** (32 bytes) and never shown: the hub itself puts it in
+  the configuration of each engine session, as the hexadecimal text. The signature is HMAC-SHA-512
+  of the raw body, in hexadecimal, in `X-Webhook-Hmac`, checked in constant time. Changing the
+  secret is `admin engine new-events-secret`; the supervision takes the new one to every session.
+- **The inbox** is `POST /v1/engine/{engine}/events`, only on the internal port. The engine named
+  in the address is the entry of the organization "by the events secret of the engine" (15,
+  section 2, rule 2): nothing of the organization is used before the signature checks, and an
+  unknown engine receives the same answer as a wrong signature. Order: declared size, content type,
+  body read with a ceiling and a deadline, signature, strict format, 12-hour window, write. The
+  event is written before the answer.
+- **An event is a row.** A message is identified by its own identifier, not by that of the event:
+  the same message coming through the inbox and through the startup fetch is one row only. The
+  other types, by the identifier of the event. The key stays as a keyed digest with the key of the
+  organization, and the body, encrypted with the key of the organization. The 12-hour window stays
+  below the retention period of the handled event (1 day): an event written by someone does not
+  become valid again after being purged.
+- **Phones and chat identifiers are personal data of third parties.** The 06 lists `telefone` as a
+  common column; the hub keeps it encrypted, with a keyed digest to find the number, and does the
+  same with the chat identifiers (`chat_engine_id`) and with the displayed name of the chat.
+- **The states of the number** are those of the 10, section 4. The reading of the code: an older
+  state of the engine session that arrives after a newer one is ignored (`status_at`); a pairing
+  has a deadline (`pairing_until`, 3 minutes); "pairing" with an account that is not the expected
+  phone, or that the engine does not name, goes to "number swapped".
+- **Removing and undoing the pairing without a message archive.** The pitfalls say to import the
+  history before leaving WhatsApp, and the message archive is not in the MVP. That is why the
+  command requires one of two words: `--keep-in-engine` (the session is stopped and stays in the
+  engine, with the history; the number leaves the hub) or `--erase-engine-history` (it leaves
+  WhatsApp and the engine erases the history). Undoing the pairing of a number swapped requires the
+  second.
+- **The security audit** gains, besides the list of the 15, section 2, rule 10: configuring the
+  engine, changing the key, changing the events secret, adding, removing and confirming a number.
+  They are what changes who can do what on WhatsApp. Asking for a pairing, the state change coming
+  from the engine and the correction of a session by the supervision are not.
+- **The supervision**, at startup and every 5 minutes: checks the version (alerts once when it
+  changes to one that is not in the tested list, today only `2026.10.1` with GOWS), creates or
+  corrects the session of each number (alerts when it corrects something put from outside),
+  restarts the stopped session of a connected number, closes an expired pairing and, for each
+  connected number, fetches from the engine the messages of the last 24 hours (at most 50 chats
+  and 100 messages per chat) that the inbox did not receive.
+- **The WhatsApp limit** (a 429 from the engine) is read as AR-704. The 08 reserves AR-704 for the
+  send ceiling of the hub; the two situations ask the same thing of Hermes (to wait).
+- **The pairing QR** is drawn in the terminal of the hub's machine by an encoder written in the
+  project (`admin/qr.rs`), with no new dependency. The QR and the code appear once and are neither
+  kept nor logged.
 
-## Consequências
+## Consequences
 
-- Os avisos de mensagem não nascem aqui: as linhas de `engine_event` de mensagem, reação, edição e
-  apagamento ficam com `processed_at` vazio para a fila de avisos. As de estado da sessão são
-  tratadas na mesma transação.
-- Sem o arquivo de mensagens, um número removido com `--keep-in-engine` deixa a sessão no motor,
-  com o histórico, até alguém decidir. O hub não a reaproveita: o nome da sessão nunca volta.
-- O formato da API do WAHA é o da documentação pública. Até o teste de contrato rodar contra um
-  motor de verdade, cada "a conferir" de waha-fatos é uma suposição, escrita na leitura mais segura.
-- Alternativas consideradas: o `reqwest`, pelo motivo acima; a assinatura conferida por um
-  cabeçalho fixo em vez do HMAC, que o motor documenta e que não prova o corpo; e o segredo dos
-  eventos digitado pelo admin, que faria um segredo duradouro passar por uma pessoa.
+- The message notices are not born here: the rows of `engine_event` for message, reaction, edit
+  and deletion stay with `processed_at` empty for the notice queue. Those of the session state are
+  handled in the same transaction.
+- Without the message archive, a number removed with `--keep-in-engine` leaves the session in the
+  engine, with the history, until someone decides. The hub does not reuse it: the name of the
+  session never comes back.
+- The format of the WAHA API is that of the public documentation. Until the contract test runs
+  against a real engine, each "to check" of waha-fatos is an assumption, written in the safest
+  reading.
+- Alternatives considered: `reqwest`, for the reason above; the signature checked by a fixed
+  header instead of the HMAC, which the engine documents and which does not prove the body; and the
+  events secret typed by the admin, which would make a long-lived secret pass through a person.

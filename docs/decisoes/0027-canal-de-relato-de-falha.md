@@ -1,17 +1,17 @@
-# 0027 — Canal para relato de falha
+# 0027 — Channel for reporting a flaw
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-Quem acha uma falha de segurança precisa de um caminho reservado para avisar. Uma issue pública entrega a falha a todos antes da correção.
+Whoever finds a security flaw needs a reserved path to report it. A public issue hands the flaw to everyone before the fix.
 
-## Decisão
+## Decision
 
-O canal é o relato privado de falha do GitHub, na aba de segurança do repositório. Não há caixa de e-mail para isso.
+The channel is GitHub's private vulnerability reporting, in the security tab of the repository. There is no e-mail inbox for this.
 
-## Consequências
+## Consequences
 
-- O repositório público fica no GitHub.
-- O canal passa a existir quando o repositório for aberto ([roteiro](../12-roteiro.md), Fase 7). O [SECURITY.md](../../SECURITY.md) aponta para ele.
-- Quem mantém precisa ligar o relato privado nas configurações do repositório e acompanhar os avisos.
+- The public repository stays on GitHub.
+- The channel comes into existence when the repository is opened ([roadmap](../12-roteiro.md), Phase 7). The [SECURITY.md](../../SECURITY.md) points to it.
+- The maintainer needs to turn on private reporting in the settings of the repository and follow the notifications.

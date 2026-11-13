@@ -1,17 +1,17 @@
-# 0010 — Identidade criada no aparelho
+# 0010 — Identity created on the device
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Se a credencial lacrada fosse a única coisa que identifica um Hermes, quem obtivesse a chave-mestra do hub numa cópia de segurança poderia criar credenciais e se passar por qualquer Hermes.
+If the sealed credential were the only thing that identifies a Hermes, whoever got the master key of the hub from a backup could create credentials and pass as any Hermes.
 
-## Decisão
+## Decision
 
-Além da credencial lacrada, o conector cria na própria máquina um par de chaves. A parte privada nunca sai dali. O hub exige as duas.
+Besides the sealed credential, the connector creates a key pair on its own machine. The private part never leaves it. The hub requires both.
 
-## Consequências
+## Consequences
 
-- Uma cópia roubada do hub não basta para se passar por um Hermes.
-- O hub guarda só a parte pública.
-- O caminho de quem usa não muda.
+- A stolen copy of the hub is not enough to pass as a Hermes.
+- The hub keeps only the public part.
+- The path of whoever uses it does not change.

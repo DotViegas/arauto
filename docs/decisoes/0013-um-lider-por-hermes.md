@@ -1,19 +1,19 @@
-# 0013 — Um líder por Hermes
+# 0013 — One leader per Hermes
 
-**Estado:** proposta, a validar no protótipo · **Data:** 09/11/2026
+**Status:** proposal, to be validated in the prototype · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-O Hermes pode iniciar mais de uma cópia do conector. Com uma credencial que troca a cada conexão, duas cópias disputando o canal trancariam uma à outra, e o hub veria conexões duplas de um Hermes saudável.
+Hermes may start more than one copy of the connector. With a credential that is swapped at each connection, two copies fighting over the channel would lock each other out, and the hub would see double connections from a healthy Hermes.
 
-## Decisão
+## Decision
 
-A primeira cópia a pegar uma trava de arquivo vira o líder: só ela abre o canal e troca a credencial. As outras são repassadoras: mandam as chamadas ao líder por um soquete local.
+The first copy to take a file lock becomes the leader: only it opens the channel and swaps the credential. The others are relays: they send the calls to the leader through a local socket.
 
-## Consequências
+## Consequences
 
-- Para o hub existe exatamente uma conexão por aparelho.
-- Conexão dupla volta a significar cópia.
-- Se o líder morre, o sistema solta a trava e outra cópia assume.
-- Outro processo local do mesmo usuário consegue usar o soquete: é o limite do modo rápido.
-- A pasta do conector não pode ser compartilhada entre dois Hermes, e o sistema de arquivos precisa suportar trava.
+- For the hub there is exactly one connection per device.
+- A double connection means a copy again.
+- If the leader dies, the system releases the lock and another copy takes over.
+- Another local process of the same user manages to use the socket: it is the limit of quick mode.
+- The connector's folder cannot be shared between two Hermes, and the file system needs to support locks.

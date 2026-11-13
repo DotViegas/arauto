@@ -1,17 +1,17 @@
-# 0022 — Motor sem porta pública, vigiado pelo hub
+# 0022 — Engine with no public port, watched by the hub
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-O motor tem a própria API e o próprio painel. Quem os alcança configura um destino extra para os eventos e copia todas as mensagens sem passar por convite, código ou acesso.
+The engine has its own API and its own panel. Whoever reaches them configures an extra destination for the events and copies every message without going through invite, code or access.
 
-## Decisão
+## Decision
 
-O motor fica só na rede interna, com chave própria da instalação. O hub confere a configuração de cada sessão do motor na partida e a cada 5 minutos; se achar um destino de eventos que não é o hub, corrige e alerta.
+The engine stays only on the internal network, with a key of its own for the installation. The hub checks the configuration of each engine session at start and every 5 minutes; if it finds an event destination that is not the hub, it corrects and alerts.
 
-## Consequências
+## Consequences
 
-- O painel do Arauto substitui o painel do motor.
-- O volume de sessões do motor fica fora da cópia de segurança comum: quem o tem, tem o WhatsApp.
-- Parear, reiniciar e remover números só pelo painel, por um admin.
+- The Arauto panel replaces the engine's panel.
+- The volume of the engine sessions stays out of the common backup: whoever has it has the WhatsApp.
+- Pairing, restarting and removing numbers only through the panel, by an admin.

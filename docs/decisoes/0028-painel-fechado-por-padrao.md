@@ -1,17 +1,17 @@
-# 0028 — Painel fechado por padrão; quem instala escolhe
+# 0028 — Panel closed by default; whoever installs chooses
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-A conta do admin é a raiz de tudo ([0019](0019-painel-com-passkey.md)). Um painel alcançável pela internet fica exposto a quem varre endereços. Mas há quem precise administrar de fora e não tenha rede privada.
+The admin's account is the root of everything ([0019](0019-painel-com-passkey.md)). A panel reachable from the internet is exposed to whoever scans addresses. But there are those who need to administer from outside and have no private network.
 
-## Decisão
+## Decision
 
-Quem instala escolhe. A instalação padrão vem com o painel fechado: ele só responde na rede privada ou por VPN. O guia de instalação mostra como abri-lo à internet, por conta de quem instala. A porta dos conectores é a única que precisa ser alcançável de fora.
+Whoever installs chooses. The default installation comes with the panel closed: it only answers on the private network or through a VPN. The installation guide shows how to open it to the internet, at the responsibility of whoever installs. The port of the connectors is the only one that needs to be reachable from outside.
 
-## Consequências
+## Consequences
 
-- Painel e conectores continuam em endereços separados ([03-arquitetura.md](../03-arquitetura.md), seção 4).
-- Aberto ou fechado, o painel exige a passkey em toda ação que muda algo e depende do TLS de quem instala.
-- O guia de instalação ([roteiro](../12-roteiro.md), Fase 7) diz o risco de abrir.
+- Panel and connectors stay at separate addresses ([03-arquitetura.md](../03-arquitetura.md), section 4).
+- Open or closed, the panel requires the passkey on every action that changes something and depends on the TLS of whoever installs.
+- The installation guide ([roadmap](../12-roteiro.md), Phase 7) states the risk of opening.

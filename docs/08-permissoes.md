@@ -1,131 +1,133 @@
-# 08 — Permissões
+# 08 — Permissions
 
-**Estado: proposta.** O que um Hermes pode fazer em cada número.
+**Status: proposal.** What a Hermes may do on each number.
 
-## Resumo
+## Summary
 
 ```
-L  LER            ver conversas e mensagens, buscar, baixar arquivo
-E  ENVIAR         escrever, reagir, marcar como lida e o que mais cria atividade nova
-M  MODIFICAR      editar e apagar o que já existe
-A  SER ACORDADO   o hub avisa o Hermes quando chega mensagem
+R  READ           see chats and messages, search, download a file
+S  SEND           write, react, mark as read and whatever else creates new activity
+M  MODIFY         edit and delete what already exists
+W  BE WOKEN       the hub notifies Hermes when a message arrives
 ```
 
-Três regras valem sempre:
+Three rules always apply:
 
-1. **Conectar não é permitir.** Todo Hermes nasce sem acesso a número nenhum.
-2. **Ausência é negação.** O que não foi marcado não existe para o Hermes.
-3. **Quem decide é o hub**, a cada chamada e a cada aviso. O conector não decide nada.
+1. **Connecting is not permitting.** Every Hermes is born with access to no number.
+2. **Absence is denial.** What was not marked does not exist for Hermes.
+3. **The hub is the one that decides**, on every call and on every notice. The connector decides
+   nothing.
 
-## 1. Os quatro verbos
+## 1. The four verbs
 
-| Verbo | Libera | Não libera |
+| Verb | Allows | Does not allow |
 |---|---|---|
-| **Ler** | Listar conversas, ler mensagens, buscar, baixar arquivo, ver participantes de grupo, ver dados públicos do contato, ver o estado do número. | Marcar como lida. |
-| **Enviar** | Texto, arquivo, resposta, reação, "digitando", marcar como lida, encaminhar e conferir se um telefone tem WhatsApp. | Iniciar conversa com quem nunca falou com o número, salvo com a opção "pode iniciar conversa". |
-| **Modificar** | Editar e apagar mensagem. | Perfil, privacidade e bloqueios da conta. |
-| **Ser acordado** | O hub avisa o Hermes quando chega mensagem numa conversa do escopo. | O conteúdo da mensagem dentro do aviso. |
+| **Read** | Listing chats, reading messages, searching, downloading a file, seeing group participants, seeing the public data of the contact, seeing the state of the number. | Marking as read. |
+| **Send** | Text, file, reply, reaction, "typing", marking as read, forwarding and checking whether a telephone has WhatsApp. | Starting a chat with someone who never talked to the number, except with the option "may start chats". |
+| **Modify** | Editing and deleting a message. | Profile, privacy and blocks of the account. |
+| **Be woken** | The hub notifies Hermes when a message arrives in a chat of the scope. | The content of the message inside the notice. |
 
-- Conferir se um telefone tem WhatsApp fica em **enviar** porque pergunta ao WhatsApp sobre alguém de
-  fora das conversas, e só faz sentido para quem vai escrever.
-- **Ser acordado** exige **ler** na mesma linha.
-- **Pode iniciar conversa** exige **enviar** e escopo "todas".
-- Não existe verbo que dê a um Hermes criar, parear, reiniciar, desconectar ou remover um número. Isso
-  é só do admin, no painel.
+- Checking whether a telephone has WhatsApp stays in **send** because it asks WhatsApp about someone
+  from outside the chats, and only makes sense for whoever is going to write.
+- **Be woken** requires **read** on the same line.
+- **May start chats** requires **send** and scope "all".
+- There is no verb that lets a Hermes create, pair, restart, disconnect or remove a number. That
+  belongs only to the admin, in the panel.
 
-## 2. Escopo e linha de conversa
+## 2. Scope and chat line
 
-| Escopo | Significado |
+| Scope | Meaning |
 |---|---|
-| **Todas as conversas** | Os verbos valem para toda conversa do número, inclusive as que surgirem. |
-| **Somente conversas escolhidas** | Só as conversas listadas existem para aquele Hermes. |
+| **All chats** | The verbs apply to every chat of the number, including the ones that come up. |
+| **Only chosen chats** | Only the listed chats exist for that Hermes. |
 
-Uma **linha de conversa**, quando existe, substitui por inteiro os verbos do número naquela conversa.
-Uma linha de conversa com os quatro verbos desligados equivale a bloquear.
+A **chat line**, when it exists, replaces entirely the verbs of the number in that chat.
+A chat line with the four verbs off is equivalent to blocking.
 
-Para isolar de verdade, prefira "somente conversas escolhidas". Uma lista de permissão falha fechada:
-o que não está nela não existe. Uma linha de conversa restritiva sob "todas" falha aberta se o
-identificador da conversa mudar no motor.
+To really isolate, prefer "only chosen chats". An allow list fails closed:
+what is not in it does not exist. A restrictive chat line under "all" fails open if the
+identifier of the chat changes in the engine.
 
-## 3. Regra de decisão
+## 3. Decision rule
 
-Aplicada no hub, nesta ordem:
+Applied in the hub, in this order:
 
-1. O aparelho do Hermes não está ativo (pendente, aprovado, suspenso, em quarentena, vencido,
-   revogado) ou o conector é incompatível: **nega**.
-2. Não existe acesso entre o Hermes e o número: **nega**.
-3. Existe linha da conversa: valem os verbos dela, e só eles.
-4. Não existe linha da conversa: com escopo "todas", valem os verbos do número; com escopo "lista",
-   **nega**.
-5. Enviar para conversa que ainda não existe: exige escopo "todas", **enviar** e "pode iniciar
-   conversa".
-6. A chamada depende do motor (enviar, modificar, conferir um telefone, baixar um arquivo que não
-   está guardado) e o número está indisponível ou o motor está fora do ar: **erro**. Ler o que já
-   está no arquivo de mensagens não depende do motor.
+1. The device of the Hermes is not active (pending, approved, suspended, in quarantine, expired,
+   revoked) or the connector is incompatible: **deny**.
+2. There is no access between the Hermes and the number: **deny**.
+3. There is a line for the chat: its verbs apply, and only they.
+4. There is no line for the chat: with scope "all", the verbs of the number apply; with scope "list",
+   **deny**.
+5. Sending to a chat that does not exist yet: requires scope "all", **send** and "may start
+   chats".
+6. The call depends on the engine (send, modify, check a telephone, download a file that is not
+   stored) and the number is unavailable or the engine is down: **error**. Reading what is already
+   in the message archive does not depend on the engine.
 
-A mudança vale na chamada seguinte. Um aviso que já está na fila é reavaliado na entrega e
-descartado se o acesso foi retirado.
+The change applies on the next call. A notice that is already in the queue is evaluated again on
+delivery and discarded if the access was removed.
 
-### O que o Hermes vê em cada caso
+### What Hermes sees in each case
 
-| Situação | Resposta |
+| Situation | Answer |
 |---|---|
-| Aparelho em quarentena, revogado ou suspenso; conector incompatível | AR-501, AR-502, AR-506 ou AR-401 |
-| Não há acesso ao número, ou falta o verbo no número | AR-701 |
-| A conversa está fora do escopo, ou a linha da conversa não tem o verbo | AR-705, a mesma resposta de conversa inexistente |
-| Número desconectado ou em "número trocado", numa chamada que depende do motor | AR-702 |
-| Motor fora do ar, numa chamada que depende do motor | AR-703 |
-| Teto de envio atingido | AR-704 |
-| Na conversa entre Hermes: teto de recado atingido; sem par com esse nome; fio não encontrado | AR-706, AR-707, AR-708 ([13](13-conversa-entre-hermes.md)) |
+| Device in quarantine, revoked or suspended; incompatible connector | AR-501, AR-502, AR-506 or AR-401 |
+| There is no access to the number, or the verb is missing on the number | AR-701 |
+| The chat is outside the scope, or the line of the chat does not have the verb | AR-705, the same answer as for a chat that does not exist |
+| Number disconnected or in "number swapped", on a call that depends on the engine | AR-702 |
+| Engine down, on a call that depends on the engine | AR-703 |
+| Send ceiling reached | AR-704 |
+| In the conversation between Hermes: note ceiling reached; no peer with that name; thread not found | AR-706, AR-707, AR-708 ([13](13-conversa-entre-hermes.md)) |
 
-O Hermes fica sabendo que não tem um verbo num número. Não fica sabendo que existe uma conversa fora
-do escopo dele.
+Hermes gets to know that it does not have a verb on a number. It does not get to know that there is
+a chat outside its scope.
 
-## 4. Ser acordado
+## 4. Being woken
 
-O aviso é um ponteiro, com frase fixa ([03-arquitetura.md](03-arquitetura.md), seção 7). O que o
-Hermes faz ao acordar é definido pelas instruções do próprio Hermes, não pelo hub.
+The notice is a pointer, with a fixed sentence ([03-arquitetura.md](03-arquitetura.md), section 7).
+What Hermes does on waking is defined by the instructions of Hermes itself, not by the hub.
 
-| Regra de entrega | Valor |
+| Delivery rule | Value |
 |---|---|
-| Garantia | Pelo menos uma vez, com confirmação do conector. Aviso repetido é descartado pelo conector. |
-| Fila enquanto o Hermes está fora | 24 horas ou 1.000 avisos. Passando de 1.000, o mais antigo expira. |
-| Agrupamento | Um aviso pendente por conversa: o que chega depois soma na quantidade. Depois de um aviso entregue, o seguinte da mesma conversa só sai em 10 segundos. |
-| Teto do conector | 30 acordadas por minuto e 300 por hora, somando os tipos. Acima disso o conector recusa, e o hub tenta de novo em 5 minutos. |
-| Mensagem do próprio número | Não acorda ninguém. Evita laço. |
+| Guarantee | At least once, with confirmation from the connector. A repeated notice is discarded by the connector. |
+| Queue while Hermes is away | 24 hours or 1,000 notices. Past 1,000, the oldest expires. |
+| Grouping | One pending notice per chat: what arrives later adds to the quantity. After a delivered notice, the next one of the same chat only leaves in 10 seconds. |
+| Connector ceiling | 30 wakes per minute and 300 per hour, adding up the types. Above that the connector refuses, and the hub tries again in 5 minutes. |
+| Message from the number itself | It wakes nobody. It avoids a loop. |
 
-O aviso de recado entre Hermes segue as mesmas regras, com os tetos de
-[13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), seção 6.
+The notice of a note between Hermes follows the same rules, with the ceilings of
+[13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), section 6.
 
-O painel mostra, por Hermes, se ele pode ser acordado. Quando não pode, o verbo fica desabilitado, com
-o motivo. Enquanto a chave da API local do Hermes não estiver resolvida
-([11-conector.md](11-conector.md), seção 6), nenhum Hermes pode.
+The panel shows, per Hermes, whether it can be woken. When it cannot, the verb stays disabled, with
+the reason. While the key of Hermes's local API is not resolved
+([11-conector.md](11-conector.md), section 6), no Hermes can.
 
-## 5. O que o hub não decide
+## 5. What the hub does not decide
 
-- Filtrar por conteúdo, palavra, horário ou tipo de contato.
-- Escolher qual Hermes responde.
-- Responder sozinho.
-- Segurar mensagem para aprovação.
+- Filtering by content, word, time of day or type of contact.
+- Choosing which Hermes answers.
+- Answering by itself.
+- Holding a message for approval.
 
-Quando dois Hermes podem enviar ou ser acordados nas mesmas conversas, o painel **avisa e não
-impede**.
+When two Hermes can send or be woken in the same chats, the panel **warns and does not
+prevent**.
 
-## 6. Dois cuidados que não são permissão
+## 6. Two cautions that are not permission
 
-**As ferramentas aparecem em todos os meios de conversa do Hermes.** Quem consegue dar ordens ao
-Hermes, por qualquer meio de conversa dele, consegue usar os números concedidos. Restringir
-ferramentas por meio de conversa é configuração do Hermes, não do hub. O painel diz isso na ficha de
-cada Hermes.
+**The tools appear on all of Hermes's conversation platforms.** Whoever manages to give orders to
+Hermes, through any conversation platform of its own, manages to use the granted numbers. Restricting
+tools by conversation platform is configuration of Hermes, not of the hub. The panel says so on the
+card of each Hermes.
 
-**Número que também é canal de comando.** Se um número pareado no motor estiver na lista de quem dá
-ordens a algum Hermes, um Hermes com **enviar** naquele número consegue escrever no canal de comando
-do outro. O hub não conhece essas listas. O painel permite marcar um número como "de comando" e
-alerta ao conceder **enviar** nele.
+**A number that is also a command channel.** If a number paired in the engine is in the list of those
+who give orders to some Hermes, a Hermes with **send** on that number manages to write in the command
+channel of the other. The hub does not know these lists. The panel allows marking a number as
+"command" and alerts when **send** is granted on it.
 
-## 7. Teto de envio
+## 7. Send ceiling
 
-O hub tem um teto técnico de envio por Hermes e por número, para um laço da LLM não levar ao
-bloqueio do número ([decisoes/0020](decisoes/0020-teto-de-envio.md)). O valor é fixo na primeira
-versão: 20 envios por minuto, como ponto de partida. Acima dele, o envio é recusado com AR-704. É isolamento, como
-proteger um vizinho de outro: o hub não olha o conteúdo nem o destinatário.
+The hub has a technical send ceiling per Hermes and per number, so that a loop of the LLM does not
+lead to the blocking of the number ([decisoes/0020](decisoes/0020-teto-de-envio.md)). The value is
+fixed in the first version: 20 sends per minute, as a starting point. Above it, the send is refused
+with AR-704. It is isolation, like protecting one neighbor from another: the hub does not look at the
+content or at the recipient.

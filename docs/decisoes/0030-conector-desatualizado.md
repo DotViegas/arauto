@@ -1,19 +1,19 @@
-# 0030 — Conector desatualizado: o hub confere a credencial antes de recusar
+# 0030 — Outdated connector: the hub checks the credential before refusing
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-Um conector abaixo da versão mínima é recusado pelo hub (AR-401). No desenho atual ele para de usar o canal e não apresenta mais a credencial. Com isso, um Hermes desatualizado conta como desligado: quem tiver uma cópia dos arquivos e usar um conector atual usa o hub até o admin reconectar esse Hermes, e o uso pode não aparecer como cópia ([04-seguranca-conexao.md](../04-seguranca-conexao.md), seção 6, item 3).
+A connector below the minimum version is refused by the hub (AR-401). In the current design it stops using the channel and no longer presents the credential. With that, an outdated Hermes counts as turned off: whoever has a copy of the files and uses a current connector uses the hub until the admin reconnects that Hermes, and the use may not show up as a copy ([04-seguranca-conexao.md](../04-seguranca-conexao.md), section 6, item 3).
 
-## Decisão
+## Decision
 
-O hub confere a credencial de um conector desatualizado antes de recusar a versão. Se a credencial apresentada já tinha sido trocada, o uso de uma cópia aparece: alerta e quarentena, como em qualquer reuso. A recusa da versão continua.
+The hub checks the credential of an outdated connector before refusing the version. If the credential presented had already been swapped, the use of a copy shows up: alert and quarantine, as in any reuse. The refusal of the version remains.
 
-## Consequências
+## Consequences
 
-- A ordem das mensagens está em [14-protocolo-do-canal.md](../14-protocolo-do-canal.md), seção 5.3, como proposta: a "apresentação sem troca". O hub responde ao conector antigo, recebe o que ele apresenta, confere e só então recusa a versão, sem nunca emitir credencial.
-- Para isso ficam congeladas, além da primeira mensagem, as mensagens dessa apresentação.
-- O conector desatualizado se apresenta na partida do líder e, depois, uma vez a cada 24 horas.
-- Até o [04](../04-seguranca-conexao.md) ser atualizado, com aprovação, a seção 6 dele continua descrevendo o limite antigo. O C8 também ainda diz que o conector antigo "recebe AR-401 e nada mais": o ponto está na seção 12 do [14](../14-protocolo-do-canal.md).
-- Em 11/11/2026 o hub já faz a apresentação sem troca para o conector antigo demais, com teste: confere a credencial, aplica as três últimas linhas da tabela do julgamento e só então manda AR-401. Falta o lado do conector.
+- The order of the messages is in [14-protocolo-do-canal.md](../14-protocolo-do-canal.md), section 5.3, as a proposal: the "presentation without swap". The hub answers the old connector, receives what it presents, checks and only then refuses the version, without ever issuing a credential.
+- For this, besides the first message, the messages of this presentation are frozen.
+- The outdated connector presents itself at the start of the leader and, after that, once every 24 hours.
+- Until the [04](../04-seguranca-conexao.md) is updated, with approval, its section 6 keeps describing the old limit. C8 also still says that the old connector "receives AR-401 and nothing else": the point is in section 12 of the [14](../14-protocolo-do-canal.md).
+- On 11/11/2026 the hub already does the presentation without swap for the connector that is too old, with a test: it checks the credential, applies the last three lines of the judgment table and only then sends AR-401. The connector's side is still missing.

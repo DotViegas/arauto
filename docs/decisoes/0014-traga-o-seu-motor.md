@@ -1,17 +1,17 @@
-# 0014 — Traga o seu motor
+# 0014 — Bring your own engine
 
-**Estado:** proposta, a validar no protótipo · **Data:** 09/11/2026
+**Status:** proposal, to be validated in the prototype · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-O motor usado hoje é de terceiro, é um cliente não oficial do WhatsApp e a imagem conferida declara licença não definida.
+The engine used today is third-party, is an unofficial WhatsApp client, and the image that was checked declares an undefined license.
 
-## Decisão
+## Decision
 
-O Arauto não embute nem redistribui o motor. Quem instala informa o endereço e a chave do próprio motor. O motor fica atrás de uma interface, para que outro, inclusive a API oficial, entre como adaptador.
+Arauto does not embed or redistribute the engine. Whoever installs gives the address and the key of their own engine. The engine stays behind an interface, so that another one, including the official API, can come in as an adapter.
 
-## Consequências
+## Consequences
 
-- A licença, o custo e o risco do motor são de quem o instala, e o projeto diz isso com clareza.
-- O hub confere a versão do motor na partida e acusa quando não é uma versão testada.
-- Um segundo adaptador pode ser acrescentado sem tocar no núcleo.
+- The license, the cost and the risk of the engine belong to whoever installs it, and the project says so clearly.
+- The hub checks the version of the engine at start and reports when it is not a tested version.
+- A second adapter can be added without touching the core.

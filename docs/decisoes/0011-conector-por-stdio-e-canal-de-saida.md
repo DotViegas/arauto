@@ -1,19 +1,19 @@
-# 0011 — Conector por stdio e canal de saída
+# 0011 — Connector over stdio and outbound channel
 
-**Estado:** proposta, a validar no protótipo · **Data:** 09/11/2026
+**Status:** proposal, to be validated in the prototype · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-O Hermes fala com servidores de ferramentas por stdio ou HTTP; não tem websocket. O serviço de origem acordava o agente chamando a API dele, o que exige alcançar o agente pela rede e guardar a chave da API de cada um.
+Hermes talks to tool servers over stdio or HTTP; it has no websocket. The source service woke the agent by calling its API, which requires reaching the agent over the network and keeping the API key of each one.
 
-## Decisão
+## Decision
 
-O conector é um servidor de ferramentas local, iniciado pelo próprio Hermes por stdio. É ele que abre um websocket de saída para o hub. Para acordar o Hermes, chama a API local.
+The connector is a local tool server, started by Hermes itself over stdio. It is the connector that opens an outbound websocket to the hub. To wake Hermes, it calls the local API.
 
-## Consequências
+## Consequences
 
-- Funciona atrás de NAT: o Hermes só abre conexão de saída.
-- Nenhuma porta de rede nova escuta na máquina do Hermes.
-- O hub deixa de guardar a chave da API de cada Hermes.
-- O conector vive enquanto o Hermes vive, sem precisar registrar serviço.
-- Depende de uma prova: como o conector obtém a chave da API local ([0023](0023-chave-da-api-local.md)).
+- It works behind NAT: Hermes only opens an outbound connection.
+- No new network port listens on Hermes's machine.
+- The hub no longer keeps the API key of each Hermes.
+- The connector lives while Hermes lives, with no need to register a service.
+- It depends on a proof: how the connector gets the key of the local API ([0023](0023-chave-da-api-local.md)).

@@ -1,17 +1,17 @@
-# 0020 — Teto técnico de envio
+# 0020 — Technical send ceiling
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-Uma LLM em laço pode enviar centenas de mensagens e levar ao bloqueio do número. Um teto no hub evita isso, mas o hub não tem regra de negócio ([0004](0004-o-hub-so-isola.md)).
+An LLM in a loop can send hundreds of messages and get the number blocked. A ceiling in the hub avoids that, but the hub has no business rule ([0004](0004-o-hub-so-isola.md)).
 
-## Decisão
+## Decision
 
-O hub tem um teto de envio por Hermes e por número, com valor fixo por minuto na primeira versão. Acima dele, o envio é recusado com o erro AR-704. O teto entra como isolamento: protege um número do descontrole de um Hermes, como se protege um vizinho de outro. O hub não olha o conteúdo nem o destinatário.
+The hub has a send ceiling per Hermes and per number, with a fixed value per minute in the first version. Above it, the sending is refused with the error AR-704. The ceiling comes in as isolation: it protects a number from a Hermes out of control, as one neighbor is protected from another. The hub does not look at the content or at the recipient.
 
-## Consequências
+## Consequences
 
-- O valor de partida, fixado no primeiro MVP, é de 20 envios por minuto ([15-mvp.md](../15-mvp.md)). É calibrado com o uso.
-- A alternativa considerada, um teto ajustável pelo admin no painel, não entra na primeira versão.
-- O cuidado com o que enviar continua nas instruções de cada Hermes.
+- The starting value, fixed in the first MVP, is 20 sends per minute ([15-mvp.md](../15-mvp.md)). It is calibrated with use.
+- The alternative considered, a ceiling adjustable by the admin in the panel, does not go into the first version.
+- The care about what to send stays in the instructions of each Hermes.

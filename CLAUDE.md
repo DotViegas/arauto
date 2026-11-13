@@ -1,113 +1,119 @@
 # CLAUDE.md
 
-Orientação para sessões de desenvolvimento neste repositório.
+Guidance for development sessions in this repository.
 
-## O projeto
+## The project
 
-O Arauto dá a cada agente Hermes acesso controlado a números de WhatsApp e deixa um Hermes mandar
-recado a outro: um **hub** (servidor) e um **conector** (programa ao lado do Hermes). É gratuito, e
-o código será aberto, sob a licença Apache-2.0. Na marca, o nome se escreve Arauto[IA]
+Arauto gives each Hermes agent controlled access to WhatsApp numbers and lets one Hermes send a note
+to another: a **hub** (server) and a **connector** (a program beside Hermes). It is free, and the
+code will be open, under the Apache-2.0 license. In the brand, the name is written Arauto[IA]
 (`docs/decisoes/0026-nome-do-projeto.md`).
 
-**Estado: primeiro MVP em construção** (`docs/15-mvp.md`). Leia nesta ordem: `README.md`,
+**Status: first MVP under construction** (`docs/15-mvp.md`). Read in this order: `README.md`,
 `docs/glossario.md`, `docs/01-visao.md`, `docs/04-seguranca-conexao.md`,
-`docs/14-protocolo-do-canal.md` e `docs/15-mvp.md`.
+`docs/14-protocolo-do-canal.md` and `docs/15-mvp.md`.
 
-## Regras de trabalho
+## Working rules
 
-### O que é público e o que é interno
+### What is public and what is internal
 
-- Tudo o que é versionado aqui é **público**. Não escreva nome de pessoa, de empresa, de servidor,
-  endereço interno, telefone ou qualquer dado real. Em exemplos, use endereços e números reservados
-  para documentação.
-- Anotações de quem mantém o projeto ficam na pasta `interno/`, que está no `.gitignore`. Nunca use
-  `git add -f` nela e nunca copie trechos dela para um documento público.
-- Antes de qualquer commit, procure por dado real no que vai entrar.
+- Everything that is versioned here is **public**. Do not write the name of a person, of a company,
+  of a server, an internal address, a phone number or any real data. In examples, use addresses and
+  numbers reserved for documentation.
+- Notes of the maintainer of the project stay in the `interno/` folder, which is in `.gitignore`.
+  Never use `git add -f` on it and never copy excerpts from it into a public document.
+- Before any commit, search for real data in what is going in.
 
-### Vocabulário
+### Vocabulary
 
-- Use os termos de `docs/glossario.md` e respeite a lista "palavras que não usamos".
-- **Convite** é o temporário, que morre no primeiro uso. **Credencial lacrada** é o que o Hermes
-  guarda para voltar. Não chame nenhum dos dois de "bilhete" ou "token".
-- **Conectar** é para Hermes. **Parear** é para número.
-- "Sessão" sempre vem com o dono: do canal, do motor, do painel.
-- O projeto é gratuito: não escreva sobre preço, venda ou assinatura.
+- Use the terms of `docs/glossario.md` and respect the "words we do not use" list.
+- **Invite** is the temporary one, which dies on first use. **Sealed credential** is what Hermes
+  keeps to come back. Call neither of them "ticket" or "token".
+- **Connect** is for Hermes. **Pair** is for numbers.
+- "Session" always comes with its owner: channel session, engine session, panel session.
+- The project is free: do not write about price, sale or subscription.
 
-### Fato, proposta e pendência
+### Fact, proposal and pending item
 
-Todo documento separa:
+Every document separates:
 
-- **fato**: conferido, com versão e data;
-- **proposta**: desenho ainda não provado;
-- **decisão pendente**: o que ainda precisa ser escolhido.
+- **fact**: checked, with version and date;
+- **proposal**: a design not proved yet;
+- **pending decision**: what still needs to be chosen.
 
-Não promova uma proposta a fato sem teste. Não escreva no presente, como se existisse, o que ainda é
-desenho. Ao conferir algo no Hermes ou no motor, registre em `referencia/`, com a versão e a data.
+Do not promote a proposal to fact without a test. Do not write in the present tense, as if it
+existed, what is still design. When checking something on Hermes or on the engine, record it in
+`referencia/`, with the version and the date.
 
-### Decisões
+### Decisions
 
-- Cada decisão de desenho tem um arquivo em `docs/decisoes/`, com o estado: decidida, proposta ou
-  pendente.
-- Decisão **decidida** não se reabre sem pedido de quem mantém o projeto.
-- Mudou o desenho: atualize o documento afetado **e** a decisão.
+- Each design decision has a file in `docs/decisoes/`, with the status: decided, proposal or
+  pending.
+- A **decided** decision is not reopened without a request from the maintainer of the project.
+- The design changed: update the affected document **and** the decision.
 
-### Precisa de aprovação de quem mantém
+### Needs the maintainer's approval
 
-- O texto do bloco de conexão (`docs/02-como-funciona.md`).
-- Qualquer mudança em `docs/04-seguranca-conexao.md`.
-- Licença, abertura do repositório e qualquer versão publicada.
+- The text of the connection block (`docs/02-como-funciona.md`).
+- Any change in `docs/04-seguranca-conexao.md`.
+- License, opening of the repository and any published version.
 
-## Princípios de segurança
+## Security principles
 
-Valem para todo código e todo documento.
+They hold for all code and every document.
 
-1. **Nada de criptografia inventada.** Componha peças conhecidas e diga quais.
-2. **Segredo duradouro nunca passa por pessoa:** não aparece em tela, chat, registro, auditoria ou
-   resposta de ferramenta. Segredo de curta duração (convite, código de pareamento, código de
-   instalação) aparece uma vez, onde é preciso, e nunca é guardado em claro.
-3. **O que só se confere guarda-se como chave pública ou resumo.** O que precisa ser lido de volta
-   fica cifrado, com a chave fora do banco.
-4. **Sorteio só pelo gerador do sistema.** Nada derivado de data, hora, nome ou contador.
-5. **Requisição de leitura não muda estado.** Abrir um endereço nunca gasta um convite.
-6. **O hub não manda texto livre para a LLM.** Aviso é ponteiro; a frase fixa e as descrições das
-   ferramentas ficam no conector.
-7. **O conector não executa comando do hub.** A única coisa que ele descarta por informação do hub é
-   um pedido de conexão que ainda não recebeu credencial. A pasta de um aparelho antigo sai por
-   decisão do conector, depois de outro assumir e de o hub responder.
-8. **O hub só isola.** Nada de regra de negócio: sem filtro de conteúdo, sem resposta automática,
-   sem escolher qual Hermes age.
-9. **Autorização a cada chamada,** no hub, contra o estado atual.
-10. **Todo texto vindo de aparelho ou do WhatsApp é hostil:** validar na entrada, escapar na saída.
-11. **A sessão do canal só serve depois da troca da credencial confirmada.** Depois da primeira
-    confirmada, nunca emitir outra só pela identidade.
-12. **Dizer o que não é garantido.** Nunca escrever que o projeto "fecha todas as brechas".
+1. **No invented cryptography.** Compose known pieces and say which ones.
+2. **A long-lived secret never passes through a person:** it does not appear on a screen, in a chat,
+   log, audit or tool response. A short-lived secret (invite, pairing code, installation code)
+   appears once, where it is needed, and is never kept in the clear.
+3. **What is only checked is kept as a public key or a digest.** What needs to be read back stays
+   encrypted, with the key outside the database.
+4. **Random draws only from the system's generator.** Nothing derived from date, time, name or
+   counter.
+5. **A read request does not change state.** Opening an address never spends an invite.
+6. **The hub does not send free text to the LLM.** A notice is a pointer; the fixed sentence and the
+   descriptions of the tools stay in the connector.
+7. **The connector does not execute a command from the hub.** The only thing it discards on
+   information from the hub is a connection request that has not received a credential yet. The
+   folder of an old device goes away by decision of the connector, after another one takes over and
+   after the hub answers.
+8. **The hub only isolates.** No business rule: no content filter, no automatic reply, no choosing
+   which Hermes acts.
+9. **Authorization on every call,** in the hub, against the current state.
+10. **Every text coming from a device or from WhatsApp is hostile:** validate on input, escape on
+    output.
+11. **The channel session only serves after the swap of the credential is confirmed.** After the
+    first confirmed one, never issue another only on the identity.
+12. **Say what is not guaranteed.** Never write that the project "closes every gap".
 
-## No código
+## In the code
 
-- Rust nos dois programas. Um espaço de trabalho com cinco partes (`docs/15-mvp.md`, seção 4): o
-  protocolo comum, o que muda de um sistema para outro, o hub, o conector e o material de teste.
-- Sem `unsafe`. Onde o protocolo (`docs/14-protocolo-do-canal.md`) e o
-  `docs/04-seguranca-conexao.md` divergirem, vale o 04.
-- O desenvolvimento roda direto pelo `cargo`, com um PostgreSQL local. Container é só para a entrega
-  em produção.
-- Nomes no código, descrições das ferramentas e mensagens de erro em inglês
-  (`docs/decisoes/0016-idioma.md`).
-- `Cargo.lock` versionado; compilar com `--locked`.
-- Rodar, antes de dizer que algo está pronto: `cargo fmt --all -- --check`,
-  `cargo clippy --workspace --all-targets --locked -- -D warnings` e
-  `cargo test --workspace --locked`, com `ARAUTO_TEST_DATABASE_URL` apontando para um PostgreSQL de
-  teste. Relatar: o que rodou, o que passou, o que falhou e o que ficou sem cobertura. O que foi só
-  lido não conta como testado.
-- Regra de segurança nova vem com teste que falha quando a regra é removida.
-- Filas e troca de credencial têm teste com rodadas sorteadas: quedas, atrasos e repetições.
-- Os testes automáticos rodam contra um motor falso e um Hermes falso. Nada de teste automático num
-  número de WhatsApp real. A exceção é o teste de contrato, feito à mão, com um número de teste.
+- Rust in both programs. A workspace with five parts (`docs/15-mvp.md`, section 4): the common
+  protocol, what changes from one system to another, the hub, the connector and the test material.
+- No `unsafe`. Where the protocol (`docs/14-protocolo-do-canal.md`) and
+  `docs/04-seguranca-conexao.md` diverge, 04 prevails.
+- Development runs directly through `cargo`, with a local PostgreSQL. A container is only for the
+  delivery in production.
+- English is the main language of the project, in everything that is versioned: names in the
+  code, descriptions of the tools, error messages, the text of the screens, commit messages and
+  documents (`docs/decisoes/0016-idioma.md`).
+- `Cargo.lock` versioned; compile with `--locked`.
+- Run, before saying that something is ready: `cargo fmt --all -- --check`,
+  `cargo clippy --workspace --all-targets --locked -- -D warnings` and
+  `cargo test --workspace --locked`, with `ARAUTO_TEST_DATABASE_URL` pointing to a test PostgreSQL.
+  Report: what ran, what passed, what failed and what was left without coverage. What was only read
+  does not count as tested.
+- A new security rule comes with a test that fails when the rule is removed.
+- Queues and the swap of the credential have a test with randomized rounds: drops, delays and
+  repetitions.
+- The automatic tests run against a fake engine and a fake Hermes. No automatic test on a real
+  WhatsApp number. The exception is the contract test, done by hand, with a test number.
 
-## O que nunca fazer
+## What never to do
 
-- Registrar conteúdo de mensagem ou segredo.
-- Expor o motor de WhatsApp fora da rede interna.
-- Embutir o motor na entrega do projeto.
-- Criar um caminho alternativo de conexão "para facilitar" que pule o convite ou o código de
-  conferência.
-- Abrir porta de rede na máquina do Hermes.
+- Log message content or a secret.
+- Expose the WhatsApp engine outside the internal network.
+- Embed the engine in the delivery of the project.
+- Create an alternative connection path "to make it easier" that skips the invite or the
+  verification code.
+- Open a network port on Hermes's machine.

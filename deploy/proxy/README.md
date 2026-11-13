@@ -1,27 +1,28 @@
-# O proxy na frente do hub
+# The proxy in front of the hub
 
-O hub não fala TLS: quem termina o TLS é um proxy seu. Estes são exemplos, **não testados**, para
-quem quer um ponto de partida. Qualquer proxy serve, desde que cumpra as três condições.
+The hub does not speak TLS: what terminates the TLS is a proxy of yours. These are examples, **not
+tested**, for whoever wants a starting point. Any proxy will do, as long as it meets the three
+conditions.
 
-## O que o proxy precisa fazer
+## What the proxy needs to do
 
-| Condição | Por quê |
+| Condition | Why |
 |---|---|
-| Repassar a troca para websocket (`Upgrade`). | O canal dos conectores é um websocket em `/v1/channel`. |
-| Prazo de inatividade **acima de 90 segundos**. | O canal bate a cada 30 segundos e desiste aos 90. Um prazo menor derruba conexões boas. |
-| Não segurar a resposta em memória (sem buffer). | O hub mede o que sai. Um proxy que acumula esconde um conector lento. |
+| Pass on the switch to websocket (`Upgrade`). | The channel of the connectors is a websocket at `/v1/channel`. |
+| Idle timeout **above 90 seconds**. | The channel beats every 30 seconds and gives up at 90. A shorter timeout drops good connections. |
+| Not hold the response in memory (no buffer). | The hub measures what goes out. A proxy that accumulates hides a slow connector. |
 
-E uma quarta, de segurança: o proxy **escreve** o cabeçalho `X-Forwarded-For` com o endereço de quem
-chegou, **substituindo** o que veio de fora. O hub só acredita nesse cabeçalho quando a conexão vem
-de um endereço de `ARAUTO_TRUSTED_PROXIES`.
+And a fourth, of security: the proxy **writes** the header `X-Forwarded-For` with the address of
+whoever arrived, **replacing** what came from outside. The hub only believes this header when the
+connection comes from an address of `ARAUTO_TRUSTED_PROXIES`.
 
-Só dois caminhos precisam chegar ao hub: `/v1/channel` e `/v1/download/`. O resto pode responder 404
-no próprio proxy.
+Only two paths need to reach the hub: `/v1/channel` and `/v1/download/`. The rest can answer 404
+at the proxy itself.
 
-O painel **não** entra neste site. Ele tem uma porta própria no hub (8445), desligada por padrão, e
-o caminho previsto é um túnel até ela ([guia](../docker/README.md)). Quem quiser abri-lo por um
-proxy dá a ele outro nome, com TLS, apontando para `127.0.0.1:8445`; as três condições acima são do
-canal e não valem para ele.
+The panel does **not** go in this site. It has a port of its own in the hub (8445), off by default,
+and the foreseen path is a tunnel to it ([guide](../docker/README.md)). Whoever wants to open it
+through a proxy gives it another name, with TLS, pointing to `127.0.0.1:8445`; the three conditions
+above belong to the channel and do not apply to it.
 
 ## Caddy
 
@@ -50,7 +51,7 @@ arauto.example.org {
 server {
     listen 443 ssl;
     server_name arauto.example.org;
-    # ssl_certificate e ssl_certificate_key: os seus.
+    # ssl_certificate and ssl_certificate_key: yours.
 
     location = /v1/channel {
         proxy_pass http://127.0.0.1:8443;
@@ -76,6 +77,6 @@ server {
 }
 ```
 
-Nos dois exemplos, `X-Forwarded-For` leva **só** o endereço de quem chegou ao proxy. Não use a forma
-que acrescenta ao cabeçalho recebido: ela deixa quem está de fora escolher o primeiro endereço da
-lista.
+In both examples, `X-Forwarded-For` carries **only** the address of whoever arrived at the proxy.
+Do not use the form that appends to the received header: it lets whoever is outside choose the
+first address of the list.

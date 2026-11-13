@@ -1,21 +1,21 @@
-# 0026 — Nome do projeto
+# 0026 — Name of the project
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-O nome de trabalho, multi-hermes, continha o nome de um projeto de terceiro, o Hermes Agent. Um nome próprio evita confusão com ele e não depende das regras de uso desse nome.
+The working name, multi-hermes, contained the name of a third-party project, Hermes Agent. A name of its own avoids confusion with it and does not depend on the rules of use of that name.
 
-## Decisão
+## Decision
 
-O projeto passa a se chamar **Arauto**. O arauto é quem leva e anuncia as mensagens.
+The project is now called **Arauto**. The "arauto" (herald) is the one who carries and announces the messages.
 
-Conferido em 10/11/2026: o nome está livre no crates.io e no PyPI e ocupado no npm; no GitHub existe um projeto pequeno, sem relação com este, com o mesmo nome. O registro de marca não foi conferido.
+Checked on 10/11/2026: the name is free on crates.io and on PyPI and taken on npm; on GitHub there is a small project, unrelated to this one, with the same name. The trademark registration was not checked.
 
-## Consequências
+## Consequences
 
-- **Trava:** a abertura do repositório ao público ([roteiro](../12-roteiro.md), Fase 7). O registro de marca precisa ser conferido antes.
-- A troca foi aplicada aos documentos em 10/11/2026, de uma vez, aprovada por quem mantém. Ela alcançou o nome nos textos, os programas (`arauto-hub` e `arauto-connector`), a pasta do conector (`~/.arauto`), o servidor de ferramentas (`arauto`) e o prefixo dos códigos de erro (`AR-`).
-- A forma de cada um desses nomes segue a decisão do idioma ([0016](0016-idioma.md)): os comandos, os arquivos do conector, os módulos do hub e as ferramentas ganharam a forma em inglês na mesma troca.
-- Na marca, o nome se escreve Arauto[IA].
-- O projeto continua sendo para agentes Hermes e continua sem vínculo com os autores do Hermes Agent.
+- **Blocks:** the opening of the repository to the public ([roadmap](../12-roteiro.md), Phase 7). The trademark registration needs to be checked before that.
+- The change was applied to the documents on 10/11/2026, all at once, approved by the maintainer. It reached the name in the texts, the programs (`arauto-hub` and `arauto-connector`), the connector's folder (`~/.arauto`), the tool server (`arauto`) and the prefix of the error codes (`AR-`).
+- The form of each of these names follows the language decision ([0016](0016-idioma.md)): the commands, the files of the connector, the modules of the hub and the tools got their English form in the same change.
+- In the brand, the name is written Arauto[IA].
+- The project is still for Hermes agents and still has no tie to the authors of Hermes Agent.

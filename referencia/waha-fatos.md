@@ -1,182 +1,185 @@
-# Fatos conferidos no motor (WAHA)
+# Facts checked on the engine (WAHA)
 
-**Estado: fatos conferidos.** O que o Arauto assume sobre o WAHA, o programa usado como motor.
+**Status: checked facts.** What Arauto assumes about WAHA, the program used as the engine.
 
-**Conferido em 09/11/2026, na imagem `devlikeapro/waha:gows-2026.10.1`, com o mecanismo interno GOWS, na
-edição CORE.** O custo e a licença do WAHA são com o autor dele; este arquivo não substitui a
-documentação dele.
+**Checked on 09/11/2026, on the image `devlikeapro/waha:gows-2026.10.1`, with the GOWS internal mechanism, in the
+CORE edition.** The cost and the license of WAHA are a matter for its author; this file does not replace
+its documentation.
 
-Marcação: **[código]** lido no programa instalado; **[observado]** visto em funcionamento;
-**[documentação]** lido na documentação pública do autor, sem rodar o programa (a seção "Os
-formatos que o hub usa").
+Marking: **[code]** read in the installed program; **[observed]** seen running;
+**[documentation]** read in the author's public documentation, without running the program (the
+section "The formats the hub uses").
 
-## Aviso
+## Warning
 
-O WAHA é um cliente **não oficial** do WhatsApp. O WhatsApp pode bloquear números que o usam. O
-Arauto não embute o WAHA: quem instala traz o seu.
+WAHA is an **unofficial** WhatsApp client. WhatsApp may block numbers that use it. Arauto does not
+embed WAHA: whoever installs brings their own.
 
-**Licença:** o `package.json` da imagem conferida declara `UNLICENSED`. Antes de qualquer
-distribuição conjunta, conferir os termos publicados pelo autor.
+**License:** the `package.json` of the checked image declares `UNLICENSED`. Before any joint
+distribution, check the terms published by the author.
 
-## O que a API permite comandar
+## What the API allows commanding
 
-| Grupo | Operações | Origem |
+| Group | Operations | Origin |
 |---|---|---|
-| Sessões do motor | Listar, criar, ver, atualizar, apagar, ligar, desligar, reiniciar, sair. | [código] |
-| Pareamento | QR e código por número de telefone. | [código] |
-| Servidor | Versão, ambiente, estado, parar. Saúde e ping. | [código] |
-| Limites do WhatsApp | Consulta de teto de mensagens e de bloqueio de primeiro contato, por sessão. | [código] |
+| Engine sessions | List, create, view, update, delete, start, stop, restart, log out. | [code] |
+| Pairing | QR and code by phone number. | [code] |
+| Server | Version, environment, state, stop. Health and ping. | [code] |
+| WhatsApp limits | Query of the message ceiling and of the first-contact block, per session. | [code] |
 
-Várias sessões do motor funcionam na edição CORE, uma por número. **[observado]**
+Several engine sessions work in the CORE edition, one per number. **[observed]**
 
-## Configuração de uma sessão do motor
+## Configuration of an engine session
 
-| Campo | Conteúdo |
+| Field | Content |
 |---|---|
-| `webhooks` | Endereço, eventos, segredo de assinatura, política de reenvio, cabeçalhos. |
-| `ignore` | Ignorar status, grupos, canais e listas de transmissão. |
-| `gows.storage` | O que o motor guarda: mensagens, grupos, conversas, etiquetas, contatos. |
-| `client` | O nome com que o dispositivo conectado aparece no celular. |
-| `metadata`, `proxy`, `debug` | Dados livres, proxy de saída, depuração. |
+| `webhooks` | Address, events, signing secret, resend policy, headers. |
+| `ignore` | Ignore status, groups, channels and broadcast lists. |
+| `gows.storage` | What the engine keeps: messages, groups, chats, labels, contacts. |
+| `client` | The name with which the linked device appears on the phone. |
+| `metadata`, `proxy`, `debug` | Free data, outbound proxy, debugging. |
 
-## Armadilhas
+## Pitfalls
 
-| Armadilha | Consequência para o hub |
+| Pitfall | Consequence for the hub |
 |---|---|
-| Atualizar a sessão **substitui a configuração inteira** e reinicia a sessão. | O hub só aplica quando há diferença, e sempre envia a configuração completa. |
-| O que está em `ignore` nem é guardado pelo motor. | Uma sessão criada com grupos ignorados perde o histórico de grupo do pareamento. O hub cria a sessão já configurada. |
-| O histórico antigo só chega **no pareamento**. Não existe "carregar mais antigas". | O arquivo do hub é o lugar permanente. |
-| **Sair apaga o histórico** que o motor guarda daquela sessão. | O hub importa antes de permitir sair. |
-| O histórico do pareamento não vira evento: só sai pela consulta de mensagens. | O hub importa por consulta. |
-| O reenvio de eventos desiste depois de um tempo (cerca de 2 minutos na configuração usada). | Na partida, o hub busca no motor o que chegou enquanto esteve fora. |
-| A contagem de participantes de grupo vem sempre zero. | Conta-se a lista de participantes. |
-| O campo de origem do evento é sempre a conversa, mesmo em mensagem enviada pelo próprio número. | O hub identifica o autor por outros campos. |
-| O motor recusa endereço de eventos com sublinhado no nome da máquina. | O hub é alcançado por um nome sem sublinhado. |
-| A API não tem contador de mensagens não lidas. | "Novidades" é calculado pelo hub. |
-| Editar sem texto e apagar sem o identificador completo têm comportamento perigoso por padrão. | O hub valida antes de chamar. |
-| A documentação interativa pede credencial própria. | Não serve de catálogo em tempo de execução. |
+| Updating the session **replaces the whole configuration** and restarts the session. | The hub only applies when there is a difference, and always sends the complete configuration. |
+| What is in `ignore` is not even kept by the engine. | A session created with groups ignored loses the group history of the pairing. The hub creates the session already configured. |
+| The old history only arrives **at the pairing**. There is no "load older ones". | The hub's archive is the permanent place. |
+| **Logging out deletes the history** the engine keeps of that session. | The hub imports before allowing a logout. |
+| The history of the pairing does not become an event: it only comes out through the message query. | The hub imports by query. |
+| The resending of events gives up after a while (about 2 minutes in the configuration used). | On start, the hub fetches from the engine what arrived while it was away. |
+| The count of group participants always comes as zero. | The list of participants is counted. |
+| The origin field of the event is always the chat, even in a message sent by the number itself. | The hub identifies the author by other fields. |
+| The engine refuses an event address with an underscore in the machine name. | The hub is reached by a name without an underscore. |
+| The API has no counter of unread messages. | "What is new" is calculated by the hub. |
+| Editing without text and deleting without the complete identifier have dangerous behavior by default. | The hub validates before calling. |
+| The interactive documentation asks for a credential of its own. | It does not serve as a catalog at run time. |
 
-Todas as armadilhas acima foram **[observado]** ou **[código]** na versão conferida.
+All the pitfalls above were **[observed]** or **[code]** in the checked version.
 
-## O que o motor não faz
+## What the engine does not do
 
-Ligações, arquivar, fixar, bloquear contato, apagar conversa e botões.
+Calls, archiving, pinning, blocking a contact, deleting a chat and buttons.
 
-## Regra para versões novas
+## Rule for new versions
 
-Antes de trocar a versão do motor, rodar à mão o teste de contrato do hub contra um número de teste:
-ler, listar grupos, enviar, e conferir o formato do evento de mensagem. O hub confere a versão do motor na
-partida e acusa quando não é uma versão testada.
+Before changing the version of the engine, run by hand the hub's contract test against a test number:
+read, list groups, send, and check the format of the message event. The hub checks the version of the engine on
+start and reports when it is not a tested version.
 
-Como rodar o teste de contrato: seção "Teste de contrato", no fim deste arquivo.
+How to run the contract test: section "Contract test", at the end of this file.
 
-## Os formatos que o hub usa
+## The formats the hub uses
 
-**Lido em 11/11/2026 na documentação pública do autor** (`waha.devlike.pro`, páginas `docs/how-to/`
-de sessões, eventos, envio de mensagens, conversas, contatos, grupos, segurança, mensagens recebidas
-e observabilidade). Só leitura: nada foi rodado contra uma instância. As páginas não dizem a versão
-da documentação; as versões que aparecem nelas são só de exemplos (`2023.10.12`, `2024.2.3`,
-`2024.3.3`, `2026.8.2`). Tudo nesta seção é **[documentação]**, salvo o que diz "a conferir": é o que
-a documentação não deixa claro, e o hub foi escrito na leitura mais segura. O motor falso do kit de
-teste (`arauto-testkit`, módulo `engine`) fala este formato; a primeira rodada do teste de contrato
-contra um motor de verdade é o que transforma esta seção em fato **[observado]**.
+**Read on 11/11/2026 in the author's public documentation** (`waha.devlike.pro`, pages `docs/how-to/`
+on sessions, events, sending messages, chats, contacts, groups, security, received messages
+and observability). Reading only: nothing was run against an instance. The pages do not say the
+version of the documentation; the versions that appear in them are only from examples (`2023.10.12`,
+`2024.2.3`, `2024.3.3`, `2026.8.2`). Everything in this section is **[documentation]**, except what
+says "to check": it is what the documentation does not make clear, and the hub was written on the
+safest reading. The fake engine of the test kit (`arauto-testkit`, module `engine`) speaks this
+format; the first round of the contract test against a real engine is what turns this section into
+an **[observed]** fact.
 
-`{s}` é o nome da sessão do motor. `@` dentro de um identificador vai no caminho como `%40`
+`{s}` is the name of the engine session. `@` inside an identifier goes in the path as `%40`
 ("Remember to escape `@` in `chatId` and `messageId` with `%40`").
 
-### Chave da API e servidor
+### API key and server
 
-| Formato | Origem e observação |
+| Format | Origin and remark |
 |---|---|
-| Cabeçalho `X-Api-Key` em toda chamada | [documentação] Sem chave ou com a errada: 401, `{"message":"Unauthorized","statusCode":401}`. Nenhum endereço fica fora da chave por padrão. O hub trata 401 e 403 como "chave recusada" e não lê o corpo. |
-| `GET /health` → `{"status", "info", "error", "details"}`, `status` ∈ `ok`, `error`, `shutting_down` | [documentação] O hub só aceita `ok`. |
-| `GET /api/server/version` → `{"version", "engine", "tier", "browser"}` | [documentação] O hub lê `version`, `engine` e `tier` e compara (`version`, `engine`) com a lista das versões testadas, hoje só (`2026.10.1`, `GOWS`). |
+| Header `X-Api-Key` on every call | [documentation] Without a key or with the wrong one: 401, `{"message":"Unauthorized","statusCode":401}`. No address stays outside the key by default. The hub treats 401 and 403 as "key refused" and does not read the body. |
+| `GET /health` → `{"status", "info", "error", "details"}`, `status` ∈ `ok`, `error`, `shutting_down` | [documentation] The hub only accepts `ok`. |
+| `GET /api/server/version` → `{"version", "engine", "tier", "browser"}` | [documentation] The hub reads `version`, `engine` and `tier` and compares (`version`, `engine`) with the list of tested versions, today only (`2026.10.1`, `GOWS`). |
 
-### Sessões do motor e pareamento
+### Engine sessions and pairing
 
-| Formato | Origem e observação |
+| Format | Origin and remark |
 |---|---|
-| `GET /api/sessions/{s}` → `{"name", "status", "config", "me", "engine"}`, com `me` = `{"id", "pushName"}` ou nulo | [documentação] A resposta para uma sessão que não existe: a conferir. O hub lê 404 como "não existe". |
-| `POST /api/sessions` com `{"name", "start": false, "config"}` | [documentação] `start: false` adia a partida: o hub cria a sessão já configurada e só a liga ao parear. |
-| `PUT /api/sessions/{s}` com a configuração inteira | [documentação] O corpo é uma configuração nova inteira; sessão que não está parada é parada e ligada de novo. Confirma a primeira armadilha. |
-| `POST /api/sessions/{s}/start`, `/stop`, `/restart`, `/logout` | [documentação] `start` e `stop` são idempotentes; `stop` não sai do WhatsApp; `logout` sai e guarda a configuração. |
-| `DELETE /api/sessions/{s}` | [documentação] Sai do WhatsApp e apaga configuração e dados. O hub chama `logout` e depois `DELETE`, e só com a palavra explícita do admin. |
-| Estados: `STOPPED`, `STARTING`, `SCAN_QR_CODE`, `WORKING`, `FAILED`, `PASSKEY_REQUIRED`, `PASSKEY_CONFIRMATION_REQUIRED` | [documentação] Estado desconhecido não é adivinhado: a resposta conta como malformada. |
-| `GET /api/{s}/auth/qr?format=raw` → `{"value"}` | [documentação] O valor vira QR no terminal da máquina do hub e não é guardado. |
-| `POST /api/{s}/auth/request-code` com `{"phoneNumber"}` → `{"code"}` | [documentação] |
-| Restrição do nome da sessão | A conferir: a documentação só diz que o nome funciona como identificador. O hub sorteia o alfabeto mais estreito, `^[a-z][a-z0-9]{15,62}$`. |
+| `GET /api/sessions/{s}` → `{"name", "status", "config", "me", "engine"}`, with `me` = `{"id", "pushName"}` or null | [documentation] The response for a session that does not exist: to check. The hub reads 404 as "does not exist". |
+| `POST /api/sessions` with `{"name", "start": false, "config"}` | [documentation] `start: false` postpones the start: the hub creates the session already configured and only starts it on pairing. |
+| `PUT /api/sessions/{s}` with the whole configuration | [documentation] The body is a whole new configuration; a session that is not stopped is stopped and started again. It confirms the first pitfall. |
+| `POST /api/sessions/{s}/start`, `/stop`, `/restart`, `/logout` | [documentation] `start` and `stop` are idempotent; `stop` does not log out of WhatsApp; `logout` logs out and keeps the configuration. |
+| `DELETE /api/sessions/{s}` | [documentation] Logs out of WhatsApp and deletes configuration and data. The hub calls `logout` and then `DELETE`, and only with the explicit word of the admin. |
+| States: `STOPPED`, `STARTING`, `SCAN_QR_CODE`, `WORKING`, `FAILED`, `PASSKEY_REQUIRED`, `PASSKEY_CONFIRMATION_REQUIRED` | [documentation] An unknown state is not guessed: the response counts as malformed. |
+| `GET /api/{s}/auth/qr?format=raw` → `{"value"}` | [documentation] The value becomes a QR in the terminal of the hub's machine and is not kept. |
+| `POST /api/{s}/auth/request-code` with `{"phoneNumber"}` → `{"code"}` | [documentation] |
+| Restriction on the session name | To check: the documentation only says the name works as an identifier. The hub draws from the narrowest alphabet, `^[a-z][a-z0-9]{15,62}$`. |
 
-### A configuração de cada sessão do motor
+### The configuration of each engine session
 
-| Campo | Origem e o que o hub põe |
+| Field | Origin and what the hub puts |
 |---|---|
-| `webhooks[]`: `url`, `events`, `hmac.key`, `retries` (`policy`, `delaySeconds`, `attempts`), `customHeaders` (`[{name, value}]`) | [documentação] Um destino só: a caixa de entrada do hub. Eventos `session.status`, `message.any`, `message.reaction`, `message.edited` e `message.revoked`. Reenvio `exponential`, 2 s, 7 tentativas. Nenhum cabeçalho extra. A página não dá os valores padrão do reenvio. |
-| `ignore`: `status`, `groups`, `channels`, `broadcast` | [documentação] `status`, `channels` e `broadcast` ligados; `groups` desligado, porque o histórico de grupo só vem no pareamento. |
-| `client`: `deviceName`, `browserName` | [documentação] `deviceName` = `Arauto`. |
-| `gows.storage`: `messages`, `groups`, `chats`, `labels`, `contacts`, `messageSecrets` | [documentação] Os cinco primeiros ligados. `messageSecrets` não é enviado: a conferir o padrão. |
-| `metadata`, `proxy` (`server`, `username`, `password`), `debug` | [documentação] `{}`, sem proxy, `false`. Um proxy posto por fora é corrigido. |
-| A chave de assinatura aparece de volta na leitura da sessão? | A conferir. Quando aparece, o hub a compara em tempo constante; quando não aparece, confia no resumo do que ele mesmo aplicou por último. |
+| `webhooks[]`: `url`, `events`, `hmac.key`, `retries` (`policy`, `delaySeconds`, `attempts`), `customHeaders` (`[{name, value}]`) | [documentation] A single destination: the hub's inbox. Events `session.status`, `message.any`, `message.reaction`, `message.edited` and `message.revoked`. Resend `exponential`, 2 s, 7 attempts. No extra header. The page does not give the default values of the resend. |
+| `ignore`: `status`, `groups`, `channels`, `broadcast` | [documentation] `status`, `channels` and `broadcast` on; `groups` off, because the group history only comes at the pairing. |
+| `client`: `deviceName`, `browserName` | [documentation] `deviceName` = `Arauto`. |
+| `gows.storage`: `messages`, `groups`, `chats`, `labels`, `contacts`, `messageSecrets` | [documentation] The first five on. `messageSecrets` is not sent: the default is to check. |
+| `metadata`, `proxy` (`server`, `username`, `password`), `debug` | [documentation] `{}`, no proxy, `false`. A proxy put from outside is fixed. |
+| Does the signing key appear back in the reading of the session? | To check. When it appears, the hub compares it in constant time; when it does not appear, it trusts the digest of what it itself applied last. |
 
-### Eventos (a caixa de entrada do hub)
+### Events (the hub's inbox)
 
-| Formato | Origem e observação |
+| Format | Origin and remark |
 |---|---|
-| `X-Webhook-Hmac`: HMAC do corpo cru, com a chave configurada; `X-Webhook-Hmac-Algorithm`: `sha512` | [documentação] A codificação da assinatura não está escrita; o exemplo parece hexadecimal. O hub aceita só hexadecimal de 128 caracteres e recusa outro algoritmo nomeado. A chave configurada é o texto hexadecimal de 32 bytes sorteados; a conferir se o motor a usa como texto, como o hub supõe. |
-| `X-Webhook-Request-Id`, `X-Webhook-Timestamp` (milissegundos) | [documentação] O hub não depende deles: a hora vem do envelope, que é o que a assinatura cobre. |
-| Envelope: `id` (`evt_` e um ULID em minúsculas), `timestamp` (milissegundos), `event`, `session`, `metadata`, `me` (`id`, `pushName`), `payload`, `engine`, `environment` (`version`, `engine`, `tier`) | [documentação] O hub exige `id`, `timestamp`, `event`, `session` e `payload`; o resto é opcional. |
-| `session.status`: `payload.status` e `payload.statuses` (`[{status, timestamp}]`) | [documentação] O telefone conectado vem do `me.id` do envelope. |
-| `message` e `message.any`: `id`, `timestamp` (segundos), `from`, `fromMe`, `source`, `to`, `body`, `hasMedia`, `media` (`url`, `mimetype`, `filename`, `error`), `ack`, `vCards`, `_data` | [documentação] `participant` (o autor num grupo) e `replyTo` não estão no exemplo do evento: a conferir. `replyTo` aparece no exemplo da leitura de mensagens. |
-| `message.reaction`: `id`, `from`, `fromMe`, `participant`, `to`, `timestamp`, `reaction` (`text`, `messageId`); `text` vazio tira a reação | [documentação] |
-| `message.edited`: `id`, `editedMessageId` (sem a conversa), `body`, `_data` | [documentação] |
-| `message.revoked`: `after` (`id`, `_data`), `revokedMessageId` (sem a conversa), `before` (quase sempre nulo) | [documentação] |
-| Reenvio: `constant`, `linear`, `exponential` (com 20% de variação) | [documentação] A página não diz quando desiste; o "cerca de 2 minutos" das armadilhas é [observado] na versão conferida. |
+| `X-Webhook-Hmac`: HMAC of the raw body, with the configured key; `X-Webhook-Hmac-Algorithm`: `sha512` | [documentation] The encoding of the signature is not written; the example looks hexadecimal. The hub accepts only hexadecimal of 128 characters and refuses another named algorithm. The configured key is the hexadecimal text of 32 randomly drawn bytes; to check whether the engine uses it as text, as the hub supposes. |
+| `X-Webhook-Request-Id`, `X-Webhook-Timestamp` (milliseconds) | [documentation] The hub does not depend on them: the time comes from the envelope, which is what the signature covers. |
+| Envelope: `id` (`evt_` and a ULID in lowercase), `timestamp` (milliseconds), `event`, `session`, `metadata`, `me` (`id`, `pushName`), `payload`, `engine`, `environment` (`version`, `engine`, `tier`) | [documentation] The hub requires `id`, `timestamp`, `event`, `session` and `payload`; the rest is optional. |
+| `session.status`: `payload.status` and `payload.statuses` (`[{status, timestamp}]`) | [documentation] The connected phone comes from the `me.id` of the envelope. |
+| `message` and `message.any`: `id`, `timestamp` (seconds), `from`, `fromMe`, `source`, `to`, `body`, `hasMedia`, `media` (`url`, `mimetype`, `filename`, `error`), `ack`, `vCards`, `_data` | [documentation] `participant` (the author in a group) and `replyTo` are not in the example of the event: to check. `replyTo` appears in the example of the reading of messages. |
+| `message.reaction`: `id`, `from`, `fromMe`, `participant`, `to`, `timestamp`, `reaction` (`text`, `messageId`); empty `text` removes the reaction | [documentation] |
+| `message.edited`: `id`, `editedMessageId` (without the chat), `body`, `_data` | [documentation] |
+| `message.revoked`: `after` (`id`, `_data`), `revokedMessageId` (without the chat), `before` (almost always null) | [documentation] |
+| Resend: `constant`, `linear`, `exponential` (with 20% of variation) | [documentation] The page does not say when it gives up; the "about 2 minutes" of the pitfalls is [observed] in the checked version. |
 
-### Leitura
+### Reading
 
-| Formato | Origem e observação |
+| Format | Origin and remark |
 |---|---|
-| `GET /api/{s}/chats/overview?limit&offset` → `[{"id", "name", "picture", "lastMessage", "_chat"}]` | [documentação] A ordem padrão não está escrita. |
-| `GET /api/{s}/chats/{chat}/messages?limit&offset&downloadMedia=false&filter.timestamp.gte&filter.timestamp.lte` | [documentação] Os filtros de tempo estão em segundos (o exemplo é `1727745026`). A ordem padrão não está escrita: o hub ordena da mais nova para a mais antiga. |
-| Uma mensagem lida: `id`, `timestamp`, `from`, `fromMe`, `body`, `hasMedia`, `ack`, `ackName`, `replyTo`, `_data` | [documentação] |
-| Identificador de mensagem: `false_{conversa}_{id}`, e num grupo `false_{grupo}_{id}_{autor}` | [documentação] O `true_` (enviada pelo número) não aparece nos exemplos de mensagem, só no nome de um arquivo: a conferir. O hub exige a forma completa para editar e apagar. |
-| `GET /api/{s}/chats/{chat}/messages/{id}?downloadMedia=true` → `media.url` = `.../api/files/{arquivo}`, baixado com `X-Api-Key` | [documentação] O exemplo é `/api/files/true_..._....jpg`, com `@` no nome. O hub nunca segue o endereço: pega só o caminho, sob `/api/files/`, num alfabeto estreito, e o pede ao motor que ele conhece, com a chave. |
-| `GET /api/contacts?contactId&session` → `id`, `name`, `pushname`, `shortName`, `isMyContact` | [documentação] Não traz "conta comercial": o hub devolve esse dado como desconhecido. |
-| `GET /api/contacts/about?contactId&session` → `{"about"}`; `GET /api/contacts/profile-picture?contactId&session` → `{"profilePictureURL"}` | [documentação] |
-| `GET /api/{s}/groups?limit&offset` | [documentação] "Depende do mecanismo interno": o hub aceita lista ou objeto por identificador. A contagem de participantes é a da lista (armadilha). |
-| `GET /api/{s}/groups/{grupo}`; `GET /api/{s}/groups/{grupo}/participants/v2` → `[{"id", "role"}]`, papéis `left`, `participant`, `admin`, `superadmin` | [documentação] O formato da resposta do grupo (assunto, descrição) não está na página: a conferir. Participante pode vir como `@lid`. |
+| `GET /api/{s}/chats/overview?limit&offset` → `[{"id", "name", "picture", "lastMessage", "_chat"}]` | [documentation] The default order is not written. |
+| `GET /api/{s}/chats/{chat}/messages?limit&offset&downloadMedia=false&filter.timestamp.gte&filter.timestamp.lte` | [documentation] The time filters are in seconds (the example is `1727745026`). The default order is not written: the hub sorts from the newest to the oldest. |
+| A message read: `id`, `timestamp`, `from`, `fromMe`, `body`, `hasMedia`, `ack`, `ackName`, `replyTo`, `_data` | [documentation] |
+| Message identifier: `false_{chat}_{id}`, and in a group `false_{group}_{id}_{author}` | [documentation] The `true_` (sent by the number) does not appear in the message examples, only in the name of a file: to check. The hub requires the complete form to edit and to delete. |
+| `GET /api/{s}/chats/{chat}/messages/{id}?downloadMedia=true` → `media.url` = `.../api/files/{file}`, downloaded with `X-Api-Key` | [documentation] The example is `/api/files/true_..._....jpg`, with `@` in the name. The hub never follows the address: it takes only the path, under `/api/files/`, in a narrow alphabet, and asks for it from the engine it knows, with the key. |
+| `GET /api/contacts?contactId&session` → `id`, `name`, `pushname`, `shortName`, `isMyContact` | [documentation] It does not bring "business account": the hub returns that data as unknown. |
+| `GET /api/contacts/about?contactId&session` → `{"about"}`; `GET /api/contacts/profile-picture?contactId&session` → `{"profilePictureURL"}` | [documentation] |
+| `GET /api/{s}/groups?limit&offset` | [documentation] "It depends on the internal mechanism": the hub accepts a list or an object by identifier. The count of participants is that of the list (pitfall). |
+| `GET /api/{s}/groups/{group}`; `GET /api/{s}/groups/{group}/participants/v2` → `[{"id", "role"}]`, roles `left`, `participant`, `admin`, `superadmin` | [documentation] The format of the group's response (subject, description) is not on the page: to check. A participant may come as `@lid`. |
 
-### Envio e mudança
+### Sending and changing
 
-| Formato | Origem e observação |
+| Format | Origin and remark |
 |---|---|
-| `GET /api/contacts/check-exists?phone&session` → `{"numberExists", "chatId", "pn"}` | [documentação] A página diz que números brasileiros anteriores a 2012 não têm o nono dígito e manda conferir antes de escrever: o hub tenta as duas formas. |
-| `POST /api/sendText`: `session`, `chatId`, `text`, `reply_to`, `mentions`, `linkPreview` | [documentação] A menção também precisa estar no texto (`@número`): isso fica com quem escreve. A resposta (o identificador da mensagem enviada) não está na página: a conferir; sem identificador, o hub devolve "enviado" sem ele. |
-| `POST /api/sendImage`, `/api/sendFile`, `/api/sendVoice`: `file` (`mimetype`, `filename`, `data` em base64), `caption`; voz com `convert` | [documentação] Só por conteúdo no MVP; o hub nunca manda `file.url`. |
-| `POST /api/sendSeen`: `session`, `chatId`; sem `messageIds`, marca todas as não lidas | [documentação] |
-| `POST /api/startTyping`, `POST /api/stopTyping` | [documentação] O corpo não está na página: a conferir. O hub manda `session` e `chatId`. |
-| `PUT /api/reaction`: `session`, `messageId`, `reaction` | [documentação] "Reaction API uses PUT, not POST"; a tabela da mesma página diz POST. O hub usa PUT. |
-| `POST /api/forwardMessage`: `session`, `chatId`, `messageId` | [documentação] Pode falhar para conversa que nunca recebeu mensagem. |
-| `PUT /api/{s}/chats/{chat}/messages/{id}`: `text`, `linkPreview` | [documentação] O perigo de editar sem texto está nas armadilhas ([código]); a página não fala dele. |
-| `DELETE /api/{s}/chats/{chat}/messages/{id}` | [documentação] |
-| Limites do WhatsApp na sessão (`me.messageCapping`, `me.reachoutTimelock`) | A conferir: os nomes vêm do [código] da versão conferida, não da documentação. O hub só diz se existem. Um 429 do motor é lido como limite do WhatsApp. |
+| `GET /api/contacts/check-exists?phone&session` → `{"numberExists", "chatId", "pn"}` | [documentation] The page says that Brazilian numbers from before 2012 do not have the ninth digit and tells to check before writing: the hub tries both forms. |
+| `POST /api/sendText`: `session`, `chatId`, `text`, `reply_to`, `mentions`, `linkPreview` | [documentation] The mention also needs to be in the text (`@number`): that stays with whoever writes. The response (the identifier of the sent message) is not on the page: to check; without an identifier, the hub returns "sent" without it. |
+| `POST /api/sendImage`, `/api/sendFile`, `/api/sendVoice`: `file` (`mimetype`, `filename`, `data` in base64), `caption`; voice with `convert` | [documentation] Only by content in the MVP; the hub never sends `file.url`. |
+| `POST /api/sendSeen`: `session`, `chatId`; without `messageIds`, it marks all the unread ones | [documentation] |
+| `POST /api/startTyping`, `POST /api/stopTyping` | [documentation] The body is not on the page: to check. The hub sends `session` and `chatId`. |
+| `PUT /api/reaction`: `session`, `messageId`, `reaction` | [documentation] "Reaction API uses PUT, not POST"; the table on the same page says POST. The hub uses PUT. |
+| `POST /api/forwardMessage`: `session`, `chatId`, `messageId` | [documentation] It may fail for a chat that never received a message. |
+| `PUT /api/{s}/chats/{chat}/messages/{id}`: `text`, `linkPreview` | [documentation] The danger of editing without text is in the pitfalls ([code]); the page does not speak of it. |
+| `DELETE /api/{s}/chats/{chat}/messages/{id}` | [documentation] |
+| WhatsApp limits on the session (`me.messageCapping`, `me.reachoutTimelock`) | To check: the names come from the [code] of the checked version, not from the documentation. The hub only says whether they exist. A 429 from the engine is read as a WhatsApp limit. |
 
-### Teste de contrato
+### Contract test
 
-Fica em `crates/arauto-hub/tests/whatsapp_contract.rs`, marcado `#[ignore]`: nunca roda na suíte
-normal. Ele só fala com um motor e um número de teste, e só lê, a não ser que o envio seja pedido.
+It is in `crates/arauto-hub/tests/whatsapp_contract.rs`, marked `#[ignore]`: it never runs in the
+normal suite. It only talks to a test engine and a test number, and only reads, unless the sending
+is requested.
 
 ```
 cargo test -p arauto-hub --test whatsapp_contract -- --ignored --nocapture
 ```
 
-| Variável | Para quê |
+| Variable | What for |
 |---|---|
-| `ARAUTO_CONTRACT_ENGINE_URL` | O endereço do motor de teste, `http://host:porta`. |
-| `ARAUTO_CONTRACT_ENGINE_KEY` | A chave da API dele. |
-| `ARAUTO_CONTRACT_SESSION` | Uma sessão do motor já pareada com o número de teste. |
-| `ARAUTO_CONTRACT_PHONE` | O telefone de teste dessa sessão, para a conferência das duas formas. |
-| `ARAUTO_CONTRACT_SEND_TO` | Opcional: o telefone de teste que recebe um texto e uma reação. Sem ela, nada é enviado. |
+| `ARAUTO_CONTRACT_ENGINE_URL` | The address of the test engine, `http://host:port`. |
+| `ARAUTO_CONTRACT_ENGINE_KEY` | Its API key. |
+| `ARAUTO_CONTRACT_SESSION` | An engine session already paired with the test number. |
+| `ARAUTO_CONTRACT_PHONE` | The test phone of that session, for the check of the two forms. |
+| `ARAUTO_CONTRACT_SEND_TO` | Optional: the test phone that receives a text and a reaction. Without it, nothing is sent. |
 
-Ele confere a saúde e a versão, a sessão, as conversas, as mensagens de uma conversa, os grupos com
-os participantes, um contato e a conferência do telefone, e, com o envio pedido, o texto e a reação.
-O formato do evento de mensagem ainda se confere à mão, olhando o que chega à caixa de entrada.
+It checks the health and the version, the session, the chats, the messages of a chat, the groups
+with the participants, a contact and the check of the phone, and, with the sending requested, the
+text and the reaction. The format of the message event is still checked by hand, looking at what
+arrives at the hub's inbox.

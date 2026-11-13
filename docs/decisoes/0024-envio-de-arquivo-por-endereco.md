@@ -1,16 +1,16 @@
-# 0024 — Envio de arquivo por endereço
+# 0024 — Sending a file by address
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-Uma ferramenta que envia um arquivo a partir de um endereço faz o hub buscar algo escolhido por outro. O serviço de origem resolve isso baixando ele mesmo, e só de endereço público.
+A tool that sends a file from an address makes the hub fetch something chosen by someone else. The source service solves this by downloading it itself, and only from a public address.
 
-## Decisão
+## Decision
 
-Manter o envio por endereço, como na origem: quem baixa é o hub, e só de endereço público. O envio por conteúdo continua existindo ao lado dele.
+Keep the sending by address, as in the source: who downloads is the hub, and only from a public address. The sending by content continues to exist beside it.
 
-## Consequências
+## Consequences
 
-- O hub precisa recusar endereço que leve à rede interna, também depois de um redirecionamento e da resolução do nome. A regra vem com teste, na Fase 2 do [roteiro](../12-roteiro.md).
-- A alternativa considerada, aceitar só conteúdo na primeira versão, eliminaria essa classe de ataque, ao custo de dividir arquivos grandes em partes pelo canal.
+- The hub needs to refuse an address that leads to the internal network, also after a redirect and after the resolution of the name. The rule comes with a test, in Phase 2 of the [roadmap](../12-roteiro.md).
+- The alternative considered, accepting only content in the first version, would eliminate this class of attack, at the cost of splitting large files into parts over the channel.

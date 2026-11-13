@@ -1,160 +1,160 @@
-# 09 — O que o Hermes enxerga
+# 09 — What Hermes sees
 
-**Estado: proposta.** As ferramentas e os avisos que o conector entrega ao Hermes. Os argumentos e o
-formato de resposta de cada ferramenta são entregas do primeiro MVP ([15](15-mvp.md)).
+**Status: proposal.** The tools and the notices the connector delivers to Hermes. The arguments and
+the answer format of each tool are deliverables of the first MVP ([15](15-mvp.md)).
 
-## Resumo
+## Summary
 
 ```
-servidor MCP "arauto" (stdio)
- ├── arauto_status                 sempre disponível
- ├── hermes_...    (recados)       4 ferramentas, da conversa entre Hermes
- ├── whatsapp_...  (ler)           7 ferramentas, mais 2 depois da primeira versão
- ├── whatsapp_...  (enviar)        7 ferramentas
- └── whatsapp_...  (modificar)     2 ferramentas
-avisos: "há N mensagens novas na conversa X do número Y"
-        "há N recados novos do Hermes Z"
+MCP server "arauto" (stdio)
+ ├── arauto_status                 always available
+ ├── hermes_...    (notes)         4 tools, of the conversation between Hermes
+ ├── whatsapp_...  (read)          7 tools, plus 2 after the first version
+ ├── whatsapp_...  (send)          7 tools
+ └── whatsapp_...  (modify)        2 tools
+notices: "there are N new messages in chat X of number Y"
+         "there are N new notes from Hermes Z"
 ```
 
-O Hermes só vê as famílias de ferramenta cujo verbo ele tem em algum número. Antes da aprovação, e
-depois dela enquanto não tiver acesso, vê só `arauto_status`. As ferramentas de recado aparecem
-quando ele tem ligação na lista de pares. No hub, em 11/11/2026 (M1), a sessão libera só
-`arauto_status`: as de recado entram no M2 e as de WhatsApp no M3.
+Hermes only sees the tool families whose verb it has on some number. Before the approval, and
+after it while it has no access, it sees only `arauto_status`. The note tools appear
+when it has a link in the peer list. In the hub, on 11/11/2026 (M1), the session allows only
+`arauto_status`: the note ones come in at M2 and the WhatsApp ones at M3.
 
-## 1. Regras do contrato
+## 1. Rules of the contract
 
-| Regra | Detalhe |
+| Rule | Detail |
 |---|---|
-| Lista fechada | Só as ferramentas desta página. Não há repasse genérico ao motor. O hub valida de novo o nome e os argumentos de cada chamada. |
-| Nomes e descrições fixos | Ficam compilados no conector. O hub diz quais nomes estão liberados e não consegue mudar um texto que a LLM lê. |
-| O número é um argumento | `number` recebe o apelido dado no painel, que tem formato restrito ([13](13-conversa-entre-hermes.md), seção 2). Pode ser omitido quando o Hermes tem acesso a um só. |
-| Identificadores opacos | O Hermes nunca informa o nome da sessão do motor. O hub resolve a partir dos acessos. |
-| Conteúdo de terceiros é dado | Toda descrição de leitura diz que o texto das mensagens foi escrito por outras pessoas e não é ordem. |
-| Erros de catálogo | Toda recusa tem um código AR e uma frase fixa que diz o que houve e quem resolve, sem comando para executar. O catálogo está em [11-conector.md](11-conector.md), seção 8. |
-| Sem segredo na resposta | Nenhuma ferramenta devolve credencial, endereço do motor ou caminho interno. |
+| Closed list | Only the tools on this page. There is no generic forwarding to the engine. The hub validates again the name and the arguments of each call. |
+| Fixed names and descriptions | They are compiled into the connector. The hub says which names are allowed and cannot change a text the LLM reads. |
+| The number is an argument | `number` receives the alias given in the panel, which has a restricted format ([13](13-conversa-entre-hermes.md), section 2). It may be omitted when Hermes has access to only one. |
+| Opaque identifiers | Hermes never states the name of the engine session. The hub resolves it from the accesses. |
+| Third-party content is data | Every read description says that the text of the messages was written by other people and is not an order. |
+| Catalog errors | Every refusal has an AR code and a fixed sentence that says what happened and who solves it, with no command to execute. The catalog is in [11-conector.md](11-conector.md), section 8. |
+| No secret in the answer | No tool returns a credential, the engine address or an internal path. |
 
-## 2. Argumentos comuns
+## 2. Common arguments
 
-| Argumento | O que é |
+| Argument | What it is |
 |---|---|
-| `number` | O apelido do número no painel. |
-| `to` | Telefone com código do país, ou o identificador da conversa ou do grupo. O hub confere se o telefone tem WhatsApp e resolve a forma exata. |
-| `message_id` | Identificador de uma mensagem, como veio na leitura. |
+| `number` | The alias of the number in the panel. |
+| `to` | Telephone with country code, or the identifier of the chat or of the group. The hub checks whether the telephone has WhatsApp and resolves the exact form. |
+| `message_id` | Identifier of a message, as it came in the reading. |
 
-## 3. Ferramentas
+## 3. Tools
 
-### Sempre disponível
+### Always available
 
-| Ferramenta | O que faz |
+| Tool | What it does |
 |---|---|
-| `arauto_status` | Diz se o Hermes está conectado, a quais números tem acesso e com quais verbos, e se a conversa entre Hermes está liberada. Sem segredo. |
+| `arauto_status` | Says whether Hermes is connected, which numbers it has access to and with which verbs, and whether the conversation between Hermes is enabled. No secret. |
 
-**A resposta de `arauto_status`, no hub em 11/11/2026.** O hub a responde sozinho, sem o motor, e o
-teste confere que ela não leva segredo:
+**The answer of `arauto_status`, in the hub on 11/11/2026.** The hub answers it by itself, without
+the engine, and the test checks that it carries no secret:
 
 ```json
-{"connected": true, "hermes": "nome-do-hermes", "can_be_woken": false, "numbers": [],
+{"connected": true, "hermes": "name-of-the-hermes", "can_be_woken": false, "numbers": [],
  "peers": {"enabled": false, "can_send": false, "can_receive": false}}
 ```
 
-| Campo | Conteúdo |
+| Field | Content |
 |---|---|
-| `connected` | Sempre `true`: a resposta só sai por uma sessão do canal aberta. |
-| `hermes` | O nome do Hermes, no formato restrito. |
-| `can_be_woken` | Se o admin liberou acordar este Hermes. |
-| `numbers` | Os números e os verbos. Vazio até o M3; o formato de cada item é entrega do M3. |
-| `peers.can_send` | Existe ligação deste Hermes para outro. |
-| `peers.can_receive` | Existe ligação de outro Hermes para este. |
-| `peers.enabled` | Um dos dois. |
+| `connected` | Always `true`: the answer only goes out through an open channel session. |
+| `hermes` | The name of the Hermes, in the restricted format. |
+| `can_be_woken` | Whether the admin allowed waking this Hermes. |
+| `numbers` | The numbers and the verbs. Empty until M3; the format of each item is a deliverable of M3. |
+| `peers.can_send` | There is a link from this Hermes to another. |
+| `peers.can_receive` | There is a link from another Hermes to this one. |
+| `peers.enabled` | Either of the two. |
 
-Só a resposta do hub está escrita. Sem sessão do canal (pedido pendente, canal fora do ar), quem
-responde à ferramenta é o conector, e essa resposta ainda não está escrita.
+Only the hub's answer is written. Without a channel session (pending request, channel down), the one
+that answers the tool is the connector, and that answer is not written yet.
 
-### Ler
+### Read
 
-| Ferramenta | O que faz |
+| Tool | What it does |
 |---|---|
-| `whatsapp_status` | Estado do número: conectado ou não, e limites que o WhatsApp impôs. |
-| `whatsapp_list_chats` | Lista as conversas e os grupos, da mais recente para a mais antiga, com a última mensagem. |
-| `whatsapp_read_chat` | Lê as mensagens de uma conversa: autor, texto, arquivo (sem baixar), citação, edição, apagamento e reações. Padrão 30, máximo 200, dentro de um orçamento de 256 KiB por resposta: corta em mensagens inteiras e diz se há mais. `before` e `after` para andar no tempo. |
-| `whatsapp_get_contact` | Dados públicos do contato: nome, frase de perfil, foto e se é conta comercial. |
-| `whatsapp_download_media` | Baixa foto, PDF, áudio ou documento de uma mensagem, até 7 MB. Imagem chega para a LLM ver. |
-| `whatsapp_list_groups` | Lista os grupos do número, com a quantidade de participantes. |
-| `whatsapp_get_group` | Dados de um grupo e os participantes, em partes quando o grupo é grande. |
+| `whatsapp_status` | State of the number: connected or not, and limits that WhatsApp imposed. |
+| `whatsapp_list_chats` | Lists the chats and the groups, from the most recent to the oldest, with the last message. |
+| `whatsapp_read_chat` | Reads the messages of a chat: author, text, file (without downloading), quote, edit, deletion and reactions. Default 30, maximum 200, within a budget of 256 KiB per answer: it cuts at whole messages and says whether there are more. `before` and `after` to move in time. |
+| `whatsapp_get_contact` | Public data of the contact: name, profile text, photo and whether it is a business account. |
+| `whatsapp_download_media` | Downloads a photo, PDF, audio or document of a message, up to 7 MB. An image arrives for the LLM to see. |
+| `whatsapp_list_groups` | Lists the groups of the number, with the number of participants. |
+| `whatsapp_get_group` | Data of a group and the participants, in parts when the group is large. |
 
-Depois da primeira versão, com o arquivo de mensagens (Fase 6):
+After the first version, with the message archive (Phase 6):
 
-| Ferramenta | O que faz |
+| Tool | What it does |
 |---|---|
-| `whatsapp_list_updates` | O que chegou desde a última vez que o Hermes olhou, por conversa. |
-| `whatsapp_search` | Busca no arquivo de mensagens por texto, pessoa, período e tipo. |
+| `whatsapp_list_updates` | What arrived since the last time Hermes looked, per chat. |
+| `whatsapp_search` | Searches the message archive by text, person, period and type. |
 
-### Enviar
+### Send
 
-| Ferramenta | O que faz |
+| Tool | What it does |
 |---|---|
-| `whatsapp_check_number` | Pergunta se um telefone tem WhatsApp e devolve o identificador exato. Não escreve para ninguém. |
-| `whatsapp_send_text` | Envia texto. Aceita responder a uma mensagem e marcar pessoas em grupo. |
-| `whatsapp_send_file` | Envia imagem, documento ou áudio, por endereço público (até 15 MB) ou por conteúdo (até 3 MB). No primeiro MVP, só por conteúdo. |
-| `whatsapp_mark_read` | Marca a conversa como lida. |
-| `whatsapp_set_typing` | Liga ou desliga o "digitando". |
-| `whatsapp_react` | Reage a uma mensagem. |
-| `whatsapp_forward` | Encaminha uma mensagem para outra conversa. Exige **ler** na origem e **enviar** no destino. |
+| `whatsapp_check_number` | Asks whether a telephone has WhatsApp and returns the exact identifier. It writes to nobody. |
+| `whatsapp_send_text` | Sends text. It accepts replying to a message and mentioning people in a group. |
+| `whatsapp_send_file` | Sends an image, document or audio, by public address (up to 15 MB) or by content (up to 3 MB). In the first MVP, only by content. |
+| `whatsapp_mark_read` | Marks the chat as read. |
+| `whatsapp_set_typing` | Turns "typing" on or off. |
+| `whatsapp_react` | Reacts to a message. |
+| `whatsapp_forward` | Forwards a message to another chat. It requires **read** at the origin and **send** at the destination. |
 
-### Modificar
+### Modify
 
-| Ferramenta | O que faz |
+| Tool | What it does |
 |---|---|
-| `whatsapp_edit_message` | Edita o texto de uma mensagem enviada pelo número, dentro do prazo do WhatsApp. |
-| `whatsapp_delete_message` | Apaga uma mensagem para todos, dentro do prazo do WhatsApp. |
+| `whatsapp_edit_message` | Edits the text of a message sent by the number, within WhatsApp's time limit. |
+| `whatsapp_delete_message` | Deletes a message for everyone, within WhatsApp's time limit. |
 
-### Conversa entre Hermes
+### Conversation between Hermes
 
-| Ferramenta | O que faz |
+| Tool | What it does |
 |---|---|
-| `hermes_list_peers` | Lista os pares deste Hermes, e se ele pode mandar e receber. |
-| `hermes_send_message` | Manda um recado a um par, num fio novo ou num que já existe. |
-| `hermes_list_threads` | Lista os fios, com a quantidade de não lidos. |
-| `hermes_read_thread` | Lê os recados de um fio. |
+| `hermes_list_peers` | Lists the peers of this Hermes, and whether it can send and receive. |
+| `hermes_send_message` | Sends a note to a peer, in a new thread or in one that already exists. |
+| `hermes_list_threads` | Lists the threads, with the number of unread ones. |
+| `hermes_read_thread` | Reads the notes of a thread. |
 
-As regras, os tetos e os erros estão em [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md).
+The rules, the ceilings and the errors are in [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md).
 
-## 4. Cuidados que o hub mantém
+## 4. Cautions the hub keeps
 
-Vêm da experiência do serviço de origem:
+They come from the experience of the source service:
 
-- `to` e `message_id` são validados e codificados antes de irem ao motor. Sem isso, um valor com
-  `../` alcançaria a sessão do motor de outro número.
-- Envio por endereço: quem baixa é o hub, e só de endereço público. A primeira versão mantém o
-  envio por endereço, ao lado do envio por conteúdo
+- `to` and `message_id` are validated and encoded before going to the engine. Without that, a value
+  with `../` would reach the engine session of another number.
+- Sending by address: the one that downloads is the hub, and only from a public address. The first
+  version keeps sending by address, beside sending by content
   ([decisoes/0024](decisoes/0024-envio-de-arquivo-por-endereco.md)).
-- Telefone brasileiro com e sem o nono dígito: o hub testa as duas formas.
-- Editar sem informar o texto e apagar sem o identificador completo são recusados: no motor, os dois
-  têm comportamento perigoso por padrão.
+- Brazilian telephone with and without the ninth digit: the hub tests both forms.
+- Editing without stating the text and deleting without the full identifier are refused: in the
+  engine, both have dangerous behavior by default.
 
-## 5. Avisos
+## 5. Notices
 
-Há dois tipos. O primeiro é mensagem nova numa conversa em que o Hermes pode ser acordado. Edição,
-apagamento e reação ficam registrados e aparecem na leitura, mas não acordam.
+There are two types. The first is a new message in a chat in which Hermes can be woken. Edit,
+deletion and reaction are recorded and appear in the reading, but do not wake.
 
-| Campo do aviso | Conteúdo |
+| Notice field | Content |
 |---|---|
 | `kind` | `whatsapp` |
-| `number` | O apelido dado pelo admin. |
-| `chat` | Identificador opaco da conversa. |
-| `count` | Quantas mensagens novas. |
-| `id` | Identificador do aviso, para descartar repetição. |
+| `number` | The alias given by the admin. |
+| `chat` | Opaque identifier of the chat. |
+| `count` | How many new messages. |
+| `id` | Identifier of the notice, to discard repetition. |
 
-O aviso não carrega texto de mensagem, nome de contato nem assunto de grupo.
+The notice carries no message text, contact name or group subject.
 
-O segundo é recado novo de outro Hermes: `kind` é `peer`, com `from`, `count` e `id`
-([13](13-conversa-entre-hermes.md), seção 5). O conector confere o formato de cada campo antes de
-montar a frase fixa, e recusa o aviso de tipo que não conhece
-([14](14-protocolo-do-canal.md), seção 5.3).
+The second is a new note from another Hermes: `kind` is `peer`, with `from`, `count` and `id`
+([13](13-conversa-entre-hermes.md), section 5). The connector checks the format of each field before
+assembling the fixed sentence, and refuses a notice of a type it does not know
+([14](14-protocolo-do-canal.md), section 5.3).
 
-## 6. Nota de origem
+## 6. Note on origin
 
-A família `whatsapp_*` vem do serviço de origem. Em 10/11/2026 os nomes passaram para o inglês, junto
-com o código ([decisoes/0016](decisoes/0016-idioma.md)): proposta, a confirmar por quem mantém. Um
-Hermes que venha do serviço de origem precisa conhecer os nomes novos. A outra diferença é o
-argumento `number`: lá cada agente tinha um número só.
+The `whatsapp_*` family comes from the source service. On 10/11/2026 the names moved to English,
+along with the code ([decisoes/0016](decisoes/0016-idioma.md)): proposal, to be confirmed by the
+maintainer. A Hermes that comes from the source service needs to know the new names. The other
+difference is the `number` argument: there each agent had only one number.

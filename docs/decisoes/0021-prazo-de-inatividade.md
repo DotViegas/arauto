@@ -1,19 +1,19 @@
-# 0021 — Prazo de inatividade
+# 0021 — Inactivity deadline
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-O uso de uma cópia da credencial só é descoberto quando o Hermes verdadeiro volta. Um Hermes desligado para sempre e nunca revogado nunca volta.
+The use of a copy of the credential is only discovered when the true Hermes comes back. A Hermes turned off forever and never revoked never comes back.
 
-## Decisão
+## Decision
 
-Um aparelho ativo que fica 30 dias sem conectar passa a vencido e só volta com Reconectar, por convite novo. Os acessos do Hermes ficam guardados.
+An active device that goes 30 days without connecting becomes expired and only comes back with Reconnect, by a new invite. The accesses of the Hermes are kept.
 
-## Consequências
+## Consequences
 
-- Pega a cópia usada pela primeira vez depois do prazo.
-- Não pega a cópia que já está em uso: ela conecta como o aparelho, e o prazo nunca vence.
-- A alternativa que fecharia o caso inteiro, uma validade máxima do aparelho, não foi adotada: custaria reconectar de tempos em tempos.
-- Um aparelho vencido por inatividade que apresenta uma credencial mais antiga do que a última gera o alerta de reuso depois do encerramento, e o reconectar mostra o último uso dele ([04-seguranca-conexao.md](../04-seguranca-conexao.md), C7 e C10). Sem isso, o uso de uma cópia deixaria de aparecer depois do prazo.
-- O aparelho vencido por inatividade recebe o erro AR-507 ([11-conector.md](../11-conector.md), seção 8). Falta escrever o rótulo dele no painel.
+- It catches the copy used for the first time after the deadline.
+- It does not catch the copy that is already in use: it connects as the device, and the deadline never expires.
+- The alternative that would close the whole case, a maximum validity of the device, was not adopted: it would cost reconnecting from time to time.
+- A device expired by inactivity that presents a credential older than the last one generates the alert of reuse after closing, and the reconnect shows its last use ([04-seguranca-conexao.md](../04-seguranca-conexao.md), C7 and C10). Without this, the use of a copy would stop showing up after the deadline.
+- The device expired by inactivity receives the error AR-507 ([11-conector.md](../11-conector.md), section 8). Its label in the panel is still to be written.

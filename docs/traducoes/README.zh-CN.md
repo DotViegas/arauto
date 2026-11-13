@@ -46,7 +46,7 @@
 
 Hermes Agent 是 Nous Research 的 AI 智能体。Arauto 是一个独立项目：与 Hermes Agent 的作者以及 WhatsApp 均无关联。
 
-本页链接的文档均以葡萄牙语撰写。
+本页链接的文档均以英语撰写。
 
 ## 一图看懂
 
@@ -65,7 +65,7 @@ Hermes Agent 是 Nous Research 的 AI 智能体。Arauto 是一个独立项目�
 
 ## 使用前须知
 
-- 通过 hub 的号码收到的内容是**信息，绝不是命令**。Arauto 不是你指挥智能体的通道：指挥仍然走 Hermes 自己的指令通道（[愿景](../01-visao.md)，“Dois WhatsApps, dois papéis”）。
+- 通过 hub 的号码收到的内容是**信息，绝不是命令**。Arauto 不是你指挥智能体的通道：指挥仍然走 Hermes 自己的指令通道（[愿景](../01-visao.md)，“Two WhatsApps, two roles”）。
 - WhatsApp 引擎是**非官方客户端**。WhatsApp 可能封禁号码。请使用你承受得起丢失的号码。
 - 安全性有已知的限制，写在 [SECURITY.md](../../SECURITY.md) 和 [docs/05-modelo-de-ameacas.md](../05-modelo-de-ameacas.md) 中。
 - 设计尚未得到验证。其中一部分内容取决于[第 1 阶段](../12-roteiro.md)的测试。

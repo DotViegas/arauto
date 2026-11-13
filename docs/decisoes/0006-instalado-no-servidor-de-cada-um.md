@@ -1,18 +1,18 @@
-# 0006 — Instalado no servidor de cada um
+# 0006 — Installed on each one's own server
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Um hub central guardaria as conversas e as sessões do motor de todos os que o usam e concentraria o risco num lugar só.
+A central hub would keep the chats and the engine sessions of everyone who uses it and would concentrate the risk in one place only.
 
-## Decisão
+## Decision
 
-O Arauto é instalado no servidor de quem o usa, uma organização por instalação. O banco nasce separado por organização, para que um hub possa servir a várias sem reescrita.
+Arauto is installed on the server of whoever uses it, one organization per installation. The database is born separated by organization, so that a hub can serve several without a rewrite.
 
-## Consequências
+## Consequences
 
-- Conversas, sessões do motor e chaves ficam com quem instala.
-- Toda tabela de negócio pertence a uma organização desde a primeira migração.
-- Com várias organizações num hub, um motor para cada uma: nunca compartilhado.
-- Não se constrói agora: cadastro aberto ao público e limites de uso por organização.
+- Chats, engine sessions and keys stay with whoever installs.
+- Every business table belongs to an organization from the first migration.
+- With several organizations on a hub, one engine for each: never shared.
+- Not built now: sign-up open to the public and usage limits per organization.

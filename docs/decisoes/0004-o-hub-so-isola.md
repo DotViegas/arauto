@@ -1,17 +1,17 @@
-# 0004 — O hub só isola
+# 0004 — The hub only isolates
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Seria fácil pôr no hub regras de conduta: horário, palavras proibidas, fila de atendimento, aprovação de envio. Cada uma delas é uma opinião sobre como um agente deve se comportar.
+It would be easy to put rules of conduct in the hub: hours, forbidden words, service queue, approval of sending. Each of them is an opinion about how an agent should behave.
 
-## Decisão
+## Decision
 
-O hub não tem regra de negócio. A única coisa que ele impõe é o isolamento: um Hermes só alcança o que lhe foi dado. A conduta é do Hermes.
+The hub has no business rule. The only thing it imposes is isolation: a Hermes only reaches what it was given. The conduct belongs to Hermes.
 
-## Consequências
+## Consequences
 
-- O hub não filtra conteúdo, não responde sozinho e não escolhe qual Hermes age.
-- Quando dois Hermes se sobrepõem, o painel avisa e não impede.
-- Limites puramente técnicos precisam ser justificados como isolamento ([0020](0020-teto-de-envio.md)).
+- The hub does not filter content, does not answer on its own and does not choose which Hermes acts.
+- When two Hermes overlap, the panel warns and does not prevent.
+- Purely technical limits need to be justified as isolation ([0020](0020-teto-de-envio.md)).

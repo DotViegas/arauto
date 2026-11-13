@@ -1,16 +1,16 @@
-# 0015 — Licença do projeto
+# 0015 — License of the project
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-Sem licença, um repositório público não é código aberto: ninguém pode usá-lo com segurança jurídica.
+Without a license, a public repository is not open source: nobody can use it with legal certainty.
 
-## Decisão
+## Decision
 
-Apache-2.0. Permite uso, mudança e redistribuição por qualquer pessoa ou organização, sem obrigação de publicar as mudanças, e inclui proteção contra patente. A alternativa considerada era uma licença que obrigasse a publicar as mudanças de quem oferecesse o programa como serviço.
+Apache-2.0. It allows use, change and redistribution by any person or organization, with no obligation to publish the changes, and includes protection against patents. The alternative considered was a license that would oblige whoever offered the program as a service to publish their changes.
 
-## Consequências
+## Consequences
 
-- O texto da licença está no arquivo [LICENSE](../../LICENSE), na raiz do repositório.
-- Fica para a abertura do repositório ([roteiro](../12-roteiro.md), Fase 7) dizer em nome de quem sai o aviso de direitos autorais.
+- The text of the license is in the file [LICENSE](../../LICENSE), at the root of the repository.
+- It is left to the opening of the repository ([roadmap](../12-roteiro.md), Phase 7) to say in whose name the copyright notice goes out.

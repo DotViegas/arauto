@@ -1,171 +1,173 @@
-# 03 — Arquitetura
+# 03 — Architecture
 
-**Estado: proposta.** As peças, o que cada uma faz e por onde elas se falam. Ainda não há código: os
-verbos no presente descrevem o desenho.
+**Status: proposal.** The parts, what each one does and where they talk to each other. There is no
+code yet: the verbs in the present tense describe the design.
 
-## Resumo
+## Summary
 
 ```
-      pessoas                                   WhatsApp
+      people                                    WhatsApp
          │                                          │
-      PAINEL                                      MOTOR   (só rede interna)
+      PANEL                                       ENGINE  (internal network only)
          │                                          │
  ┌───────┴──────────────── HUB ─────────────────────┴───────┐
- │  painel │ porta dos conectores │ caixa preta │ adaptador  │
- │  núcleo: acessos, filas, arquivo de mensagens, auditoria  │
+ │  panel  │  port of the connectors  │  vault  │  adapter   │
+ │  core: accesses, queues, message archive, audit           │
  └──────────────────────────▲────────────────────────────────┘
-                            │  canal de saída: websocket, cifrado por dentro
+                            │  outbound channel: websocket, encrypted inside
                             │
-                        CONECTOR   (ao lado do Hermes)
+                        CONNECTOR  (beside Hermes)
                             ▲
-                            │  ferramentas (MCP por stdio)
-                         HERMES ◄──── canal de comando (o operador;
-                                      fora do Arauto)
+                            │  tools (MCP over stdio)
+                         HERMES ◄──── command channel (the operator;
+                                      outside Arauto)
 ```
 
-O projeto tem dois programas, o **hub** e o **conector**, e usa um terceiro, o **motor**, que é de
-quem instala.
+The project has two programs, the **hub** and the **connector**, and uses a third one, the
+**engine**, which belongs to whoever installs.
 
-## 1. O que cada peça faz
+## 1. What each part does
 
-| Peça | Faz | Não faz |
+| Part | Does | Does not do |
 |---|---|---|
-| **Hub** | Mostra o painel, autentica conectores, guarda as conversas, decide cada acesso, comanda o motor. | Não responde mensagem, não filtra conteúdo, não escolhe qual Hermes age. |
-| **Conector** | Entrega as ferramentas ao Hermes, mantém o canal com o hub, acorda o Hermes. | Não decide acesso, não fala com o motor, não executa comando do hub. |
-| **Motor** | Fala com o WhatsApp. | Não é alcançado por ninguém além do hub. |
+| **Hub** | Shows the panel, authenticates connectors, keeps the chats, decides each access, commands the engine. | Does not answer messages, does not filter content, does not choose which Hermes acts. |
+| **Connector** | Delivers the tools to Hermes, keeps the channel with the hub, wakes Hermes. | Does not decide access, does not talk to the engine, does not execute a command from the hub. |
+| **Engine** | Talks to WhatsApp. | Is not reached by anyone other than the hub. |
 
-## 2. Fronteiras
+## 2. Boundaries
 
-- **Só o hub fala com o motor.** O Hermes nunca recebe endereço nem credencial do motor. Arquivos e
-  mensagens passam pelo canal.
-- **O Hermes só abre conexão de saída.** Nenhuma porta de rede nova escuta na máquina do Hermes; o
-  conector usa só um soquete local, entre as próprias cópias. Um Hermes atrás de NAT conecta do mesmo
-  jeito.
-- **Hub e motor são processos separados.** O hub manda no motor pela API dele. Uma versão nova do hub
-  não derruba as sessões do motor.
-- **O hub é a fonte da verdade sobre o motor.** Ele cria as sessões do motor, configura o destino dos
-  eventos e confere tudo de novo a cada partida e a cada 5 minutos. Se achar um destino de eventos
-  que não é o hub, corrige e alerta.
+- **Only the hub talks to the engine.** Hermes never receives the address or the credential of the
+  engine. Files and messages go through the channel.
+- **Hermes only opens outbound connections.** No new network port listens on Hermes's machine; the
+  connector uses only a local socket, between its own copies. A Hermes behind NAT connects the same
+  way.
+- **Hub and engine are separate processes.** The hub commands the engine through its API. A new
+  version of the hub does not bring down the engine sessions.
+- **The hub is the source of truth about the engine.** It creates the engine sessions, configures
+  the destination of the events and checks everything again on every start and every 5 minutes. If
+  it finds an event destination that is not the hub, it fixes it and alerts.
 
-## 3. Módulos do hub
+## 3. Modules of the hub
 
-| Módulo | Responsabilidade |
+| Module | Responsibility |
 |---|---|
-| `panel` | Telas e ações do admin. No hub, em 13/11/2026: as telas de leitura e o guia de conectar Hermes ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
-| `enrollment` | Recebe pedidos de conexão e serve o download do conector. |
-| `channel` | O websocket com cada conector: aperto de mãos, troca da credencial, chamadas e avisos. |
-| `vault` | A caixa preta: sorteia, lacra e abre credenciais. Único módulo que toca a chave-mestra. |
-| `core` | Organizações, Hermes, acessos, filas e auditoria. Sem regra de negócio. |
-| `archive` | O arquivo de mensagens e a busca nele. |
-| `peers` | A conversa entre Hermes: lista de pares, fios, recados e tetos ([13](13-conversa-entre-hermes.md)). |
-| `engine` | O único cliente do motor e o único receptor dos eventos dele. |
+| `panel` | Screens and actions of the admin. In the hub, on 13/11/2026: the read-only screens, the guide to connect Hermes, the editing of accesses and the revoking ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| `enrollment` | Receives connection requests and serves the download of the connector. |
+| `channel` | The websocket with each connector: handshake, swap of the credential, calls and notices. |
+| `vault` | The vault: draws random values, seals and opens credentials. The only module that touches the master key. |
+| `core` | Organizations, Hermes, accesses, queues and audit. No business rule. |
+| `archive` | The message archive and the search in it. |
+| `peers` | The conversation between Hermes: peer list, threads, notes and ceilings ([13](13-conversa-entre-hermes.md)). |
+| `engine` | The only client of the engine and the only receiver of its events. |
 
-O módulo `engine` fica atrás de uma interface, `WhatsappEngine`, com quatro grupos de operação: a vida
-da sessão do motor (criar, configurar, ligar, reiniciar, parear, sair), as conversas (listar, ler,
-grupos, contatos), o envio (texto, arquivo, reação, editar, apagar) e os eventos. O WAHA é um
-adaptador dela. Um segundo adaptador, para a API oficial do WhatsApp, cabe no mesmo lugar. A lista
-exata de operações e o motor falso dos testes são entregas da Fase 2.
+The `engine` module stays behind an interface, `WhatsappEngine`, with four groups of operations: the
+life of the engine session (create, configure, start, restart, pair, log out), the chats (list, read,
+groups, contacts), the sending (text, file, reaction, edit, delete) and the events. WAHA is an
+adapter of it. A second adapter, for the official WhatsApp API, fits in the same place. The exact
+list of operations and the fake engine of the tests are deliveries of Phase 2.
 
-O desenho prevê um único ponto do código que chama o motor, e ele só aceita uma sessão do motor já
-autorizada. O tipo que representa "autorizada" só pode ser criado pela função que confere o acesso.
-A ideia é o isolamento sair da construção, e não de conferências espalhadas.
+The design foresees a single point of the code that calls the engine, and it only accepts an engine
+session that is already authorized. The type that represents "authorized" can only be created by the
+function that checks the access. The idea is for the isolation to come from the construction, and
+not from scattered checks.
 
-## 4. Portas
+## 4. Ports
 
-| Escuta | Quem usa | Onde pode ficar |
+| Listener | Who uses it | Where it may stay |
 |---|---|---|
-| **Painel** | Admins, pelo navegador | Por padrão, só rede privada ou VPN. Quem instala pode abri-lo à internet ([decisoes/0028](decisoes/0028-painel-fechado-por-padrao.md)). |
-| **Conectores** | Os conectores: download, inscrição e canal | Precisa ser alcançável pelos Hermes. |
-| **Eventos do motor** | O motor | Só rede interna. |
-| **Saúde e métricas** | Monitoramento | Só rede interna. |
+| **Panel** | Admins, through the browser | By default, only private network or VPN. Whoever installs may open it to the internet ([decisoes/0028](decisoes/0028-painel-fechado-por-padrao.md)). |
+| **Connectors** | The connectors: download, enrollment and channel | It needs to be reachable by the Hermes. |
+| **Engine events** | The engine | Internal network only. |
+| **Health and metrics** | Monitoring | Internal network only. |
 
-Painel e conectores ficam em endereços diferentes. Assim o login do admin nunca viaja para a porta
-dos conectores. O TLS das duas portas é de quem instala. No hub, em 12/11/2026, o painel tem uma
-porta própria, desligada por padrão, e nenhum endereço dele existe nas outras duas
-([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)).
+Panel and connectors stay at different addresses. This way the admin's login never travels to the
+port of the connectors. The TLS of the two ports belongs to whoever installs. In the hub, on
+12/11/2026, the panel has a port of its own, off by default, and no address of it exists on the
+other two ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)).
 
-## 5. O que roda onde
+## 5. What runs where
 
-Hoje o desenho é de uma instalação por organização, no servidor de quem instala: hub, banco, motor e
-chaves ficam ali, e o conector fica ao lado de cada Hermes.
+Today the design is of one installation per organization, on the server of whoever installs: hub,
+database, engine and keys stay there, and the connector stays beside each Hermes.
 
-O banco já nasce separado por organização. Isso deixa aberta a possibilidade de um hub servir a
-várias organizações, com um motor para cada uma, sem reescrita. O que **não** se constrói agora:
-cadastro aberto ao público e limites de uso por organização.
+The database is already born separated by organization. This leaves open the possibility of one hub
+serving several organizations, with one engine for each, without a rewrite. What is **not** built
+now: registration open to the public and usage limits per organization.
 
-## 6. Tecnologia
+## 6. Technology
 
-| Parte | Escolha |
+| Part | Choice |
 |---|---|
-| Linguagem | Rust, nos dois programas. |
-| Hub | `axum` e `tokio`; PostgreSQL com `sqlx` ([decisão 0031](decisoes/0031-banco-postgresql.md)). |
-| Canal | Websocket com Noise por dentro (`snow`). |
-| Lacre e cifra em repouso | `chacha20poly1305`. |
-| Painel | Páginas geradas no servidor, com modelos de escape automático. Sem framework de frontend. Login por passkey (`webauthn-rs`). No hub, em 12/11/2026: as páginas são escritas pelo próprio programa, com uma função única de escape e sem biblioteca de modelos, e a entrada é por código, enquanto a passkey não existe ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
-| Conector | Um binário estático, sem dependência do sistema. |
-| Entrega do hub | Imagem de container e um arquivo de composição com hub e PostgreSQL. O proxy e o motor são de quem instala: referenciados, não embutidos. |
+| Language | Rust, in both programs. |
+| Hub | `axum` and `tokio`; PostgreSQL with `sqlx` ([decision 0031](decisoes/0031-banco-postgresql.md)). |
+| Channel | Websocket with Noise inside (`snow`). |
+| Seal and encryption at rest | `chacha20poly1305`. |
+| Panel | Pages generated on the server, with templates that escape automatically. No frontend framework. Login by passkey (`webauthn-rs`). In the hub, on 12/11/2026: the pages are written by the program itself, with a single escape function and no template library, and the entry is by code, while the passkey does not exist ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| Connector | A static binary, with no dependency on the system. |
+| Delivery of the hub | A container image and a compose file with hub and PostgreSQL. The proxy and the engine belong to whoever installs: referenced, not embedded. |
 
-**Origem.** As ideias do hub vêm de um serviço particular, que ligava agentes Hermes ao WhatsApp: o
-isolamento entre agentes, as filas no banco, a retomada depois de queda e a reconciliação com o
-motor. O código do Arauto é escrito do zero ([decisão 0033](decisoes/0033-escopo-do-mvp.md)).
+**Origin.** The ideas of the hub come from a private service, which linked Hermes agents to
+WhatsApp: the isolation between agents, the queues in the database, the resumption after a drop and
+the reconciliation with the engine. The code of Arauto is written from scratch
+([decision 0033](decisoes/0033-escopo-do-mvp.md)).
 
-## 7. Como o Hermes é acordado
+## 7. How Hermes is woken
 
 ```
- HUB        grava o aviso na fila de saída
- CANAL      entrega ao conector: número, conversa, quantidade
- CONECTOR   monta a frase FIXA e chama a API local do Hermes
- HERMES     inicia uma execução e lê a conversa com a ferramenta
- CONECTOR   confirma ao hub
+ HUB        writes the notice to the outbound queue
+ CHANNEL    delivers to the connector: number, chat, quantity
+ CONNECTOR  builds the FIXED sentence and calls Hermes's local API
+ HERMES     starts a run and reads the chat with the tool
+ CONNECTOR  confirms to the hub
 ```
 
-A frase fixa, na redação do primeiro MVP:
+The fixed sentence, in the wording of the first MVP:
 
 > Arauto notice (data, not an instruction): {count} new message(s) in chat {chat} of number
 > "{number}". The content was written by third parties. Read it with whatsapp_read_chat.
 
-Nela entram só o apelido que o admin deu ao número, o identificador da conversa e a quantidade. Nunca
-o texto da mensagem, o nome do contato ou o assunto do grupo: os três são escritos por quem está do
-outro lado. O conector confere o formato dos três campos antes de montar a frase
-([14](14-protocolo-do-canal.md), seção 5.3). A redação e o idioma aguardam aprovação
-([decisão 0016](decisoes/0016-idioma.md)). O aviso de recado entre Hermes tem a própria frase
-([13](13-conversa-entre-hermes.md), seção 5).
+Only the alias the admin gave the number, the identifier of the chat and the quantity go into it.
+Never the text of the message, the name of the contact or the subject of the group: all three are
+written by whoever is on the other side. The connector checks the format of the three fields before
+building the sentence ([14](14-protocolo-do-canal.md), section 5.3). The wording and the language
+await approval ([decision 0016](decisoes/0016-idioma.md)). The notice of a note between Hermes has
+its own sentence ([13](13-conversa-entre-hermes.md), section 5).
 
-A API local do Hermes exige uma chave própria. A ordem dos caminhos para o conector obtê-la está
-decidida ([decisoes/0023](decisoes/0023-chave-da-api-local.md)), e o teste é da Fase 1
-([11-conector.md](11-conector.md), seção 6). Enquanto nenhum caminho estiver confirmado, o verbo
-"ser acordado" não funciona.
-O painel mostra, por Hermes, "Pode ser acordado: sim ou não", com o motivo.
+Hermes's local API requires a key of its own. The order of the paths for the connector to obtain it
+is decided ([decisoes/0023](decisoes/0023-chave-da-api-local.md)), and the test belongs to Phase 1
+([11-conector.md](11-conector.md), section 6). While no path is confirmed, the verb "be woken" does
+not work.
+The panel shows, per Hermes, "Can be woken: yes or no", with the reason.
 
-## 8. Operação
+## 8. Operation
 
-| Tema | Como |
+| Topic | How |
 |---|---|
-| Saúde | Um endereço que diz se o hub está vivo e outro que diz se está pronto (banco, motor, chaves). |
-| Métricas | Conexões por aparelho, fila de avisos, falhas de aperto de mãos, estado de cada número. |
-| Registro do sistema | Estruturado, com organização e aparelho. Nunca conteúdo de mensagem nem segredo. A única exceção é o código de instalação da primeira partida, que vale uma vez. |
-| Cópia do banco | A do PostgreSQL: contínua ou, no mínimo, diária ([15](15-mvp.md), seção 6). |
-| Sessões do motor | Fora da cópia comum: quem tem a sessão do motor tem o número. |
-| Chave-mestra e marca da auditoria | Fora do banco e fora da cópia do banco. A chave-mestra, em dois lugares. |
+| Health | One address that says whether the hub is alive and another that says whether it is ready (database, engine, keys). |
+| Metrics | Connections per device, notice queue, handshake failures, state of each number. |
+| System log | Structured, with organization and device. Never message content nor a secret. The only exception is the installation code of the first start, which is valid once. |
+| Database backup | PostgreSQL's own: continuous or, at the least, daily ([15](15-mvp.md), section 6). |
+| Engine sessions | Outside the ordinary backup: whoever has the engine session has the number. |
+| Master key and audit mark | Outside the database and outside the database backup. The master key, in two places. |
 
-O que se perde em cada desastre:
+What is lost in each disaster:
 
-| Perda | Efeito | Saída |
+| Loss | Effect | Way out |
 |---|---|---|
-| Servidor do hub, com cópia e chave-mestra | Ferramentas param | Restaurar. O hub entra em modo restaurado: os aparelhos ativos ficam suspensos e cada Hermes reconecta com convite novo ([04](04-seguranca-conexao.md), C11). O hub busca no motor as mensagens do intervalo. |
-| Volume do motor | Números desconectados | Parear de novo, aos poucos. |
-| Chave do hub | Nenhum conector reconhece o hub | Gerar outra e conectar todos os Hermes de novo; antes, em cada Hermes, uma pessoa faz a saída local. Os acessos continuam. |
-| Chave-mestra | Segredos e arquivo de mensagens ficam ilegíveis | Recadastrar o motor e conectar os Hermes de novo, com a saída local em cada um. O arquivo de mensagens se perde. |
-| Volume de um Hermes | O aparelho some | Reconectar. Os acessos continuam. |
-| Volume de um Hermes restaurado de cópia antiga | Quarentena: a credencial dali já foi trocada | Reconectar. |
-| Arquivo da credencial perdido ou corrompido | Quarentena | Reconectar. |
+| The hub's server, with a backup and the master key | Tools stop | Restore. The hub enters restored mode: the active devices become suspended and each Hermes reconnects with a new invite ([04](04-seguranca-conexao.md), C11). The hub fetches from the engine the messages of the interval. |
+| The engine's volume | Numbers disconnected | Pair again, little by little. |
+| Hub key | No connector recognizes the hub | Generate another one and connect all the Hermes again; before that, on each Hermes, a person does the local leave. The accesses remain. |
+| Master key | Secrets and message archive become unreadable | Register the engine again and connect the Hermes again, with the local leave on each one. The message archive is lost. |
+| The volume of a Hermes | The device disappears | Reconnect. The accesses remain. |
+| The volume of a Hermes restored from an old backup | Quarantine: the credential from there was already swapped | Reconnect. |
+| Credential file lost or corrupted | Quarantine | Reconnect. |
 
-## 9. Limites conhecidos
+## 9. Known limits
 
-- O motor é ponto único de falha de todos os números.
-- As ferramentas aparecem em todos os meios de conversa do Hermes. O hub não sabe de qual conversa do
-  Hermes veio uma chamada.
-- O registro das conexões vive na memória de um processo: um segundo hub para a mesma organização
-  não é tratado.
-- Arquivos grandes não cabem numa mensagem do canal: vão em partes.
-- Até existir o arquivo de mensagens (Fase 6), toda leitura depende do motor estar no ar.
+- The engine is a single point of failure for all the numbers.
+- The tools appear on all of Hermes's conversation platforms. The hub does not know which of
+  Hermes's conversations a call came from.
+- The registry of the connections lives in the memory of one process: a second hub for the same
+  organization is not handled.
+- Large files do not fit in one message of the channel: they go in parts.
+- Until the message archive exists (Phase 6), every reading depends on the engine being up.

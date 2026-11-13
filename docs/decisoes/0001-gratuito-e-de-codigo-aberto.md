@@ -1,18 +1,18 @@
-# 0001 — Gratuito e de código aberto
+# 0001 — Free and open source
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Quem instala algo que lê e envia no WhatsApp da própria organização precisa poder conferir o que o programa faz.
+Whoever installs something that reads and sends on the WhatsApp of their own organization needs to be able to check what the program does.
 
-## Decisão
+## Decision
 
-O Arauto é gratuito e de código aberto.
+Arauto is free and open source.
 
-## Consequências
+## Consequences
 
-- A segurança não pode depender de esconder o programa: só as chaves são secretas.
-- Tudo o que é versionado é público.
-- O projeto precisa de licença ([0015](0015-licenca.md)), de canal para relato de falha e de versões assinadas antes de o repositório ser aberto.
-- Enquanto a licença não for escolhida, o código ainda não é aberto de fato.
+- Security cannot depend on hiding the program: only the keys are secret.
+- Everything that is versioned is public.
+- The project needs a license ([0015](0015-licenca.md)), a channel for reporting a flaw and signed versions before the repository is opened.
+- While the license is not chosen, the code is not yet open in fact.

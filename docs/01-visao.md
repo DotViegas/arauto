@@ -1,105 +1,106 @@
-# 01 — Visão
+# 01 — Vision
 
-**Estado: planejamento.** Este documento descreve o que será construído; ainda não há código.
+**Status: planning.** This document describes what will be built; there is no code yet.
 
-## Resumo
+## Summary
 
 ```
-O CANAL DE WHATSAPP DO PRÓPRIO HERMES      OS NÚMEROS DO ARAUTO
-serve para falar COM o agente              servem para o agente TRABALHAR
-quem escreve ali dá ordens                 o que chega ali é informação, nunca ordem
-                                           ler, enviar, modificar e ser acordado, por conversa
-                                           as conversas ficam arquivadas no seu hub
-                                           uma tela para todos os agentes
+HERMES'S OWN WHATSAPP CHANNEL              ARAUTO'S NUMBERS
+is for talking TO the agent                are for the agent to WORK
+whoever writes there gives orders          what arrives there is information, never an order
+                                           read, send, modify and be woken, per chat
+                                           the chats are archived in your hub
+                                           one screen for all the agents
 ```
 
-O Arauto dá a cada agente Hermes acesso controlado a números de WhatsApp, com uma tela para
-conectar agentes, parear números e dizer qual agente acessa qual número. É gratuito, e o código será
-aberto.
+Arauto gives each Hermes agent controlled access to WhatsApp numbers, with a screen to connect
+agents, pair numbers and say which agent accesses which number. It is free, and the code will be
+open.
 
-## O problema
+## The problem
 
-O Hermes Agent já sabe conversar pelo WhatsApp: é um dos meios pelos quais ele recebe ordens. Esse
-canal serve para falar **com** o agente. Ele não foi feito para o agente **operar** números de
-WhatsApp como instrumento de trabalho, que pede outras coisas:
+Hermes Agent already knows how to talk over WhatsApp: it is one of the platforms through which it
+receives orders. That channel is for talking **to** the agent. It was not made for the agent to
+**operate** WhatsApp numbers as a working tool, which asks for other things:
 
-- separar ordem de informação: o que um contato escreve não pode valer como ordem;
-- permissão por conversa, inclusive "só ler";
-- as conversas guardadas num lugar seu, que o agente consulte depois;
-- vários números repartidos entre vários agentes.
+- separating order from information: what a contact writes cannot count as an order;
+- permission per chat, including "read only";
+- the chats kept in a place of your own, which the agent consults later;
+- several numbers shared among several agents.
 
-Quem tenta resolver isso por conta própria acaba com um arranjo manual: um programa de WhatsApp de
-terceiro, uma chave fixa colada na configuração de cada agente, o pareamento pela linha de comando e
-tudo de novo a cada agente novo. Com um agente, aguenta-se. Com dezenas, não.
+Whoever tries to solve this on their own ends up with a manual arrangement: a third-party WhatsApp
+program, a fixed key pasted into the configuration of each agent, the pairing through the command
+line, and all of it again for each new agent. With one agent, it is bearable. With dozens, it is not.
 
-## A ideia
+## The idea
 
-**Uma tela.** O painel lista os Hermes conectados e os números de WhatsApp, e mostra numa matriz o
-que cada Hermes pode em cada número.
+**One screen.** The panel lists the connected Hermes and the WhatsApp numbers, and shows in a matrix
+what each Hermes may do on each number.
 
-**Conectar é copiar e colar.** Você clica em "Conectar Hermes", copia um bloco e cola no canal de
-comando do seu Hermes. Ele instala um programa pequeno, o conector, e responde um código de
-conferência. Você digita o código no painel.
+**Connecting is copy and paste.** You click "Connect Hermes", copy a block and paste it into the
+command channel of your Hermes. It installs a small program, the connector, and answers with a
+verification code. You type the code in the panel.
 
-**As conversas ficam arquivadas.** O Hermes não precisa responder a cada mensagem que chega. As
-conversas dos números ficam guardadas no seu hub, como num WhatsApp Web que é dele: quando alguém
-pede algo que depende do WhatsApp, ele abre, lê o que está lá e age. Acordar o Hermes quando chega
-mensagem é uma permissão a mais, dada por número e por conversa.
+**The chats are archived.** Hermes does not need to answer every message that arrives. The chats of
+the numbers are kept in your hub, as in a WhatsApp Web of its own: when someone asks for something
+that depends on WhatsApp, it opens, reads what is there and acts. Waking Hermes when a message
+arrives is one more permission, given per number and per chat.
 
-**Nenhum segredo duradouro passa pelo chat.** O bloco carrega só um convite, que vale 15 minutos e um
-uso. As credenciais de verdade são criadas pelas duas máquinas, entre si, e trocam a cada conexão.
+**No long-lived secret passes through the chat.** The block carries only an invite, which is valid
+for 15 minutes and one use. The real credentials are created by the two machines, between
+themselves, and are swapped on every connection.
 
-## Dois WhatsApps, dois papéis
+## Two WhatsApps, two roles
 
-| | O canal de comando | Os números do hub |
+| | The command channel | The numbers of the hub |
 |---|---|---|
-| O que é | Um dos meios de conversa do próprio Hermes. Pode até ser um WhatsApp. | Contas de WhatsApp pareadas no motor. |
-| Quem escreve ali | O operador, que está na lista de quem pode dar ordens. | Qualquer pessoa. |
-| O que vale | Ordem. | Informação. Nunca ordem. |
-| Quem cuida | O Hermes, sem o Arauto. | O Arauto. |
+| What it is | One of Hermes's own conversation platforms. It may even be a WhatsApp. | WhatsApp accounts paired in the engine. |
+| Who writes there | The operator, who is on the list of those who may give orders. | Anyone. |
+| What it counts as | Order. | Information. Never an order. |
+| Who takes care of it | Hermes, without Arauto. | Arauto. |
 
-É no canal de comando que você cola o bloco de conexão.
+It is in the command channel that you paste the connection block.
 
-## Para quem
+## For whom
 
-Para quem desenvolve e opera agentes Hermes, um ou vários, em servidor próprio. As ferramentas seguem
-o MCP, o protocolo padrão de ferramentas de agentes. O registro e o acordar, hoje, são específicos do
-Hermes.
+For those who develop and operate Hermes agents, one or several, on their own server. The tools
+follow MCP, the standard protocol for agent tools. The registration and the waking, today, are
+specific to Hermes.
 
-O Arauto é um projeto independente. Não tem vínculo com os autores do Hermes Agent nem com o
-WhatsApp.
+Arauto is an independent project. It has no tie to the authors of Hermes Agent nor to WhatsApp.
 
-## Princípios
+## Principles
 
-| Princípio | O que significa na prática |
+| Principle | What it means in practice |
 |---|---|
-| **Comando e dado são coisas separadas** | Ordem vem do canal de comando. O que chega pelos números do hub é informação. O Arauto não é canal de comando. |
-| **O hub só isola** | O hub garante que um Hermes só alcance o que lhe foi dado. Não filtra conteúdo, não escolhe quem responde, não responde sozinho. A conduta é do Hermes. |
-| **Segredo duradouro não passa por pessoa** | Nenhuma chave aparece em tela, em chat ou em registro. |
-| **Cada um instala o seu** | Hub, motor e conversas ficam no servidor de quem instala. |
-| **Aberto por desenho** | A segurança não depende de esconder o programa. Quem lê todo o código não ganha nada. |
-| **Dizer o que não é garantido** | Todo documento de segurança lista o que o desenho não resolve. |
+| **Command and data are separate things** | Orders come from the command channel. What arrives through the numbers of the hub is information. Arauto is not a command channel. |
+| **The hub only isolates** | The hub guarantees that a Hermes only reaches what was given to it. It does not filter content, does not choose who answers, does not answer by itself. The conduct is Hermes's. |
+| **A long-lived secret does not pass through a person** | No key appears on a screen, in a chat or in a log. |
+| **Each one installs their own** | Hub, engine and chats stay on the server of whoever installs. |
+| **Open by design** | The security does not depend on hiding the program. Whoever reads all the code gains nothing. |
+| **Say what is not guaranteed** | Every security document lists what the design does not solve. |
 
-## Módulos
+## Modules
 
-| Módulo | Estado |
+| Module | Status |
 |---|---|
-| **WhatsApp dos Hermes** | É o que está sendo planejado. |
-| Conversa entre Hermes | No primeiro MVP: um Hermes manda recado a outro pelo hub, só onde o admin criou a ligação ([13](13-conversa-entre-hermes.md)). Salas e observador ficam na visão. |
-| Outros meios de conversa | Na visão: a mesma tela de conexão para e-mail, Telegram e outros. |
-| Gestão da frota | Na visão: criar, atualizar e monitorar os Hermes pelo painel. |
+| **WhatsApp for the Hermes** | It is what is being planned. |
+| Conversation between Hermes | In the first MVP: a Hermes sends a note to another through the hub, only where the admin created the link ([13](13-conversa-entre-hermes.md)). Rooms and observer stay in the vision. |
+| Other conversation platforms | In the vision: the same connection screen for e-mail, Telegram and others. |
+| Fleet management | In the vision: creating, updating and monitoring the Hermes from the panel. |
 
-A intenção é reaproveitar a conexão por convite e o canal do conector nos quatro. Como, ainda não
-está desenhado.
+The intention is to reuse the connection by invite and the channel of the connector in all four.
+How, is not designed yet.
 
-## O que o Arauto não é
+## What Arauto is not
 
-- **Não é atendente automático.** Não tem resposta automática, fila de atendimento, horário comercial
-  nem modelo de mensagem.
-- **Não é canal de comando.** Uma mensagem que chega por um número do hub não vira ordem.
-- **Não é serviço oficial do WhatsApp.** O motor usado é um cliente não oficial. O WhatsApp pode
-  bloquear o número. Use números que você pode perder.
-- **Hoje não é serviço hospedado.** Não há um servidor central guardando as conversas de todos.
-- **Não embute o motor.** Você traz o seu, com a licença e o custo dele.
+- **It is not an automatic attendant.** It has no automatic reply, service queue, business hours
+  nor message template.
+- **It is not a command channel.** A message that arrives through a number of the hub does not
+  become an order.
+- **It is not an official WhatsApp service.** The engine used is an unofficial client. WhatsApp may
+  block the number. Use numbers you can afford to lose.
+- **Today it is not a hosted service.** There is no central server keeping everyone's chats.
+- **It does not embed the engine.** You bring your own, with its license and its cost.
 
-A ordem de construção está em [12-roteiro.md](12-roteiro.md).
+The order of construction is in [12-roteiro.md](12-roteiro.md).

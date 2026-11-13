@@ -46,7 +46,7 @@
 
 Hermes Agent は Nous Research の AI エージェントです。Arauto は独立したプロジェクトであり、Hermes Agent の作者とも WhatsApp とも関係はありません。
 
-このページからリンクしているドキュメントはポルトガル語で書かれています。
+このページからリンクしているドキュメントは英語で書かれています。
 
 ## ひと目でわかる
 
@@ -65,7 +65,7 @@ Hermes Agent は Nous Research の AI エージェントです。Arauto は独�
 
 ## 使う前に知っておくこと
 
-- hub の番号を通じて届くものは**情報であり、命令ではありません**。Arauto はエージェントに指示を出すためのチャネルではありません。指示はこれまでどおり、Hermes 自身のコマンドチャネルで行います（[ビジョン](../01-visao.md)、「Dois WhatsApps, dois papéis」）。
+- hub の番号を通じて届くものは**情報であり、命令ではありません**。Arauto はエージェントに指示を出すためのチャネルではありません。指示はこれまでどおり、Hermes 自身のコマンドチャネルで行います（[ビジョン](../01-visao.md)、「Two WhatsApps, two roles」）。
 - WhatsApp エンジンは**非公式クライアント**です。WhatsApp が番号をブロックすることがあります。失ってもかまわない番号を使ってください。
 - セキュリティには既知の限界があり、[SECURITY.md](../../SECURITY.md) と [docs/05-modelo-de-ameacas.md](../05-modelo-de-ameacas.md) に書かれています。
 - 設計はまだ実証されていません。記述の一部は[フェーズ 1](../12-roteiro.md) のテストにかかっています。

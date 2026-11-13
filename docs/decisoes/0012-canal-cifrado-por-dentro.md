@@ -1,22 +1,22 @@
-# 0012 — Canal cifrado por dentro do websocket
+# 0012 — Channel encrypted inside the websocket
 
-**Estado:** proposta, a validar no protótipo · **Data:** 09/11/2026
+**Status:** proposal, to be validated in the prototype · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Em instalações reais o TLS termina num proxy que não é do projeto, e numa rede interna ele pode não existir. Depender só do TLS deixaria a segurança da conexão nas mãos de cada instalação.
+In real installations TLS ends at a proxy that does not belong to the project, and on an internal network it may not exist. Depending on TLS alone would leave the security of the connection in the hands of each installation.
 
-## Decisão
+## Decision
 
-O canal usa o padrão Noise XK por dentro do websocket, numa suíte fixa e sem modo de reserva. A chave estática do conector é a identidade do aparelho; a do hub é a que veio no bloco. Na inscrição o conector leva o convite; nas conexões seguintes, a credencial lacrada.
+The channel uses the Noise XK pattern inside the websocket, in a fixed suite and with no fallback mode. The static key of the connector is the device identity; the hub's is the one that came in the block. At enrollment the connector carries the invite; in the following connections, the sealed credential.
 
-## Consequências
+## Consequences
 
-- A segurança do canal é a mesma com TLS, sem TLS e com proxy de terceiro.
-- O convite só viaja cifrado, para o hub verdadeiro. O hub guarda só o resumo dele.
-- O conector prova que tem a identidade já na inscrição.
-- Um só aperto de mãos para inscrição e conexão.
-- O código de conferência sai do próprio aperto de mãos e de um número sorteado pelo hub: os dois lados calculam e ninguém o transmite.
-- Não protege o painel: o navegador do admin depende do TLS de quem instala.
-- Custo: implementar e testar o formato das mensagens, com vetores de teste.
-- **Alternativa registrada:** TLS 1.3 com desafio assinado. É mais simples e basta quando o proxy é de quem instala. Fica como plano B se o protótipo mostrar que o custo do Noise não compensa.
+- The security of the channel is the same with TLS, without TLS and with a third-party proxy.
+- The invite only travels encrypted, to the true hub. The hub keeps only its digest.
+- The connector proves it has the identity already at enrollment.
+- A single handshake for enrollment and connection.
+- The verification code comes out of the handshake itself and of a number drawn by the hub: both sides compute it and nobody transmits it.
+- It does not protect the panel: the admin's browser depends on the TLS of whoever installs.
+- Cost: implementing and testing the message format, with test vectors.
+- **Recorded alternative:** TLS 1.3 with a signed challenge. It is simpler and is enough when the proxy belongs to whoever installs. It stays as plan B if the prototype shows that the cost of Noise does not pay off.

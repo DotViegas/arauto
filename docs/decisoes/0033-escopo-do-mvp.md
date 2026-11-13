@@ -1,29 +1,29 @@
-# 0033 — Escopo do primeiro MVP: conversa e WhatsApp juntos
+# 0033 — Scope of the first MVP: conversation and WhatsApp together
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-O roteiro previa oito fases em sequência, com as provas antes de qualquer código e a conversa entre Hermes para depois da publicação. Quem mantém o projeto pediu para começar o primeiro MVP, com a conversa entre Hermes e o WhatsApp na mesma leva.
+The roadmap foresaw eight phases in sequence, with the proofs before any code and the conversation between Hermes for after publication. The maintainer of the project asked to start the first MVP, with the conversation between Hermes and WhatsApp in the same batch.
 
-## Decisão
+## Decision
 
-O primeiro MVP reúne a conexão, a conversa entre Hermes, o WhatsApp e o acordar, em cinco marcos ([15-mvp.md](../15-mvp.md)). Conversa e WhatsApp são construídos juntos, sobre a mesma conexão.
+The first MVP brings together the connection, the conversation between Hermes, WhatsApp and waking, in five milestones ([15-mvp.md](../15-mvp.md)). Conversation and WhatsApp are built together, on the same connection.
 
-Três pontos são proposta de quem escreve, a confirmar por quem mantém:
+Three points are a proposal of whoever writes, to be confirmed by the maintainer:
 
-- **Administração por comando no servidor**, sem endereço de administração na rede. O painel, com passkey ([0019](0019-painel-com-passkey.md)), vem depois do MVP.
-- **Código escrito do zero.** O serviço de origem não é copiado enquanto a liberação por quem tem direito sobre ele não vier ([roteiro](../12-roteiro.md), Fase 2). As ideias que vêm dele já estão nestes documentos.
-- **As provas "no canal" da Fase 1 são feitas dentro do MVP**, como testes com rodadas sorteadas. As provas "no Hermes" continuam pendentes e dependem de um Hermes de verdade.
+- **Administration by command on the server**, with no administration address on the network. The panel, with passkey ([0019](0019-painel-com-passkey.md)), comes after the MVP.
+- **Code written from scratch.** The source service is not copied while the release by whoever has rights over it has not come ([roadmap](../12-roteiro.md), Phase 2). The ideas that come from it are already in these documents.
+- **The "in the channel" proofs of Phase 1 are done inside the MVP**, as tests with randomized rounds. The "in Hermes" proofs remain pending and depend on a real Hermes.
 
-## Consequências
+## Consequences
 
-- O roteiro é reescrito na ordem dos marcos. O critério de pronto de cada fase continua valendo.
-- Ficam fora do MVP: painel, arquivo de mensagens, assinatura das versões, envio de arquivo por endereço e modo blindado. O modo restaurado entra, porque mexe em toda gravação de evento de segurança desde o primeiro marco.
-- O desenho do MVP passou por uma revisão adversarial em 10/11/2026, antes do código. As correções estão nos documentos 13, 14 e 15.
-- Enquanto não houver painel, a regra da passkey em toda ação que muda algo não tem onde ser aplicada: quem administra é quem tem acesso ao servidor.
-- O MVP não é uma versão publicada. Nada é aberto ao público antes da Fase 7.
-- **Mudança de 12/11/2026, a pedido de quem mantém:** o painel começou antes do fim do MVP, pelas
-  telas de leitura e pelo guia de conectar Hermes. Como ele entra no hub, e o que ainda falta
-  decidir, está na [0040](0040-painel-dentro-do-hub.md), que é proposta. Parear e dar acesso
-  continuam pelo comando.
+- The roadmap is rewritten in the order of the milestones. The done criterion of each phase still holds.
+- Left out of the MVP: panel, message archive, signing of the versions, sending a file by address and shielded mode. Restored mode goes in, because it touches every write of a security event from the first milestone.
+- The design of the MVP went through an adversarial review on 10/11/2026, before the code. The corrections are in documents 13, 14 and 15.
+- While there is no panel, the rule of the passkey on every action that changes something has nowhere to be applied: whoever administers is whoever has access to the server.
+- The MVP is not a published version. Nothing is opened to the public before Phase 7.
+- **Change of 12/11/2026, at the maintainer's request:** the panel started before the end of the MVP, with the
+  read-only screens and the guide for connecting Hermes. How it goes into the hub, and what is still left to
+  decide, is in [0040](0040-painel-dentro-do-hub.md), which is a proposal. On 13/11/2026 the
+  editing of accesses and revoking came in; pairing numbers is still done by the command.

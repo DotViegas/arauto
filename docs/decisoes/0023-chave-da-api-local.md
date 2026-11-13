@@ -1,17 +1,17 @@
-# 0023 — Como o conector obtém a chave da API local do Hermes
+# 0023 — How the connector gets the key of Hermes's local API
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-Para acordar o Hermes, o conector chama a API local dele, que exige uma chave. A chave fica no arquivo de segredos do Hermes, e o conector, como processo filho, não a recebe do ambiente.
+To wake Hermes, the connector calls its local API, which requires a key. The key is in Hermes's secrets file, and the connector, as a child process, does not receive it from the environment.
 
-## Decisão
+## Decision
 
-Os caminhos são tentados nesta ordem. Primeiro, a entrada do servidor de ferramentas referencia a variável do Hermes, e é o próprio Hermes que entrega a chave ao conector. Se o teste mostrar que isso não funciona, o conector lê a chave do arquivo de segredos do Hermes, com aviso claro a quem instala. Sem chave, aquele Hermes fica sem acordar.
+The paths are tried in this order. First, the entry of the tool server references Hermes's variable, and it is Hermes itself that hands the key to the connector. If the test shows that this does not work, the connector reads the key from Hermes's secrets file, with a clear warning to whoever installs. Without a key, that Hermes is left without waking.
 
-## Consequências
+## Consequences
 
-- O teste do primeiro caminho é da Fase 1 do [roteiro](../12-roteiro.md). Dele depende o verbo "ser acordado" (Fase 5).
-- Se valer o segundo caminho, o texto do bloco passa a dizer que o conector lê esse arquivo.
-- Em qualquer caminho, a chave nunca vai ao hub nem aparece em tela.
+- The test of the first path belongs to Phase 1 of the [roadmap](../12-roteiro.md). The verb "be woken" depends on it (Phase 5).
+- If the second path holds, the text of the block comes to say that the connector reads that file.
+- On either path, the key never goes to the hub and never appears on screen.

@@ -1,147 +1,147 @@
-# 05 — Modelo de ameaças
+# 05 — Threat model
 
-**Estado: proposta**, acompanhando o desenho de [04-seguranca-conexao.md](04-seguranca-conexao.md).
-O que protegemos, de quem, o que cada ataque rende e o que sobra depois das defesas.
+**Status: proposal**, following the design of [04-seguranca-conexao.md](04-seguranca-conexao.md).
+What we protect, from whom, what each attack yields and what is left after the defenses.
 
-## Resumo
+## Summary
 
 ```
-O QUE O DESENHO TRATA               O QUE SOBRA (as três raízes)
-chat ou bloco vazado                conta do admin tomada
-credencial copiada                  servidor do hub invadido
-banco do hub lido                   motor de WhatsApp exposto
-quem termina o TLS do canal
-um Hermes tentando alcançar outro
+WHAT THE DESIGN HANDLES             WHAT IS LEFT (the three roots)
+leaked chat or block                admin account taken over
+copied credential                   hub server broken into
+hub database read                   WhatsApp engine exposed
+whoever terminates the channel TLS
+one Hermes trying to reach another
 ```
 
-**De onde vem este modelo.** Antes de existir código, o desenho passou por várias rodadas de revisão
-automática, feitas por agentes de IA que só tinham os documentos. Na primeira, quatro atacaram um
-rascunho, cada um de um ponto de partida (o chat vazado, o Hermes manipulado, a rede e o painel, a
-cadeia de fornecimento), e um quinto tentou refutar os 51 achados: 34 se sustentaram, inteiros ou em
-parte, e nenhum ficou classificado como crítico. Na segunda, quatro leitores sem contexto releram os
-documentos já corrigidos e acharam falhas de lógica na troca da credencial, corrigidas na proposta
-v0.3. As rodadas seguintes, com um a quatro leitores cada, acharam falhas no hub restaurado de
-cópia, no reconectar, no sair e no código de conferência, corrigidas na proposta v0.4. Os relatórios
-completos não estão publicados. Revisão de pessoas, de fora, ainda não houve.
+**Where this model comes from.** Before any code existed, the design went through several rounds of
+automatic review, done by AI agents that had only the documents. In the first, four attacked a
+draft, each from one starting point (the leaked chat, the manipulated Hermes, the network and the
+panel, the supply chain), and a fifth tried to refute the 51 findings: 34 held, in whole or in
+part, and none was classified as critical. In the second, four readers with no context reread the
+documents, already corrected, and found logic flaws in the credential swap, corrected in proposal
+v0.3. The following rounds, with one to four readers each, found flaws in the hub restored from a
+backup, in reconnecting, in leaving and in the verification code, corrected in proposal v0.4. The
+full reports are not published. Review by people, from outside, has not happened yet.
 
-## 1. O que protegemos
+## 1. What we protect
 
-| Ativo | Por que importa |
+| Asset | Why it matters |
 |---|---|
-| As sessões do motor | Quem as tem **é** o número: lê e envia tudo. |
-| O arquivo de mensagens | São conversas de terceiros. |
-| A conta do admin | Cria convites, aprova aparelhos e concede acessos. |
-| A chave-mestra e a chave do hub | Lacrar credenciais e ser reconhecido como o hub. |
-| A identidade e a credencial de cada Hermes | Agir como aquele Hermes. |
-| O programa do conector | Roda dentro de cada Hermes. |
+| The engine sessions | Whoever has them **is** the number: reads and sends everything. |
+| The message archive | They are chats of third parties. |
+| The admin account | It creates invites, approves devices and grants accesses. |
+| The master key and the hub key | Sealing credentials and being recognized as the hub. |
+| The identity and the credential of each Hermes | Acting as that Hermes. |
+| The connector program | It runs inside each Hermes. |
 
-## 2. De quem
+## 2. From whom
 
-| Quem | O que consegue de partida |
+| Who | What they can do from the start |
 |---|---|
-| Quem lê o canal de comando | O bloco, antes, durante ou depois do uso. |
-| Um contato do WhatsApp | Escrever o que o Hermes vai ler. |
-| A LLM do Hermes, manipulada | Rodar comandos e ler arquivos com o usuário do Hermes. |
-| Alguém na rede | Ver, atrasar e alterar o tráfego entre Hermes e hub, inclusive no proxy que termina o TLS. |
-| Alguém com a sessão do painel roubada | Ver o painel. Não tem a passkey. **No hub, em 13/11/2026, a passkey ainda não existe: essa pessoa também conecta e reconecta Hermes, enquanto a sessão valer** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
-| Quem lê o banco ou a cópia de segurança do hub | Tudo o que estiver gravado ali. |
-| Quem invade o servidor do hub | Tudo o que o hub pode. |
+| Whoever reads the command channel | The block, before, during or after its use. |
+| A WhatsApp contact | Writing what Hermes will read. |
+| Hermes's LLM, manipulated | Running commands and reading files as Hermes's user. |
+| Someone on the network | Seeing, delaying and altering the traffic between Hermes and hub, including at the proxy that terminates the TLS. |
+| Someone with a stolen panel session | Seeing the panel. They do not have the passkey. **In the hub, on 13/11/2026, the passkey does not exist yet: this person also connects, reconnects and revokes Hermes and changes accesses, while the session is valid** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| Whoever reads the database or the backup of the hub | Everything that is stored there. |
+| Whoever breaks into the hub server | Everything the hub can do. |
 
-## 3. O que cada vazamento dá
+## 3. What each leak gives
 
-| O que vazou | O que o invasor consegue | Por quê |
+| What leaked | What the intruder gets | Why |
 |---|---|---|
-| Chat ou bloco, depois do uso | Nada. | O convite já foi gasto e o código de conferência não é segredo. |
-| Chat ou bloco, antes do uso | Atrapalhar a conexão. Acesso, nenhum. | Falta o código que o Hermes verdadeiro disse. |
-| Arquivos do conector, copiados com o Hermes ligado | A cópia é barrada em segundos e o aparelho vai para a quarentena. Se quem copiou também segura a rede do Hermes, usa o hub enquanto segurar. | É uma conexão dupla. O painel alerta quando uma conexão aberta é tomada por outra; quem espera a conexão cair antes de entrar só aparece como volta de outro endereço. |
-| Arquivos do conector, copiados com o Hermes desligado | Usar o Hermes **até ele voltar**. Na volta, quarentena. Conta como desligado o Hermes com o conector abaixo da versão mínima: a cópia funciona até o admin reconectar, e o uso dela pode não aparecer como cópia. | Para usar, a cópia tem de trocar a credencial, e a do verdadeiro morre. |
-| Cópia antiga dos arquivos do conector | Acesso, nenhum, depois da primeira troca que veio depois dela. Mas apresentá-la tira o Hermes do ar. | Reuso leva à quarentena. |
-| Tráfego entre conector e hub | Nada. | O canal é cifrado por dentro. |
-| Proxy que termina o TLS do canal | Derrubar e atrasar a conexão. | Idem. |
-| Proxy que termina o TLS do painel | Ver e alterar o que o admin faz no navegador. | O painel é um site: depende do TLS de quem instala. |
-| Domínio ou DNS do hub | Indisponibilidade para os conectores. | O conector só aceita o hub cuja chave veio no bloco. |
-| Banco do hub, só lido | Nenhuma credencial de Hermes ou de admin. | Só há chaves públicas e resumos; o resto está cifrado com chave fora do banco. |
-| Sessão do painel | Ver o painel. | Toda ação que muda algo pede a passkey na hora. No hub, em 13/11/2026, sem passkey: o que limita é o painel fechado (só por túnel) e o prazo da sessão. |
-| **Conta do admin** | **Tudo.** | É uma raiz. |
-| **Servidor do hub** | **Tudo daquele hub.** | É uma raiz. |
-| **Volume de sessões do motor** | **O próprio WhatsApp.** | É uma raiz. |
-| Chave de versões do conector | Publicar um conector falso como atualização. | Fica fora de qualquer hub, guardada à parte. |
+| Chat or block, after use | Nothing. | The invite was already spent and the verification code is not a secret. |
+| Chat or block, before use | Disrupting the connection. Access, none. | The code the real Hermes said is missing. |
+| Connector files, copied with Hermes on | The copy is stopped in seconds and the device goes to quarantine. If whoever copied also holds Hermes's network, they use the hub for as long as they hold it. | It is a double connection. The panel alerts when an open connection is taken by another; whoever waits for the connection to drop before coming in only shows up as a return from another address. |
+| Connector files, copied with Hermes off | Using Hermes **until it comes back**. On its return, quarantine. A Hermes with the connector below the minimum version counts as off: the copy works until the admin reconnects, and its use may not show up as a copy. | To use it, the copy has to swap the credential, and the real one's dies. |
+| Old copy of the connector files | Access, none, after the first swap that came after it. But presenting it takes Hermes offline. | Reuse leads to quarantine. |
+| Traffic between connector and hub | Nothing. | The channel is encrypted on the inside. |
+| Proxy that terminates the channel TLS | Dropping and delaying the connection. | Same. |
+| Proxy that terminates the panel TLS | Seeing and altering what the admin does in the browser. | The panel is a website: it depends on the TLS of whoever installs. |
+| Domain or DNS of the hub | Unavailability for the connectors. | The connector only accepts the hub whose key came in the block. |
+| Hub database, read only | No credential of a Hermes or of an admin. | There are only public keys and digests; the rest is encrypted with a key outside the database. |
+| Panel session | Seeing the panel. | Every action that changes something asks for the passkey on the spot. In the hub, on 13/11/2026, with no passkey: what limits it is the closed panel (only through a tunnel) and the session's time limit. |
+| **Admin account** | **Everything.** | It is a root. |
+| **Hub server** | **Everything of that hub.** | It is a root. |
+| **Engine session volume** | **WhatsApp itself.** | It is a root. |
+| Release key of the connector | Publishing a fake connector as an update. | It stays outside any hub, kept apart. |
 
-## 4. Ameaças e tratamento
+## 4. Threats and handling
 
-### Na conexão
+### In the connection
 
-| # | Ameaça | Tratamento | O que sobra |
+| # | Threat | Handling | What is left |
 |---|---|---|---|
-| 1 | Quem obteve o convite se inscreve primeiro e é aprovado com um clique. | O admin **digita** o código que o Hermes disse. O que o aparelho declara não decide. Há um só pedido por Hermes, e o código depende de um sorteio do hub: quem se inscreve não escolhe o seu. | Engenharia social que leve o admin a digitar outro código. |
-| 2 | O gesto de colar um bloco que roda um programa da internet é imitado por um contato. | O bloco baixa uma versão exata, confere o resumo e só então executa; recusa-se fora do canal de comando; não deixa regra permanente no Hermes. | Um Hermes que obedeça a um bloco falso. A defesa disso é do Hermes: dado não é ordem. |
-| 3 | Alguém no meio da rede troca a chave ou o programa na inscrição. | O bloco traz a chave do hub e o resumo do conector. O canal é autenticado desde a primeira mensagem. O código sai do próprio aperto de mãos e de um sorteio do hub. | Um painel falso ou um hub já invadido na hora de copiar o bloco. |
-| 4 | Um convite antigo é reapresentado para derrubar um Hermes. | Convite encerrado só gera registro. Não existe bloqueio por segunda tentativa. | Nada conhecido. |
-| 5 | O convite aparece em registro de servidor ou em pré-visualização. | O convite não vai em endereço: é argumento do conector e só viaja cifrado, para o hub verdadeiro. | O convite fica no histórico do canal de comando, já gasto. |
-| 6 | O hub arquiva a conversa em que o bloco foi colado e a mostra a outro Hermes. | Com o código digitado, rende só atrapalhar. | Atrapalhar a conexão durante 15 minutos. |
+| 1 | Whoever obtained the invite enrolls first and is approved with one click. | The admin **types** the code Hermes said. What the device declares does not decide. There is only one request per Hermes, and the code depends on a random draw by the hub: whoever enrolls does not choose theirs. | Social engineering that leads the admin to type another code. |
+| 2 | The gesture of pasting a block that runs a program from the internet is imitated by a contact. | The block downloads an exact version, checks the digest and only then executes; it is refused outside the command channel; it leaves no permanent rule in Hermes. | A Hermes that obeys a fake block. The defense against that belongs to Hermes: data is not an order. |
+| 3 | Someone in the middle of the network swaps the key or the program at enrollment. | The block carries the hub key and the digest of the connector. The channel is authenticated from the first message. The code comes out of the handshake itself and of a random draw by the hub. | A fake panel or an already compromised hub at the moment the block is copied. |
+| 4 | An old invite is presented again to take a Hermes down. | A closed invite only produces a log entry. There is no lockout on a second attempt. | Nothing known. |
+| 5 | The invite shows up in a server log or in a preview. | The invite does not go in an address: it is an argument of the connector and only travels encrypted, to the real hub. | The invite stays in the history of the command channel, already spent. |
+| 6 | The hub archives the chat in which the block was pasted and shows it to another Hermes. | With the typed code, it yields only disruption. | Disrupting the connection for 15 minutes. |
 
-### Na credencial
+### In the credential
 
-| # | Ameaça | Tratamento | O que sobra |
+| # | Threat | Handling | What is left |
 |---|---|---|---|
-| 7 | A LLM, ou outro processo do mesmo usuário, copia os arquivos do conector. A cópia pode sair pela própria ferramenta de envio. | Para usar o hub é preciso trocar a credencial, o que mata a do verdadeiro; um só canal por aparelho; quarentena sem "liberar"; encerramento pedido pelo aparelho gera alerta, e credencial antiga apresentada depois do encerramento também. | A cópia usada com o Hermes desligado funciona até ele voltar, sem limite de tempo. Um processo que continua na máquina e grava na pasta devolve a credencial nova e não deixa sinal. Se ele voltar como aparelho novo, o uso não aparece como cópia: resta o admin reconhecer o último uso na aprovação. |
-| 8 | Vários processos do mesmo Hermes parecem cópias e disparam o alarme. | Um líder por Hermes. O hub testa a conexão antiga antes de acusar conexão dupla, e só julga quem responde. | Pasta compartilhada entre dois Hermes, ou sistema de arquivos sem trava: o hub trata como cópia. |
-| 9 | A troca da credencial cai no meio e tranca o Hermes do lado de fora. | Troca em duas fases, gravação durável antes do "gravei", primeira credencial pelo mesmo caminho. | O arquivo da credencial perdido ou corrompido: quarentena, reconectar. |
-| 10 | Alguém tem uma cópia antiga dos arquivos, ou só a identidade, e quer tirar o Hermes do ar. | Não há defesa: reuso leva à quarentena, e a identidade basta para pedir o encerramento. | Negação de serviço. A pasta do conector deve ficar fora das cópias de segurança. |
-| 11 | Alguém substitui o programa do conector no disco do Hermes. | Não há defesa por programa dentro do mesmo usuário. | **Limite do modo rápido.** A defesa é o modo blindado. |
-| 12 | O hub volta de uma cópia de segurança antiga. | O hub percebe por uma marca fora do banco, ou por um lacre válido que o banco não explica; suspende todos os aparelhos ativos, encerra convites e pedidos, e avisa; cada Hermes reconecta com convite novo; aparelho desconhecido não apaga nada e aparece numa lista. | O que foi revogado, trocado ou retirado depois da cópia se perde até o admin refazer, inclusive a remoção de um admin. Restauração do servidor inteiro por imagem só é percebida quando conecta um aparelho que trocou de credencial depois dela. |
+| 7 | The LLM, or another process of the same user, copies the connector files. The copy may leave through the sending tool itself. | To use the hub the credential has to be swapped, which kills the real one's; a single channel per device; quarantine with no "release"; a closing requested by the device raises an alert, and so does an old credential presented after the closing. | The copy used with Hermes off works until it comes back, with no time limit. A process that stays on the machine and writes to the folder puts the new credential back and leaves no sign. If it comes back as a new device, the use does not show up as a copy: what is left is the admin recognizing the last use at approval. |
+| 8 | Several processes of the same Hermes look like copies and set off the alarm. | One leader per Hermes. The hub tests the old connection before accusing a double connection, and only judges the one that answers. | A folder shared between two Hermes, or a file system with no locking: the hub treats it as a copy. |
+| 9 | The credential swap drops in the middle and locks Hermes out. | Swap in two phases, durable write before the "saved", first credential through the same path. | The credential file lost or corrupted: quarantine, reconnect. |
+| 10 | Someone has an old copy of the files, or only the identity, and wants to take Hermes offline. | There is no defense: reuse leads to quarantine, and the identity is enough to ask for the closing. | Denial of service. The connector folder should stay out of the backups. |
+| 11 | Someone replaces the connector program on Hermes's disk. | There is no defense by a program inside the same user. | **Limit of quick mode.** The defense is shielded mode. |
+| 12 | The hub comes back from an old backup. | The hub notices by a mark outside the database, or by a valid seal the database does not explain; it suspends all active devices, closes invites and requests, and warns; each Hermes reconnects with a new invite; an unknown device erases nothing and appears in a list. | What was revoked, swapped or removed after the backup is lost until the admin redoes it, including the removal of an admin. A restoration of the whole server from an image is only noticed when a device that swapped its credential after it connects. |
 
-### No uso
+### In use
 
-| # | Ameaça | Tratamento | O que sobra |
+| # | Threat | Handling | What is left |
 |---|---|---|---|
-| 13 | Uma LLM manipulada usa as ferramentas que o Hermes já tem. | Acesso mínimo por número e por conversa; lista fechada de ferramentas; autorização a cada chamada; tudo na auditoria. | **Ela usa o que tem.** Nenhum protocolo de conexão resolve. |
-| 14 | Um Hermes alcança o número de outro. | O Hermes nunca informa sessão do motor; um ponto único chama o motor e só aceita sessão autorizada; identificadores validados. | Erro de implementação. O teste automático disso é critério do MVP ([15](15-mvp.md), M3). |
-| 15 | O acesso é retirado e a sessão aberta continua valendo. | Autorização a cada chamada, contra o estado atual. | Nada conhecido. |
-| 16 | Um número pareado também é canal de comando de algum Hermes. | O painel permite marcar o número como "de comando" e alerta ao conceder envio nele. | O hub não conhece as listas de cada Hermes. Depende de quem instala. |
-| 17 | O hub, invadido, dita o que a LLM lê. | Aviso é ponteiro; a frase fixa e as descrições das ferramentas ficam no conector; o conector não executa comando remoto. | O conteúdo das mensagens, que já é tratado como de terceiros. |
+| 13 | A manipulated LLM uses the tools Hermes already has. | Minimum access per number and per chat; closed list of tools; authorization on every call; everything in the audit. | **It uses what it has.** No connection protocol solves this. |
+| 14 | A Hermes reaches the number of another. | Hermes never states an engine session; a single point calls the engine and only accepts an authorized session; validated identifiers. | Implementation error. The automatic test of this is a criterion of the MVP ([15](15-mvp.md), M3). |
+| 15 | The access is removed and the open session keeps being valid. | Authorization on every call, against the current state. | Nothing known. |
+| 16 | A paired number is also the command channel of some Hermes. | The panel allows marking the number as "command" and alerts when send is granted on it. | The hub does not know the lists of each Hermes. It depends on whoever installs. |
+| 17 | The hub, compromised, dictates what the LLM reads. | A notice is a pointer; the fixed sentence and the tool descriptions stay in the connector; the connector does not execute a remote command. | The content of the messages, which is already treated as coming from third parties. |
 
-### Na conversa entre Hermes
+### In the conversation between Hermes
 
-Entra com o primeiro MVP. O desenho e os limites estão em
+It comes in with the first MVP. The design and the limits are in
 [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md).
 
-| Ameaça | Tratamento | O que sobra |
+| Threat | Handling | What is left |
 |---|---|---|
-| Dois Hermes se acordam um ao outro sem parar. | Tetos fixos por ligação e por destinatário, que abrir um fio novo não zera; teto de acordadas no conector. | Até o teto, eles ainda trocam recados à toa. |
-| Um Hermes manipulado escreve a outro. | Só existe recado onde o admin criou a ligação; recado é dado, nunca ordem; a frase fixa diz isso. | **Ele usa as ligações que tem.** O que o outro faz depende das instruções dele. |
-| Um Hermes lê ou responde num fio que não é dele. | A leitura e o envio conferem a ligação e a participação a cada chamada; fio de outros responde igual a fio inexistente. | Erro de implementação. Tem teste no MVP. |
-| Um remetente enche o banco ou a fila de avisos de outro. | Tetos por dia, de não lidos e de fios novos; um aviso pendente por remetente; expurgo em 30 dias. | Nada conhecido. |
-| O hub, invadido, forja um recado. | O nome do remetente tem formato restrito, conferido no conector. | **Raiz.** Não há prova de remetente de ponta a ponta: quem controla o hub escreve como qualquer Hermes. |
+| Two Hermes wake each other without stopping. | Fixed ceilings per link and per recipient, which opening a new thread does not reset; ceiling of wakes in the connector. | Up to the ceiling, they still exchange notes for nothing. |
+| A manipulated Hermes writes to another. | A note only exists where the admin created the link; a note is data, never an order; the fixed sentence says so. | **It uses the links it has.** What the other one does depends on its instructions. |
+| A Hermes reads or answers in a thread that is not its own. | Reading and sending check the link and the participation on every call; a thread of others answers the same as a thread that does not exist. | Implementation error. It has a test in the MVP. |
+| A sender fills the database or the notice queue of another. | Ceilings per day, of unread notes and of new threads; one pending notice per sender; purge in 30 days. | Nothing known. |
+| The hub, compromised, forges a note. | The sender's name has a restricted format, checked in the connector. | **Root.** There is no end-to-end proof of sender: whoever controls the hub writes as any Hermes. |
 
-### No painel e no hub
+### In the panel and in the hub
 
-| # | Ameaça | Tratamento | O que sobra |
+| # | Threat | Handling | What is left |
 |---|---|---|---|
-| 18 | A conta do admin é tomada por phishing, por pedido forjado ou por texto malicioso exibido na tela. | Passkey; confirmação na hora para toda ação que muda algo; todo texto de terceiros escapado; sessão presa ao endereço do painel; primeiro admin só com o código de instalação. | **Raiz.** Quem controla a passkey controla tudo. |
-| 19 | Alguém alcança o motor por fora e acrescenta um destino para os eventos. | Motor só na rede interna; o hub confere a configuração de cada sessão do motor e corrige. | **Raiz.** Quem alcança o motor com a chave dele tem o número. |
-| 20 | O banco ou a cópia de segurança do hub vaza. | Segredos cifrados com chave fora do banco; admins por passkey; sessões do motor fora da cópia comum; nada de segredo ou conteúdo no registro do sistema, salvo o código de instalação, de uso único. | O arquivo de mensagens, se a chave-mestra vazar junto. |
-| 21 | O hub é invadido e indica um conector falso. | Não há atualização empurrada: toda instalação passa pelo bloco, com o resumo à vista; o resumo de cada versão fica publicado fora do hub, com a assinatura da chave de versões. | **Raiz.** Em toda instalação o resumo vem do painel; quem quer certeza compara com o publicado. E o hub invadido lê e envia em todos os números dele. |
+| 18 | The admin account is taken over by phishing, by a forged request or by malicious text shown on the screen. | Passkey; confirmation on the spot for every action that changes something; every third-party text escaped; session bound to the panel address; first admin only with the installation code. | **Root.** Whoever controls the passkey controls everything. |
+| 19 | Someone reaches the engine from outside and adds a destination for the events. | Engine only on the internal network; the hub checks the configuration of each engine session and corrects it. | **Root.** Whoever reaches the engine with its key has the number. |
+| 20 | The database or the backup of the hub leaks. | Secrets encrypted with a key outside the database; admins by passkey; engine sessions outside the ordinary backup; no secret or content in the system log, except the installation code, which is single-use. | The message archive, if the master key leaks along with it. |
+| 21 | The hub is compromised and points to a fake connector. | There is no pushed update: every installation goes through the block, with the digest in plain sight; the digest of each version is published outside the hub, with the signature of the release key. | **Root.** In every installation the digest comes from the panel; whoever wants certainty compares it with the published one. And the compromised hub reads and sends on all of its numbers. |
 
-### Fora do protocolo
+### Outside the protocol
 
-| Ameaça | Tratamento |
+| Threat | Handling |
 |---|---|
-| Várias organizações num hub, e uma alcança a outra. | Hoje cada instalação tem uma organização. O banco já separa por organização; com várias, um motor para cada uma. |
-| Conector antigo usado para contornar as regras. | Versão mínima exigida; a primeira mensagem do canal nunca muda de formato; uma suíte de cifra só. |
-| O hub é levado a buscar um endereço escolhido por outro. | O hub só baixa de endereço público; o endereço do motor só muda por um admin, com passkey. |
-| Relógio errado e excesso de pedidos nas portas abertas. | Todo prazo usa só o relógio do hub; convite vencido tem o resumo apagado; limite de pedidos por origem. |
-| O WhatsApp bloqueia o número; a licença do motor muda; uma versão nova do Hermes recusa o conector. | O projeto não embute o motor, diz o risco em todo lugar e prevê teste de contrato por versão. |
+| Several organizations in one hub, and one reaches another. | Today each installation has one organization. The database already separates by organization; with several, one engine for each. |
+| An old connector used to get around the rules. | Minimum version required; the first message of the channel never changes format; a single cipher suite. |
+| The hub is led to fetch an address chosen by someone else. | The hub only downloads from a public address; the engine address only changes by an admin, with the passkey. |
+| Wrong clock and too many requests on the open ports. | Every deadline uses only the hub's clock; an expired invite has its digest erased; limit of requests per origin. |
+| WhatsApp blocks the number; the engine's license changes; a new version of Hermes refuses the connector. | The project does not bundle the engine, states the risk everywhere and plans a contract test per version. |
 
-## 5. O que este modelo não cobre
+## 5. What this model does not cover
 
-- A conduta do Hermes: o que ele faz com o que lê.
-- A segurança do canal de comando do Hermes, que existe fora do Arauto.
-- A máquina de quem administra: quem administra o servidor do Hermes lê os arquivos do conector.
+- The conduct of Hermes: what it does with what it reads.
+- The security of Hermes's command channel, which exists outside Arauto.
+- The machine of whoever administers: whoever administers Hermes's server reads the connector files.
 
-## 6. Como testar
+## 6. How to test
 
-Cada linha da seção 4 que tem regra testável vira ao menos um teste automático antes de a fase
-correspondente ser dada como pronta ([12-roteiro.md](12-roteiro.md)). As linhas marcadas como raiz ou
-como limite não têm teste: têm aviso. Os testes de regra de segurança são conferidos por mutação:
-tira-se a regra do código, e o teste tem de falhar.
+Each line of section 4 that has a testable rule becomes at least one automatic test before the
+corresponding phase is considered done ([12-roteiro.md](12-roteiro.md)). The lines marked as root or
+as limit have no test: they have a warning. The security rule tests are checked by mutation: the
+rule is taken out of the code, and the test has to fail.

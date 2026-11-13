@@ -1,17 +1,17 @@
-# 0002 — Rust nos dois programas
+# 0002 — Rust in both programs
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-O serviço de origem já é escrito em Rust e foi pensado para dezenas de agentes num servidor pequeno.
+The source service is already written in Rust and was designed for dozens of agents on a small server.
 
-## Decisão
+## Decision
 
-Hub e conector são escritos em Rust. O conector é um binário estático, sem dependência do sistema.
+Hub and connector are written in Rust. The connector is a static binary, with no dependency on the system.
 
-## Consequências
+## Consequences
 
-- O conector é um arquivo só, fácil de conferir por resumo SHA-256.
-- O código de origem é reaproveitado, com os testes dele.
-- Contribuir exige saber Rust.
+- The connector is a single file, easy to check by SHA-256 digest.
+- The source code is reused, with its tests.
+- Contributing requires knowing Rust.

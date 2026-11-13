@@ -1,155 +1,184 @@
-# 0040 — O painel dentro do hub: porta própria, entrada por código e as primeiras telas
+# 0040 — The panel inside the hub: its own port, entry by code and the first screens
 
-**Estado:** proposta · **Data:** 12/11/2026, com o código da primeira entrega do painel no hub
-(telas de leitura); 13/11/2026, com a segunda (conectar Hermes)
+**Status:** proposal · **Date:** 12/11/2026, with the code of the first delivery of the panel in
+the hub (read-only screens); 13/11/2026, with the second (connecting a Hermes) and the third
+(accesses and revoking)
 
-## Contexto
+## Context
 
-A [0033](0033-escopo-do-mvp.md) deixou o painel para depois do MVP: administra-se por comando, no
-servidor. A [0019](0019-painel-com-passkey.md) diz como ele deve ser quando existir: login por
-passkey, e, com a sessão do painel sozinha, só se vê. Em 12/11/2026 quem mantém o projeto pediu o
-painel e aprovou o desenho das telas.
+The [0033](0033-escopo-do-mvp.md) left the panel for after the MVP: administration is by command,
+on the server. The [0019](0019-painel-com-passkey.md) says how it must be when it exists: login by
+passkey, and, with the panel session alone, one can only see. On 12/11/2026 the maintainer asked
+for the panel and approved the design of the screens.
 
-A passkey ainda não foi construída. Esta decisão registra o que as duas primeiras entregas do
-painel fazem, o que o código escolheu onde os textos são omissos e onde ele se afasta deles. Tudo
-foi testado só pelos testes automáticos, contra um hub de teste: o painel nunca rodou num servidor,
-num container nem atrás de um proxy, e nunca conectou um Hermes de verdade.
+The passkey has not been built yet. This decision records what the first three deliveries of the
+panel do, what the code chose where the texts are silent and where it moves away from them.
+Everything was tested only by the automatic tests, against a test hub: the panel never ran on a
+server, in a container or behind a proxy, and never connected a real Hermes.
 
-## Decidido por quem mantém, em 12/11/2026
+## Decided by the maintainer, on 12/11/2026
 
-- **A entrada é por código enquanto a passkey não existir.**
-- **A sessão do painel aberta por esse código pode agir** (conectar Hermes, parear, dar acesso).
-  Isso muda a 0019, que pedia a passkey em cada ação, e está anotado nela.
-- **Nesse período o painel fica fechado:** a porta dele só é alcançada na própria máquina do hub,
-  por túnel. A passkey volta antes de o painel ser aberto à internet.
+- **The entry is by code while the passkey does not exist.**
+- **The panel session opened by that code can act** (connect a Hermes, pair, give access). This
+  changes the 0019, which asked for the passkey on each action, and is noted in it.
+- **In this period the panel stays closed:** its port is only reached on the hub's own machine, by
+  tunnel. The passkey comes back before the panel is opened to the internet.
+- **On 13/11/2026: the text of the screens is in English,** like everything else that is versioned
+  ([0016](0016-idioma.md)). The prototype that was approved was in Portuguese; the screens kept its
+  structure and changed its words.
 
-## Decisão
+## Decision
 
-### Onde o painel mora
+### Where the panel lives
 
-- **Dentro do hub, numa terceira porta.** Não é outro programa: usa as mesmas funções que o
-  `arauto-hub admin` usa, com a mesma conferência da organização.
-- **Desligado por padrão.** O painel só existe com as duas variáveis: `ARAUTO_LISTEN_PANEL` (onde
-  a porta escuta) e `ARAUTO_PANEL_URL` (o endereço que o admin abre no navegador, com as mesmas
-  regras do `ARAUTO_PUBLIC_URL`). Uma sem a outra impede o `serve` de subir, e o endereço da porta
-  não pode ser o de nenhuma das outras duas.
-- **Cada porta só responde o que é dela.** Nenhum endereço do painel existe na porta dos
-  conectores nem na interna, e nenhum endereço delas existe na do painel
-  ([03-arquitetura.md](../03-arquitetura.md), seção 4: o login do admin nunca viaja para a porta
-  dos conectores).
-- **A requisição tem de nomear o painel.** O cabeçalho `Host` é o do `ARAUTO_PANEL_URL`; qualquer
-  outro recebe 421 antes de qualquer leitura.
-- **Páginas escritas pelo próprio programa, sem biblioteca de modelos.** A marcação é texto fixo
-  do programa; todo valor passa por uma única função de escape. O 03 previa "modelos de escape
-  automático": o escape continua obrigatório, só não vem de uma biblioteca.
-- **Um script só, que é um arquivo do painel.** Nenhuma página leva script escrito dentro dela, e
-  a política de conteúdo enviada em toda resposta (`default-src 'none'`, script, folha e fontes só
-  do próprio painel, `form-action 'self'`, `frame-ancestors 'none'`) impede o navegador de rodar
-  outro. Só as páginas do guia carregam o arquivo. Ele ajuda a tela (copiar o bloco, a animação, a
-  contagem do prazo): não escreve marcação, não lê cookie e não chama endereço nenhum. Sem ele,
-  cada passo continua funcionando, porque cada passo é uma página do hub.
-- **A folha de estilo, as fontes, o script e o mascote vão dentro do programa.** As fontes são
-  livres, com a licença ao lado.
+- **Inside the hub, on a third port.** It is not another program: it uses the same functions that
+  `arauto-hub admin` uses, with the same check of the organization.
+- **Off by default.** The panel only exists with the two variables: `ARAUTO_LISTEN_PANEL` (where
+  the port listens) and `ARAUTO_PANEL_URL` (the address the admin opens in the browser, with the
+  same rules as `ARAUTO_PUBLIC_URL`). One without the other prevents `serve` from starting, and the
+  address of the port cannot be that of either of the other two.
+- **Each port only answers what is its own.** No address of the panel exists on the port of the
+  connectors or on the internal one, and no address of theirs exists on that of the panel
+  ([03-arquitetura.md](../03-arquitetura.md), section 4: the login of the admin never travels to
+  the port of the connectors).
+- **The request has to name the panel.** The `Host` header is that of `ARAUTO_PANEL_URL`; any
+  other receives 421 before any read.
+- **Pages written by the program itself, with no template library.** The markup is fixed text of
+  the program; every value passes through a single escape function. The 03 foresaw "automatic
+  escape templates": the escape remains mandatory, it just does not come from a library.
+- **One script only, which is a file of the panel.** No page carries a script written inside it,
+  and the content policy sent in every response (`default-src 'none'`, script, sheet and fonts only
+  from the panel itself, `form-action 'self'`, `frame-ancestors 'none'`) prevents the browser from
+  running another. Only the pages of the guide load the file. It helps the screen (copying the
+  block, the animation, the countdown of the deadline): it does not write markup, does not read a
+  cookie and does not call any address. Without it, each step keeps working, because each step is
+  a page of the hub.
+- **The style sheet, the fonts, the script and the mascot go inside the program.** The fonts are
+  free, with the license beside them.
 
-### A entrada
+### The entry
 
-- **Código de entrada.** O comando `arauto-hub admin panel code`, rodado na máquina do hub, sorteia
-  20 bytes no gerador do sistema e mostra o código uma vez. O hub guarda só o SHA-256 dele. Vale
-  10 minutos e uma entrada; emitir outro cancela o anterior.
-- **O código é digitado, nunca mostrado pelo painel,** e só é gasto por um formulário enviado
-  (`POST`). Ele não vai em endereço: abrir uma página nunca gasta um código.
-- **Uma frase só para toda recusa** (código errado, vencido, já usado), e um teto de 30 consultas
-  de código por minuto, de todos juntos. O teto não protege o código, que tem 160 bits: afasta uma
-  enxurrada do banco.
-- **Peças usadas:** SHA-256 com um prefixo fixo para cada uso, o gerador do sistema, e um cookie
-  `HttpOnly` e `SameSite=Strict` (com `Secure` e o prefixo `__Host-` quando o endereço do painel é
-  `https`). Nenhuma cifra própria.
+- **Entry code.** The command `arauto-hub admin panel code`, run on the hub's machine, draws
+  20 bytes from the system generator and shows the code once. The hub keeps only its SHA-256. It is
+  valid for 10 minutes and one entry; issuing another cancels the previous one.
+- **The code is typed, never shown by the panel,** and is only spent by a submitted form (`POST`).
+  It does not go in an address: opening a page never spends a code.
+- **One sentence only for every refusal** (wrong code, expired, already used), and a ceiling of
+  30 code lookups per minute, of everyone together. The ceiling does not protect the code, which
+  has 160 bits: it keeps a flood away from the database.
+- **Pieces used:** SHA-256 with a fixed prefix for each use, the system generator, and a cookie
+  `HttpOnly` and `SameSite=Strict` (with `Secure` and the prefix `__Host-` when the address of the
+  panel is `https`). No cipher of our own.
 
-### A sessão do painel
+### The panel session
 
-- **O identificador** tem 32 bytes do gerador do sistema e vive só no cookie. O hub guarda o
-  SHA-256 dele, e apaga esse resumo quando fecha a sessão do painel.
-- **Dura 12 horas, ou 30 minutos sem uso,** como o [07-telas.md](../07-telas.md) previa.
-- **O tempo sem uso fica na memória do hub, não no banco,** para que uma requisição de leitura não
-  grave nada. Consequência: quando o hub reinicia, toda sessão do painel acaba, e o admin entra de
-  novo com outro código.
-- **Cada requisição confere a sessão do painel no banco** (resumo, estado e validade), sem memória
-  intermediária do que foi autorizado antes.
-- **Um formulário só é aceito com o `Origin` do painel.** Sem ele, ou com outro, a resposta é 403
-  antes de o formulário ser lido.
-- **Na auditoria:** a entrada é evento de segurança (`panel.signed_in`); o código emitido
-  (`panel.code_issued`) e a saída (`panel.signed_out`) são eventos comuns. O ator é o admin local;
-  onde o comando grava o usuário do sistema, o painel grava a palavra fixa `panel`.
-- **Expurgo:** as linhas dos códigos e das sessões do painel saem 30 dias depois do momento em que
-  deixaram de valer. O que cada uma fez continua na auditoria.
+- **The identifier** has 32 bytes from the system generator and lives only in the cookie. The hub
+  keeps its SHA-256, and erases that digest when it closes the panel session.
+- **It lasts 12 hours, or 30 minutes without use,** as the [07-telas.md](../07-telas.md) foresaw.
+- **The time without use stays in the memory of the hub, not in the database,** so that a read
+  request writes nothing. Consequence: when the hub restarts, every panel session ends, and the
+  admin enters again with another code.
+- **Each request checks the panel session in the database** (digest, state and validity), with no
+  intermediate memory of what was authorized before.
+- **A form is only accepted with the `Origin` of the panel.** Without it, or with another, the
+  answer is 403 before the form is read.
+- **In the audit:** the entry is a security event (`panel.signed_in`); the issued code
+  (`panel.code_issued`) and the exit (`panel.signed_out`) are common events. The actor is the local
+  admin; where the command writes the system user, the panel writes the fixed word `panel`.
+- **Purge:** the rows of the codes and of the panel sessions leave 30 days after the moment they
+  stopped being valid. What each one did remains in the audit.
 
-### As telas de leitura
+### The read-only screens
 
-- **Hermes, WhatsApps e Acessos, com a faixa de alertas no topo.** Mostram o que
-  `arauto-hub admin` mostra, mais o que só o hub em execução sabe: quais Hermes estão conectados
-  agora.
-- **O que as telas nunca mostram:** código de entrada, código de conferência, endereço ou chave do
-  motor, nome da sessão do motor e conteúdo de mensagem.
+- **Hermes, WhatsApps and Accesses, with the alert banner at the top.** They show what
+  `arauto-hub admin` shows, plus what only the running hub knows: which Hermes are connected
+  now.
+- **What the screens never show:** entry code, verification code, address or key of the engine,
+  name of the engine session and message content.
 
-### Conectar Hermes
+### Connecting a Hermes
 
-O guia do [02-como-funciona.md](../02-como-funciona.md), seção 1, numa janela sobre a lista de
-Hermes, com o percurso das etapas no topo: nome, bloco, código, pronto.
+The guide of the [02-como-funciona.md](../02-como-funciona.md), section 1, in a window over the
+list of Hermes, with the path of the stages at the top: name, block, code, done.
 
-- **A regra de cada ação continua num lugar só.** Criar a linha, emitir o convite, aprovar e negar
-  são as funções que `arauto-hub admin` chama, com as mesmas conferências, a mesma auditoria e a
-  mesma marca. Do painel é só a ordem das telas.
-- **O convite aparece uma vez,** na resposta do formulário que o emitiu. Nenhum endereço aberto
-  por leitura emite, mostra ou gasta um convite, e o banco continua guardando só o resumo.
-- **O texto do bloco é o proposto no 02,** palavra por palavra; o painel só preenche os campos.
-  Onde o 02 escreve `arauto-connector-{VERSAO}`, vai o nome do arquivo que o hub serve, com o
-  SHA-256 calculado dos bytes servidos.
-- **Sem conector para servir, o painel não faz bloco** e não emite nada: manda usar o comando.
-  Com mais de um conector para Linux na pasta, o bloco usa o primeiro pelo nome.
-- **O código de conferência é digitado e nunca mostrado,** nem de volta a quem o errou.
-- **Cada etapa acende quando o hub a observa:** convite emitido, aparelho usou o convite, pedido
-  aprovado, conector confirmou a primeira credencial. A página que espera pergunta de novo sozinha,
-  e essa pergunta só lê.
-- **No reconectar, a resposta sobre o último uso vale para o uso que estava na tela.** Se o
-  aparelho atual foi usado enquanto o admin respondia, nada é aprovado e o uso novo é mostrado.
-- **Fechar o guia não cancela o convite.** Ele vence sozinho, em 15 minutos, ou é cancelado por
-  outro convite; a linha do Hermes leva de volta ao guia.
+- **The rule of each action stays in one place only.** Creating the line, issuing the invite,
+  approving and denying are the functions that `arauto-hub admin` calls, with the same checks, the
+  same audit and the same mark. Only the order of the screens belongs to the panel.
+- **The invite appears once,** in the answer of the form that issued it. No address opened by a
+  read issues, shows or spends an invite, and the database keeps storing only the digest.
+- **The text of the block is the one proposed in the 02,** word for word; the panel only fills in
+  the fields. Where the 02 writes `arauto-connector-{VERSION}`, the name of the file the hub serves
+  goes, with the SHA-256 calculated from the bytes served.
+- **Without a connector to serve, the panel makes no block** and issues nothing: it says to use
+  the command. With more than one connector for Linux in the folder, the block uses the first by
+  name.
+- **The verification code is typed and never shown,** not even back to whoever got it wrong.
+- **Each stage lights up when the hub observes it:** invite issued, device used the invite,
+  request approved, connector confirmed the first credential. The page that waits asks again by
+  itself, and that question only reads.
+- **In the reconnect, the answer about the last use applies to the use that was on the screen.**
+  If the current device was used while the admin was answering, nothing is approved and the new use
+  is shown.
+- **Closing the guide does not cancel the invite.** It expires by itself, in 15 minutes, or is
+  canceled by another invite; the line of the Hermes leads back to the guide.
 
-## O que não é garantido
+### Accesses and revoking
 
-- O código de entrada não identifica uma pessoa. Quem roda o comando já tem o banco e a
-  chave-mestra; toda sessão do painel é do "admin local".
-- **Uma sessão do painel roubada age enquanto valer** (12 horas, ou 30 minutos sem uso). Com ela
-  dá para ver tudo o que as telas mostram e para reconectar um Hermes num aparelho de quem a
-  roubou, que então herda os acessos daquele Hermes. É o risco aceito em 12/11/2026, e a razão de
-  o painel ficar fechado até a passkey existir.
-- O painel depende do TLS de quem instala. Sem TLS ele só é aceito em `localhost`, para uso por
-  túnel, e aí o cookie não leva `Secure`.
-- Num container, a porta do painel escuta em todas as interfaces: quem está na mesma rede do hub,
-  como o motor de WhatsApp, alcança a tela de entrada. O que segura ali é o código de uso único.
-- O bloco passa pela tela e pela área de transferência de quem o copia. O convite dentro dele vale
-  15 minutos e um uso.
+- **Each cell of the matrix opens the editor of that access,** in a window: where it applies (all
+  the chats or only the chosen ones), the four verbs, the wait before waking and "may start
+  chats". A sentence says what the access means, and changes while one marks.
+- **Saving is the `access grant` of the command, followed by the `wake-wait`.** With no verb, in
+  "all the chats", it is the `access remove`. The rules are those of the command (being woken
+  requires reading; starting chats requires sending and all the chats): the panel only says them
+  in the words of the screen, and what the script greys out is checked again on saving.
+- **They are two writes, not one:** if the wait fails after the access is written, the screen says
+  that something failed and the matrix shows what remained.
+- **What the editor does not do yet: choosing the chats** of the scope "only chosen chats". The
+  chat lines continue through the `access chat` of the command; the screen shows how many exist.
+  The reason is that choosing a chat depends on the identifiers of the engine, not yet seen in a
+  real engine.
+- **Revoking asks first.** The line of the Hermes leads to a window that says what revoking
+  closes; only its form revokes, through the `revoke` of the command.
+- **The address that says "Saved" only reads:** it carries the Hermes and the number, and the page
+  writes the access as it is in the database at that moment.
 
-## Decisões pendentes, de quem mantém
+## What is not guaranteed
 
-1. **O idioma do texto das telas.** A [0016](0016-idioma.md) não trata dele. As telas estão em
-   português, como o protótipo aprovado.
-2. **O nome "código de entrada".** Entrou no glossário como proposta. A alternativa é alargar o
-   "código de instalação".
-3. **O texto do bloco.** O painel usa o proposto no 02, em português. O comando imprime outro, em
-   inglês, com as mesmas linhas de comando. Falta escolher um, ou dizer que são dois de propósito.
-4. **O [04-seguranca-conexao.md](../04-seguranca-conexao.md)** diz, em duas tabelas, que o login do
-   painel é por passkey. Ele não foi alterado: muda só com aprovação.
+- The entry code does not identify a person. Whoever runs the command already has the database and
+  the master key; every panel session belongs to the "local admin".
+- **A stolen panel session acts while it is valid** (12 hours, or 30 minutes without use). With it
+  one can see everything the screens show, change any access, revoke a Hermes and reconnect a
+  Hermes on a device of whoever stole it, which then inherits its accesses. It is the risk accepted
+  on 12/11/2026, and the reason the panel stays closed until the passkey exists.
+- The panel depends on the TLS of whoever installs. Without TLS it is only accepted on
+  `localhost`, for use by tunnel, and then the cookie does not carry `Secure`.
+- In a container, the port of the panel listens on all interfaces: whoever is on the same network
+  as the hub, like the WhatsApp engine, reaches the entry screen. What holds there is the
+  single-use code.
+- The block passes through the screen and through the clipboard of whoever copies it. The invite
+  inside it is valid for 15 minutes and one use.
 
-## Consequências
+## Pending decisions, for the maintainer
 
-- A 0033 ganha a nota de que o painel começou antes do fim do MVP, e a 0019 a de que a sessão do
-  painel age enquanto a passkey não existir. A [0028](0028-painel-fechado-por-padrao.md) não muda.
-- O hub passa a ter um endereço de administração na rede, quando quem instala o liga. O guia de
-  instalação publica a porta do painel só em `127.0.0.1`.
-- Um banco que já tem dados precisa da migração nova antes de o `serve` subir.
-- Alternativas consideradas: um programa separado para o painel (outra credencial de banco e outra
-  superfície para proteger); uma biblioteca de modelos (escape automático, mas uma dependência a
-  mais); guardar o último uso da sessão no banco (sobrevive ao reinício do hub, mas é uma gravação
-  em requisição de leitura); senha (a 0019 já a descartou); um painel sem script nenhum (o bloco
-  não seria copiado com um clique, que é o que o desenho aprovado pede).
+1. **The name "entry code".** It entered the glossary as a proposal. The alternative is to widen
+   the "installation code".
+2. **The text of the block.** The panel uses the one proposed in the 02, which is still in
+   Portuguese: its English wording waits for the maintainer's approval, with the rest of the 02.
+   The command prints another, in English, with the same command lines. It remains to choose one,
+   or to say that they are two on purpose.
+3. **The [04-seguranca-conexao.md](../04-seguranca-conexao.md)** says, in two tables, that the
+   login of the panel is by passkey. It was not changed: it changes only with approval.
+
+## Consequences
+
+- The 0033 gains the note that the panel started before the end of the MVP, and the 0019 the note
+  that the panel session acts while the passkey does not exist. The
+  [0028](0028-painel-fechado-por-padrao.md) does not change.
+- The hub now has an administration address on the network, when whoever installs turns it on. The
+  installation guide publishes the port of the panel only on `127.0.0.1`.
+- A database that already has data needs the new migration before `serve` starts.
+- Alternatives considered: a separate program for the panel (another database credential and
+  another surface to protect); a template library (automatic escape, but one more dependency);
+  keeping the last use of the session in the database (it survives the restart of the hub, but is
+  a write in a read request); password (the 0019 already discarded it); a panel with no script at
+  all (the block would not be copied with one click, which is what the approved design asks for).

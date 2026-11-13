@@ -1,18 +1,18 @@
-# 0003 — Hub e motor são processos separados
+# 0003 — Hub and engine are separate processes
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-O motor de WhatsApp é um programa de terceiro. Fundi-lo ao hub obrigaria a reiniciar todas as sessões do motor a cada versão nova do hub. Deixá-lo solto, configurado à mão, permite erro silencioso: uma sessão do motor criada com a opção errada descarta histórico sem avisar.
+The WhatsApp engine is a third-party program. Merging it into the hub would force a restart of every engine session at each new version of the hub. Leaving it loose, configured by hand, allows a silent error: an engine session created with the wrong option discards history without warning.
 
-## Decisão
+## Decision
 
-Hub e motor continuam dois processos. O hub é o único que fala com o motor e é o dono da configuração de cada sessão do motor: cria, configura, confere e corrige.
+Hub and engine remain two processes. The hub is the only one that talks to the engine and is the owner of the configuration of each engine session: it creates, configures, checks and corrects.
 
-## Consequências
+## Consequences
 
-- Uma versão nova do hub não derruba o WhatsApp.
-- A configuração de uma sessão do motor existe num lugar só.
-- Trocar a versão do motor continua sendo um ato de quem instala. O hub não controla containers.
-- O hub precisa de um teste de contrato contra o motor a cada versão nova.
+- A new version of the hub does not bring WhatsApp down.
+- The configuration of an engine session exists in one place only.
+- Changing the version of the engine remains an act of whoever installs. The hub does not control containers.
+- The hub needs a contract test against the engine at each new version.

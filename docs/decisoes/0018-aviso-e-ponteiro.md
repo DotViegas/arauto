@@ -1,17 +1,17 @@
-# 0018 — O aviso é um ponteiro, com frase fixa no conector
+# 0018 — The notice is a pointer, with a fixed sentence in the connector
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Para acordar um Hermes é preciso entregar a ele um texto. Se esse texto viesse do hub, um hub invadido ditaria o que a LLM de cada instalação lê. Se levasse o conteúdo da mensagem, um contato escreveria direto no início de uma execução.
+To wake a Hermes it is necessary to deliver a text to it. If that text came from the hub, an invaded hub would dictate what the LLM of each installation reads. If it carried the content of the message, a contact would write straight into the start of a run.
 
-## Decisão
+## Decision
 
-O hub envia só um ponteiro: número, conversa e quantidade. A frase que acorda o Hermes é fixa e fica compilada no conector, assim como as descrições das ferramentas.
+The hub sends only a pointer: number, chat and count. The sentence that wakes Hermes is fixed and is compiled into the connector, as are the descriptions of the tools.
 
-## Consequências
+## Consequences
 
-- O conteúdo só chega como resultado de ferramenta, marcado como de terceiros.
-- O hub não consegue mudar um texto que a LLM lê.
-- No aviso não entram texto de mensagem, nome de contato nem assunto de grupo.
+- The content only arrives as a tool result, marked as third-party.
+- The hub cannot change a text the LLM reads.
+- The notice carries no message text, no contact name and no group subject.

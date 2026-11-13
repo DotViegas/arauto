@@ -1,196 +1,199 @@
-# 10 — Máquinas de estado
+# 10 — State machines
 
-**Estado: proposta.** Os estados de cada coisa, quem muda cada um e os prazos. Os números são pontos
-de partida, a calibrar no protótipo.
+**Status: proposal.** The states of each thing, who changes each one and the deadlines. The numbers
+are starting points, to be calibrated in the prototype.
 
-## Resumo
+## Summary
 
 ```
-CONVITE     emitido -> usado | vencido | cancelado
-APARELHO    pendente -> aprovado -> ativo
-            saídas: negado, vencido, quarentena, suspenso, substituído, revogado
-NÚMERO      sem pareamento -> pareando -> conectado <-> reconectando
-            desvios: desconectado, número trocado, falha, removido
-AVISO       pendente -> enviado -> confirmado
-            saídas: expirado, descartado
+INVITE      issued -> used | expired | cancelled
+DEVICE      pending -> approved -> active
+            exits: denied, expired, quarantined, suspended, replaced, revoked
+NUMBER      unpaired -> pairing -> connected <-> reconnecting
+            detours: disconnected, number swapped, failed, removed
+NOTICE      pending -> sent -> confirmed
+            exits: expired, discarded
 ```
 
-Todo prazo usa só o relógio do hub.
+Every deadline uses only the clock of the hub.
 
-## 1. Convite
+## 1. Invite
 
-| De | Para | Quem dispara |
+| From | To | Who triggers it |
 |---|---|---|
-| (nada) | **emitido** | Admin clica "Conectar Hermes" ou "Reconectar". |
-| emitido | **usado** | Primeira inscrição válida. |
-| emitido | **vencido** | 15 minutos sem inscrição. O hub apaga o resumo do convite. |
-| emitido | **cancelado** | Admin cancela, gera outro convite para o mesmo Hermes ou revoga o Hermes; ou o hub entra em modo restaurado. |
+| (nothing) | **issued** | The admin clicks "Connect Hermes" or "Reconnect". |
+| issued | **used** | First valid enrollment. |
+| issued | **expired** | 15 minutes with no enrollment. The hub deletes the digest of the invite. |
+| issued | **cancelled** | The admin cancels, generates another invite for the same Hermes or revokes the Hermes; or the hub enters restored mode. |
 
-- Um Hermes tem no máximo um convite emitido por vez.
-- Estados finais ficam gravados. Um convite nunca volta a valer.
-- No hub, o resumo também é apagado quando o convite é cancelado, e não só quando vence
-  ([14](14-protocolo-do-canal.md), seção 12). Um convite vencido que uma inscrição encontra é
-  encerrado ali mesmo.
-- Convite usado, apresentado por **outra identidade** enquanto o pedido está pendente: recusa e
-  **alerta** no painel.
-- Em qualquer outro caso de convite que não vale: recusa e só registro na auditoria. **Nunca derruba
-  um Hermes conectado.**
+- A Hermes has at most one issued invite at a time.
+- Final states stay recorded. An invite never becomes valid again.
+- In the hub, the digest is also deleted when the invite is cancelled, and not only when it expires
+  ([14](14-protocolo-do-canal.md), section 12). An expired invite that an enrollment finds is
+  closed right there.
+- A used invite, presented by **another identity** while the request is pending: refusal and an
+  **alert** in the panel.
+- In any other case of an invite that is not valid: refusal and only a record in the audit. **It
+  never brings down a connected Hermes.**
 
-## 2. Aparelho
+## 2. Device
 
-| De | Para | Quem dispara |
+| From | To | Who triggers it |
 |---|---|---|
-| (nada) | **pendente** | Inscrição válida ([04](04-seguranca-conexao.md), C3). |
-| pendente | **aprovado** | Admin digita o código de conferência certo. |
-| pendente | **negado** | Cinco códigos errados; a sexta inscrição; o admin nega, gera outro convite para o mesmo Hermes ou revoga o Hermes; o próprio aparelho desiste (`leave`); ou duas conexões em espera com a mesma identidade. |
-| pendente | **vencido** | 10 minutos sem código, contados da primeira inscrição; ou o hub entra em modo restaurado. |
-| aprovado | **ativo** | A primeira credencial foi confirmada. |
-| aprovado | **vencido** | 24 horas sem confirmar a primeira credencial; ou o hub entra em modo restaurado. |
-| aprovado, ativo | **quarentena** | O hub deixou de confiar na credencial: reuso, conexão dupla ou credencial ilegível; ou o admin não reconhece o último uso de um aparelho ativo ao aprovar um reconectar. |
-| ativo | **suspenso** | O hub entrou em modo restaurado ([04](04-seguranca-conexao.md), C11). |
-| ativo | **vencido** | 30 dias sem conectar ([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)). |
-| ativo, suspenso, quarentena | **substituído** | Um aparelho novo do mesmo Hermes teve a primeira credencial confirmada (Reconectar). |
-| aprovado, ativo, suspenso, quarentena | **revogado** | O admin revoga o Hermes ou o exclui; o admin gera outro convite e o aparelho ainda não tinha credencial confirmada; ou o próprio aparelho pede o encerramento (`leave`, ou ao ser trocado por outro na mesma máquina). Encerramento pedido pelo aparelho gera alerta. |
+| (nothing) | **pending** | Valid enrollment ([04](04-seguranca-conexao.md), C3). |
+| pending | **approved** | The admin types the right verification code. |
+| pending | **denied** | Five wrong codes; the sixth enrollment; the admin denies, generates another invite for the same Hermes or revokes the Hermes; the device itself gives up (`leave`); or two waiting connections with the same identity. |
+| pending | **expired** | 10 minutes with no code, counted from the first enrollment; or the hub enters restored mode. |
+| approved | **active** | The first credential was confirmed. |
+| approved | **expired** | 24 hours without confirming the first credential; or the hub enters restored mode. |
+| approved, active | **quarantined** | The hub no longer trusts the credential: reuse, double connection or unreadable credential; or the admin does not recognize the last use of an active device when approving a reconnect. |
+| active | **suspended** | The hub entered restored mode ([04](04-seguranca-conexao.md), C11). |
+| active | **expired** | 30 days without connecting ([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)). |
+| active, suspended, quarantined | **replaced** | A new device of the same Hermes had its first credential confirmed (Reconnect). |
+| approved, active, suspended, quarantined | **revoked** | The admin revokes the Hermes or deletes it; the admin generates another invite and the device did not have a confirmed credential yet; or the device itself asks for its closing (`leave`, or when it is swapped for another on the same machine). A closing asked by the device generates an alert. |
 
-- Um Hermes tem no máximo um aparelho em uso (o que já confirmou credencial: ativo, suspenso ou em
-  quarentena) e um pedido em andamento (o que ainda não confirmou: pendente ou aprovado, mesmo que
-  tenha ido à quarentena).
-- Negado, vencido, substituído e revogado são finais. A linha fica, como registro: se a mesma
-  identidade tentar voltar, o hub reconhece e responde a situação dela.
-- Da quarentena e do suspenso só se sai por Reconectar (vira substituído) ou Revogar. Não existe
-  "liberar" nem "reativar".
-- "Incompatível" não é estado do aparelho. É um rótulo calculado a partir da versão do conector
-  gravada na última conexão aceita.
+- A Hermes has at most one device in use (the one that has already confirmed a credential: active,
+  suspended or in quarantine) and one request in progress (the one that has not confirmed yet:
+  pending or approved, even if it went to quarantine).
+- Denied, expired, replaced and revoked are final. The line stays, as a record: if the same
+  identity tries to come back, the hub recognizes it and answers its situation.
+- Out of quarantine and out of suspended there is only Reconnect (it becomes replaced) or Revoke.
+  There is no "release" and no "reactivate".
+- "Incompatible" is not a state of the device. It is a label computed from the version of the
+  connector recorded at the last accepted connection.
 
-No hub, em 11/11/2026:
+In the hub, on 11/11/2026:
 
-- **Prazo vencido vale na hora.** Quem encontra um prazo vencido antes da varredura o aplica ali:
-  a inscrição, a aprovação e as duas gravações da troca. As da troca aplicam também os 30 dias de
-  inatividade.
-- **Negar** pelo comando de administração só vale para pedido pendente. Um aprovado sem credencial
-  sai por revogar ou por convite novo.
-- **Excluir um Hermes** encerra tudo o que é dele, como um revogar, e tira as ligações dele
-  ([13](13-conversa-entre-hermes.md), seção 7).
-- **Vencido sem motivo que explique** responde AR-507, o único código que nunca leva o conector a
-  descartar nada.
+- **An expired deadline applies at once.** Whoever finds an expired deadline before the sweep
+  applies it there: the enrollment, the approval and the two writes of the swap. Those of the swap
+  also apply the 30 days of inactivity.
+- **Denying** through the admin command only applies to a pending request. An approved one with no
+  credential leaves by revoke or by a new invite.
+- **Deleting a Hermes** closes everything that is its own, like a revoke, and removes its links
+  ([13](13-conversa-entre-hermes.md), section 7).
+- **Expired with no reason that explains it** answers AR-507, the only code that never leads the
+  connector to discard anything.
 
-## 3. Hermes: o que a tela mostra
+## 3. Hermes: what the screen shows
 
-O rótulo da linha é calculado a partir do aparelho e do canal.
+The label of the line is computed from the device and the channel.
 
-| Rótulo | Quando |
+| Label | When |
 |---|---|
-| Sem aparelho | A linha existe, sem convite emitido e sem aparelho vivo. |
-| Aguardando o Hermes | Há convite emitido. |
-| Aguardando seu código | Há aparelho pendente. |
-| Aprovado, aguardando o conector | Aparelho aprovado, ainda sem a primeira credencial confirmada. |
-| Conectado | Aparelho ativo com sessão do canal aberta. |
-| Desconectado há X | Aparelho ativo sem sessão do canal. |
-| Incompatível | O conector está abaixo da versão mínima. |
-| Em quarentena | O hub deixou de confiar na credencial. |
-| Suspenso | O hub voltou de uma cópia de segurança. Este Hermes precisa ser reconectado. |
-| Revogado | O aparelho foi encerrado. |
+| No device | The line exists, with no issued invite and no live device. |
+| Waiting for the Hermes | There is an issued invite. |
+| Waiting for your code | There is a pending device. |
+| Approved, waiting for the connector | Device approved, still without the first credential confirmed. |
+| Connected | Active device with an open channel session. |
+| Disconnected for X | Active device with no channel session. |
+| Incompatible | The connector is below the minimum version. |
+| In quarantine | The hub no longer trusts the credential. |
+| Suspended | The hub came back from a backup. This Hermes needs to be reconnected. |
+| Revoked | The device was closed. |
 
-Os acessos pertencem à linha do Hermes e valem para o aparelho ativo. Trocar de aparelho não mexe
-neles. Com o aparelho em qualquer outro estado, toda chamada é negada.
+The accesses belong to the line of the Hermes and apply to the active device. Changing devices does
+not touch them. With the device in any other state, every call is denied.
 
-O rótulo do aparelho vencido por inatividade ainda não está escrito
-([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)). Pelas regras acima, a linha aparece como
-"Sem aparelho".
+The label of the device expired by inactivity is not written yet
+([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)). By the rules above, the line appears as
+"No device".
 
-## 4. Número
+## 4. Number
 
-| De | Para | Quem dispara |
+| From | To | Who triggers it |
 |---|---|---|
-| (nada) | **sem pareamento** | Admin adiciona o número. |
-| sem pareamento, desconectado | **pareando** | Admin pede o código de pareamento ou o QR. |
-| pareando | **conectado** | O celular confirmou, e o número pareado é o esperado. |
-| pareando | **número trocado** | O celular confirmou, mas o número pareado é outro. |
-| pareando | **sem pareamento** | O código de pareamento ou o QR venceu sem uso. |
-| conectado | **reconectando** | O motor perdeu a ligação com o WhatsApp. |
-| reconectando | **conectado** | A ligação voltou. |
-| conectado, reconectando | **desconectado** | Alguém removeu o dispositivo conectado, no celular, ou o admin desconectou pelo painel. |
-| número trocado | **conectado** | O admin confirma o número novo. |
-| número trocado | **sem pareamento** | O admin desfaz o pareamento. |
-| conectado, reconectando | **falha** | O motor informou erro na sessão do motor. |
-| falha | **reconectando** | O admin reinicia a sessão do motor. |
-| qualquer | **removido** | O admin remove o número. |
+| (nothing) | **unpaired** | The admin adds the number. |
+| unpaired, disconnected | **pairing** | The admin asks for the pairing code or the QR. |
+| pairing | **connected** | The phone confirmed, and the paired number is the expected one. |
+| pairing | **number swapped** | The phone confirmed, but the paired number is another one. |
+| pairing | **unpaired** | The pairing code or the QR expired unused. |
+| connected | **reconnecting** | The engine lost the connection with WhatsApp. |
+| reconnecting | **connected** | The connection came back. |
+| connected, reconnecting | **disconnected** | Someone removed the linked device, on the phone, or the admin disconnected through the panel. |
+| number swapped | **connected** | The admin confirms the new number. |
+| number swapped | **unpaired** | The admin undoes the pairing. |
+| connected, reconnecting | **failed** | The engine reported an error in the engine session. |
+| failed | **reconnecting** | The admin restarts the engine session. |
+| any | **removed** | The admin removes the number. |
 
-- Em **número trocado** os acessos ficam parados até o admin decidir.
-- **Estado desconhecido** não é estado do número: é o que a tela mostra quando o motor não responde.
-- O hub confere a configuração de cada sessão do motor na partida e a cada 5 minutos. Se achar algo
-  diferente do esperado (por exemplo, um destino de eventos que não é o hub), corrige e alerta.
+- In **number swapped** the accesses stay stopped until the admin decides.
+- **Unknown state** is not a state of the number: it is what the screen shows when the engine does
+  not answer.
+- The hub checks the configuration of each engine session at startup and every 5 minutes. If it
+  finds something different from what is expected (for example, an event destination that is not
+  the hub), it corrects it and alerts.
 
-## 5. Aviso
+## 5. Notice
 
-| De | Para | Quem dispara |
+| From | To | Who triggers it |
 |---|---|---|
-| (nada) | **pendente** | Chegou mensagem numa conversa em que o Hermes pode ser acordado, ou recado de um par que o acorda ([13](13-conversa-entre-hermes.md)). |
-| pendente | **enviado** | O hub entregou ao conector. |
-| enviado | **confirmado** | O conector confirmou depois de a API local do Hermes aceitar. |
-| enviado | **pendente** | O conector não confirmou no prazo, ou respondeu que falhou ou que atingiu o teto dele; o hub tenta de novo. |
-| pendente, enviado | **expirado** | 24 horas na fila, ou a fila do Hermes passou de 1.000 e este era o mais antigo. |
-| pendente, enviado | **descartado** | O acesso ou a ligação saiu antes da confirmação, ou o conector recusou o aviso por estar fora do formato. |
+| (nothing) | **pending** | A message arrived in a chat in which the Hermes may be woken, or a note from a peer that wakes it ([13](13-conversa-entre-hermes.md)). |
+| pending | **sent** | The hub delivered it to the connector. |
+| sent | **confirmed** | The connector confirmed after Hermes's local API accepted. |
+| sent | **pending** | The connector did not confirm in time, or answered that it failed or that it reached its ceiling; the hub tries again. |
+| pending, sent | **expired** | 24 hours in the queue, or the queue of the Hermes went past 1,000 and this was the oldest. |
+| pending, sent | **discarded** | The access or the link left before the confirmation, or the connector refused the notice for being out of format. |
 
-- A entrega é pelo menos uma vez. O conector descarta aviso repetido pelo identificador.
-- Só existe um aviso pendente por alvo (a conversa, ou o Hermes remetente): o que chega depois soma
-  na quantidade. Depois de um aviso entregue, o seguinte do mesmo alvo só sai em 10 segundos.
-- Mensagem enviada pelo próprio número não acorda ninguém.
+- Delivery is at least once. The connector discards a repeated notice by its identifier.
+- There is only one pending notice per target (the chat, or the sender Hermes): what arrives later
+  adds to the count. After a delivered notice, the next one for the same target only leaves in 10
+  seconds.
+- A message sent by the number itself wakes no one.
 
-## 6. Conexão e sessão do canal
+## 6. Connection and channel session
 
-Uma conexão de canal começa no aperto de mãos. A **sessão do canal** começa quando a troca da
-credencial é confirmada ([04](04-seguranca-conexao.md), C7). Antes disso a conexão só serve para a
-espera do pedido ou para a própria troca. As conexões curtas do `join` e do `leave` não são de
-canal ([04](04-seguranca-conexao.md), C9).
+A channel connection starts at the handshake. The **channel session** starts when the swap of the
+credential is confirmed ([04](04-seguranca-conexao.md), C7). Before that the connection only serves
+for the waiting of the request or for the swap itself. The short connections of `join` and of
+`leave` are not channel connections ([04](04-seguranca-conexao.md), C9).
 
-| Motivo do fim | O que o conector faz |
+| Reason for the end | What the connector does |
 |---|---|
-| Queda de rede, ou falta de batimento | Reconecta na hora. Se a tentativa falhar, abre outra, com espera crescente e sorteada, de 1 a 60 segundos. |
-| Dada por morta (o hub aceitou outra conexão no lugar; AR-208) | Reconecta na hora. Se alguém tomou o lugar dele, é aí que aparece. |
-| O hub está parando ou sem recursos (AR-205) | Reconecta depois de uma espera sorteada. |
-| Tentativa trocada por outra mais nova do mesmo aparelho (AR-206) | Espera de 5 a 15 segundos, sorteados, e tenta de novo. |
-| Erro de protocolo ou limite (AR-204) | Reconecta com espera crescente e não repete a mesma mensagem. |
-| O "gravei" da troca de 24 horas não chegou em 60 segundos | Reconecta e apresenta a credencial que tem. |
-| Aparelho substituído (AR-503) | Passa a usar a pasta do aparelho novo. Se não tem pasta nova, para de usar o canal e mostra o erro. |
-| Pedido negado ou vencido | Se a pasta daquele pedido ainda não tem credencial, descarta a pasta e, se não há outro aparelho, remove o registro. Se tem, não descarta nada e mostra o erro. |
-| Incompatível | Para de usar o canal e mostra o erro de versão em toda ferramenta. |
-| Quarentena, suspenso | Para de usar o canal e mostra o erro. Não apaga nada. |
-| Revogado | Para de usar o canal e mostra AR-502. Não apaga nada. |
-| O hub não reconhece o aparelho (AR-504) | Para de usar o canal e mostra o erro. Não apaga nada. |
-| Vencido por inatividade (AR-507) | Para de usar o canal e mostra o erro. Não apaga nada. |
+| Network drop, or missing heartbeat | Reconnects at once. If the attempt fails, it opens another, with a growing and random wait, from 1 to 60 seconds. |
+| Taken for dead (the hub accepted another connection in its place; AR-208) | Reconnects at once. If someone took its place, that is where it shows. |
+| The hub is stopping or out of resources (AR-205) | Reconnects after a random wait. |
+| Attempt swapped for a newer one of the same device (AR-206) | Waits from 5 to 15 seconds, drawn at random, and tries again. |
+| Protocol error or limit (AR-204) | Reconnects with a growing wait and does not repeat the same message. |
+| The "saved" of the 24-hour swap did not arrive in 60 seconds | Reconnects and presents the credential it has. |
+| Device replaced (AR-503) | Starts using the folder of the new device. If it has no new folder, it stops using the channel and shows the error. |
+| Request denied or expired | If the folder of that request has no credential yet, it discards the folder and, if there is no other device, removes the registration. If it has one, it discards nothing and shows the error. |
+| Incompatible | Stops using the channel and shows the version error in every tool. |
+| Quarantine, suspended | Stops using the channel and shows the error. It deletes nothing. |
+| Revoked | Stops using the channel and shows AR-502. It deletes nothing. |
+| The hub does not recognize the device (AR-504) | Stops using the channel and shows the error. It deletes nothing. |
+| Expired by inactivity (AR-507) | Stops using the channel and shows the error. It deletes nothing. |
 
-"Parar de usar o canal" não encerra o conector: ele continua respondendo ao Hermes, com o erro, e
-continua atendendo o `join` e o `leave` pelo soquete local.
+"Stopping using the channel" does not end the connector: it keeps answering Hermes, with the error,
+and keeps serving `join` and `leave` through the local socket.
 
-## 7. Prazos e limites
+## 7. Deadlines and limits
 
-| Item | Valor |
+| Item | Value |
 |---|---|
-| Validade do convite | 15 minutos |
-| Prazo para digitar o código de conferência | 10 minutos a partir da primeira inscrição |
-| Tentativas de código | 5 |
-| Inscrições por pedido | 5 |
-| Aprovado sem confirmar a primeira credencial | 24 horas |
-| Batimento do canal | A cada 30 segundos; 90 segundos sem resposta encerram a conexão |
-| Conferência de quem apresenta uma credencial | 5 segundos |
-| Teste da conexão antiga numa conexão dupla | 3 segundos |
-| Conexão que ainda não virou sessão, fora a espera do pedido | 90 segundos |
-| Troca de credencial dentro da sessão | A cada 24 horas |
-| Prazo do "gravei", em qualquer troca | 60 segundos |
-| Conexões sem confirmar a troca que geram alerta | 3 em 24 horas |
-| Fila de avisos por Hermes | 24 horas ou 1.000 avisos |
-| Intervalo entre avisos do mesmo alvo | 10 segundos |
-| Teto de acordadas do conector | 30 por minuto e 300 por hora |
-| Varredura do hub: aparelhos conectados e filas | A cada 2 segundos, por um conjunto de conexões do banco só dela |
-| Um quadro que não sai do hub | 30 segundos fecham a conexão |
-| Parada em ordem do hub | Até 8 segundos pelas chamadas em andamento, e mais 2 para os últimos `closing` |
-| Conferência da configuração do motor | A cada 5 minutos |
-| Revogação: tempo até o canal cair | Menos de 5 segundos |
-| Inatividade que exige reconectar | 30 dias |
-| Teto de envio por Hermes e por número | 20 por minuto |
+| Validity of the invite | 15 minutes |
+| Deadline to type the verification code | 10 minutes from the first enrollment |
+| Code attempts | 5 |
+| Enrollments per request | 5 |
+| Approved without confirming the first credential | 24 hours |
+| Channel heartbeat | Every 30 seconds; 90 seconds with no answer end the connection |
+| Check of whoever presents a credential | 5 seconds |
+| Test of the old connection in a double connection | 3 seconds |
+| Connection that has not become a session yet, apart from the waiting of the request | 90 seconds |
+| Credential swap inside the session | Every 24 hours |
+| Deadline of the "saved", in any swap | 60 seconds |
+| Connections without confirming the swap that generate an alert | 3 in 24 hours |
+| Notice queue per Hermes | 24 hours or 1,000 notices |
+| Interval between notices of the same target | 10 seconds |
+| Wake ceiling of the connector | 30 per minute and 300 per hour |
+| Sweep of the hub: connected devices and queues | Every 2 seconds, through a set of database connections only for it |
+| A frame that does not leave the hub | 30 seconds close the connection |
+| Orderly stop of the hub | Up to 8 seconds for the calls in progress, and 2 more for the last `closing` |
+| Check of the engine configuration | Every 5 minutes |
+| Revocation: time until the channel drops | Under 5 seconds |
+| Inactivity that requires reconnecting | 30 days |
+| Send ceiling per Hermes and per number | 20 per minute |
 
-Os limites do canal, por fase e por origem, estão em [14-protocolo-do-canal.md](14-protocolo-do-canal.md),
-seção 4. Os tetos de recado, em [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), seção 6. Os
-prazos de guarda, em [15-mvp.md](15-mvp.md), seção 2. A definir: o prazo padrão de guarda do arquivo
-de mensagens.
+The limits of the channel, per phase and per origin, are in [14-protocolo-do-canal.md](14-protocolo-do-canal.md),
+section 4. The note ceilings, in [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), section 6. The
+retention periods, in [15-mvp.md](15-mvp.md), section 2. To be defined: the default retention period of
+the message archive.

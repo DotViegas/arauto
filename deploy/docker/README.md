@@ -1,51 +1,53 @@
-# Arauto com Docker Compose
+# Arauto with Docker Compose
 
-O hub e o banco numa composição. O proxy e o motor de WhatsApp são seus e ficam fora dela.
+The hub and the database in one composition. The proxy and the WhatsApp engine are yours and stay
+outside it.
 
-| Arquivo | O que é |
+| File | What it is |
 |---|---|
-| [`Dockerfile`](Dockerfile) | A imagem do hub. Traz também o conector para Linux x86_64, servido para download. |
-| [`compose.yaml`](compose.yaml) | O hub e o PostgreSQL 16, com os volumes e as redes. |
-| [`arauto.env.example`](arauto.env.example) | As variáveis que você preenche. |
+| [`Dockerfile`](Dockerfile) | The image of the hub. It also brings the connector for Linux x86_64, served for download. |
+| [`compose.yaml`](compose.yaml) | The hub and PostgreSQL 16, with the volumes and the networks. |
+| [`arauto.env.example`](arauto.env.example) | The variables you fill in. |
 
-## O que falta provar
+## What is left to prove
 
-Estes arquivos foram escritos junto com o código, mas **a imagem ainda não foi construída e a
-composição ainda não subiu num servidor**: a máquina de desenvolvimento do projeto não tem Docker.
-O primeiro uso num servidor é o teste. O que conferir nele está no fim desta página.
+These files were written together with the code, but **the image has not been built yet and the
+composition has not started on a server yet**: the development machine of the project has no
+Docker. The first use on a server is the test. What to check in it is at the end of this page.
 
-## 1. Preparar
+## 1. Prepare
 
-Você precisa de um servidor Linux x86_64 com Docker e o plugin Compose, de um nome de domínio
-apontando para ele, e de um proxy com TLS ([exemplos](../proxy/README.md)).
+You need a Linux x86_64 server with Docker and the Compose plugin, a domain name pointing to it,
+and a proxy with TLS ([examples](../proxy/README.md)).
 
 ```
-git clone <o repositório> arauto
+git clone <the repository> arauto
 cd arauto/deploy/docker
 cp arauto.env.example arauto.env
 ```
 
-Preencha o `arauto.env`:
+Fill in the `arauto.env`:
 
-| Variável | O que pôr |
+| Variable | What to put |
 |---|---|
-| `POSTGRES_PASSWORD` | Uma senha longa e sorteada. Por exemplo: `openssl rand -hex 32`. |
-| `ARAUTO_PUBLIC_URL` | O endereço de fora, com `https://`. Só o nome: sem caminho. |
-| `ARAUTO_TRUSTED_PROXIES` | O endereço do seu proxy **como o hub o enxerga**. Veja abaixo. |
+| `POSTGRES_PASSWORD` | A long, randomly drawn password. For example: `openssl rand -hex 32`. |
+| `ARAUTO_PUBLIC_URL` | The outside address, with `https://`. Only the name: no path. |
+| `ARAUTO_TRUSTED_PROXIES` | The address of your proxy **as the hub sees it**. See below. |
 
-O `arauto.env` guarda uma senha. Não o ponha num repositório.
+The `arauto.env` keeps a password. Do not put it in a repository.
 
-**O endereço do proxy, visto pelo hub.** Com o proxy no próprio servidor apontando para
-`127.0.0.1:8443`, o hub **não** enxerga `127.0.0.1` nem o endereço do servidor: ele enxerga o
-gateway de uma rede do Docker. A composição fixa essas redes, e o exemplo já traz os dois gateways
-(`172.30.250.1` e `172.30.251.1`). Se você trocar as sub-redes, troque a lista junto.
+**The address of the proxy, seen by the hub.** With the proxy on the server itself pointing to
+`127.0.0.1:8443`, the hub does **not** see `127.0.0.1` or the address of the server: it sees the
+gateway of a Docker network. The composition fixes these networks, and the example already brings
+the two gateways (`172.30.250.1` and `172.30.251.1`). If you change the subnets, change the list
+along with them.
 
-Lista errada não impede o hub de subir. Ele ignora o cabeçalho, trata todos os conectores como se
-viessem de um endereço só, e avisa **uma vez** no registro: "a connection that is not from a trusted
-proxy brought X-Forwarded-For". Se essa linha aparecer, o endereço que ela mostra é o que falta na
-lista.
+A wrong list does not prevent the hub from starting. It ignores the header, treats all the
+connectors as if they came from a single address, and warns **once** in the log: "a connection that
+is not from a trusted proxy brought X-Forwarded-For". If that line appears, the address it shows is
+the one missing from the list.
 
-## 2. Construir e iniciar
+## 2. Build and start
 
 ```
 docker compose --env-file arauto.env build
@@ -55,86 +57,89 @@ docker compose --env-file arauto.env up -d
 docker compose --env-file arauto.env ps
 ```
 
-- `init` roda **uma vez**. Ele cria a chave-mestra, a marca da auditoria, a organização e a chave do
-  hub. Rodar de novo não refaz nada.
-- Depois do `up`, o serviço `hub` precisa aparecer como `healthy`. A conferência de saúde é o
-  comando `arauto-hub health`, que pergunta pela porta interna.
+- `init` runs **once**. It creates the master key, the audit mark, the organization and the hub
+  key. Running it again redoes nothing.
+- After the `up`, the service `hub` needs to appear as `healthy`. The health check is the command
+  `arauto-hub health`, which asks through the internal port.
 
-Daqui em diante, todo comando de administração roda dentro do container:
+From here on, every admin command runs inside the container:
 
 ```
 docker compose --env-file arauto.env exec hub arauto-hub admin status
 ```
 
-**O registro do hub** sai em `docker compose --env-file arauto.env logs hub`. Ao subir ele diz
-"the hub is up", com os dois endereços (três, com o painel ligado). É ali que aparecem os avisos do motor de WhatsApp, a lista
-de proxies errada e o modo restaurado. Para mais detalhe, ponha `RUST_LOG=debug` no `arauto.env`.
+**The log of the hub** comes out in `docker compose --env-file arauto.env logs hub`. On starting it
+says "the hub is up", with the two addresses (three, with the panel turned on). That is where the
+warnings of the WhatsApp engine, the wrong list of proxies and the restored mode appear. For more
+detail, put `RUST_LOG=debug` in the `arauto.env`.
 
-## Abrir o painel (opcional)
+## Open the panel (optional)
 
-O painel mostra os Hermes, os números e os acessos, e conecta um Hermes, passo a passo. Parear
-números e dar acesso continuam pelo comando. Vem desligado, e **ainda não foi provado num
-servidor**.
+The panel shows the Hermes, the numbers and the accesses, connects and revokes a Hermes and changes
+the access of a Hermes on a number. Pairing numbers and choosing the chats of an access continue
+through the command. It comes off, and **has not been proven on a server yet**.
 
-Ainda não há passkey: quem está com a sessão do painel aberta pode conectar e reconectar Hermes.
-Por isso, deixe o painel fechado, como abaixo, e saia dele ao terminar.
+There is no passkey yet: whoever has the panel session open can connect, reconnect and revoke
+Hermes and change accesses.
+For that reason, leave the panel closed, as below, and sign out of it when you finish.
 
-1. No `arauto.env`, tire o comentário de `ARAUTO_LISTEN_PANEL` e de `ARAUTO_PANEL_URL`, e rode
+1. In the `arauto.env`, uncomment `ARAUTO_LISTEN_PANEL` and `ARAUTO_PANEL_URL`, and run
    `docker compose --env-file arauto.env up -d`.
-2. Do seu computador, abra um túnel até o servidor: `ssh -L 8445:127.0.0.1:8445 SEU-SERVIDOR`.
-3. Emita o código de entrada: `docker compose --env-file arauto.env exec hub arauto-hub admin panel code`.
-   Ele aparece uma vez, vale 10 minutos e uma entrada. É segredo: não o cole em conversa nem em
-   relatório.
-4. Abra `http://localhost:8445` no navegador e digite o código.
+2. From your computer, open a tunnel to the server: `ssh -L 8445:127.0.0.1:8445 YOUR-SERVER`.
+3. Issue the entry code: `docker compose --env-file arauto.env exec hub arauto-hub admin panel code`.
+   It appears once, is valid for 10 minutes and one entry. It is a secret: do not paste it in a
+   chat or in a report.
+4. Open `http://localhost:8445` in the browser and type the code.
 
-O endereço no navegador tem de ser exatamente o do `ARAUTO_PANEL_URL`: com outro nome, o hub
-responde 421. A sessão do painel dura 12 horas, ou 30 minutos sem uso, e acaba quando o hub
-reinicia.
+The address in the browser has to be exactly that of `ARAUTO_PANEL_URL`: with another name, the hub
+answers 421. The panel session lasts 12 hours, or 30 minutes without use, and ends when the hub
+restarts.
 
-A porta do painel é publicada só em `127.0.0.1` do servidor. Dentro do Docker, quem está numa rede
-do hub (o motor de WhatsApp, por exemplo) alcança a tela de entrada; sem o código, não passa dela.
-Abrir o painel sem túnel (um endereço próprio no seu proxy, com TLS, que não seja o dos
-conectores) é possível, mas **não é recomendado enquanto a passkey não existir**. O risco de abri-lo
-é seu.
+The port of the panel is published only on `127.0.0.1` of the server. Inside Docker, whoever is on
+a network of the hub (the WhatsApp engine, for example) reaches the entry screen; without the code,
+they do not get past it. Opening the panel without a tunnel (an address of its own on your proxy,
+with TLS, that is not that of the connectors) is possible, but **is not recommended while the
+passkey does not exist**. The risk of opening it is yours.
 
-## 3. Conectar o primeiro Hermes
+## 3. Connect the first Hermes
 
 ```
 docker compose --env-file arauto.env exec hub arauto-hub admin hermes add atendimento
 docker compose --env-file arauto.env exec hub arauto-hub admin invite atendimento
 ```
 
-O `invite` mostra o bloco: o endereço do hub, a chave do hub, o convite (vale 15 minutos e um uso),
-o endereço do conector, o SHA-256 do arquivo e **um comando só**, encadeado: ele baixa o conector
-para `~/.arauto`, confere o SHA-256 escrito no bloco e só então roda o `join`. Se o arquivo não
-confere, nada roda.
+The `invite` shows the block: the address of the hub, the hub key, the invite (valid for
+15 minutes and one use), the address of the connector, the SHA-256 of the file and **one command
+only**, chained: it downloads the connector to `~/.arauto`, checks the SHA-256 written in the block
+and only then runs the `join`. If the file does not match, nothing runs.
 
-Esse comando roda **na máquina do Hermes, com o mesmo usuário do Hermes** (de preferência pelo
-próprio Hermes, colando o bloco no canal de comando dele). Não o rode como outro usuário nem por
-`docker exec` como root: o `join` registra o conector no Hermes chamando o programa `hermes`, e
-precisa encontrá-lo.
+This command runs **on Hermes's machine, with the same user as Hermes** (preferably by Hermes
+itself, pasting the block into its command channel). Do not run it as another user or through
+`docker exec` as root: the `join` registers the connector in Hermes by calling the program
+`hermes`, and needs to find it.
 
-O `join` responde um código de seis dígitos, no formato `182-239`. Você o digita aqui, com ou sem
-o hífen:
+The `join` answers a six-digit code, in the format `182-239`. You type it here, with or without the
+hyphen:
 
 ```
 docker compose --env-file arauto.env exec hub arauto-hub admin approve atendimento 182-239
 ```
 
-O Hermes nasce conectado e sem acesso a nada.
+The Hermes is born connected and with access to nothing.
 
-| Se o `join` disser | O que fazer |
+| If the `join` says | What to do |
 |---|---|
-| `AR-601` (o registro no Hermes falhou) | O programa `hermes` não foi achado, ou recusou. Diga onde ele está com a variável `ARAUTO_HERMES_BIN` e repita o mesmo `join`; ou repita com `--no-register` e registre à mão. O pedido continua aberto no hub. |
-| `AR-101` ou `AR-102` | O convite venceu ou já foi usado. Emita outro com `admin invite`. |
+| `AR-601` (the registration in Hermes failed) | The program `hermes` was not found, or refused. Say where it is with the variable `ARAUTO_HERMES_BIN` and repeat the same `join`; or repeat with `--no-register` and register by hand. The request remains open in the hub. |
+| `AR-101` or `AR-102` | The invite expired or was already used. Issue another with `admin invite`. |
 
-Um **reconectar** (outro convite para um Hermes que já tem aparelho) não registra de novo no
-Hermes: a entrada que já existe continua valendo.
+A **reconnect** (another invite for a Hermes that already has a device) does not register again in
+Hermes: the entry that already exists remains valid.
 
-## 4. Ligar o motor de WhatsApp
+## 4. Link the WhatsApp engine
 
-O motor é seu. Ponha-o na rede `arauto-engine` (o nome está em `ARAUTO_ENGINE_NETWORK`), **sem porta
-pública**. Nessa rede o hub alcança o motor, e o motor alcança o hub em `http://hub:8444`.
+The engine is yours. Put it on the network `arauto-engine` (the name is in
+`ARAUTO_ENGINE_NETWORK`), **with no public port**. On that network the hub reaches the engine, and
+the engine reaches the hub at `http://hub:8444`.
 
 ```
 docker compose --env-file arauto.env exec hub arauto-hub admin engine set --url http://waha:3000 --events-url http://hub:8444
@@ -142,20 +147,21 @@ docker compose --env-file arauto.env exec -it hub arauto-hub admin engine set-ke
 docker compose --env-file arauto.env exec hub arauto-hub admin engine health
 ```
 
-O `set-key` pede a chave da API do motor no terminal, para ela não ficar no histórico.
+The `set-key` asks for the API key of the engine in the terminal, so that it does not stay in the
+history.
 
-**Confira os dois sentidos.** O `engine health` só prova que o hub alcança o motor. O caminho de
-volta, do motor para o hub, é por onde as mensagens chegam na hora:
+**Check both directions.** The `engine health` only proves that the hub reaches the engine. The
+way back, from the engine to the hub, is where the messages arrive on time:
 
 ```
 docker run --rm --network arauto-engine curlimages/curl -s http://hub:8444/health
 ```
 
-Tem de responder `ok`. Se esse caminho estiver errado, nada acusa: o hub ainda busca as mensagens
-sozinho a cada 5 minutos, e tudo parece funcionar, só que atrasado. Depois de parear, mande uma
-mensagem ao número: ela tem de aparecer em segundos, não em minutos.
+It has to answer `ok`. If that way is wrong, nothing reports it: the hub still fetches the messages
+by itself every 5 minutes, and everything seems to work, only late. After pairing, send a message
+to the number: it has to appear in seconds, not in minutes.
 
-Depois, o número e os acessos:
+Then, the number and the accesses:
 
 ```
 ... admin number add balcao +5565900000000
@@ -164,42 +170,43 @@ Depois, o número e os acessos:
 ... admin access grant atendimento balcao --scope all --read --send --wake
 ```
 
-**Para o Hermes ser acordado** falta uma coisa que nenhum comando do hub faz: o conector precisa da
-chave da API local do Hermes. Ela chega por duas variáveis na entrada `arauto` do servidor de
-ferramentas do Hermes: `ARAUTO_HERMES_API_KEY` (a chave) e `ARAUTO_HERMES_API_URL` (o endereço, com o
-número da máquina e a porta, como `http://127.0.0.1:8642/v1/runs`; `localhost` não é aceito). Sem
-a chave, as ferramentas funcionam e ninguém é acordado. Confira na máquina do Hermes:
+**For Hermes to be woken** one thing is missing that no command of the hub does: the connector
+needs the key of Hermes's local API. It arrives through two variables in the entry `arauto` of the
+tool server of Hermes: `ARAUTO_HERMES_API_KEY` (the key) and `ARAUTO_HERMES_API_URL` (the address,
+with the number of the machine and the port, like `http://127.0.0.1:8642/v1/runs`; `localhost` is
+not accepted). Without the key, the tools work and nobody is woken. Check on Hermes's machine:
 
 ```
 ~/.arauto/arauto-connector-linux-x86_64 status
 ```
 
-Ele mostra duas linhas: `Waking allowed by the admin` (o que você liberou no hub) e `Key of the
-local API of Hermes` (se o conector tem a chave). O Hermes só acorda com as duas em ordem. O formato
-exato dessa chamada ainda não foi provado contra um Hermes de verdade: é uma das conferências do
-primeiro uso.
+It shows two lines: `Waking allowed by the admin` (what you released in the hub) and `Key of the
+local API of Hermes` (whether the connector has the key). Hermes only wakes with both in order. The
+exact format of this call has not been proven against a real Hermes yet: it is one of the checks of
+the first use.
 
-Um acesso ao número inteiro acorda em conversa com uma pessoa. Um **grupo** só acorda o Hermes que
-tem uma linha própria para aquele grupo (`admin access chat ... --read --wake`). E o aviso espera a
-conversa ficar quieta por 6 segundos antes de acordar; mude com `admin access wake-wait`.
+An access to the whole number wakes in a chat with a person. A **group** only wakes the Hermes that
+has a line of its own for that group (`admin access chat ... --read --wake`). And the notice waits
+for the chat to stay quiet for 6 seconds before waking; change it with `admin access wake-wait`.
 
-## 5. Deixar dois Hermes conversarem
+## 5. Let two Hermes talk
 
 ```
 ... admin link add atendimento financeiro --wake --both
 ```
 
-## Cópia de segurança
+## Backup
 
-- **Do banco:** o volume `arauto-postgres`, por `pg_dump` ou por arquivamento do registro de
-  transações. Diária, no mínimo.
-- **Da pasta de dados** (volume `arauto-data`): guarde **separada** da cópia do banco, num lugar
-  mais protegido. Ela tem a chave-mestra. Sem ela, o banco restaurado não abre nenhuma credencial.
-- Restaurar o banco de uma cópia liga o modo restaurado: os Hermes param de ser atendidos até
-  reconectarem, cada um com um convite novo. É de propósito: uma cópia antiga traz credenciais
-  antigas.
+- **Of the database:** the volume `arauto-postgres`, by `pg_dump` or by archiving the transaction
+  log. Daily, at least.
+- **Of the data folder** (volume `arauto-data`): keep it **separate** from the backup of the
+  database, in a more protected place. It has the master key. Without it, the restored database
+  opens no credential.
+- Restoring the database from a copy turns on the restored mode: the Hermes stop being served
+  until they reconnect, each one with a new invite. It is on purpose: an old copy brings old
+  credentials.
 
-## Atualizar
+## Update
 
 ```
 git pull
@@ -208,18 +215,18 @@ docker compose --env-file arauto.env run --rm hub migrate --i-have-a-backup
 docker compose --env-file arauto.env up -d
 ```
 
-Faça a cópia de segurança do banco antes do `migrate`: o nome do argumento é o lembrete.
+Make the backup of the database before the `migrate`: the name of the argument is the reminder.
 
-## O que conferir no primeiro uso num servidor
+## What to check on the first use on a server
 
-| Conferência | Como |
+| Check | How |
 |---|---|
-| A imagem constrói | `docker compose build` termina sem erro. |
-| O hub passa na saúde | `docker compose ps` mostra `healthy`. |
-| O banco força a gravação | O hub sobe sem pedir `ARAUTO_ALLOW_UNSAFE_DB`. |
-| A porta interna não é publicada | De fora do servidor, a porta 8444 não responde. |
-| A porta do painel não é publicada | De fora do servidor, a porta 8445 não responde, com o painel ligado ou desligado. |
-| O painel não existe no endereço dos conectores | `curl -I https://SEU-ENDERECO/sign-in` responde 404. |
-| O download funciona | `curl -O https://SEU-ENDERECO/v1/download/arauto-connector-linux-x86_64` e o `sha256sum` bate com o do bloco. |
-| O endereço dos conectores | Em `admin audit`, a conexão de um Hermes mostra o endereço dele, não o do proxy. |
-| A parada em ordem | `docker compose stop hub` termina em menos de 20 segundos, sem ser forçada. |
+| The image builds | `docker compose build` ends without error. |
+| The hub passes the health check | `docker compose ps` shows `healthy`. |
+| The database forces the write | The hub starts without asking for `ARAUTO_ALLOW_UNSAFE_DB`. |
+| The internal port is not published | From outside the server, port 8444 does not answer. |
+| The port of the panel is not published | From outside the server, port 8445 does not answer, with the panel on or off. |
+| The panel does not exist on the address of the connectors | `curl -I https://YOUR-ADDRESS/sign-in` answers 404. |
+| The download works | `curl -O https://YOUR-ADDRESS/v1/download/arauto-connector-linux-x86_64` and the `sha256sum` matches that of the block. |
+| The address of the connectors | In `admin audit`, the connection of a Hermes shows its address, not that of the proxy. |
+| The orderly stop | `docker compose stop hub` ends in less than 20 seconds, without being forced. |

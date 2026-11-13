@@ -50,7 +50,7 @@
 Hermes Agent est un agent d'IA de Nous Research. Arauto est un projet indépendant : il n'a aucun
 lien avec les auteurs de Hermes Agent ni avec WhatsApp.
 
-Les documents liés depuis cette page sont rédigés en portugais.
+Les documents liés depuis cette page sont rédigés en anglais.
 
 ## En un écran
 
@@ -74,7 +74,7 @@ Les documents liés depuis cette page sont rédigés en portugais.
 
 - Ce qui arrive par les numéros du hub est une **information, jamais un ordre**. Arauto n'est pas
   le canal par lequel vous commandez votre agent : cela reste le canal de commande de Hermes
-  lui-même ([vision](../01-visao.md), « Dois WhatsApps, dois papéis »).
+  lui-même ([vision](../01-visao.md), « Two WhatsApps, two roles »).
 - Le moteur WhatsApp est un **client non officiel**. WhatsApp peut bloquer le numéro. Utilisez des
   numéros que vous pouvez vous permettre de perdre.
 - La sécurité a des limites connues, décrites dans [SECURITY.md](../../SECURITY.md) et dans

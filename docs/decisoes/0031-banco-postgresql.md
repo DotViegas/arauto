@@ -1,20 +1,20 @@
-# 0031 — Banco: PostgreSQL
+# 0031 — Database: PostgreSQL
 
-**Estado:** decidida · **Data:** 10/11/2026
+**Status:** decided · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-O desenho anterior usava SQLite, em dois arquivos: um pequeno e crítico, outro com as mensagens. A escolha vinha do serviço de origem. O modelo de dados já previa a troca: todo acesso ao banco passa por uma camada de repositório.
+The previous design used SQLite, in two files: a small and critical one, another with the messages. The choice came from the source service. The data model already foresaw the change: every access to the database goes through a repository layer.
 
-## Decisão
+## Decision
 
-O hub usa PostgreSQL. Em produção ele sobe em container, ao lado do hub, pelo arquivo de composição. Em desenvolvimento, usa-se um PostgreSQL local, sem container.
+The hub uses PostgreSQL. In production it runs in a container, beside the hub, through the compose file. In development, a local PostgreSQL is used, with no container.
 
-## Consequências
+## Consequences
 
-- Um banco só. A separação em dois arquivos existia porque o SQLite tem um escritor; no PostgreSQL, as mensagens ficam em tabelas com expurgo por data ([15-mvp.md](../15-mvp.md), seção 2).
-- As filas continuam no banco, com `FOR UPDATE SKIP LOCKED`. O hub é avisado por `LISTEN/NOTIFY` e também confere de tempos em tempos.
-- A chave-mestra e a marca da auditoria continuam fora do banco e fora da cópia de segurança dele ([04](../04-seguranca-conexao.md), C11).
-- A cópia de segurança passa a ser a do PostgreSQL. A regra de [03-arquitetura.md](../03-arquitetura.md), seção 8, é reescrita com isso.
-- O banco é mais um serviço para quem instala cuidar. Em troca, mais de um processo escreve ao mesmo tempo, o que o comando de administração e, mais adiante, um segundo hub precisam.
-- Quem só lê o banco continua sem conseguir se passar por um Hermes: nada do que se guarda mudou.
+- One database only. The separation into two files existed because SQLite has one writer; in PostgreSQL, the messages stay in tables with purge by date ([15-mvp.md](../15-mvp.md), section 2).
+- The queues stay in the database, with `FOR UPDATE SKIP LOCKED`. The hub is notified by `LISTEN/NOTIFY` and also checks from time to time.
+- The master key and the audit mark stay outside the database and outside its backup ([04](../04-seguranca-conexao.md), C11).
+- The backup becomes the PostgreSQL one. The rule of [03-arquitetura.md](../03-arquitetura.md), section 8, is rewritten with this.
+- The database is one more service for whoever installs to take care of. In exchange, more than one process writes at the same time, which the admin command and, later on, a second hub need.
+- Whoever only reads the database still cannot pass as a Hermes: nothing of what is kept has changed.

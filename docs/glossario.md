@@ -1,154 +1,173 @@
-# Glossário
+# Glossary
 
-**Estado: proposta.** Um nome para cada coisa. Os outros documentos usam estes termos.
+**Status: proposal.** One name for each thing. The other documents use these terms.
 
-## As peças
+## The parts
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Arauto** | O projeto. Tem dois programas, o hub e o conector, e usa um terceiro, o motor. |
-| **Hermes** | Um agente de IA (Hermes Agent). No painel, é uma linha: a identidade lógica do agente, dona dos acessos. |
-| **LLM do Hermes** | O modelo de linguagem que decide o que o Hermes faz e roda comandos no terminal dele. |
-| **Hub** | O servidor do Arauto. Tem o painel, a porta dos conectores e a caixa preta, e fala com o motor. |
-| **Painel** | As telas do hub, usadas por pessoas. |
-| **Conector** | Programa pequeno que roda ao lado do Hermes. Para o Hermes, é um servidor de ferramentas local. |
-| **Motor** | O programa que fala com o WhatsApp. Hoje, o WAHA de quem instala. |
-| **Arquivo de mensagens** | As conversas guardadas no hub. |
-| **MCP** | O protocolo padrão pelo qual um agente usa ferramentas de fora. |
-| **stdio** | Forma de dois programas conversarem pela entrada e pela saída de texto, sem rede. É como o Hermes fala com o conector. |
-| **API local do Hermes** | O endereço, na própria máquina do Hermes, por onde se inicia uma execução dele. |
+| **Arauto** | The project. It has two programs, the hub and the connector, and uses a third one, the engine. |
+| **Hermes** | An AI agent (Hermes Agent). In the panel it is a line: the logical identity of the agent, which owns the accesses. |
+| **Hermes's LLM** | The language model that decides what Hermes does and runs commands in its terminal. |
+| **Hub** | The Arauto server. It has the panel, the port of the connectors and the vault, and talks to the engine. |
+| **Panel** | The screens of the hub, used by people. |
+| **Connector** | A small program that runs beside Hermes. To Hermes, it is a local tool server. |
+| **Engine** | The program that talks to WhatsApp. Today, the WAHA of whoever installs. |
+| **Message archive** | The chats kept in the hub. |
+| **MCP** | The standard protocol through which an agent uses outside tools. |
+| **stdio** | A way for two programs to talk through text input and output, with no network. It is how Hermes talks to the connector. |
+| **Hermes's local API** | The address, on Hermes's own machine, through which a run of it is started. |
 
-## As pessoas
+## The people
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Admin** | Pessoa com login no painel. |
-| **Operador** | Quem dá ordens ao Hermes pelo canal de comando. Pode ser o admin. |
-| **Organização** | Dona de Hermes, números e admins. Uma instalação tem uma; o banco já separa por organização. |
+| **Admin** | A person with a login in the panel. |
+| **Operator** | Whoever gives orders to Hermes through the command channel. It may be the admin. |
+| **Organization** | The owner of Hermes, numbers and admins. An installation has one; the database already separates by organization. |
 
-## Comando e dado
+## Command and data
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Canal de comando** | Por onde o operador dá ordens ao Hermes. Existe fora do Arauto e não passa por ele. |
-| **Meios de conversa do Hermes** | As plataformas em que o Hermes conversa: o canal de comando e as demais. |
-| **Número** | Uma conta de WhatsApp pareada no motor. |
-| **Apelido** | O nome que o admin dá a um número no painel. |
-| **Parear** | Ligar um número ao motor, pelo celular. Vale só para números. |
-| **Código de pareamento, QR** | O que o celular lê ou digita para parear. Segredo de curta duração. |
-| **Dispositivo conectado** | Cada aparelho ou programa ligado a uma conta de WhatsApp, como aparece no celular. O motor é um deles. |
-| **Conversa** | Um contato ou grupo dentro de um número. |
+| **Command channel** | Where the operator gives orders to Hermes. It exists outside Arauto and does not go through it. |
+| **Hermes's conversation platforms** | The platforms on which Hermes talks: the command channel and the others. |
+| **Number** | A WhatsApp account paired in the engine. |
+| **Alias** | The name the admin gives a number in the panel. |
+| **Pair** | To link a number to the engine, with the phone. It applies only to numbers. |
+| **Pairing code, QR** | What the phone reads or types to pair. A short-lived secret. |
+| **Linked device** | Each device or program linked to a WhatsApp account, as it appears on the phone. The engine is one of them. |
+| **Chat** | A contact or a group inside a number. |
 
-## A conexão de um Hermes
+## Connecting a Hermes
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Conectar** | Ligar um Hermes ao hub. Vale só para Hermes. |
-| **Bloco** | O texto que o admin copia do painel e cola no canal de comando do Hermes. |
-| **Convite** | Segredo temporário que vai dentro do bloco. Vale 15 minutos e um uso. Só serve para pedir conexão. |
-| **Inscrição** | O momento em que um conector apresenta um convite ao hub. |
-| **Pedido de conexão** | O que nasce de uma inscrição. Não dá acesso a nada até o admin digitar o código. |
-| **Código de conferência** | Seis dígitos que o conector mostra e o admin digita no painel. Não é segredo. |
-| **Aparelho** | Uma instalação do conector, com a sua identidade. Um Hermes tem no máximo um aparelho ativo. |
-| **Identidade do aparelho** | Par de chaves criado na máquina do Hermes. A parte privada nunca sai dali. |
-| **Credencial lacrada** | Envelope emitido pela caixa preta, que o conector guarda e não consegue abrir. Para usar o hub é preciso trocá-la por outra. |
-| **Lacre** | A cifra que fecha a credencial. Só o hub abre. |
-| **Geração** | O número de ordem de cada credencial emitida para um aparelho. O hub compara também o resumo da credencial, porque depois de uma restauração um número pode se repetir. |
-| **Geração zero** | Aparelho aprovado que ainda não confirmou a primeira credencial. |
-| **Caixa preta** | A parte do hub que sorteia e lacra. |
-| **Chave-mestra** | A chave da caixa preta. Fica fora do banco. |
-| **Chave do hub** | Par de chaves do hub. A parte pública vai em todo bloco: é por ela que o conector reconhece o hub certo. |
-| **Chave de versões** | A chave do projeto que assina cada versão publicada do conector. Não fica em hub nenhum. |
-| **Canal** | A conexão de saída do conector para o hub, cifrada de ponta a ponta. |
-| **Aperto de mãos** | A troca inicial em que conector e hub se reconhecem e combinam a chave da conversa. |
-| **Sessão do canal** | Um período em que o canal está aberto e a credencial daquela sessão já foi trocada. |
-| **Batimento** | Mensagem periódica que mostra que o outro lado continua ali. |
-| **Líder** | A única cópia do conector que segura o canal num Hermes. |
-| **Repassadora** | Cópia do conector que não é líder: repassa as chamadas ao líder. |
-| **Reuso** | Apresentar uma credencial que já foi trocada, ou nenhuma quando deveria haver. Sinal de cópia. |
-| **Conexão dupla** | Duas conexões vivas do mesmo aparelho ao mesmo tempo. Sinal de cópia. |
-| **Dada por morta** | Conexão antiga que não respondeu ao teste do hub e foi fechada para outra entrar no lugar. |
-| **Quarentena** | Aparelho parado porque o hub deixou de confiar na credencial dele: houve sinal de cópia, ou o arquivo se perdeu. Só volta com convite novo. |
-| **Suspenso** | Aparelho parado porque o hub voltou de uma cópia de segurança. Só volta com convite novo. |
-| **Modo restaurado** | O estado do hub depois de perceber que voltou de uma cópia de segurança antiga. Dura até não restar aparelho suspenso. |
-| **Marca da auditoria** | O número do último evento de segurança, guardado fora do banco. Banco atrás da marca é banco restaurado. |
-| **Revogar** | Encerrar um Hermes no hub: o aparelho, o pedido em andamento e o convite emitido. Os acessos ficam guardados. Quem revoga é o admin, no painel; um aparelho também pode pedir o próprio encerramento. |
-| **Saída local** | Apagar os arquivos do conector sem falar com o hub. É para uma pessoa, quando o hub não existe mais ou trocou de chave. |
-| **Reconectar** | Gerar convite novo para um Hermes que já existe. Os acessos são mantidos. |
-| **Modo rápido** | O próprio Hermes instala o conector. A credencial fica onde a LLM alcança. |
-| **Modo blindado** | Uma pessoa instala o conector separado do Hermes. A LLM não alcança a credencial. Previsto, não é da primeira versão. |
-| **Resumo** | O resultado de uma função de resumo (SHA-256) sobre um dado. Serve para conferir sem guardar o dado. |
-| **Vigente e pendente** | As duas credenciais que o hub acompanha por aparelho: a que vale, e a que ele acabou de emitir e ainda não foi confirmada. |
-| **Troca** | O passo em que o conector apresenta a credencial que tem e recebe outra. "Gravei" é a confirmação do conector de que a nova está em disco. |
-| **Em espera** | Conexão de canal que provou a identidade e aguarda: o pedido ainda não foi aprovado. |
-| **Conexão estabelecida** | Conexão de canal em espera ou em sessão. É a que o hub testa antes de tratar outra como conexão dupla. |
-| **Origem** | De onde vem uma conexão, para os tetos do hub: o endereço IPv4, ou os primeiros 64 bits do endereço IPv6. Não confundir com o serviço de origem. |
-| **Varredura** | A tarefa do hub que, a cada 2 segundos, confere a marca, aplica os prazos e relê o estado dos aparelhos com conexão aberta. É ela que garante o revogar em menos de 5 segundos. |
-| **Parada em ordem** | O jeito de o hub parar: deixa de aceitar conexões, deixa as chamadas em andamento responderem e manda `closing` a cada conexão antes de sair. |
-| **Conexão curta** | Conexão do `join` ou do `leave`: prova a identidade, leva um pedido e fecha. Não é canal. |
-| **Pedido em andamento** | Aparelho que ainda não confirmou a primeira credencial: pendente ou aprovado, mesmo que tenha ido à quarentena antes de confirmar. |
-| **Aparelho em uso** | Aparelho que já confirmou credencial: ativo, suspenso ou em quarentena depois de ativo. |
-| **Encerrado** | Aparelho em estado final: negado, vencido, substituído ou revogado. |
-| **Alerta** | Aviso do painel para o admin. Não é o aviso que acorda o Hermes. |
-| **Prova de restauração** | Sinal de que o banco do hub voltou no tempo: banco atrás da marca, ou lacre válido que o banco não explica. |
-| **Linha do tempo perdida** | O que aconteceu entre a cópia de segurança e a restauração, e que o banco restaurado não conhece. |
+| **Connect** | To link a Hermes to the hub. It applies only to Hermes. |
+| **Block** | The text the admin copies from the panel and pastes into Hermes's command channel. |
+| **Invite** | A temporary secret that goes inside the block. It is valid for 15 minutes and for one use. It only serves to ask for a connection. |
+| **Enrollment** | The moment a connector presents an invite to the hub. |
+| **Connection request** | What an enrollment creates. It gives access to nothing until the admin types the code. |
+| **Verification code** | Six digits the connector shows and the admin types in the panel. It is not a secret. |
+| **Device** | An installation of the connector, with its identity. A Hermes has at most one active device. |
+| **Device identity** | A key pair created on Hermes's machine. The private part never leaves it. |
+| **Sealed credential** | An envelope issued by the vault, which the connector keeps and cannot open. To use the hub it has to be swapped for another one. |
+| **Seal** | The cipher that closes the credential. Only the hub opens it. |
+| **Generation** | The sequence number of each credential issued to a device. The hub also compares the digest of the credential, because after a restoration a number may repeat. |
+| **Generation zero** | An approved device that has not confirmed its first credential yet. |
+| **Vault** | The part of the hub that draws random values and seals. |
+| **Master key** | The key of the vault. It stays outside the database. |
+| **Hub key** | The key pair of the hub. The public part goes in every block: it is how the connector recognizes the right hub. |
+| **Release key** | The project key that signs each published version of the connector. It is in no hub. |
+| **Channel** | The outbound connection from the connector to the hub, encrypted end to end. |
+| **Handshake** | The initial exchange in which connector and hub recognize each other and agree on the key of the conversation. |
+| **Channel session** | A period in which the channel is open and the credential of that session has already been swapped. |
+| **Heartbeat** | A periodic message that shows the other side is still there. |
+| **Leader** | The only copy of the connector that holds the channel for a Hermes. |
+| **Relay** | A copy of the connector that is not the leader: it relays the calls to the leader. |
+| **Reuse** | Presenting a credential that was already swapped, or none when there should be one. A sign of a copy. |
+| **Double connection** | Two live connections of the same device at the same time. A sign of a copy. |
+| **Taken for dead** | An old connection that did not answer the hub's check and was closed so that another could take its place. |
+| **Quarantine** | A device stopped because the hub no longer trusts its credential: there was a sign of a copy, or the file was lost. It only comes back with a new invite. |
+| **Suspended** | A device stopped because the hub came back from a backup. It only comes back with a new invite. |
+| **Restored mode** | The state of the hub after it notices it came back from an old backup. It lasts until no suspended device is left. |
+| **Audit mark** | The number of the last security event, kept outside the database. A database behind the mark is a restored database. |
+| **Revoke** | To close a Hermes in the hub: the device, the request in progress and the issued invite. The accesses are kept. The admin revokes, in the panel; a device may also ask for its own closing. |
+| **Local leave** | Erasing the files of the connector without talking to the hub. It is for a person, when the hub no longer exists or changed its key. |
+| **Reconnect** | To issue a new invite for a Hermes that already exists. The accesses are kept. |
+| **Quick mode** | Hermes itself installs the connector. The credential stays where the LLM reaches it. |
+| **Shielded mode** | A person installs the connector apart from Hermes. The LLM does not reach the credential. Planned, not in the first version. |
+| **Digest** | The result of a hash function (SHA-256) over a piece of data. It serves to check without keeping the data. |
+| **Current and pending** | The two credentials the hub tracks per device: the one in force, and the one it has just issued and that has not been confirmed yet. |
+| **Swap** | The step in which the connector presents the credential it has and receives another. "Saved" is the connector's confirmation that the new one is on disk. |
+| **Waiting** | A channel connection that proved its identity and waits: the request has not been approved yet. |
+| **Established connection** | A channel connection that is waiting or in session. It is the one the hub checks before treating another as a double connection. |
+| **Origin** | Where a connection comes from, for the ceilings of the hub: the IPv4 address, or the first 64 bits of the IPv6 address. Not to be confused with the source service. |
+| **Sweep** | The task of the hub that, every 2 seconds, checks the mark, applies the deadlines and rereads the state of the devices with an open connection. It is what guarantees a revocation in under 5 seconds. |
+| **Orderly stop** | The way the hub stops: it stops accepting connections, lets the calls in progress answer and sends `closing` to each connection before leaving. |
+| **Short connection** | A connection of `join` or of `leave`: it proves the identity, carries one request and closes. It is not a channel. |
+| **Request in progress** | A device that has not confirmed its first credential yet: pending or approved, even if it went to quarantine before confirming. |
+| **Device in use** | A device that has already confirmed a credential: active, suspended, or in quarantine after being active. |
+| **Closed** | A device in a final state: denied, expired, replaced or revoked. |
+| **Alert** | A warning from the panel to the admin. It is not the notice that wakes Hermes. |
+| **Proof of restoration** | A sign that the hub's database went back in time: a database behind the mark, or a valid seal the database does not explain. |
+| **Lost timeline** | What happened between the backup and the restoration, and that the restored database does not know. |
 
-## O uso
+## The use
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Acesso** | O que um Hermes pode num número. |
-| **Verbo** | Cada coisa que um acesso libera: ler, enviar, modificar, ser acordado. |
-| **Escopo** | Se o acesso vale para todas as conversas do número ou só para as escolhidas. |
-| **Linha de conversa** | Exceção de acesso para uma conversa. |
-| **Matriz** | A tela que cruza Hermes e números e mostra os acessos. |
-| **Aviso** | Sinal do hub de que há mensagem nova numa conversa, ou recado novo de outro Hermes. É um ponteiro: não leva o conteúdo. |
-| **Frase fixa** | O texto, guardado no conector, que acorda o Hermes. |
-| **Acordar** | O conector inicia uma execução no Hermes a partir de um aviso. |
-| **Auditoria** | O registro, que só cresce, do que cada um fez no hub. Sem conteúdo de mensagem. |
-| **Registro do sistema** | O diário técnico do hub. |
-| **Expurgo** | Apagar o que passou do prazo de guarda. |
-| **Passkey** | A chave de acesso do celular ou do computador, usada no lugar da senha. |
-| **Código de instalação** | Código de uso único que o hub mostra na primeira partida, para criar o primeiro admin. |
-| **Código de entrada** | Código de uso único, emitido por comando na máquina do hub, que abre uma sessão do painel enquanto a passkey não existe. É segredo de curta duração: aparece uma vez, e o hub guarda só o resumo. Nome proposto ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| **Access** | What a Hermes may do on a number. |
+| **Verb** | Each thing an access allows: read, send, modify, be woken. |
+| **Scope** | Whether the access applies to every chat of the number or only to the chosen ones. |
+| **Chat line** | An access exception for one chat. |
+| **Matrix** | The screen that crosses Hermes and numbers and shows the accesses. |
+| **Notice** | A signal from the hub that there is a new message in a chat, or a new note from another Hermes. It is a pointer: it does not carry the content. |
+| **Fixed sentence** | The text, kept in the connector, that wakes Hermes. |
+| **Wake** | The connector starts a run in Hermes from a notice. |
+| **Audit** | The record, which only grows, of what each one did in the hub. No message content. |
+| **System log** | The technical log of the hub. |
+| **Purge** | Deleting what passed its retention period. |
+| **Passkey** | The access key of the phone or the computer, used in place of a password. |
+| **Installation code** | A single-use code the hub shows on its first start, to create the first admin. |
+| **Entry code** | A single-use code, issued by a command on the hub's machine, that opens a panel session while the passkey does not exist. It is a short-lived secret: it appears once, and the hub keeps only its digest. Proposed name ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 
-## A conversa entre Hermes
+## Conversation between Hermes
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Recado** | Mensagem de texto de um Hermes para outro, entregue pelo hub. É dado, nunca ordem. |
-| **Ligação** | Uma entrada da lista de pares: de um Hermes para outro, num sentido só. |
-| **Lista de pares** | O conjunto das ligações de uma organização. Só o admin a muda. |
-| **Par** | Para um Hermes, outro Hermes com o qual ele tem ligação. |
-| **Fio** | Sequência de recados entre os mesmos dois Hermes, sobre o mesmo assunto. |
-| **Teto** | Limite fixo de quantidade, que o hub aplica sem olhar o conteúdo. |
+| **Note** | A text message from one Hermes to another, delivered by the hub. It is data, never an order. |
+| **Link** | An entry of the peer list: from one Hermes to another, in one direction only. |
+| **Peer list** | The set of links of an organization. Only the admin changes it. |
+| **Peer** | For a Hermes, another Hermes it has a link with. |
+| **Thread** | A sequence of notes between the same two Hermes, about the same subject. |
+| **Ceiling** | A fixed limit on quantity, which the hub applies without looking at the content. |
 
-## Sessões
+## Sessions
 
-A palavra "sessão" sempre vem com o dono:
+The word "session" always comes with its owner:
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Sessão do canal** | Ver acima. |
-| **Sessão do motor** | A ligação do motor com uma conta de WhatsApp. Quem a copia tem o número. |
-| **Sessão do painel** | O login de um admin no navegador. |
+| **Channel session** | See above. |
+| **Engine session** | The link between the engine and a WhatsApp account. Whoever copies it has the number. |
+| **Panel session** | The login of an admin in the browser. |
 
-## Origem
+## Origin
 
-| Termo | O que é |
+| Term | What it is |
 |---|---|
-| **Serviço de origem** | O programa particular de onde o projeto nasceu. Ligava agentes Hermes ao WhatsApp por configuração manual. |
-| **WAHA** | O programa de terceiro usado hoje como motor. É um cliente não oficial do WhatsApp. |
-| **Noise** | Uma família conhecida de apertos de mãos para canais cifrados. |
+| **Source service** | The private program the project was born from. It linked Hermes agents to WhatsApp by manual configuration. |
+| **WAHA** | The third-party program used today as the engine. It is an unofficial WhatsApp client. |
+| **Noise** | A well-known family of handshakes for encrypted channels. |
 
-## Palavras que não usamos
+## Words we do not use
 
-| Não usar | Usar | Motivo |
+| Do not use | Use | Reason |
 |---|---|---|
-| bilhete, token, chave do Hermes | credencial lacrada | "Bilhete" já foi confundido com o convite. |
-| link de conexão | convite, bloco | O convite não é um endereço: vai como argumento do conector. |
-| parear um Hermes | conectar um Hermes | Parear é para números. |
-| inquilino, vaga | Hermes, organização | Eram nomes do serviço de origem. |
-| aparelho, para o WhatsApp | dispositivo conectado | Aparelho é a instalação do conector. |
-| canal, para Telegram ou e-mail | meio de conversa | Canal é a conexão do conector com o hub. |
-| cliente, no sentido de quem usa o projeto | quem instala, organização | O projeto é gratuito. O sentido técnico ("cliente não oficial", "cliente MCP") continua valendo. |
+| ticket, token, Hermes key | sealed credential | "Ticket" was once confused with the invite. |
+| connection link | invite, block | The invite is not an address: it goes as an argument of the connector. |
+| pair a Hermes | connect a Hermes | Pairing is for numbers. |
+| tenant, slot | Hermes, organization | They were names from the source service. |
+| device, for WhatsApp | linked device | A device is an installation of the connector. |
+| channel, for Telegram or e-mail | conversation platform | The channel is the connection from the connector to the hub. |
+| customer, client, meaning whoever uses the project | whoever installs, organization | The project is free. The technical sense ("unofficial client", "MCP client") still holds. |
+
+## From Portuguese
+
+The documents were written in Portuguese until 13/11/2026. The terms above replaced these:
+
+| Portuguese | English |
+|---|---|
+| convite · bloco · inscrição · pedido de conexão | invite · block · enrollment · connection request |
+| código de conferência · código de entrada · código de instalação | verification code · entry code · installation code |
+| aparelho · credencial lacrada · lacre · caixa preta · chave-mestra | device · sealed credential · seal · vault · master key |
+| conectar · parear · reconectar · revogar · acordar | connect · pair · reconnect · revoke · wake |
+| canal · aperto de mãos · batimento · troca · "gravei" | channel · handshake · heartbeat · swap · "saved" |
+| líder · repassadora · reuso · conexão dupla · dada por morta | leader · relay · reuse · double connection · taken for dead |
+| quarentena · suspenso · modo restaurado · marca da auditoria | quarantine · suspended · restored mode · audit mark |
+| varredura · expurgo · teto · resumo | sweep · purge · ceiling · digest |
+| número · apelido · conversa · linha de conversa · escopo · verbo · matriz | number · alias · chat · chat line · scope · verb · matrix |
+| aviso · alerta · frase fixa · recado · ligação · par · fio | notice · alert · fixed sentence · note · link · peer · thread |
+| motor · painel · arquivo de mensagens · registro do sistema | engine · panel · message archive · system log |
+| serviço de origem · quem instala · meio de conversa | source service · whoever installs · conversation platform |

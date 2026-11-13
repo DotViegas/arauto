@@ -1,19 +1,19 @@
-# 0008 — O admin digita o código de conferência
+# 0008 — The admin types the verification code
 
-**Estado:** decidida · **Data:** 09/11/2026
+**Status:** decided · **Date:** 09/11/2026
 
-## Contexto
+## Context
 
-Quem obtiver o convite antes do uso consegue criar um pedido com o nome certo. Se aprovar fosse um clique diante de dados que o próprio aparelho declara, esse pedido seria aprovado.
+Whoever gets the invite before its use manages to create a request with the right name. If approving were a click in front of data that the device itself declares, that request would be approved.
 
-## Decisão
+## Decision
 
-O conector calcula e mostra um código de conferência de seis dígitos. O Hermes o diz no canal de comando. O admin o digita no painel. O painel nunca mostra o código.
+The connector computes and shows a six-digit verification code. Hermes says it in the command channel. The admin types it in the panel. The panel never shows the code.
 
-## Consequências
+## Consequences
 
-- Só é aprovado o pedido cujo código o Hermes verdadeiro disse.
-- Convite vazado antes do uso rende, no máximo, atrapalhar a conexão.
-- O que o aparelho declara aparece como não verificado e não decide nada.
-- Cinco erros encerram o pedido; o prazo é de 10 minutos.
-- Se o comando rodar de novo, vale o código mais recente.
+- Only the request whose code the true Hermes said is approved.
+- An invite leaked before its use yields, at most, getting in the way of the connection.
+- What the device declares appears as unverified and decides nothing.
+- Five errors close the request; the deadline is 10 minutes.
+- If the command runs again, the most recent code is the one that counts.

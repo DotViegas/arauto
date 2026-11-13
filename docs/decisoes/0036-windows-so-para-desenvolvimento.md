@@ -1,21 +1,21 @@
-# 0036 — Windows só para desenvolvimento; Linux na produção
+# 0036 — Windows only for development; Linux in production
 
-**Estado:** proposta · **Data:** 10/11/2026
+**Status:** proposal · **Date:** 10/11/2026
 
-## Contexto
+## Context
 
-O conector foi desenhado para Linux, que é onde o Hermes roda, com Windows para depois. Quem mantém o projeto pediu para rodar e testar tudo direto pelo `cargo`, sem container, e uma das máquinas de desenvolvimento é Windows. Quatro peças do conector não funcionam no Windows do jeito que o desenho descrevia: a gravação forçada da pasta, a troca do programa em uso por troca de nome, o soquete local e a trava de arquivo.
+The connector was designed for Linux, which is where Hermes runs, with Windows for later. The maintainer of the project asked to run and test everything directly through `cargo`, with no container, and one of the development machines is Windows. Four pieces of the connector do not work on Windows the way the design described: the forced write of the folder, the replacement of the program in use by rename, the local socket and the file lock.
 
-## Decisão
+## Decision
 
-O hub e o conector compilam e passam na suíte em Linux e em Windows. **Linux é a plataforma de produção. Windows é só de desenvolvimento.**
+The hub and the connector compile and pass the suite on Linux and on Windows. **Linux is the production platform. Windows is for development only.**
 
-- O que muda de um sistema para outro fica num módulo só (`arauto-platform`), com a mesma interface nos dois.
-- No Windows: a gravação durável não força a pasta; o programa em uso é renomeado antes de ser trocado; o soquete local é um canal nomeado, com o nome derivado da pasta, primeira instância e sem cliente remoto; a trava é a de arquivo, num arquivo só para isso.
-- A pasta do conector pode ser trocada pela variável `ARAUTO_HOME`, para dois conectores na mesma máquina.
+- What changes from one system to another stays in a single module (`arauto-platform`), with the same interface on both.
+- On Windows: the durable write does not force the folder; the program in use is renamed before being replaced; the local socket is a named pipe, with the name derived from the folder, first instance and no remote client; the lock is the file lock, on a file only for that.
+- The connector's folder can be changed by the variable `ARAUTO_HOME`, for two connectors on the same machine.
 
-## Consequências
+## Consequences
 
-- No Windows não vale a garantia de gravação durável da pasta ([04](../04-seguranca-conexao.md), C7, regra 5), nem a de que só o dono fala com o canal nomeado. Por isso ele não é plataforma de produção, e os documentos dizem isso.
-- Enquanto o desenvolvimento for só em Windows, o código específico de Linux é conferido pelo compilador e nunca executado. Ele precisa rodar em Linux, com a suíte inteira, antes de qualquer uso de verdade ([15-mvp.md](../15-mvp.md), seção 8).
-- macOS e Linux arm64 continuam para depois.
+- On Windows the guarantee of durable write of the folder does not hold ([04](../04-seguranca-conexao.md), C7, rule 5), nor the one that only the owner talks to the named pipe. That is why it is not a production platform, and the documents say so.
+- While development is only on Windows, the Linux-specific code is checked by the compiler and never executed. It needs to run on Linux, with the whole suite, before any real use ([15-mvp.md](../15-mvp.md), section 8).
+- macOS and Linux arm64 remain for later.

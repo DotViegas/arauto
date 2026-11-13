@@ -1,25 +1,25 @@
-# 0035 — Pilha do websocket e formato das mensagens
+# 0035 — Websocket stack and message format
 
-**Estado:** proposta · **Data:** 10/11/2026 · revisada no mesmo dia, depois da revisão do desenho, e
-em 11/11/2026, com o código do canal no hub
+**Status:** proposal · **Date:** 10/11/2026 · revised on the same day, after the review of the design, and
+on 11/11/2026, with the code of the channel in the hub
 
-## Contexto
+## Context
 
-O canal é um websocket com Noise por dentro ([0012](0012-canal-cifrado-por-dentro.md)). Faltava escolher as peças e o formato do que passa nele, com o desempenho em vista.
+The channel is a websocket with Noise inside ([0012](0012-canal-cifrado-por-dentro.md)). What was missing was choosing the pieces and the format of what passes through it, with performance in view.
 
-## Decisão
+## Decision
 
-- Servidor: `axum` sobre `hyper`, no `tokio` com vários núcleos. O laço que aceita conexões é do projeto, para ter prazo de cabeçalhos, teto de conexões e cancelamento por conexão. Websocket só com mensagens binárias, de até 65.535 bytes, e sem compressão. No hub, o laço e as rotas são do projeto, sobre o HTTP/1 do `hyper`; do `axum` vêm o websocket e os tipos de HTTP.
-- Cada conexão tem uma tarefa que lê e outra que escreve. Duas filas de saída, contadas em quadros: controle e dados. Quem produz dado espera lugar; a conexão só é fechada quando um quadro fica 30 segundos sem sair ou a fila de controle enche. O `closing` vai pela fila de dados, depois do que já estava nela; só os quadros de controle passam na frente.
-- O Noise é usado no modo em que o contador de cada sentido é passado à mão. Só a tarefa que escreve cifra, depois de escolher a fila. A recusa de quadro repetido ou fora de ordem é código do projeto, com teste.
-- Mensagens em JSON, dentro do Noise, cortadas em pedaços de até 60.000 bytes com número de fluxo, com limites por fase ([14-protocolo-do-canal.md](../14-protocolo-do-canal.md)).
-- Banco pelo `sqlx`, com dois conjuntos fixos de conexões: o dos conectores e um pequeno, só da varredura, para o revogar valer em menos de 5 segundos mesmo com o primeiro ocupado. Autorização a cada chamada por consulta com índice, sem memória intermediária.
-- Entre processos, o comando de administração avisa o hub por `NOTIFY`. Como esse aviso se perde, o hub também varre a cada 2 segundos.
+- Server: `axum` over `hyper`, on `tokio` with several cores. The loop that accepts connections belongs to the project, to have a deadline for headers, a ceiling on connections and cancellation per connection. Websocket only with binary messages, of up to 65,535 bytes, and with no compression. In the hub, the loop and the routes belong to the project, over the HTTP/1 of `hyper`; from `axum` come the websocket and the HTTP types.
+- Each connection has one task that reads and another that writes. Two output queues, counted in frames: control and data. Whoever produces data waits for room; the connection is only closed when a frame goes 30 seconds without leaving or the control queue fills up. The `closing` goes through the data queue, after what was already in it; only the control frames go ahead.
+- Noise is used in the mode in which the counter of each direction is passed by hand. Only the task that writes encrypts, after choosing the queue. The refusal of a repeated or out-of-order frame is code of the project, with a test.
+- Messages in JSON, inside Noise, cut into pieces of up to 60,000 bytes with a stream number, with limits per phase ([14-protocolo-do-canal.md](../14-protocolo-do-canal.md)).
+- Database through `sqlx`, with two fixed pools of connections: the one of the connectors and a small one, only for the sweep, so that revoking takes effect in under 5 seconds even with the first one busy. Authorization on each call by a query with an index, with no cache.
+- Between processes, the admin command notifies the hub by `NOTIFY`. Since that notification can be lost, the hub also sweeps every 2 seconds.
 
-## Consequências
+## Consequences
 
-- JSON custa mais processador e mais bytes do que um formato binário. Foi escolhido porque as chamadas e respostas das ferramentas já são JSON, porque tipo desconhecido pode ser ignorado e porque o custo que pesa é o da cifra e o do banco. Se o teste de carga mostrar o contrário, troca-se o formato numa versão nova do protocolo.
-- Sem memória intermediária de acessos, tirar um acesso vale na chamada seguinte sem depender de invalidação. O custo é uma consulta por chamada.
-- A meta de alguns milhares de conectores por hub só vira dado quando o teste de carga do repositório rodar. Em 11/11/2026 rodou só a versão menor, com 500 conectores no mesmo processo, numa compilação de desenvolvimento: os números estão em [15-mvp.md](../15-mvp.md), seção 3.
-- O `keep_alive` desligado do `hyper` quebra a troca para websocket. Por isso a conexão HTTP fica aberta entre requisições, e o prazo de 5 segundos dos cabeçalhos vale também entre elas.
-- Alternativas consideradas: uma biblioteca de websocket mais enxuta, que ganha na leitura dos quadros e não no que pesa aqui; e mensagens em formato binário, pelos motivos acima.
+- JSON costs more processor and more bytes than a binary format. It was chosen because the calls and answers of the tools are already JSON, because an unknown type can be ignored and because the cost that weighs is that of the cipher and that of the database. If the load test shows the opposite, the format is changed in a new version of the protocol.
+- With no cache of accesses, removing an access takes effect on the next call without depending on invalidation. The cost is one query per call.
+- The goal of a few thousand connectors per hub only becomes data when the load test of the repository runs. On 11/11/2026 only the smaller version ran, with 500 connectors in the same process, in a development build: the numbers are in [15-mvp.md](../15-mvp.md), section 3.
+- The `keep_alive` of `hyper` turned off breaks the upgrade to websocket. That is why the HTTP connection stays open between requests, and the deadline of 5 seconds for the headers also holds between them.
+- Alternatives considered: a leaner websocket library, which gains in the reading of the frames and not in what weighs here; and messages in a binary format, for the reasons above.

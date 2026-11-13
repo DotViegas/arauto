@@ -1,186 +1,195 @@
-# 12 — Roteiro
+# 12 — Roadmap
 
-**Estado: proposta.** A ordem de construção, com o critério de pronto de cada fase. A ordem pode
-mudar; o critério de pronto de cada fase, não.
+**Status: proposal.** The order of construction, with the done criterion of each phase. The order
+may change; the done criterion of each phase may not.
 
-## Resumo
+## Summary
 
 ```
-0 PLANEJAMENTO        estes documentos                              feita
-1 PROVAS              conferir as suposições e prototipar o canal   no canal: dentro do MVP
-2 FUNDAÇÃO DO HUB     banco, acessos, motor sob comando do hub      ┐
-4 CONEXÃO             conector, convite, código, credencial lacrada ├ PRIMEIRO MVP, em construção
-5 ACORDAR             avisos do hub ao Hermes                       ┘
-3 PAINEL              login, números, matriz, auditoria
-6 ARQUIVO             histórico guardado, novidades e busca
-7 PUBLICAÇÃO          licença, versões assinadas, guia de instalação
+0 PLANNING            these documents                                       done
+1 PROOFS              check the assumptions and prototype the channel       in the channel: inside the MVP
+2 HUB FOUNDATION      database, accesses, engine under the hub's command    ┐
+4 CONNECTION          connector, invite, code, sealed credential            ├ FIRST MVP, under construction
+5 WAKE                notices from the hub to Hermes                        ┘
+3 PANEL               login, numbers, matrix, audit
+6 ARCHIVE             stored history, what is new and search
+7 PUBLICATION         license, signed versions, installation guide
 ```
 
-Em 10/11/2026 as fases 2, 4 e 5 foram reunidas no **primeiro MVP**, que também traz a conversa entre
-Hermes ([15-mvp.md](15-mvp.md), [decisão 0033](decisoes/0033-escopo-do-mvp.md)). O painel fica para
-depois dele: no MVP, administra-se por comando. O critério de pronto de cada fase continua valendo.
-Em 12/11/2026, a pedido de quem mantém, o painel começou pelas telas de leitura e pelo guia de
-conectar Hermes ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)); o resto da Fase 3 continua
-por fazer.
+On 10/11/2026 phases 2, 4 and 5 were gathered into the **first MVP**, which also brings the
+conversation between Hermes ([15-mvp.md](15-mvp.md), [decision 0033](decisoes/0033-escopo-do-mvp.md)).
+The panel is left for after it: in the MVP, administration is done by command. The done criterion of
+each phase still holds.
+On 12/11/2026, at the maintainer's request, the panel started with the read-only screens and the guide
+to connect Hermes ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)); the rest of Phase 3 is
+still to be done.
 
-"Publicação" é abrir o repositório ao público. Até lá o projeto não tem versão em uso por terceiros.
+"Publication" is opening the repository to the public. Until then the project has no version in use
+by third parties.
 
-## Fase 1 — Provas
+## Phase 1 — Proofs
 
-Antes de escrever o projeto, tirar as dúvidas que podem mudar o desenho. Esta é a **lista única** do
-que precisa ser provado; os outros documentos apontam para cá.
+Before writing the project, clear up the doubts that may change the design. This is the **single
+list** of what needs to be proved; the other documents point here.
 
-### O ambiente das provas
+### The environment of the proofs
 
-Ainda não está escrito, e é a primeira entrega da fase: como subir um Hermes Agent nas versões 0.22 e
-0.23 para teste, e um motor com um número de teste. Sem isso, quatro das provas abaixo não rodam.
+It is not written yet, and it is the first delivery of the phase: how to bring up a Hermes Agent in
+versions 0.22 and 0.23 for testing, and an engine with a test number. Without this, four of the
+proofs below do not run.
 
-### No Hermes
+### On Hermes
 
-| O que provar | Como |
+| What to prove | How |
 |---|---|
-| O Hermes aceita o conector como servidor de ferramentas | Registrar um programa mínimo pelo comando oficial, nas versões 0.22 e 0.23, e reiniciar o Hermes. Medir também em quanto tempo ele inicia o programa sem ser reiniciado. |
-| Como o conector obtém a chave da API local | Testar o primeiro caminho de [11-conector.md](11-conector.md), seção 6; se ele não funcionar, o segundo ([decisão 0023](decisoes/0023-chave-da-api-local.md)). |
-| O bloco chega idêntico pelo WhatsApp | Colar pelo celular e pelo computador e comparar byte a byte do lado do Hermes. |
-| O que o Hermes faz ao receber o bloco | Se pede aprovação humana, se guarda o procedimento em memória, quanto tempo o terminal dá ao comando. |
-| Quantas cópias do conector o Hermes inicia | Subir todos os processos do Hermes e contar. |
-| O Hermes reinicia um servidor de ferramentas que encerra | Encerrar o programa mínimo e ver se, e em quanto tempo, ele volta. |
-| A chamada à API local | Endereço, corpo, em que conversa a execução acontece e como usar o identificador de repetição. |
-| O que muda na versão 0.23 | Repetir cada linha de [hermes-fatos](../referencia/hermes-fatos.md). |
+| Hermes accepts the connector as a tool server | Register a minimal program through the official command, in versions 0.22 and 0.23, and restart Hermes. Also measure how long it takes to start the program without being restarted. |
+| How the connector obtains the key of the local API | Test the first path of [11-conector.md](11-conector.md), section 6; if it does not work, the second ([decision 0023](decisoes/0023-chave-da-api-local.md)). |
+| The block arrives identical through WhatsApp | Paste from the phone and from the computer and compare byte by byte on Hermes's side. |
+| What Hermes does on receiving the block | Whether it asks for human approval, whether it keeps the procedure in memory, how much time the terminal gives the command. |
+| How many copies of the connector Hermes starts | Bring up all of Hermes's processes and count. |
+| Hermes restarts a tool server that exits | Terminate the minimal program and see whether, and in how long, it comes back. |
+| The call to the local API | Address, body, in which conversation the run happens and how to use the repetition identifier. |
+| What changes in version 0.23 | Repeat each line of [hermes-fatos](../referencia/hermes-fatos.md). |
 
-### No canal
+### On the channel
 
-Desde 10/11/2026 estas provas são feitas dentro do MVP, como testes da suíte
-([15-mvp.md](15-mvp.md), seção 7). Em 11/11/2026 o lado do hub já tem teste, contra um conector de
-teste e só em Windows, para: o aperto de mãos e a inscrição; a troca com quedas sorteadas dos dois
-lados; a troca de 24 horas com o "gravei" que não chega; a cópia com o verdadeiro ligado e desligado;
-o hub restaurado com o hub no ar e com o `admin` antes do `serve`; e as mensagens cortadas em
-pedaços. Nenhuma está "confirmada" ainda: falta o conector do projeto, e as provas que dependem dele
-(arquivo perdido, troca de pasta, comandos repetidos, sair e reconectar cruzados).
+Since 10/11/2026 these proofs are done inside the MVP, as tests of the suite
+([15-mvp.md](15-mvp.md), section 7). On 11/11/2026 the hub's side already has a test, against a
+test connector and only on Windows, for: the handshake and the enrollment; the swap with randomized
+drops on both sides; the 24-hour swap with the "saved" that does not arrive; the copy with the real
+one on and off; the restored hub with the hub up and with the `admin` before the `serve`; and the
+messages cut into pieces. None is "confirmed" yet: the project's connector is missing, and so are
+the proofs that depend on it (lost file, change of folder, repeated commands, crossed leave and
+reconnect).
 
-| O que provar | Como |
+| What to prove | How |
 |---|---|
-| O aperto de mãos e a inscrição | Dois programas mínimos, com o convite e o código de conferência. |
-| O código não pode ser escolhido | Do lado de quem se inscreve, tentar chegar a um código alvo refazendo a inscrição. |
-| A troca da credencial aguenta queda | Quedas sorteadas nos dois lados, em qualquer ponto da troca, inclusive na primeira. |
-| A troca aguenta atraso | Mensagens entregues atrasadas e fora de ordem. |
-| A ordem de gravação do hub | O hub cai entre gravar a pendente e enviar a nova, e entre ouvir o "gravei" e gravar a promoção. |
-| A troca de 24 horas | A troca dentro da sessão aberta, com queda no meio e com um "gravei" que não chega. |
-| A cópia aparece | Um conector que apresenta a credencial e nunca confirma; uma cópia que conecta com o verdadeiro desligado e com ele ligado. |
-| O arquivo perdido | O conector sem o arquivo da credencial, e com o arquivo antigo depois de uma queda de energia simulada. |
-| O hub restaurado | O banco voltando de uma cópia antiga: com aparelhos que trocaram de credencial depois dela, com um aparelho reconectado depois dela, com a cópia tirada sem o hub reiniciar, e com o servidor inteiro voltando de uma imagem. A queda entre gravar o banco e gravar a marca. |
-| Reconectar com queda | A máquina cai no meio da troca de pasta do aparelho. |
-| Comandos repetidos | `join` e `leave` rodados de novo em cada situação: pendente, aprovado, vencido, revogado, hub fora do ar. |
-| Sair e reconectar cruzados | `leave` no meio de um reconectar; convite de outra linha colado num Hermes já conectado; `leave` feito por quem tem uma cópia. |
-| Mensagens grandes | Como dividir o que passa de 64 KB. |
+| The handshake and the enrollment | Two minimal programs, with the invite and the verification code. |
+| The code cannot be chosen | On the side of whoever enrolls, try to reach a target code by redoing the enrollment. |
+| The swap of the credential withstands a drop | Randomized drops on both sides, at any point of the swap, including the first one. |
+| The swap withstands delay | Messages delivered late and out of order. |
+| The hub's write order | The hub goes down between writing the pending one and sending the new one, and between hearing the "saved" and writing the promotion. |
+| The 24-hour swap | The swap inside the open session, with a drop in the middle and with a "saved" that does not arrive. |
+| The copy shows up | A connector that presents the credential and never confirms; a copy that connects with the real one off and with it on. |
+| The lost file | The connector without the credential file, and with the old file after a simulated power failure. |
+| The restored hub | The database coming back from an old backup: with devices that swapped credentials after it, with a device reconnected after it, with the backup taken without the hub restarting, and with the whole server coming back from an image. The drop between writing the database and writing the mark. |
+| Reconnect with a drop | The machine goes down in the middle of the change of folder of the device. |
+| Repeated commands | `join` and `leave` run again in each situation: pending, approved, expired, revoked, hub down. |
+| Crossed leave and reconnect | `leave` in the middle of a reconnect; an invite of another line pasted into a Hermes already connected; `leave` done by whoever has a copy. |
+| Large messages | How to split what goes over 64 KB. |
 
-Entregas escritas da fase: o formato das mensagens do canal, o conteúdo do lacre, a função do código
-de conferência, a conferência da regra 3 da troca ([04](04-seguranca-conexao.md), C7), o tratamento
-das credenciais que sobram de uma restauração já tratada (C11) e o formato do soquete local do
-conector. Define-se também como o hub confere a credencial de um conector abaixo da versão mínima
-antes de recusá-lo: a regra está decidida ([decisão 0030](decisoes/0030-conector-desatualizado.md)),
-falta a ordem das mensagens ([04](04-seguranca-conexao.md), seção 6, item 3). Tudo isso está
-escrito, como proposta, em [14-protocolo-do-canal.md](14-protocolo-do-canal.md).
+Written deliveries of the phase: the format of the messages of the channel, the content of the seal,
+the function of the verification code, the check of rule 3 of the swap
+([04](04-seguranca-conexao.md), C7), the handling of the credentials left over from a restoration
+already handled (C11) and the format of the connector's local socket. It is also defined how the hub
+checks the credential of a connector below the minimum version before refusing it: the rule is
+decided ([decision 0030](decisoes/0030-conector-desatualizado.md)), the order of the messages is
+missing ([04](04-seguranca-conexao.md), section 6, item 3). All of this is written, as a proposal,
+in [14-protocolo-do-canal.md](14-protocolo-do-canal.md).
 
-**Pronto quando:** cada suposição está marcada "confirmada" ou "não vale, e o desenho mudou"; e o
-protótipo passa por milhares de rodadas sorteadas sem trancar do lado de fora um aparelho legítimo
-que manteve os arquivos, sem aceitar uma credencial reusada e sem deixar uma cópia levada para fora
-usar o hub sem que isso apareça quando o verdadeiro voltar a apresentar a credencial dele.
+**Done when:** each assumption is marked "confirmed" or "does not hold, and the design changed"; and
+the prototype goes through thousands of randomized rounds without locking out a legitimate device
+that kept its files, without accepting a reused credential and without letting a copy taken outside
+use the hub without this showing up when the real one presents its credential again.
 
-As decisões que travavam o código foram tomadas em 10/11/2026: nomes no código em inglês, teto de
-envio fixo, inatividade de 30 dias, a ordem de tentativa para a chave da API local e envio de arquivo
-por endereço público ([decisões](decisoes/README.md)). O nome novo do projeto foi aplicado
-aos documentos em 10/11/2026 ([decisão 0026](decisoes/0026-nome-do-projeto.md)).
+The decisions that were blocking the code were taken on 10/11/2026: names in the code in English,
+fixed send ceiling, inactivity of 30 days, the order of attempts for the key of the local API and
+sending a file by public address ([decisions](decisoes/README.md)). The new name of the project was
+applied to the documents on 10/11/2026 ([decision 0026](decisoes/0026-nome-do-projeto.md)).
 
-## Fase 2 — Fundação do hub
+## Phase 2 — Hub foundation
 
-O código do hub é escrito do zero ([decisão 0033](decisoes/0033-escopo-do-mvp.md)). O serviço de
-origem é particular e não é copiado; as ideias que vêm dele já estão nestes documentos. Os nomes no
-código entram em inglês ([decisão 0016](decisoes/0016-idioma.md)).
+The code of the hub is written from scratch ([decision 0033](decisoes/0033-escopo-do-mvp.md)). The
+source service is private and is not copied; the ideas that come from it are already in these
+documents. The names in the code go in English ([decision 0016](decisoes/0016-idioma.md)).
 
-Entram: o banco com organização, Hermes, número e acesso; o adaptador do motor como único ponto de
-contato; o hub como dono da configuração das sessões do motor; as ferramentas com o argumento
-`number`; a autorização a cada chamada; o teto de envio, com o valor fixado nesta fase; a recusa de
-endereço que leve à rede interna, com teste; e os programas falsos (motor e Hermes) para os testes.
+What goes in: the database with organization, Hermes, number and access; the engine adapter as the
+only point of contact; the hub as the owner of the configuration of the engine sessions; the tools
+with the `number` argument; the authorization on every call; the send ceiling, with the value
+fixed in this phase; the refusal of an address that leads to the internal network, with a test; and
+the fake programs (engine and Hermes) for the tests.
 
-**Pronto quando:** existe teste automático de que um Hermes não alcança o número de outro; retirar um
-acesso com a sessão aberta vale na chamada seguinte; os testes rodam contra um motor falso; o hub
-detecta e corrige uma sessão do motor configurada por fora.
+**Done when:** there is an automatic test that a Hermes does not reach the number of another;
+removing an access with the session open holds on the next call; the tests run against a fake
+engine; the hub detects and fixes an engine session configured from outside.
 
-## Fase 3 — Painel
+## Phase 3 — Panel
 
-Primeiro acesso, login por passkey, as telas de Hermes, WhatsApps, parear, acessos e auditoria.
+First access, login by passkey, the screens of Hermes, WhatsApps, pairing, accesses and audit.
 
-**Pronto quando:** um número de teste é pareado por código e por QR pela tela; nenhuma tela, registro
-ou auditoria mostra convite, QR ou credencial fora do momento de uso; um nome de contato com código
-malicioso aparece como texto; uma ação que muda algo, sem a passkey, é recusada.
+**Done when:** a test number is paired by code and by QR through the screen; no screen, log or
+audit shows an invite, QR or credential outside the moment of use; a contact name with malicious
+code appears as text; an action that changes something, without the passkey, is refused.
 
-## Fase 4 — Conexão
+## Phase 4 — Connection
 
-O conector com os quatro comandos, o líder único, o convite, o código digitado, a credencial lacrada,
-a quarentena, revogar, reconectar e sair. As telas de conectar e de confirmar. O prazo de
-inatividade, com o rótulo da tela que ainda falta
-([decisão 0021](decisoes/0021-prazo-de-inatividade.md)).
+The connector with the four commands, the single leader, the invite, the typed code, the sealed
+credential, the quarantine, revoke, reconnect and leave. The screens to connect and to confirm. The
+inactivity period, with the label of the screen that is still missing
+([decision 0021](decisoes/0021-prazo-de-inatividade.md)).
 
-**Pronto quando:**
+**Done when:**
 
-- Do zero ao primeiro Hermes lendo um número leva menos de 15 minutos, seguindo só o que a tela diz.
-- Cada falha do catálogo tem mensagem própria nos dois lados.
-- Copiar a pasta do conector para outra máquina e usar leva à quarentena quando o verdadeiro conecta.
-- Revogar derruba o canal em menos de 5 segundos.
-- Existe um teste para cada linha do [modelo de ameaças](05-modelo-de-ameacas.md) que tem regra
-  testável.
+- From zero to the first Hermes reading a number takes less than 15 minutes, following only what the
+  screen says.
+- Each failure of the catalog has its own message on both sides.
+- Copying the connector's folder to another machine and using it leads to quarantine when the real
+  one connects.
+- Revoking brings down the channel in less than 5 seconds.
+- There is a test for each line of the [threat model](05-modelo-de-ameacas.md) that has a testable
+  rule.
 
-## Fase 5 — Acordar
+## Phase 5 — Wake
 
-A fila de avisos, a frase fixa e a chamada à API local do Hermes.
+The notice queue, the fixed sentence and the call to Hermes's local API.
 
-**Pronto quando:** com quedas sorteadas do hub, do conector e do Hermes, nenhum aviso some antes de
-expirar e nenhum aviso repetido inicia uma segunda execução no Hermes; o aviso não carrega texto
-escrito por terceiros.
+**Done when:** with randomized drops of the hub, of the connector and of Hermes, no notice
+disappears before expiring and no repeated notice starts a second run in Hermes; the notice does not
+carry text written by third parties.
 
-## Fase 6 — Arquivo
+## Phase 6 — Archive
 
-Importar o histórico que o motor guarda, gravar a mensagem inteira e os arquivos na chegada, e as
-ferramentas de novidades e de busca.
+Importing the history the engine keeps, storing the whole message and the files on arrival, and the
+tools for what is new and for search.
 
-**Pronto quando:** o Hermes lê uma conversa com o motor desligado; a busca acha por texto, por pessoa
-e por período; o expurgo apaga o que venceu, inclusive os arquivos.
+**Done when:** Hermes reads a chat with the engine off; the search finds by text, by person and by
+period; the purge deletes what expired, including the files.
 
-Até esta fase, toda leitura depende do motor estar no ar.
+Until this phase, every reading depends on the engine being up.
 
-## Fase 7 — Publicação
+## Phase 7 — Publication
 
-Licença no repositório (Apache-2.0), com o titular dos direitos definido, registro de marca do nome
-conferido, histórico do repositório
-limpo, README em inglês com as traduções ([decisão 0016](decisoes/0016-idioma.md)), versões
-assinadas com o resumo publicado, guia de instalação (com o painel fechado por padrão), relato
-privado de falha ligado no GitHub e a página de quem mantém.
+License in the repository (Apache-2.0), with the rights holder defined, trademark registration of
+the name checked, history of the repository
+clean, README in English with the translations ([decision 0016](decisoes/0016-idioma.md)), signed
+versions with the digest published, installation guide (with the panel closed by default), private
+flaw reporting turned on in GitHub and the maintainer's page.
 
-**Pronto quando:** alguém de fora instala o hub, conecta um Hermes e pareia um número seguindo só o
-guia.
+**Done when:** someone from outside installs the hub, connects a Hermes and pairs a number following
+only the guide.
 
-## Depois
+## After
 
-| Item | Observação |
+| Item | Remark |
 |---|---|
-| Modo blindado | O conector separado do Hermes, instalado por uma pessoa. |
-| Segundo motor | Adaptador para a API oficial do WhatsApp. |
-| Conversa entre Hermes: salas e observador | O recado entre dois Hermes já entra no primeiro MVP ([13](13-conversa-entre-hermes.md)). |
-| Outros meios de conversa | E-mail, Telegram e outros, na mesma tela de conexão. |
-| Gestão da frota | Criar, atualizar e monitorar os Hermes pelo painel. Exige rever a regra de que o conector não executa nada por ordem do hub. |
-| Várias organizações num hub | Com um motor por organização. |
+| Shielded mode | The connector separate from Hermes, installed by a person. |
+| Second engine | Adapter for the official WhatsApp API. |
+| Conversation between Hermes: rooms and observer | The note between two Hermes already goes into the first MVP ([13](13-conversa-entre-hermes.md)). |
+| Other conversation platforms | E-mail, Telegram and others, on the same connection screen. |
+| Fleet management | Creating, updating and monitoring the Hermes from the panel. It requires reviewing the rule that the connector executes nothing by order of the hub. |
+| Several organizations in one hub | With one engine per organization. |
 
-## Como se verifica
+## How it is verified
 
-O padrão vem do serviço de origem e vale para todas as fases:
+The standard comes from the source service and holds for all phases:
 
-- **Motor falso e Hermes falso** nos testes automáticos, para rodar tudo sem WhatsApp de verdade.
-- **Rodadas sorteadas** nas filas e na troca de credencial: o teste derruba, atrasa e repete em
-  pontos aleatórios e confere que nada se perde nem se repete.
-- **Mutantes** nas regras de segurança: altera-se o código de propósito, e algum teste tem de falhar.
-- **Canário:** um segredo conhecido é plantado nos testes e não pode aparecer em nenhuma saída,
-  registro ou resposta.
-- **Revisão adversarial** antes de cada publicação.
-- **Teste de contrato**, feito à mão, contra o motor e o Hermes de verdade, com um número de teste, a
-  cada versão nova de um deles. É a única exceção à regra de não testar em número real.
+- **Fake engine and fake Hermes** in the automatic tests, to run everything without a real WhatsApp.
+- **Randomized rounds** in the queues and in the swap of the credential: the test drops, delays and
+  repeats at random points and checks that nothing is lost nor repeated.
+- **Mutants** in the security rules: the code is altered on purpose, and some test has to fail.
+- **Canary:** a known secret is planted in the tests and cannot appear in any output, log or
+  response.
+- **Adversarial review** before each publication.
+- **Contract test**, done by hand, against the real engine and the real Hermes, with a test number,
+  on each new version of one of them. It is the only exception to the rule of not testing on a real
+  number.
