@@ -140,6 +140,24 @@ Les décisions ont trois états : décidée, proposée et en attente.
 - **Qui maintient le projet et comment contribuer :** à définir avant l'ouverture du dépôt au
   public.
 
+## Soutenir le projet
+
+<p align="center">
+  <img src="../marca/cafe.webp" alt="La mascotte d'Arauto, une tasse de café à la main, qui salue à la porte d'un café, à côté d'une ardoise où l'on lit buy me coffee" width="600">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../marca/em-breve-fr-escuro.svg">
+    <img src="../marca/em-breve-fr-claro.svg" alt="bientôt" width="96">
+  </picture>
+</p>
+
+<p align="center">
+  Une page Buy Me a Coffee est en préparation.<br>
+  Arauto est gratuit : le café sera une façon de dire merci, pas un prix.
+</p>
+
 <p align="center">
   <img src="../marca/mascote-pixel-acenando.svg" alt="La mascotte d'Arauto, en pixels, qui salue" width="108">
 </p>

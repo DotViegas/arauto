@@ -123,6 +123,24 @@ Arauto **不内置**引擎：你需要安装自己的引擎。引擎的费用和
 - **漏洞报告：** 仓库公开后，通过 GitHub 的私密报告功能提交（[SECURITY.md](../../SECURITY.md)）。
 - **维护者与贡献方式：** 将在仓库向公众开放之前确定。
 
+## 支持本项目
+
+<p align="center">
+  <img src="../marca/cafe.webp" alt="Arauto 的吉祥物端着一杯咖啡，在咖啡馆门口挥手，旁边的黑板上写着 buy me coffee" width="600">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../marca/em-breve-zh-CN-escuro.svg">
+    <img src="../marca/em-breve-zh-CN-claro.svg" alt="即将推出" width="103">
+  </picture>
+</p>
+
+<p align="center">
+  Buy Me a Coffee 页面正在准备中。<br>
+  Arauto 是免费的：请喝一杯咖啡只是表达感谢的方式，而不是价格。
+</p>
+
 <p align="center">
   <img src="../marca/mascote-pixel-acenando.svg" alt="Arauto 的像素吉祥物在挥手" width="108">
 </p>

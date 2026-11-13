@@ -140,6 +140,24 @@ Decisions have three states: decided, proposed and pending.
 - **Who maintains it and how to contribute:** to be defined before the repository is opened to the
   public.
 
+## Support the project
+
+<p align="center">
+  <img src="docs/marca/cafe.webp" alt="The Arauto mascot holding a cup of coffee and waving at the door of a café, next to a chalkboard that reads buy me coffee" width="600">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/em-breve-en-escuro.svg">
+    <img src="docs/marca/em-breve-en-claro.svg" alt="coming soon" width="150">
+  </picture>
+</p>
+
+<p align="center">
+  A Buy Me a Coffee page is on the way.<br>
+  Arauto is free: a coffee will be a way to say thanks, not a price.
+</p>
+
 <p align="center">
   <img src="docs/marca/mascote-pixel-acenando.svg" alt="Arauto pixel mascot, waving" width="108">
 </p>

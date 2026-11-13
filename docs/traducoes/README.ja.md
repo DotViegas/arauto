@@ -123,6 +123,24 @@ Arauto はエンジンを**同梱しません**。エンジンは各自でイン
 - **脆弱性の報告：** リポジトリの公開後、GitHub の非公開報告機能で受け付けます（[SECURITY.md](../../SECURITY.md)）。
 - **メンテナーと貢献の方法：** リポジトリを一般公開する前に決めます。
 
+## プロジェクトを支援する
+
+<p align="center">
+  <img src="../marca/cafe.webp" alt="コーヒーカップを持ち、カフェの入口で手を振る Arauto のマスコット。隣の黒板には buy me coffee と書かれている" width="600">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../marca/em-breve-ja-escuro.svg">
+    <img src="../marca/em-breve-ja-claro.svg" alt="近日公開" width="103">
+  </picture>
+</p>
+
+<p align="center">
+  Buy Me a Coffee のページを準備中です。<br>
+  Arauto は無料です。コーヒーは感謝を伝える手段であり、対価ではありません。
+</p>
+
 <p align="center">
   <img src="../marca/mascote-pixel-acenando.svg" alt="手を振る Arauto のピクセルマスコット" width="108">
 </p>

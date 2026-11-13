@@ -142,6 +142,24 @@ Entscheidungen haben drei Zustände: entschieden, vorgeschlagen und offen.
 - **Wer das Projekt betreut und wie man beiträgt:** wird festgelegt, bevor das Repository
   öffentlich wird.
 
+## Das Projekt unterstützen
+
+<p align="center">
+  <img src="../marca/cafe.webp" alt="Das Maskottchen von Arauto mit einer Tasse Kaffee, winkend vor der Tür eines Cafés, neben einer Tafel mit der Aufschrift buy me coffee" width="600">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../marca/em-breve-de-escuro.svg">
+    <img src="../marca/em-breve-de-claro.svg" alt="demnächst" width="137">
+  </picture>
+</p>
+
+<p align="center">
+  Eine Seite bei Buy Me a Coffee ist in Vorbereitung.<br>
+  Arauto ist kostenlos: Der Kaffee wird ein Dankeschön sein, kein Preis.
+</p>
+
 <p align="center">
   <img src="../marca/mascote-pixel-acenando.svg" alt="Das Pixel-Maskottchen von Arauto winkt" width="108">
 </p>

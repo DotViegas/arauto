@@ -135,6 +135,24 @@ As decisões têm três estados: decidida, proposta e pendente.
   ([SECURITY.md](../../SECURITY.md)).
 - **Quem mantém e como contribuir:** a definir antes de o repositório ser aberto ao público.
 
+## Apoie o projeto
+
+<p align="center">
+  <img src="../marca/cafe.webp" alt="O mascote do Arauto com uma xícara de café, acenando na porta de um café, ao lado de uma placa em que se lê buy me coffee" width="600">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../marca/em-breve-pt-BR-escuro.svg">
+    <img src="../marca/em-breve-pt-BR-claro.svg" alt="em breve" width="118">
+  </picture>
+</p>
+
+<p align="center">
+  Uma página no Buy Me a Coffee está a caminho.<br>
+  O Arauto é gratuito: o café vai ser um jeito de agradecer, não um preço.
+</p>
+
 <p align="center">
   <img src="../marca/mascote-pixel-acenando.svg" alt="O mascote do Arauto, em pixel, acenando" width="108">
 </p>
