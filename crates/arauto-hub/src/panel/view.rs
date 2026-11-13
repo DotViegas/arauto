@@ -60,10 +60,10 @@ pub enum Tone {
 impl Tone {
     const fn state_class(self) -> &'static str {
         match self {
-            Tone::Ok => "estado",
-            Tone::Wait => "estado atencao",
-            Tone::Bad => "estado grave",
-            Tone::Idle => "estado parado",
+            Tone::Ok => "state",
+            Tone::Wait => "state wait",
+            Tone::Bad => "state bad",
+            Tone::Idle => "state idle",
         }
     }
 }
@@ -234,18 +234,18 @@ pub struct AccessPage {
 pub fn sign_in(refusal: Option<&'static str>) -> String {
     let mut html = Html::new();
     head(&mut html, Over::Nothing);
-    html.raw("<main class=\"entrada\">")
+    html.raw("<main class=\"entry\">")
         .raw(LOGO)
-        .raw("<h1>Entrar no painel</h1><form class=\"cartao\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\">")
-        .raw("<div class=\"campo\"><label for=\"code\">Código de entrada</label>")
+        .raw("<h1>Sign in to the panel</h1><form class=\"card\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\">")
+        .raw("<div class=\"field\"><label for=\"code\">Entry code</label>")
         .raw("<input id=\"code\" name=\"code\" type=\"password\" inputmode=\"text\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"64\" required autofocus></div>");
     if let Some(refusal) = refusal {
-        html.raw("<p class=\"erro\" role=\"alert\">")
+        html.raw("<p class=\"error\" role=\"alert\">")
             .raw(refusal)
             .raw("</p>");
     }
-    html.raw("<p class=\"dica\">Gere o código no servidor do hub, com <code>arauto-hub admin panel code</code>. Ele vale 10 minutos e uma entrada.</p>")
-        .raw("<div><button class=\"botao principal\" type=\"submit\">Entrar</button></div></form></main>")
+    html.raw("<p class=\"hint\">Issue the code on the hub's server, with <code>arauto-hub admin panel code</code>. It is valid for 10 minutes and for one sign-in.</p>")
+        .raw("<div><button class=\"button primary\" type=\"submit\">Sign in</button></div></form></main>")
         .raw(TAIL);
     html.finish()
 }
@@ -253,25 +253,25 @@ pub fn sign_in(refusal: Option<&'static str>) -> String {
 fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
     head(html, over);
     html.raw(if over == Over::Nothing {
-        "<div class=\"pagina\"><header class=\"topo\">"
+        "<div class=\"page\"><header class=\"top\">"
     } else {
-        "<div class=\"pagina\" inert><header class=\"topo\">"
+        "<div class=\"page\" inert><header class=\"top\">"
     })
         .raw(LOGO)
-        .raw("<div class=\"quem\"><span>admin</span><form method=\"post\" action=\"/sign-out\"><button class=\"sair\" type=\"submit\">Sair</button></form></div></header>");
+        .raw("<div class=\"who\"><span>admin</span><form method=\"post\" action=\"/sign-out\"><button class=\"sign-out\" type=\"submit\">Sign out</button></form></div></header>");
     let alerts = frame.restored.is_some() || !frame.notices.is_empty() || frame.unknown_devices > 0;
     if alerts {
-        html.raw("<ul class=\"alertas\" aria-label=\"Alertas\">");
+        html.raw("<ul class=\"alerts\" aria-label=\"Alerts\">");
         if let Some(restored) = &frame.restored {
-            html.raw("<li class=\"alerta restaurado\">")
+            html.raw("<li class=\"alert restored\">")
                 .text(restored)
                 .raw("</li>");
         }
         for notice in &frame.notices {
             html.raw(if notice.grave {
-                "<li class=\"alerta grave\"><span class=\"estado grave\">"
+                "<li class=\"alert bad\"><span class=\"state bad\">"
             } else {
-                "<li class=\"alerta\"><span class=\"estado atencao\">"
+                "<li class=\"alert\"><span class=\"state wait\">"
             })
             .raw(notice.lead)
             .raw(":</span> ")
@@ -279,24 +279,24 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
             .raw("</li>");
         }
         if frame.unknown_devices > 0 {
-            html.raw("<li class=\"alerta grave\"><span class=\"estado grave\">Aparelhos desconhecidos:</span> ")
+            html.raw("<li class=\"alert bad\"><span class=\"state bad\">Unknown devices:</span> ")
                 .number(frame.unknown_devices)
-                .raw(" apresentaram uma credencial válida que o banco não explica. O caminho de cada um é um convite novo. Veja com <code>arauto-hub admin alerts</code>.</li>");
+                .raw(" presented a valid credential the database does not explain. The way back for each one is a new invite. See them with <code>arauto-hub admin alerts</code>.</li>");
         }
         if frame.more_notices > 0 {
-            html.raw("<li class=\"alerta\"><span class=\"mais\">E mais ")
+            html.raw("<li class=\"alert\"><span class=\"more\">And ")
                 .number(frame.more_notices)
                 .raw(
-                    " alerta(s). Veja todos com <code>arauto-hub admin alerts</code>.</span></li>",
+                    " more alert(s). See them all with <code>arauto-hub admin alerts</code>.</span></li>",
                 );
         }
         html.raw("</ul>");
     }
-    html.raw("<nav class=\"abas\" aria-label=\"Painel\">");
+    html.raw("<nav class=\"tabs\" aria-label=\"Panel\">");
     for (this, address, label) in [
         (Tab::Hermes, "<a href=\"/\"", "Hermes"),
         (Tab::Numbers, "<a href=\"/whatsapps\"", "WhatsApps"),
-        (Tab::Accesses, "<a href=\"/accesses\"", "Acessos"),
+        (Tab::Accesses, "<a href=\"/accesses\"", "Accesses"),
     ] {
         html.raw(address)
             .raw(if this == tab {
@@ -312,7 +312,7 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
 
 /// Ends the page, up to where a window over it would go.
 fn close(html: &mut Html) {
-    html.raw("</main><p class=\"rodape\">Nesta versão o painel conecta e revoga Hermes e muda os acessos de cada número. Parear números e escolher conversas continuam pelo comando <code>arauto-hub admin</code>, no servidor do hub.</p></div>");
+    html.raw("</main><p class=\"footer\">In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the <code>arauto-hub admin</code> command, on the hub's server.</p></div>");
 }
 
 fn state(html: &mut Html, tone: Tone, label: &'static str) {
@@ -349,66 +349,66 @@ pub fn hermes(frame: &Frame, page: &HermesPage) -> String {
 /// Writes the page of the Hermes up to where a window over it would go.
 pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, over: Over) {
     open(html, frame, Tab::Hermes, over);
-    html.raw("<div class=\"cabeca\"><div><h1>Seus Hermes e os <b>[números]</b> deles</h1><p class=\"contadores\">")
+    html.raw("<div class=\"heading\"><div><h1>Your Hermes and their <b>[numbers]</b></h1><p class=\"counters\">")
         .number(page.connected)
-        .raw(if page.connected == 1 { " conectado · " } else { " conectados · " })
+        .raw(" connected · ")
         .number(page.waiting)
-        .raw(" aguardando · ")
+        .raw(" waiting · ")
         .number(page.stopped)
-        .raw(" em alerta</p></div><a class=\"botao principal\" href=\"/hermes/connect\">Conectar Hermes</a></div>")
-        .raw("<div class=\"quadro\"><table class=\"lista\"><thead><tr>")
-        .raw("<th scope=\"col\">Hermes</th><th scope=\"col\">Estado</th><th scope=\"col\">Números</th>")
-        .raw("<th scope=\"col\">Acordado</th><th scope=\"col\">Conector</th><th scope=\"col\">Visto</th>")
-        .raw("<th scope=\"col\"><span class=\"so-leitor\">Ações</span></th></tr></thead><tbody>");
+        .raw(" on alert</p></div><a class=\"button primary\" href=\"/hermes/connect\">Connect Hermes</a></div>")
+        .raw("<div class=\"frame\"><table class=\"list\"><thead><tr>")
+        .raw("<th scope=\"col\">Hermes</th><th scope=\"col\">State</th><th scope=\"col\">Numbers</th>")
+        .raw("<th scope=\"col\">Can be woken</th><th scope=\"col\">Connector</th><th scope=\"col\">Seen</th>")
+        .raw("<th scope=\"col\"><span class=\"sr-only\">Actions</span></th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"vazio\"><td colspan=\"7\">Nenhum Hermes ainda. Conecte o primeiro pelo botão \"Conectar Hermes\".</td></tr>");
+        html.raw("<tr class=\"empty\"><td colspan=\"7\">No Hermes yet. Connect the first one with the \"Connect Hermes\" button.</td></tr>");
     }
     for row in &page.rows {
-        html.raw("<tr><td><span class=\"nome\">")
+        html.raw("<tr><td><span class=\"name\">")
             .text(&row.name)
             .raw("</span></td><td>");
         state(html, row.tone, row.state);
-        html.raw("</td><td class=\"linha2\">");
-        names(html, &row.numbers, "nenhum");
-        html.raw("</td><td class=\"so-largo\">")
-            .raw(if row.woken { "sim" } else { "não" })
-            .raw("</td><td class=\"so-largo fixa\">");
+        html.raw("</td><td class=\"second-line\">");
+        names(html, &row.numbers, "none");
+        html.raw("</td><td class=\"wide-only\">")
+            .raw(if row.woken { "yes" } else { "no" })
+            .raw("</td><td class=\"wide-only mono\">");
         match &row.connector {
             Some(version) => html.text(version),
             None => html.raw("—"),
         };
-        html.raw("</td><td class=\"so-largo num\">")
+        html.raw("</td><td class=\"wide-only num\">")
             .text(&row.seen)
-            .raw("</td><td class=\"c-acoes\"><div class=\"acoes\">");
+            .raw("</td><td class=\"actions-cell\"><div class=\"actions\">");
         match row.action {
             RowAction::Continue => {
-                html.raw("<a class=\"botao\" href=\"/hermes/wait?name=")
+                html.raw("<a class=\"button\" href=\"/hermes/wait?name=")
                     .text(&row.name)
-                    .raw("\">Continuar</a>");
+                    .raw("\">Continue</a>");
             }
             RowAction::Connect | RowAction::Reconnect => {
                 html.raw("<form method=\"post\" action=\"/hermes/invite\"><input type=\"hidden\" name=\"name\" value=\"")
                     .text(&row.name)
                     .raw(if row.action == RowAction::Connect {
-                        "\"><button class=\"botao\" type=\"submit\">Conectar</button></form>"
+                        "\"><button class=\"button\" type=\"submit\">Connect</button></form>"
                     } else {
-                        "\"><button class=\"botao\" type=\"submit\">Reconectar</button></form>"
+                        "\"><button class=\"button\" type=\"submit\">Reconnect</button></form>"
                     });
             }
         }
         if row.action.has_something() {
-            html.raw("<a class=\"botao perigo\" href=\"/hermes/revoke?name=")
+            html.raw("<a class=\"button danger\" href=\"/hermes/revoke?name=")
                 .text(&row.name)
-                .raw("\">Revogar</a>");
+                .raw("\">Revoke</a>");
         }
         html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
-            html.raw("<tr class=\"explica\"><td colspan=\"7\">")
+            html.raw("<tr class=\"explain\"><td colspan=\"7\">")
                 .text(explain)
                 .raw("</td></tr>");
         }
     }
-    html.raw("</tbody></table></div><p class=\"nota\">\"Números\" são os que o Hermes alcança. O conector é o que o aparelho declarou: não é verificado.</p>");
+    html.raw("</tbody></table></div><p class=\"note\">\"Numbers\" are the ones the Hermes reaches. The connector is what the device declared: it is not verified.</p>");
     close(html);
 }
 
@@ -417,45 +417,47 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
 pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     let mut html = Html::new();
     open(&mut html, frame, Tab::Numbers, Over::Nothing);
-    html.raw("<div class=\"cabeca\"><h1>WhatsApps</h1><p class=\"contadores\">");
+    html.raw("<div class=\"heading\"><h1>WhatsApps</h1><p class=\"counters\">");
     match &page.engine {
         Some(engine) => {
             html.raw("<span class=\"")
                 .raw(engine.tone.state_class())
-                .raw("\">Motor</span> ")
+                .raw("\">Engine</span> ")
                 .text(&engine.text);
         }
         None => {
-            html.raw("Ainda não há motor. Configure com <code>arauto-hub admin engine set</code>.");
+            html.raw(
+                "There is no engine yet. Set it with <code>arauto-hub admin engine set</code>.",
+            );
         }
     }
-    html.raw("</p></div><div class=\"quadro\"><table class=\"lista\"><thead><tr>")
-        .raw("<th scope=\"col\">Apelido</th><th scope=\"col\">Número</th><th scope=\"col\">Estado</th>")
-        .raw("<th scope=\"col\">Hermes com acesso</th><th scope=\"col\">Última mensagem</th></tr></thead><tbody>");
+    html.raw("</p></div><div class=\"frame\"><table class=\"list\"><thead><tr>")
+        .raw("<th scope=\"col\">Alias</th><th scope=\"col\">Number</th><th scope=\"col\">State</th>")
+        .raw("<th scope=\"col\">Hermes with access</th><th scope=\"col\">Last message</th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"vazio\"><td colspan=\"5\">Nenhum número ainda. Adicione com <code>arauto-hub admin number add APELIDO TELEFONE</code>.</td></tr>");
+        html.raw("<tr class=\"empty\"><td colspan=\"5\">No number yet. Add one with <code>arauto-hub admin number add ALIAS PHONE</code>.</td></tr>");
     }
     for row in &page.rows {
-        html.raw("<tr><td><span class=\"nome\">")
+        html.raw("<tr><td><span class=\"name\">")
             .text(&row.alias)
             .raw("</span>");
         if row.command {
-            html.raw("<span class=\"marca\">de comando</span>");
+            html.raw("<span class=\"tag\">command</span>");
         }
-        html.raw("</td><td class=\"so-largo fixa\">");
+        html.raw("</td><td class=\"wide-only mono\">");
         match &row.phone {
             Some(phone) => html.text(phone),
             None => html.raw("—"),
         };
         html.raw("</td><td>");
         state(&mut html, row.tone, row.state);
-        html.raw("</td><td class=\"linha2\">");
-        names(&mut html, &row.hermes, "nenhum");
-        html.raw("</td><td class=\"so-largo num\">")
+        html.raw("</td><td class=\"second-line\">");
+        names(&mut html, &row.hermes, "none");
+        html.raw("</td><td class=\"wide-only num\">")
             .text(&row.last_message)
             .raw("</td></tr>");
     }
-    html.raw("</tbody></table></div><p class=\"nota\">A última mensagem aparece só com o tempo, sem conteúdo. O painel lista o que passa pelo hub: outros dispositivos conectados ao mesmo número só aparecem no celular.</p>");
+    html.raw("</tbody></table></div><p class=\"note\">The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.</p>");
     close(&mut html);
     html.raw(TAIL);
     html.finish()
@@ -473,23 +475,25 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
 /// Writes the page of the accesses up to where a window over it would go.
 pub(super) fn accesses_into(html: &mut Html, frame: &Frame, page: &AccessPage, over: Over) {
     open(html, frame, Tab::Accesses, over);
-    html.raw("<div class=\"cabeca\"><div><h1>Acessos</h1><p class=\"contadores\">Nas linhas, os Hermes. Nas colunas, os números. Clique numa célula para mudar.</p></div></div>");
+    html.raw("<div class=\"heading\"><div><h1>Accesses</h1><p class=\"counters\">Hermes in the rows, numbers in the columns. Click a cell to change it.</p></div></div>");
     if page.rows.is_empty() || page.numbers.is_empty() {
-        html.raw("<div class=\"quadro\"><table class=\"lista\"><tbody><tr class=\"vazio\"><td>")
+        html.raw("<div class=\"frame\"><table class=\"list\"><tbody><tr class=\"empty\"><td>")
             .raw(if page.rows.is_empty() {
-                "Conecte um Hermes primeiro."
+                "Connect a Hermes first."
             } else {
-                "Adicione um WhatsApp primeiro."
+                "Add a WhatsApp first."
             })
             .raw("</td></tr></tbody></table></div>");
         close(html);
         return;
     }
-    html.raw("<div class=\"quadro\"><div class=\"rola\"><table class=\"matriz\"><thead><tr><th scope=\"col\">Hermes</th>");
+    html.raw("<div class=\"frame\"><div class=\"scroll\"><table class=\"matrix\"><thead><tr><th scope=\"col\">Hermes</th>");
     for (alias, phone) in &page.numbers {
         html.raw("<th scope=\"col\">").text(alias);
         if let Some(phone) = phone {
-            html.raw("<span class=\"tel\">").text(phone).raw("</span>");
+            html.raw("<span class=\"phone\">")
+                .text(phone)
+                .raw("</span>");
         }
         html.raw("</th>");
     }
@@ -501,44 +505,44 @@ pub(super) fn accesses_into(html: &mut Html, frame: &Frame, page: &AccessPage, o
         if let Some(stopped) = row.stopped {
             html.raw("<td colspan=\"")
                 .number(page.numbers.len())
-                .raw("\"><span class=\"estado grave\">")
+                .raw("\"><span class=\"state bad\">")
                 .raw(stopped)
-                .raw("</span><span class=\"guardado\"> (acessos preservados)</span></td></tr>");
+                .raw("</span><span class=\"kept\"> (accesses kept)</span></td></tr>");
             continue;
         }
         for (cell, (alias, _)) in row.cells.iter().zip(&page.numbers) {
-            html.raw("<td><a class=\"celula\" href=\"/accesses/edit?hermes=")
+            html.raw("<td><a class=\"cell\" href=\"/accesses/edit?hermes=")
                 .text(&row.hermes)
                 .raw("&amp;number=")
                 .text(alias)
-                .raw("\"><span class=\"verbos\">");
+                .raw("\"><span class=\"verbs\">");
             let verbs = cell.as_ref().map_or([false; 4], |cell| cell.verbs);
-            for (granted, letter) in verbs.iter().zip(["L", "E", "M", "A"]) {
+            for (granted, letter) in verbs.iter().zip(["R", "S", "M", "W"]) {
                 html.raw(if *granted {
                     "<span>"
                 } else {
-                    "<span class=\"nao\">"
+                    "<span class=\"off\">"
                 })
                 .raw(letter)
                 .raw("</span>");
             }
-            html.raw("</span><span class=\"escopo\">");
+            html.raw("</span><span class=\"scope\">");
             match cell {
                 Some(cell) => html.text(&cell.scope),
-                None => html.raw("sem acesso"),
+                None => html.raw("no access"),
             };
             html.raw("</span></a></td>");
         }
         html.raw("</tr>");
     }
-    html.raw("</tbody></table></div></div><p class=\"nota\"><b>L</b> ler · <b>E</b> enviar · <b>M</b> modificar · <b>A</b> ser acordado.</p>");
+    html.raw("</tbody></table></div></div><p class=\"note\"><b>R</b> read · <b>S</b> send · <b>M</b> modify · <b>W</b> be woken.</p>");
     if let Some(saved) = &page.saved {
-        html.raw("<p class=\"situacao\" role=\"status\">Salvo: ")
+        html.raw("<p class=\"status\" role=\"status\">Saved: ")
             .text(saved)
             .raw("</p>");
     }
     if !page.warnings.is_empty() {
-        html.raw("<div class=\"avisos\"><b>Avisos que não bloqueiam</b><ul>");
+        html.raw("<div class=\"warnings\"><b>Warnings that block nothing</b><ul>");
         for warning in &page.warnings {
             html.raw("<li>").text(warning).raw("</li>");
         }
@@ -572,7 +576,7 @@ mod tests {
             restored: Some(HOSTILE.to_owned()),
             notices: vec![Notice {
                 grave: true,
-                lead: "Conexão tomada",
+                lead: "Connection taken",
                 text: HOSTILE.to_owned(),
             }],
             more_notices: 2,
@@ -587,7 +591,7 @@ mod tests {
             rows: vec![HermesRow {
                 name: HOSTILE.to_owned(),
                 tone: Tone::Bad,
-                state: "Em quarentena",
+                state: "In quarantine",
                 numbers: vec![HOSTILE.to_owned(), HOSTILE.to_owned()],
                 woken: true,
                 connector: Some(HOSTILE.to_owned()),
@@ -610,7 +614,7 @@ mod tests {
                 alias: HOSTILE.to_owned(),
                 phone: Some(HOSTILE.to_owned()),
                 tone: Tone::Ok,
-                state: "Conectado",
+                state: "Connected",
                 command: true,
                 hermes: vec![HOSTILE.to_owned()],
                 last_message: HOSTILE.to_owned(),
@@ -646,7 +650,7 @@ mod tests {
             numbers(&empty, &NumbersPage::default()),
             accesses(&empty, &AccessPage::default()),
             sign_in(None),
-            sign_in(Some("Código inválido ou vencido.")),
+            sign_in(Some("Invalid or expired code.")),
         ] {
             assert!(
                 !page.contains("<script"),
@@ -659,12 +663,12 @@ mod tests {
             assert!(!page.contains("javascript:"));
             assert!(page.contains("/assets/panel.css"));
         }
-        assert!(hermes(&empty, &HermesPage::default()).contains("Nenhum Hermes ainda"));
-        assert!(numbers(&empty, &NumbersPage::default()).contains("Nenhum número ainda"));
-        assert!(accesses(&empty, &AccessPage::default()).contains("Conecte um Hermes primeiro"));
+        assert!(hermes(&empty, &HermesPage::default()).contains("No Hermes yet"));
+        assert!(numbers(&empty, &NumbersPage::default()).contains("No number yet"));
+        assert!(accesses(&empty, &AccessPage::default()).contains("Connect a Hermes first"));
         // The band of alerts only exists when there is something to say.
-        assert!(!hermes(&empty, &HermesPage::default()).contains("class=\"alertas\""));
-        assert!(hermes(&hostile_frame(), &HermesPage::default()).contains("class=\"alertas\""));
+        assert!(!hermes(&empty, &HermesPage::default()).contains("class=\"alerts\""));
+        assert!(hermes(&hostile_frame(), &HermesPage::default()).contains("class=\"alerts\""));
     }
 
     #[test]
@@ -678,14 +682,14 @@ mod tests {
                     cells: vec![
                         Some(Cell {
                             verbs: [true, true, false, true],
-                            scope: "todas".to_owned(),
+                            scope: "all".to_owned(),
                         }),
                         None,
                     ],
                 },
                 AccessRow {
                     hermes: "antigo".to_owned(),
-                    stopped: Some("Em quarentena"),
+                    stopped: Some("In quarantine"),
                     cells: Vec::new(),
                 },
             ],
@@ -696,7 +700,7 @@ mod tests {
         // Each cell leads to the editor of its Hermes and its number.
         assert!(
             html.contains(
-                "<a class=\"celula\" href=\"/accesses/edit?hermes=ana&amp;number=balcao\">"
+                "<a class=\"cell\" href=\"/accesses/edit?hermes=ana&amp;number=balcao\">"
             )
         );
         assert!(html.contains("href=\"/accesses/edit?hermes=ana&amp;number=compras\""));
@@ -704,14 +708,12 @@ mod tests {
             !html.contains("hermes=antigo"),
             "a stopped Hermes has no cell to click"
         );
-        assert!(!html.contains("class=\"situacao\""));
+        assert!(!html.contains("class=\"status\""));
         assert!(
-            html.contains("<span>L</span><span>E</span><span class=\"nao\">M</span><span>A</span>")
+            html.contains("<span>R</span><span>S</span><span class=\"off\">M</span><span>W</span>")
         );
-        assert!(html.contains("sem acesso"));
-        assert!(
-            html.contains("<td colspan=\"2\"><span class=\"estado grave\">Em quarentena</span>")
-        );
-        assert!(!html.contains("class=\"avisos\""));
+        assert!(html.contains("no access"));
+        assert!(html.contains("<td colspan=\"2\"><span class=\"state bad\">In quarantine</span>"));
+        assert!(!html.contains("class=\"warnings\""));
     }
 }

@@ -29,7 +29,7 @@ pub const PATIENCE: Duration = Duration::from_secs(15);
 pub const COOKIE: &str = "arauto-panel";
 
 /// The sentence of every refusal of the entry.
-pub const REFUSED: &str = "Código inválido ou vencido";
+pub const REFUSED: &str = "Invalid or expired code";
 
 /// A browser of a test, pointed at the panel of a hub.
 #[derive(Debug, Clone, Copy)]

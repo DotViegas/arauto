@@ -85,7 +85,7 @@ fn has_code(text: &str, code: &str) -> bool {
 /// The invite inside the block a page shows.
 fn invite_of(page: &str) -> String {
     let start = page
-        .find("<pre id=\"guia-texto\">")
+        .find("<pre id=\"guide-text\">")
         .expect("the page shows a block");
     let end = start + page[start..].find("</pre>").unwrap();
     let text = page[start..end].replace("&quot;", "\"");

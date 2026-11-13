@@ -42,17 +42,21 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
     // The matrix leads to the editor, and the editor starts from what is saved: nothing.
     let matrix = page(&browser, &cookie, "/accesses").await;
     assert!(matrix.contains(&format!(
-        "<a class=\"celula\" href=\"/accesses/edit?hermes={ana}&amp;number=balcao\">"
+        "<a class=\"cell\" href=\"/accesses/edit?hermes={ana}&amp;number=balcao\">"
     )));
     let editor = page(&browser, &cookie, &edit).await;
-    assert!(editor.contains(&format!("<h2 id=\"t-editor\">{ana} no número balcao</h2>")));
-    assert!(editor.contains("<div class=\"pagina\" inert>"));
+    assert!(editor.contains(&format!(
+        "<h2 id=\"editor-title\">{ana} on the number balcao</h2>"
+    )));
+    assert!(editor.contains("<div class=\"page\" inert>"));
     assert!(editor.contains("name=\"scope\" value=\"all\" checked>"));
     assert!(
         !editor.contains("value=\"on\" checked>"),
         "no verb is marked"
     );
-    assert!(editor.contains(&format!("O Hermes {ana} não tem acesso ao número balcao.")));
+    assert!(editor.contains(&format!(
+        "The Hermes {ana} has no access to the number balcao."
+    )));
     assert!(
         accesses(&world).await.is_empty(),
         "opening the editor saves nothing"
@@ -74,10 +78,10 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
     );
     let matrix = page(&browser, &cookie, &saved_at).await;
     assert!(matrix.contains(&format!(
-        "<p class=\"situacao\" role=\"status\">Salvo: O Hermes {ana} pode ler e enviar em todas as conversas do número balcao. Não modifica e é acordado depois de 9 s de silêncio na conversa.</p>"
+        "<p class=\"status\" role=\"status\">Saved: The Hermes {ana} may read and send in every chat of the number balcao. It does not modify and is woken after 9 s of silence in the chat.</p>"
     )), "{matrix}");
     assert!(
-        matrix.contains("<span>L</span><span>E</span><span class=\"nao\">M</span><span>A</span>")
+        matrix.contains("<span>R</span><span>S</span><span class=\"off\">M</span><span>W</span>")
     );
     // The audit has what the command would have written, and names the panel.
     let audit = rows(fixture, "audit").await.join("\n");
@@ -111,11 +115,9 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
         accesses(&world).await,
         [("all".to_owned(), true, true, true, false, true, 9_000)]
     );
-    assert!(
-        page(&browser, &cookie, &saved_at)
-            .await
-            .contains("Não é acordado. Pode iniciar conversa com quem nunca falou com o número.")
-    );
+    assert!(page(&browser, &cookie, &saved_at).await.contains(
+        "It is not woken. It may start a chat with someone who never talked to the number."
+    ));
 
     // Only chosen chats: the lines of the chats are of the command, and the page says so.
     let saved = browser
@@ -126,11 +128,11 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
     let matrix = page(&browser, &cookie, &saved_at).await;
     assert!(
         matrix.contains(&format!(
-            "Salvo: O Hermes {ana} só alcança as conversas escolhidas do número balcao: 0 hoje."
+            "Saved: The Hermes {ana} only reaches the chosen chats of the number balcao: 0 today."
         )),
         "{matrix}"
     );
-    assert!(matrix.contains("nenhuma conversa"));
+    assert!(matrix.contains("no chat"));
 
     // No verb on every chat: the access goes.
     let saved = browser
@@ -140,7 +142,7 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
     assert!(accesses(&world).await.is_empty());
     let matrix = page(&browser, &cookie, &saved_at).await;
     assert!(matrix.contains(&format!(
-        "Salvo: O Hermes {ana} não tem acesso ao número balcao."
+        "Saved: The Hermes {ana} has no access to the number balcao."
     )));
     assert!(
         rows(fixture, "audit")
@@ -168,32 +170,32 @@ async fn the_rules_of_an_access_are_the_ones_of_the_command() {
     for (rest, said) in [
         (
             "scope=all&wake=on",
-            "Ser acordado exige ler. Nada foi salvo.",
+            "Being woken requires reading. Nothing was saved.",
         ),
         (
             "scope=all&send=on&wake=on&wait=5",
-            "Ser acordado exige ler. Nada foi salvo.",
+            "Being woken requires reading. Nothing was saved.",
         ),
         (
             "scope=all&read=on&start=on",
-            "Iniciar conversa exige enviar",
+            "Starting chats requires sending",
         ),
         (
             "scope=list&read=on&send=on&start=on",
-            "Iniciar conversa exige enviar",
+            "Starting chats requires sending",
         ),
-        ("scope=all&start=on", "Iniciar conversa exige enviar"),
+        ("scope=all&start=on", "Starting chats requires sending"),
         (
             "scope=all&read=on&wake=on&wait=61",
-            "A espera antes de acordar vai de 0 a 60 segundos.",
+            "The wait before waking goes from 0 to 60 seconds.",
         ),
         (
             "scope=all&read=on&wait=abc",
-            "A espera antes de acordar vai de 0 a 60 segundos.",
+            "The wait before waking goes from 0 to 60 seconds.",
         ),
         (
             "scope=all&read=on&wait=-1",
-            "A espera antes de acordar vai de 0 a 60 segundos.",
+            "The wait before waking goes from 0 to 60 seconds.",
         ),
     ] {
         let body = format!("hermes={ana}&number=balcao&{rest}");
@@ -202,7 +204,7 @@ async fn the_rules_of_an_access_are_the_ones_of_the_command() {
         let text = answer.text();
         assert!(text.contains(said), "{rest}: {text}");
         // The form comes back as it was sent, for the admin to fix it.
-        assert!(text.contains("<form id=\"ed-form\""), "{rest}");
+        assert!(text.contains("<form id=\"editor-form\""), "{rest}");
     }
     // A Hermes or a number that does not exist: nothing to edit and nothing to save.
     for body in [
@@ -298,7 +300,7 @@ async fn the_editor_needs_a_session_and_the_origin_and_reading_saves_nothing() {
     )
     .await;
     assert!(says.contains(&format!(
-        "Salvo: O Hermes {ana} não tem acesso ao número balcao."
+        "Saved: The Hermes {ana} has no access to the number balcao."
     )));
     for path in [
         "/accesses?hermes=ninguem&number=balcao",
@@ -308,7 +310,7 @@ async fn the_editor_needs_a_session_and_the_origin_and_reading_saves_nothing() {
         assert!(
             !page(&browser, &cookie, path)
                 .await
-                .contains("class=\"situacao\""),
+                .contains("class=\"status\""),
             "{path}"
         );
     }
@@ -338,16 +340,16 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
     // The line of a Hermes with a device has the button; one with nothing to close has not.
     let list = page(&browser, &cookie, "/").await;
     assert!(list.contains(&format!(
-        "<a class=\"botao perigo\" href=\"/hermes/revoke?name={name}\">Revogar</a>"
+        "<a class=\"button danger\" href=\"/hermes/revoke?name={name}\">Revoke</a>"
     )));
     assert!(!list.contains(&format!("/hermes/revoke?name={alone}")));
 
     // Asking revokes nothing, however many times.
     for _ in 0..3 {
         let question = page(&browser, &cookie, &asks).await;
-        assert!(question.contains(&format!("<h2 id=\"t-revogar\">Revogar {name}</h2>")));
-        assert!(question.contains("Os acessos ficam guardados"));
-        assert!(question.contains("<div class=\"pagina\" inert>"));
+        assert!(question.contains(&format!("<h2 id=\"revoke-title\">Revoke {name}</h2>")));
+        assert!(question.contains("The accesses are kept"));
+        assert!(question.contains("<div class=\"page\" inert>"));
     }
     assert_eq!(fixture.state_of(&device).await.0, "active");
     assert_eq!(browser.get(&asks, None).await.status, 303);
@@ -396,7 +398,7 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
         "the session of the Hermes ended"
     );
     let list = page(&browser, &cookie, "/").await;
-    assert!(list.contains("<span class=\"estado parado\">Sem aparelho</span>"));
+    assert!(list.contains("<span class=\"state idle\">No device</span>"));
     assert!(!list.contains(&format!("/hermes/revoke?name={name}")));
     let audit = rows(&fixture, "audit").await.join("\n");
     assert!(audit.contains("\"actor_note\":\"panel\""));

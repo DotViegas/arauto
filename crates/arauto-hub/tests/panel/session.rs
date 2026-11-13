@@ -332,7 +332,7 @@ async fn the_looks_at_entry_codes_have_a_ceiling_and_the_ceiling_spends_no_code(
     // Past the ceiling not even the right code is looked up, and the page says why.
     let held = browser.enter(&entry).await;
     assert_eq!(held.status, 429);
-    assert!(held.text().contains("Muitas tentativas"));
+    assert!(held.text().contains("Too many attempts"));
     assert!(cookie_of(&held).is_none());
     assert_eq!(audited(&fixture, "panel.signed_in").await, 0);
     // A request that is refused before the form is read does not count.

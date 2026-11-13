@@ -22,7 +22,7 @@ const fn all(read: bool, send: bool, modify: bool, wake: bool) -> Grant {
 /// The line of a list that is about `name`: from its name to the end of its row.
 fn line<'p>(page: &'p str, name: &str) -> &'p str {
     let start = page
-        .find(&format!("<span class=\"nome\">{name}</span>"))
+        .find(&format!("<span class=\"name\">{name}</span>"))
         .unwrap_or_else(|| panic!("{name} is not on the page: {page}"));
     let rest = &page[start..];
     &rest[..rest.find("</tr>").expect("the row ends")]
@@ -54,22 +54,22 @@ async fn an_empty_hub_says_what_to_do_first() {
     let cookie = browser.signed_in(&fixture).await;
 
     let hermes = page(&browser, &cookie, "/").await;
-    assert!(hermes.contains("Nenhum Hermes ainda"));
-    assert!(hermes.contains("0 conectados · 0 aguardando · 0 em alerta"));
+    assert!(hermes.contains("No Hermes yet"));
+    assert!(hermes.contains("0 connected · 0 waiting · 0 on alert"));
     assert!(
-        !hermes.contains("class=\"alertas\""),
+        !hermes.contains("class=\"alerts\""),
         "nothing to warn about"
     );
     assert!(hermes.contains("<a href=\"/\" aria-current=\"page\">Hermes</a>"));
 
     let numbers = page(&browser, &cookie, "/whatsapps").await;
-    assert!(numbers.contains("Nenhum número ainda"));
-    assert!(numbers.contains("Ainda não há motor"));
+    assert!(numbers.contains("No number yet"));
+    assert!(numbers.contains("There is no engine yet"));
     assert!(numbers.contains("<a href=\"/whatsapps\" aria-current=\"page\">WhatsApps</a>"));
 
     let accesses = page(&browser, &cookie, "/accesses").await;
-    assert!(accesses.contains("Conecte um Hermes primeiro"));
-    assert!(accesses.contains("<a href=\"/accesses\" aria-current=\"page\">Acessos</a>"));
+    assert!(accesses.contains("Connect a Hermes first"));
+    assert!(accesses.contains("<a href=\"/accesses\" aria-current=\"page\">Accesses</a>"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -89,15 +89,15 @@ async fn the_page_of_the_hermes_shows_each_one_in_its_state() {
 
     let shown = page(&browser, &cookie, "/").await;
     for (name, class, state) in [
-        (&alone, "estado parado", "Sem aparelho"),
-        (&invited, "estado atencao", "Aguardando o Hermes"),
-        (&asking, "estado atencao", "Aguardando seu código"),
+        (&alone, "state idle", "No device"),
+        (&invited, "state wait", "Waiting for the Hermes"),
+        (&asking, "state wait", "Waiting for your code"),
         (
             &approved,
-            "estado atencao",
-            "Aprovado, aguardando o conector",
+            "state wait",
+            "Approved, waiting for the connector",
         ),
-        (&connected, "estado", "Conectado"),
+        (&connected, "state", "Connected"),
     ] {
         let line = line(&shown, name);
         assert!(
@@ -106,11 +106,11 @@ async fn the_page_of_the_hermes_shows_each_one_in_its_state() {
         );
     }
     assert!(
-        shown.contains("1 conectado · 3 aguardando · 0 em alerta"),
+        shown.contains("1 connected · 3 waiting · 0 on alert"),
         "{shown}"
     );
-    assert!(line(&shown, &connected).contains(">agora</td>"));
-    assert!(line(&shown, &alone).contains(">nunca</td>"));
+    assert!(line(&shown, &connected).contains(">now</td>"));
+    assert!(line(&shown, &alone).contains(">never</td>"));
     // The code the admin types to approve is never on a page.
     assert!(!shown.contains(&typed), "the panel shows no code");
 
@@ -119,8 +119,8 @@ async fn the_page_of_the_hermes_shows_each_one_in_its_state() {
     let mut gone = false;
     for _ in 0..200 {
         let shown = page(&browser, &cookie, "/").await;
-        if line(&shown, &connected).contains("<span class=\"estado parado\">Desconectado</span>") {
-            assert!(shown.contains("0 conectados · 3 aguardando · 0 em alerta"));
+        if line(&shown, &connected).contains("<span class=\"state idle\">Disconnected</span>") {
+            assert!(shown.contains("0 connected · 3 waiting · 0 on alert"));
             gone = true;
             break;
         }
@@ -161,14 +161,14 @@ async fn the_numbers_and_the_matrix_are_the_ones_of_the_admin_command() {
     assert!(balcao.contains("+55119876"), "{balcao}");
     assert!(balcao.contains(&format!("+{}", phone(1))), "{balcao}");
     assert!(
-        balcao.contains("<span class=\"estado\">Conectado</span>"),
+        balcao.contains("<span class=\"state\">Connected</span>"),
         "{balcao}"
     );
     assert!(balcao.contains(&ana) && balcao.contains(&bia), "{balcao}");
     assert!(!balcao.contains(&nobody), "{balcao}");
     let compras = line(&numbers, "compras");
     assert!(
-        compras.contains("<span class=\"estado parado\">Sem pareamento</span>"),
+        compras.contains("<span class=\"state idle\">Not paired</span>"),
         "{compras}"
     );
     assert!(
@@ -176,10 +176,10 @@ async fn the_numbers_and_the_matrix_are_the_ones_of_the_admin_command() {
         "{compras}"
     );
     assert!(
-        numbers.contains("\">Motor</span>"),
+        numbers.contains("\">Engine</span>"),
         "the engine has its line"
     );
-    assert!(!numbers.contains("Ainda não há motor"));
+    assert!(!numbers.contains("There is no engine yet"));
     // Nothing of the engine that is a secret or an address is on the page.
     assert!(!numbers.contains(crate::world::KEY));
     assert!(!numbers.contains(&world.fake.address()));
@@ -187,40 +187,40 @@ async fn the_numbers_and_the_matrix_are_the_ones_of_the_admin_command() {
     let hermes = page(&browser, &cookie, "/").await;
     assert!(line(&hermes, &ana).contains(">balcao</td>"));
     assert!(line(&hermes, &bia).contains(">balcao, compras</td>"));
-    assert!(line(&hermes, &nobody).contains(">nenhum</td>"));
+    assert!(line(&hermes, &nobody).contains(">none</td>"));
 
     let matrix = page(&browser, &cookie, "/accesses").await;
-    let read_send_wake = "<span>L</span><span>E</span><span class=\"nao\">M</span><span>A</span>";
+    let read_send_wake = "<span>R</span><span>S</span><span class=\"off\">M</span><span>W</span>";
     let read_send =
-        "<span>L</span><span>E</span><span class=\"nao\">M</span><span class=\"nao\">A</span>";
-    let read = "<span>L</span><span class=\"nao\">E</span><span class=\"nao\">M</span>\
-                <span class=\"nao\">A</span>";
-    let nothing = "<span class=\"nao\">L</span><span class=\"nao\">E</span>\
-                   <span class=\"nao\">M</span><span class=\"nao\">A</span>";
+        "<span>R</span><span>S</span><span class=\"off\">M</span><span class=\"off\">W</span>";
+    let read = "<span>R</span><span class=\"off\">S</span><span class=\"off\">M</span>\
+                <span class=\"off\">W</span>";
+    let nothing = "<span class=\"off\">R</span><span class=\"off\">S</span>\
+                   <span class=\"off\">M</span><span class=\"off\">W</span>";
     // The columns are the numbers by alias: balcao, then compras.
     let of_ana = matrix_line(&matrix, &ana);
     assert!(
         of_ana.find(read_send_wake).unwrap() < of_ana.find(nothing).unwrap(),
         "{of_ana}"
     );
-    assert_eq!(of_ana.matches("sem acesso").count(), 1);
+    assert_eq!(of_ana.matches("no access").count(), 1);
     let of_bia = matrix_line(&matrix, &bia);
     assert!(
         of_bia.find(read_send).unwrap() < of_bia.find(read).unwrap(),
         "{of_bia}"
     );
-    assert_eq!(of_bia.matches(">todas<").count(), 2);
+    assert_eq!(of_bia.matches(">all<").count(), 2);
     assert_eq!(
-        matrix_line(&matrix, &nobody).matches("sem acesso").count(),
+        matrix_line(&matrix, &nobody).matches("no access").count(),
         2
     );
     // What `admin access grant` warns of and does not prevent, the page says too.
     assert!(
-        matrix.contains("balcao: 2 Hermes enviam nas mesmas conversas."),
+        matrix.contains("balcao: 2 Hermes send in the same chats."),
         "{matrix}"
     );
     assert!(!matrix.contains("compras: 2 Hermes"));
-    assert!(!matrix.contains("são acordados nas mesmas conversas"));
+    assert!(!matrix.contains("are woken in the same chats"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -240,20 +240,22 @@ async fn a_hub_that_came_back_from_a_copy_says_so_and_still_lets_the_admin_in() 
     let cookie = cookie_of(&answer).unwrap();
 
     let shown = page(&browser, &cookie, "/").await;
-    assert!(shown.contains("class=\"alertas\""));
+    assert!(shown.contains("class=\"alerts\""));
     assert!(
-        shown.contains("<li class=\"alerta restaurado\">O hub voltou de uma cópia de "),
+        shown.contains("<li class=\"alert restored\">The hub came back from a backup of "),
         "{shown}"
     );
     let line = line(&shown, &name);
     assert!(
-        line.contains("<span class=\"estado grave\">Suspenso</span>"),
+        line.contains("<span class=\"state bad\">Suspended</span>"),
         "{line}"
     );
-    assert!(shown.contains("0 conectados · 0 aguardando · 1 em alerta"));
-    assert!(shown.contains(&format!("{name} está suspenso e só volta com convite novo")));
+    assert!(shown.contains("0 connected · 0 waiting · 1 on alert"));
+    assert!(shown.contains(&format!(
+        "{name} is suspended and only comes back with a new invite"
+    )));
 
     // Its accesses are kept and none applies: the matrix says the state, not the cells.
     let matrix = page(&browser, &cookie, "/accesses").await;
-    assert!(matrix.contains("Adicione um WhatsApp primeiro") || matrix.contains("Suspenso"));
+    assert!(matrix.contains("Add a WhatsApp first") || matrix.contains("Suspended"));
 }

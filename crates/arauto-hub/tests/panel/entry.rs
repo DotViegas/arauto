@@ -144,7 +144,7 @@ async fn the_code_opens_one_session_and_only_once() {
     for _ in 0..3 {
         let page = browser.get("/sign-in", None).await;
         assert_eq!(page.status, 200);
-        assert!(page.text().contains("Código de entrada"));
+        assert!(page.text().contains("Entry code"));
         assert!(
             !page.text().contains(&entry),
             "the panel never shows a code"
@@ -169,7 +169,7 @@ async fn the_code_opens_one_session_and_only_once() {
     assert_eq!(home.status, 200);
     assert!(
         home.text()
-            .contains("Seus Hermes e os <b>[números]</b> deles")
+            .contains("Your Hermes and their <b>[numbers]</b>")
     );
     assert_eq!(browser.get("/sign-in", Some(&cookie)).await.status, 303);
 

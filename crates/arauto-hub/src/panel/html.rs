@@ -123,14 +123,14 @@ mod tests {
     #[test]
     fn markup_and_values_are_kept_apart() {
         let mut html = Html::new();
-        html.raw("<td class=\"nome\">")
+        html.raw("<td class=\"name\">")
             .text("<b>ana</b>")
             .raw("</td><td>")
             .number(3)
             .raw("</td>");
         assert_eq!(
             html.finish(),
-            "<td class=\"nome\">&lt;b&gt;ana&lt;/b&gt;</td><td>3</td>"
+            "<td class=\"name\">&lt;b&gt;ana&lt;/b&gt;</td><td>3</td>"
         );
     }
 }

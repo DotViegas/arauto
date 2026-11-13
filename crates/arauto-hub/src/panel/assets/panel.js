@@ -19,14 +19,14 @@
 
   function joined(parts) {
     if (parts.length <= 1) return parts.join('');
-    return parts.slice(0, -1).join(', ') + ' e ' + parts[parts.length - 1];
+    return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
   }
 
   // The editor of an access: what cannot be marked is greyed out, and the sentence under the
   // form says what the form means while it is filled. The hub checks it all again on saving.
   function editor() {
-    var form = document.getElementById('ed-form');
-    var said = document.getElementById('ed-frase');
+    var form = document.getElementById('editor-form');
+    var said = document.getElementById('editor-sentence');
     if (!form || !said) return;
     var hermes = form.getAttribute('data-hermes');
     var number = form.getAttribute('data-number');
@@ -46,28 +46,27 @@
       var text;
       var none = !(read.checked || send.checked || modify.checked || wake.checked);
       if (!all.checked) {
-        text = 'O Hermes ' + hermes + ' só alcança as conversas escolhidas do número ' + number + ': ' +
-          lines + ' hoje. O que ele pode em cada uma está na linha dela.';
+        text = 'The Hermes ' + hermes + ' only reaches the chosen chats of the number ' + number + ': ' +
+          lines + ' today. What it may do in each one is in its line.';
       } else if (none) {
-        text = 'O Hermes ' + hermes + ' não tem acesso ao número ' + number + '.';
+        text = 'The Hermes ' + hermes + ' has no access to the number ' + number + '.';
       } else {
         var can = [], rest = [];
-        if (read.checked) can.push('ler'); else rest.push('não lê');
-        if (send.checked) can.push('enviar'); else rest.push('não envia');
-        if (modify.checked) can.push('modificar'); else rest.push('não modifica');
+        if (read.checked) can.push('read'); else rest.push('does not read');
+        if (send.checked) can.push('send'); else rest.push('does not send');
+        if (modify.checked) can.push('modify'); else rest.push('does not modify');
         var seconds = parseInt(wait.value, 10);
         if (isNaN(seconds)) seconds = 0;
-        rest.push(wake.checked ? 'é acordado depois de ' + seconds + ' s de silêncio na conversa' : 'não é acordado');
-        var second = joined(rest);
+        rest.push(wake.checked ? 'is woken after ' + seconds + ' s of silence in the chat' : 'is not woken');
         if (can.length) {
-          text = 'O Hermes ' + hermes + ' pode ' + joined(can) + ' em todas as conversas do número ' + number + '. ' +
-            second.charAt(0).toUpperCase() + second.slice(1) + '.';
+          text = 'The Hermes ' + hermes + ' may ' + joined(can) + ' in every chat of the number ' + number +
+            '. It ' + joined(rest) + '.';
         } else {
-          text = 'O Hermes ' + hermes + ' ' + second + ' em todas as conversas do número ' + number + '.';
+          text = 'The Hermes ' + hermes + ' ' + joined(rest) + ' in every chat of the number ' + number + '.';
         }
-        if (start.checked) text += ' Pode iniciar conversa com quem nunca falou com o número.';
-        if (lines === 1) text += ' 1 conversa tem regra própria.';
-        if (lines > 1) text += ' ' + lines + ' conversas têm regra própria.';
+        if (start.checked) text += ' It may start a chat with someone who never talked to the number.';
+        if (lines === 1) text += ' 1 chat has its own rule.';
+        if (lines > 1) text += ' ' + lines + ' chats have their own rule.';
       }
       said.textContent = text;
     }
@@ -78,13 +77,13 @@
   }
 
   ready(function () {
-    var guide = document.getElementById('guia');
+    var guide = document.getElementById('guide');
     if (!guide) return;
 
     // The time left of an invite or of a request, counted down on the screen. The deadline
     // itself is the one of the hub: this is only what the admin sees.
-    Array.prototype.forEach.call(guide.querySelectorAll('[data-segundos]'), function (node) {
-      var left = parseInt(node.getAttribute('data-segundos'), 10);
+    Array.prototype.forEach.call(guide.querySelectorAll('[data-seconds]'), function (node) {
+      var left = parseInt(node.getAttribute('data-seconds'), 10);
       if (isNaN(left) || left < 0) return;
       node.textContent = clock(left);
       setInterval(function () {
@@ -95,30 +94,30 @@
 
     editor();
 
-    var block = document.getElementById('guia-bloco');
-    if (guide.classList.contains('prepara')) {
-      var title = document.getElementById('guia-preparo');
+    var block = document.getElementById('guide-block');
+    if (guide.classList.contains('preparing')) {
+      var title = document.getElementById('guide-preparing');
       if (title) title.focus();
       setTimeout(function () {
-        guide.classList.remove('prepara');
+        guide.classList.remove('preparing');
         if (block) block.focus();
       }, PREPARING_MS);
     }
     if (!block) return;
 
-    var text = document.getElementById('guia-texto');
-    var said = document.getElementById('guia-copiado');
+    var text = document.getElementById('guide-text');
+    var said = document.getElementById('guide-copied');
     block.setAttribute('role', 'button');
     block.setAttribute('tabindex', '0');
 
     function done(copied) {
-      block.classList.remove('copiou');
+      block.classList.remove('copied');
       void block.offsetWidth; // the animation starts again at every click
-      block.classList.add('copiou');
+      block.classList.add('copied');
       if (said) {
         said.textContent = copied
-          ? 'Copiado para a área de transferência.'
-          : 'O texto está selecionado. Copie com Ctrl+C.';
+          ? 'Copied to the clipboard.'
+          : 'The text is selected. Copy it with Ctrl+C.';
         said.hidden = false;
       }
       if (!copied) {
@@ -128,7 +127,7 @@
         selection.removeAllRanges();
         selection.addRange(range);
       }
-      guide.classList.add('ja-copiou');
+      guide.classList.add('was-copied');
     }
 
     function copy() {

@@ -35,23 +35,22 @@ use crate::repo::approval::{ApproveOutcome, LastUse, Recognition, Recognized};
 
 use arauto_protocol::names::{HermesName, NameError};
 
-const NAME_TAKEN: &str = "Já existe um Hermes com esse nome. Para ligar outro aparelho a ele, use o botão da linha dele.";
+const NAME_TAKEN: &str = "There already is a Hermes with that name. To link another device to it, use the button on its line.";
 const NAME_RETIRED: &str =
-    "Esse nome foi de um Hermes removido, e um nome nunca é reaproveitado. Escolha outro.";
-const USE_NOT_ANSWERED: &str =
-    "Antes do código, diga se reconhece o último uso do aparelho atual. Nada foi contado.";
-const USE_CHANGED: &str = "O aparelho atual foi usado enquanto você respondia. Veja o último uso de agora e responda de novo. Nada foi aprovado.";
-const CODE_FORMAT: &str = "O código tem 6 dígitos, como 123-456. Nada foi contado.";
-const RESTORED: &str = "O banco voltou de uma cópia mais antiga e o hub ainda não tratou disso. Nada foi gravado. Reinicie o hub: ele liga o modo restaurado, e então cada Hermes é reconectado com convite novo.";
-const FAILED: &str = "Algo falhou no hub e nada foi feito. Veja o registro do hub.";
+    "That name belonged to a Hermes that was removed, and a name is never reused. Choose another.";
+const USE_NOT_ANSWERED: &str = "Before the code, say whether you recognize the last use of the current device. Nothing was counted.";
+const USE_CHANGED: &str = "The current device was used while you were answering. See its last use now and answer again. Nothing was approved.";
+const CODE_FORMAT: &str = "The code has 6 digits, like 123-456. Nothing was counted.";
+const RESTORED: &str = "The database came back from an older backup and the hub has not handled it yet. Nothing was written. Restart the hub: it turns the restored mode on, and then each Hermes is reconnected with a new invite.";
+const FAILED: &str = "Something failed in the hub and nothing was done. See the hub's log.";
 
 /// Why a name was refused, in the words of the form.
 const fn name_error(error: NameError) -> &'static str {
     match error {
-        NameError::Length => "O nome tem de 1 a 32 caracteres.",
-        NameError::FirstCharacter => "O nome começa por letra minúscula ou número.",
-        NameError::Character => "Use só minúsculas, números, hífen e sublinhado.",
-        NameError::Reserved => "Esse nome é reservado. Escolha outro.",
+        NameError::Length => "The name has from 1 to 32 characters.",
+        NameError::FirstCharacter => "The name starts with a lowercase letter or a digit.",
+        NameError::Character => "Use only lowercase letters, digits, hyphen and underscore.",
+        NameError::Reserved => "That name is reserved. Choose another.",
     }
 }
 
@@ -201,7 +200,7 @@ async fn approve(
         Ok(ApproveOutcome::NotFound) | Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
         Ok(ApproveOutcome::WrongCode { attempts }) => {
             let said = format!(
-                "Código não confere. Tentativa {attempts} de {}. Digite o último código que o Hermes respondeu.",
+                "The code does not match. Attempt {attempts} of {}. Type the last code the Hermes answered.",
                 crate::repo::approval::CODE_ATTEMPTS_MAX
             );
             code_again(hub, organization, name, said).await

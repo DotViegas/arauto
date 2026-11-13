@@ -66,9 +66,9 @@ use crate::repo::{self, RepoError};
 const ATTEMPTS_PER_MINUTE: u32 = 30;
 
 /// What the page of the entry says when it refuses. One sentence for every reason.
-const REFUSED: &str = "Código inválido ou vencido. Gere outro no servidor do hub.";
+const REFUSED: &str = "Invalid or expired code. Issue another one on the hub's server.";
 
-const TOO_MANY: &str = "Muitas tentativas agora. Espere um minuto e tente de novo.";
+const TOO_MANY: &str = "Too many attempts right now. Wait a minute and try again.";
 
 /// The files of the panel, written by the project and built into the program.
 const ASSETS: &[(&str, &str, &[u8])] = &[

@@ -49,9 +49,9 @@ fn unescaped(text: &str) -> String {
 /// The block a page shows, as the admin would copy it.
 fn block_of(page: &str) -> String {
     let start = page
-        .find("<pre id=\"guia-texto\">")
+        .find("<pre id=\"guide-text\">")
         .unwrap_or_else(|| panic!("the page shows no block: {page}"))
-        + "<pre id=\"guia-texto\">".len();
+        + "<pre id=\"guide-text\">".len();
     let end = start + page[start..].find("</pre>").unwrap();
     unescaped(&page[start..end])
 }
@@ -135,8 +135,8 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     let asks = browser.get("/hermes/connect", Some(&cookie)).await;
     assert_eq!(asks.status, 200);
     let asks = asks.text();
-    assert!(asks.contains("Que nome este Hermes vai ter no painel?"));
-    assert!(asks.contains("<div class=\"pagina\" inert>"));
+    assert!(asks.contains("What name will this Hermes have in the panel?"));
+    assert!(asks.contains("<div class=\"page\" inert>"));
     assert!(asks.contains("<script src=\"/assets/panel.js\"></script>"));
     assert_eq!(asks.matches("<script").count(), 1);
     assert_eq!(
@@ -152,9 +152,9 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     assert_eq!(issued.status, 200, "{}", issued.text());
     assert_eq!(issued.header("cache-control"), Some("no-store"));
     let page = issued.text();
-    assert!(page.contains("class=\"modal guia prepara\""));
-    assert!(page.contains("<h2 id=\"t-guia\">Conectar atendimento</h2>"));
-    assert!(page.contains("Preparando conexão segura"));
+    assert!(page.contains("class=\"modal guide preparing\""));
+    assert!(page.contains("<h2 id=\"guide-title\">Connect atendimento</h2>"));
+    assert!(page.contains("Preparing a secure connection"));
     let block = block_of(&page);
     assert!(
         block.starts_with("Conecte este Hermes ao hub Arauto. Convite para: atendimento.\n"),
@@ -192,10 +192,10 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
 
     // Step 3, before the Hermes ran anything: the page waits, and asks again by itself.
     let waits = wait_page(&browser, &cookie, "atendimento").await;
-    assert!(waits.contains("Aguardando o Hermes atendimento"));
+    assert!(waits.contains("Waiting for the Hermes atendimento"));
     assert!(waits.contains("<meta http-equiv=\"refresh\" content=\"3\">"));
-    assert!(waits.contains("<li class=\"ok\">Convite emitido</li>"));
-    assert!(waits.contains("<li class=\"espera\">Um aparelho usou o convite: aguardando…</li>"));
+    assert!(waits.contains("<li class=\"ok\">Invite issued</li>"));
+    assert!(waits.contains("<li class=\"waiting\">A device used the invite: waiting…</li>"));
     assert!(
         !waits.contains(&invite),
         "the invite is in no page but the one of the block"
@@ -205,10 +205,10 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     let device = fixture.device();
     let code = enroll(&device, &invite, device::declared()).await;
     let asks_code = wait_page(&browser, &cookie, "atendimento").await;
-    assert!(asks_code.contains("Um aparelho usou o convite de atendimento"));
-    assert!(asks_code.contains("<li class=\"ok\">Um aparelho usou o convite, de 127.0.0.1"));
+    assert!(asks_code.contains("A device used the invite of atendimento"));
+    assert!(asks_code.contains("<li class=\"ok\">A device used the invite, from 127.0.0.1"));
     assert!(asks_code.contains(
-        "máquina \"test-host\" · sistema \"test-os\" · Hermes \"0.0.0-test\" (não verificado)"
+        "machine \"test-host\" · system \"test-os\" · Hermes \"0.0.0-test\" (not verified)"
     ));
     assert!(
         !asks_code.contains("http-equiv"),
@@ -233,18 +233,18 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     assert!(
         refused
             .text()
-            .contains("Código não confere. Tentativa 1 de 5.")
+            .contains("The code does not match. Attempt 1 of 5.")
     );
     assert!(!has_code(&refused.text(), wrong) && !has_code(&refused.text(), &code));
     let malformed = browser
         .post("/hermes/approve", Some(&cookie), &form("12"))
         .await;
-    assert!(malformed.text().contains("O código tem 6 dígitos"));
+    assert!(malformed.text().contains("The code has 6 digits"));
     let refused = browser
         .post("/hermes/approve", Some(&cookie), &form(wrong))
         .await;
     assert!(
-        refused.text().contains("Tentativa 2 de 5."),
+        refused.text().contains("Attempt 2 of 5."),
         "the malformed one was not counted"
     );
 
@@ -258,9 +258,9 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
         Some("/hermes/wait?name=atendimento")
     );
     let done = wait_page(&browser, &cookie, "atendimento").await;
-    assert!(done.contains("<h3>atendimento foi aprovado</h3>"));
-    assert!(done.contains("Ele ainda não tem acesso a número nenhum."));
-    assert!(done.contains("class=\"mascote acenando\""));
+    assert!(done.contains("<h3>atendimento was approved</h3>"));
+    assert!(done.contains("It has no access to any number yet."));
+    assert!(done.contains("class=\"mascot waving\""));
     assert!(!done.contains("http-equiv"));
 
     // The connector confirms its first credential: connected, in the guide and in the list.
@@ -271,14 +271,11 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
         .session()
         .unwrap();
     let done = wait_page(&browser, &cookie, "atendimento").await;
-    assert!(
-        done.contains("<h3>atendimento está conectado</h3>"),
-        "{done}"
-    );
+    assert!(done.contains("<h3>atendimento is connected</h3>"), "{done}");
     assert_eq!(done.matches("<li class=\"ok\">").count(), 4);
     let list = browser.get("/", Some(&cookie)).await.text();
-    assert!(list.contains("<span class=\"estado\">Conectado</span>"));
-    assert!(list.contains("1 conectado · 0 aguardando · 0 em alerta"));
+    assert!(list.contains("<span class=\"state\">Connected</span>"));
+    assert!(list.contains("1 connected · 0 waiting · 0 on alert"));
     drop(session);
 }
 
@@ -372,7 +369,7 @@ async fn reading_the_guide_changes_nothing_while_a_request_waits() {
     let before = everything(&fixture).await;
     for _ in 0..3 {
         let page = wait_page(&browser, &cookie, &name).await;
-        assert!(page.contains("Código de conferência"));
+        assert!(page.contains("Verification code"));
         assert!(!has_code(&page, &code));
         assert_eq!(browser.get("/", Some(&cookie)).await.status, 200);
         assert_eq!(
@@ -406,24 +403,27 @@ async fn a_name_the_hub_refuses_creates_nothing() {
 
     let long = "a".repeat(33);
     for (typed, said) in [
-        ("", "O nome tem de 1 a 32 caracteres."),
-        (long.as_str(), "O nome tem de 1 a 32 caracteres."),
-        ("Ana", "O nome começa por letra minúscula ou número."),
-        ("-ana", "O nome começa por letra minúscula ou número."),
+        ("", "The name has from 1 to 32 characters."),
+        (long.as_str(), "The name has from 1 to 32 characters."),
+        ("Ana", "The name starts with a lowercase letter or a digit."),
+        (
+            "-ana",
+            "The name starts with a lowercase letter or a digit.",
+        ),
         (
             "ana+maria",
-            "Use só minúsculas, números, hífen e sublinhado.",
+            "Use only lowercase letters, digits, hyphen and underscore.",
         ),
         (
             "ana%20maria",
-            "Use só minúsculas, números, hífen e sublinhado.",
+            "Use only lowercase letters, digits, hyphen and underscore.",
         ),
         (
             "a%3Cscript%3Ealert(1)%3C%2Fscript%3E",
-            "Use só minúsculas, números, hífen e sublinhado.",
+            "Use only lowercase letters, digits, hyphen and underscore.",
         ),
-        ("admin", "Esse nome é reservado. Escolha outro."),
-        (taken.as_str(), "Já existe um Hermes com esse nome."),
+        ("admin", "That name is reserved. Choose another."),
+        (taken.as_str(), "There already is a Hermes with that name."),
     ] {
         let answer = browser
             .post("/hermes/connect", Some(&cookie), &format!("name={typed}"))
@@ -432,10 +432,10 @@ async fn a_name_the_hub_refuses_creates_nothing() {
         let page = answer.text();
         assert!(page.contains(said), "{typed}: {page}");
         assert!(
-            page.contains("Que nome este Hermes vai ter no painel?"),
+            page.contains("What name will this Hermes have in the panel?"),
             "{typed}"
         );
-        assert!(!page.contains("guia-texto"), "{typed}: no block");
+        assert!(!page.contains("guide-text"), "{typed}: no block");
         assert!(
             !page.contains("<script>alert"),
             "what was typed is shown as text"
@@ -445,7 +445,11 @@ async fn a_name_the_hub_refuses_creates_nothing() {
     let answer = browser
         .post("/hermes/connect", Some(&cookie), "other=1")
         .await;
-    assert!(answer.text().contains("O nome tem de 1 a 32 caracteres."));
+    assert!(
+        answer
+            .text()
+            .contains("The name has from 1 to 32 characters.")
+    );
     assert_eq!(
         before,
         everything(&fixture).await,
@@ -466,7 +470,7 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
     assert!(
         !first
             .text()
-            .contains("O convite emitido antes foi cancelado.")
+            .contains("The invite issued before was cancelled.")
     );
 
     // No page that is read shows it, and the database holds only its digest.
@@ -478,7 +482,7 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
     ] {
         let page = browser.get(path, Some(&cookie)).await.text();
         assert!(!page.contains(&first_invite), "{path} shows the invite");
-        assert!(!page.contains("guia-texto"), "{path} shows a block");
+        assert!(!page.contains("guide-text"), "{path} shows a block");
     }
     let mut stored = String::new();
     for table in ["invite", "audit", "alert", "hermes", "device"] {
@@ -493,7 +497,7 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
     // The line already exists: another invite comes from its button, and cancels the first.
     let list = browser.get("/", Some(&cookie)).await.text();
     assert!(
-        list.contains("<a class=\"botao\" href=\"/hermes/wait?name=vendas\">Continuar</a>"),
+        list.contains("<a class=\"button\" href=\"/hermes/wait?name=vendas\">Continue</a>"),
         "{list}"
     );
     let second = browser
@@ -503,7 +507,7 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
     assert!(
         second
             .text()
-            .contains("O convite emitido antes foi cancelado.")
+            .contains("The invite issued before was cancelled.")
     );
     let second_invite = invite_of(&block_of(&second.text()));
     assert_ne!(first_invite, second_invite);
@@ -542,11 +546,11 @@ async fn a_hub_that_serves_no_connector_issues_nothing_from_the_panel() {
         assert_eq!(answer.status, 200, "{path}");
         let page = answer.text();
         assert!(
-            page.contains("Este hub não tem conector para servir"),
+            page.contains("This hub has no connector to serve"),
             "{path}: {page}"
         );
-        assert!(page.contains("Nada foi emitido."));
-        assert!(!page.contains("guia-texto"));
+        assert!(page.contains("Nothing was issued."));
+        assert!(!page.contains("guide-text"));
     }
     assert_eq!(
         before,
@@ -566,7 +570,7 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
 
     let list = browser.get("/", Some(&cookie)).await.text();
     assert!(
-        list.contains("<button class=\"botao\" type=\"submit\">Reconectar</button>"),
+        list.contains("<button class=\"button\" type=\"submit\">Reconnect</button>"),
         "{list}"
     );
     let issued = browser
@@ -574,15 +578,15 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
         .await;
     assert_eq!(issued.status, 200);
     let page = issued.text();
-    assert!(page.contains(&format!("<h2 id=\"t-guia\">Reconectar {name}</h2>")));
-    assert!(page.contains("O aparelho em uso continua funcionando até o novo confirmar"));
+    assert!(page.contains(&format!("<h2 id=\"guide-title\">Reconnect {name}</h2>")));
+    assert!(page.contains("The device in use keeps working until the new one confirms"));
     let invite = invite_of(&block_of(&page));
 
     let new = fixture.device();
     let code = enroll(&new, &invite, device::declared()).await;
     let asks = wait_page(&browser, &cookie, &name).await;
-    assert!(asks.contains("Último uso do aparelho atual: "), "{asks}");
-    assert!(asks.contains("Você reconhece?"));
+    assert!(asks.contains("Last use of the current device: "), "{asks}");
+    assert!(asks.contains("Do you recognize it?"));
     let seen = format!(
         "seen_device={}&seen_at={}&seen_state={}",
         hidden(&asks, "seen_device"),
@@ -599,7 +603,7 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
     assert!(
         unanswered
             .text()
-            .contains("Antes do código, diga se reconhece o último uso")
+            .contains("Before the code, say whether you recognize the last use")
     );
     // An answer about a use that is not the one of the device now: nothing either.
     for stale in [
@@ -618,7 +622,7 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
             .await;
         assert_eq!(answer.status, 200, "{stale}");
         assert!(
-            answer.text().contains("Nada foi aprovado."),
+            answer.text().contains("Nothing was approved."),
             "{stale}: {}",
             answer.text()
         );
@@ -626,7 +630,7 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
     assert_eq!(fixture.state_of(&new).await.0, "pending");
     assert_eq!(fixture.state_of(&old).await.0, "active");
     let asks = wait_page(&browser, &cookie, &name).await;
-    assert!(!asks.contains("Tentativa"), "no attempt was counted");
+    assert!(!asks.contains("Attempt"), "no attempt was counted");
 
     // The answer about the use on the screen, with the right code.
     let approved = browser
@@ -639,8 +643,8 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
     assert_eq!(approved.status, 303, "{}", approved.text());
     assert_eq!(fixture.state_of(&new).await.0, "approved");
     let done = wait_page(&browser, &cookie, &name).await;
-    assert!(done.contains(&format!("<h3>{name} foi aprovado</h3>")));
-    assert!(done.contains("Os acessos que ele já tinha voltam a valer para este aparelho."));
+    assert!(done.contains(&format!("<h3>{name} was approved</h3>")));
+    assert!(done.contains("The accesses it already had apply to this device again."));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -655,20 +659,16 @@ async fn five_wrong_codes_deny_the_request_and_so_does_the_button() {
     let wrong = format!("name={name}&code={}", another(&code));
     for attempt in 1..=4 {
         let answer = browser.post("/hermes/approve", Some(&cookie), &wrong).await;
-        assert!(
-            answer
-                .text()
-                .contains(&format!("Tentativa {attempt} de 5."))
-        );
+        assert!(answer.text().contains(&format!("Attempt {attempt} of 5.")));
     }
     let fifth = browser.post("/hermes/approve", Some(&cookie), &wrong).await;
     assert_eq!(fifth.status, 200);
     let page = fifth.text();
     assert!(
-        page.contains(&format!("O pedido de {name} foi negado")),
+        page.contains(&format!("The request of {name} was denied")),
         "{page}"
     );
-    assert!(page.contains("Emitir outro convite"));
+    assert!(page.contains("Issue another invite"));
     assert_eq!(fixture.state_of(&device).await.0, "denied");
     // The right code, now: there is nothing to approve, and the guide says what there is.
     let late = browser
@@ -681,7 +681,7 @@ async fn five_wrong_codes_deny_the_request_and_so_does_the_button() {
     assert_eq!(late.status, 303);
     let ended = wait_page(&browser, &cookie, &name).await;
     assert!(
-        ended.contains("não tem convite nem pedido aguardando"),
+        ended.contains("has no invite and no request waiting"),
         "{ended}"
     );
 
@@ -717,7 +717,7 @@ async fn what_a_device_says_of_itself_is_shown_as_text() {
 
     let page = wait_page(&browser, &cookie, &name).await;
     assert!(
-        page.contains("máquina \"&lt;script&gt;alert(1)&lt;/script&gt;\""),
+        page.contains("machine \"&lt;script&gt;alert(1)&lt;/script&gt;\""),
         "{page}"
     );
     assert!(page.contains("&quot;&gt;&lt;img src=x onerror=alert(2)&gt;"));

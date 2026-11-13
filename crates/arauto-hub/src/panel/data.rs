@@ -37,29 +37,29 @@ const READ_MAX: u32 = 100;
 /// How long ago something happened, in words.
 pub(super) fn ago(now: i64, at: Option<i64>) -> String {
     let Some(at) = at else {
-        return "nunca".to_owned();
+        return "never".to_owned();
     };
     let seconds = now.saturating_sub(at).max(0) / 1_000;
     if seconds < 60 {
-        "agora".to_owned()
+        "now".to_owned()
     } else if seconds < 3_600 {
-        format!("há {} min", seconds / 60)
+        format!("{} min ago", seconds / 60)
     } else if seconds < 48 * 3_600 {
-        format!("há {} h", seconds / 3_600)
+        format!("{} h ago", seconds / 3_600)
     } else {
-        format!("há {} dias", seconds / 86_400)
+        format!("{} days ago", seconds / 86_400)
     }
 }
 
 /// Why the hub stopped trusting a credential, in the words of `docs/07-telas.md`.
 fn reason(device: &Device) -> &'static str {
     match device.state_reason.map(|reason| reason.as_str()) {
-        Some("reuse") => "uma credencial já trocada foi apresentada",
-        Some("double_connection") => "duas conexões ao mesmo tempo",
-        Some("unreadable_credential") => "a credencial não pôde ser lida",
-        Some("not_recognized") => "o último uso não foi reconhecido no reconectar",
-        Some("double_waiting") => "a identidade foi copiada antes da aprovação",
-        _ => "o hub deixou de confiar na credencial",
+        Some("reuse") => "a credential that had already been swapped was presented",
+        Some("double_connection") => "two connections at the same time",
+        Some("unreadable_credential") => "the credential could not be read",
+        Some("not_recognized") => "the last use was not recognized on the reconnect",
+        Some("double_waiting") => "the identity was copied before the approval",
+        _ => "the hub no longer trusts the credential",
     }
 }
 
@@ -84,51 +84,51 @@ fn standing(line: &HermesLine, in_session: bool) -> (Tone, &'static str) {
     let request = line.request.as_ref().map(|device| device.state);
     let in_use = line.in_use.as_ref().map(|device| device.state);
     if request == Some(DeviceState::Pending) {
-        (Tone::Wait, "Aguardando seu código")
+        (Tone::Wait, "Waiting for your code")
     } else if request == Some(DeviceState::Approved) {
-        (Tone::Wait, "Aprovado, aguardando o conector")
+        (Tone::Wait, "Approved, waiting for the connector")
     } else if line.invite_expires_at.is_some() {
-        (Tone::Wait, "Aguardando o Hermes")
+        (Tone::Wait, "Waiting for the Hermes")
     } else if in_use == Some(DeviceState::Active) {
         if in_session {
-            (Tone::Ok, "Conectado")
+            (Tone::Ok, "Connected")
         } else {
-            (Tone::Idle, "Desconectado")
+            (Tone::Idle, "Disconnected")
         }
     } else if in_use == Some(DeviceState::Quarantined) || request == Some(DeviceState::Quarantined)
     {
-        (Tone::Bad, "Em quarentena")
+        (Tone::Bad, "In quarantine")
     } else if in_use == Some(DeviceState::Suspended) {
-        (Tone::Bad, "Suspenso")
+        (Tone::Bad, "Suspended")
     } else {
-        (Tone::Idle, "Sem aparelho")
+        (Tone::Idle, "No device")
     }
 }
 
 /// The sentence of an alert. The name of the Hermes and the address in it are values: the
 /// page escapes the whole sentence.
 fn notice(alert: &Alert) -> Notice {
-    let hermes = alert.hermes_name.as_deref().unwrap_or("um Hermes");
+    let hermes = alert.hermes_name.as_deref().unwrap_or("a Hermes");
     let from = alert
         .details
         .get("from")
         .and_then(serde_json::Value::as_str)
-        .map(|address| format!(", de {address}"))
+        .map(|address| format!(", from {address}"))
         .unwrap_or_default();
     let (grave, lead, text) = match alert.kind {
         AlertKind::InviteMisused => (
             false,
-            "Convite",
+            "Invite",
             format!(
-                "outro aparelho tentou usar o convite de {hermes}{from}. O bloco foi parar em \
-                 outro lugar. O primeiro pedido continua valendo."
+                "another device tried to use the invite of {hermes}{from}. The block ended up \
+                 somewhere else. The first request still stands."
             ),
         ),
         AlertKind::IdentityCopied => (
             true,
-            "Identidade copiada",
+            "Identity copied",
             format!(
-                "a identidade de {hermes} foi copiada antes da aprovação. O pedido foi negado."
+                "the identity of {hermes} was copied before the approval. The request was denied."
             ),
         ),
         AlertKind::Quarantined => {
@@ -137,66 +137,67 @@ fn notice(alert: &Alert) -> Notice {
                 .get("reason")
                 .and_then(serde_json::Value::as_str)
             {
-                Some("reuse") => "uma credencial já trocada foi apresentada",
-                Some("double_connection") => "duas conexões ao mesmo tempo",
-                Some("unreadable_credential") => "a credencial não pôde ser lida",
-                Some("not_recognized") => "o último uso não foi reconhecido no reconectar",
-                _ => "o hub deixou de confiar na credencial",
+                Some("reuse") => "a credential that had already been swapped was presented",
+                Some("double_connection") => "two connections at the same time",
+                Some("unreadable_credential") => "the credential could not be read",
+                Some("not_recognized") => "the last use was not recognized on the reconnect",
+                _ => "the hub no longer trusts the credential",
             };
             (
                 true,
-                "Hermes em quarentena",
-                format!("{hermes}. Motivo: {why}{from}."),
+                "Hermes in quarantine",
+                format!("{hermes}. Reason: {why}{from}."),
             )
         }
         AlertKind::CopySuspected => (
             true,
-            "Cópia suspeita",
-            format!("o último uso de {hermes} não foi reconhecido no reconectar."),
+            "Suspected copy",
+            format!("the last use of {hermes} was not recognized on the reconnect."),
         ),
         AlertKind::ConnectionTaken => (
             true,
-            "Conexão tomada",
-            format!("a conexão de {hermes} foi tomada por outra{from}."),
+            "Connection taken",
+            format!("the connection of {hermes} was taken by another one{from}."),
         ),
         AlertKind::DeviceLeft => (
             false,
-            "Encerramento",
-            format!("{hermes} pediu o próprio encerramento{from}."),
+            "Closing",
+            format!("{hermes} asked for its own closing{from}."),
         ),
         AlertKind::ReuseAfterClosing => (
             true,
-            "Reuso",
-            format!("uma cópia de {hermes} foi usada antes do encerramento{from}."),
+            "Reuse",
+            format!("a copy of {hermes} was used before the closing{from}."),
         ),
         AlertKind::UnconfirmedSwaps => (
             false,
-            "Trocas sem confirmação",
+            "Unconfirmed swaps",
             format!(
-                "{hermes} recebeu credenciais e não confirmou, três vezes em 24 horas{from}. \
-                 Pode ser rede ruim, pode ser alguém testando uma cópia."
+                "{hermes} received credentials and did not confirm them, three times in 24 hours{from}. \
+                 It may be a bad network, or someone trying a copy."
             ),
         ),
         AlertKind::MarkNotAdvanced => (
             false,
-            "Marca da auditoria",
-            "um evento de segurança foi gravado e a marca fora do banco não acompanhou.".to_owned(),
+            "Audit mark",
+            "a security event was written and the mark outside the database did not follow."
+                .to_owned(),
         ),
         AlertKind::EngineVersionUntested => (
             false,
-            "Motor",
-            "a versão do motor não é uma das que o hub conferiu.".to_owned(),
+            "Engine",
+            "the version of the engine is not one the hub has checked.".to_owned(),
         ),
         AlertKind::EngineSessionCorrected => (
             false,
-            "Motor",
-            "uma sessão do motor estava com outra configuração, e o hub aplicou a dele.".to_owned(),
+            "Engine",
+            "an engine session had another configuration, and the hub applied its own.".to_owned(),
         ),
         AlertKind::NumberSwapped => (
             true,
-            "Número trocado",
-            "o celular que pareou é de um número diferente do informado. Os acessos ficam \
-             parados até você decidir."
+            "Number swapped",
+            "the phone that paired belongs to a different number from the one given. The accesses \
+             stay stopped until you decide."
                 .to_owned(),
         ),
     };
@@ -211,11 +212,11 @@ pub(super) async fn frame(hub: &Hub, organization: ResolvedOrg) -> Result<Frame,
         .map(|installation| {
             let copy = installation
                 .restored_copy_of
-                .map_or_else(|| "data desconhecida".to_owned(), render::time);
+                .map_or_else(|| "an unknown date".to_owned(), render::time);
             format!(
-                "O hub voltou de uma cópia de {copy}. O que foi aprovado, revogado, reconectado \
-                 ou mudado nos acessos depois disso se perdeu. Reconecte cada Hermes e confira \
-                 os acessos."
+                "The hub came back from a backup of {copy}. What was approved, revoked, reconnected \
+                 or changed in the accesses after that is lost. Reconnect each Hermes and check \
+                 the accesses."
             )
         });
     let alerts = repo::alert::list(hub.pool(), organization, AlertFilter::Unseen, READ_MAX).await?;
@@ -253,13 +254,13 @@ pub(super) async fn hermes(hub: &Hub, organization: ResolvedOrg) -> Result<Herme
         let explain = stopped(line).filter(|_| tone == Tone::Bad).map(|device| {
             if device.state == DeviceState::Suspended {
                 format!(
-                    "O hub voltou de uma cópia de segurança. {name} está suspenso e só volta \
-                     com convite novo: reconecte ou revogue. Não existe \"reativar\"."
+                    "The hub came back from a backup. {name} is suspended and only comes back \
+                     with a new invite: reconnect or revoke it. There is no \"reactivate\"."
                 )
             } else {
                 format!(
-                    "O hub deixou de confiar na credencial de {name}. Motivo: {}. O acesso está \
-                     parado. Saídas: reconectar ou revogar. Não existe \"liberar\".",
+                    "The hub no longer trusts the credential of {name}. Reason: {}. Its access is \
+                     stopped. Ways out: reconnect or revoke. There is no \"release\".",
                     reason(device)
                 )
             }
@@ -277,7 +278,7 @@ pub(super) async fn hermes(hub: &Hub, organization: ResolvedOrg) -> Result<Herme
             woken: line.hermes.can_be_woken,
             connector: device.and_then(|device| device.connector_version.clone()),
             seen: if in_session {
-                "agora".to_owned()
+                "now".to_owned()
             } else {
                 ago(
                     now,
@@ -335,7 +336,7 @@ pub(super) async fn guide(
                             at: last.at,
                             state: last.state.as_str(),
                             when: last.at.map_or_else(
-                                || "nunca".to_owned(),
+                                || "never".to_owned(),
                                 |at| format!("{} ({})", ago(now, Some(at)), render::time(at)),
                             ),
                             address: last.address.clone(),
@@ -389,14 +390,14 @@ pub(super) async fn guide(
 
 fn number_state(state: NumberState) -> (Tone, &'static str) {
     match state {
-        NumberState::Unpaired => (Tone::Idle, "Sem pareamento"),
-        NumberState::Pairing => (Tone::Wait, "Pareando"),
-        NumberState::Connected => (Tone::Ok, "Conectado"),
-        NumberState::Reconnecting => (Tone::Wait, "Reconectando"),
-        NumberState::Disconnected => (Tone::Idle, "Desconectado"),
-        NumberState::NumberSwapped => (Tone::Bad, "Número trocado"),
-        NumberState::Failed => (Tone::Bad, "Falha"),
-        NumberState::Removed => (Tone::Idle, "Removido"),
+        NumberState::Unpaired => (Tone::Idle, "Not paired"),
+        NumberState::Pairing => (Tone::Wait, "Pairing"),
+        NumberState::Connected => (Tone::Ok, "Connected"),
+        NumberState::Reconnecting => (Tone::Wait, "Reconnecting"),
+        NumberState::Disconnected => (Tone::Idle, "Disconnected"),
+        NumberState::NumberSwapped => (Tone::Bad, "Number swapped"),
+        NumberState::Failed => (Tone::Bad, "Failed"),
+        NumberState::Removed => (Tone::Idle, "Removed"),
     }
 }
 
@@ -438,13 +439,13 @@ pub(super) async fn numbers(
         .await?
         .map(|engine| {
             let version = match (&engine.version_seen, engine.version_tested) {
-                (Some(version), Some(true)) => format!("versão {version}, conferida"),
-                (Some(version), _) => format!("versão {version}, não conferida pelo hub"),
-                (None, _) => "versão ainda não lida".to_owned(),
+                (Some(version), Some(true)) => format!("version {version}, checked"),
+                (Some(version), _) => format!("version {version}, not checked by the hub"),
+                (None, _) => "version not read yet".to_owned(),
             };
             let answered = match engine.last_ok_at {
-                Some(at) => format!("última resposta {}", ago(now, Some(at))),
-                None => "ainda não respondeu".to_owned(),
+                Some(at) => format!("last answer {}", ago(now, Some(at))),
+                None => "has not answered yet".to_owned(),
             };
             EngineLine {
                 tone: if engine.version_tested == Some(true) && engine.last_ok_at.is_some() {
@@ -485,9 +486,9 @@ fn cell(access: &Listed) -> Cell {
         Scope::All => (
             access.grant.verbs,
             if lines == 0 {
-                "todas".to_owned()
+                "all".to_owned()
             } else {
-                format!("todas, {lines} com regra própria")
+                format!("all, {lines} with their own rule")
             },
         ),
         // With chosen chats, only the chats with a line exist: the verbs are theirs.
@@ -500,9 +501,9 @@ fn cell(access: &Listed) -> Cell {
                 verbs.wake |= line.wake;
             }
             let scope = match lines {
-                0 => "nenhuma conversa".to_owned(),
-                1 => "1 conversa".to_owned(),
-                more => format!("{more} conversas"),
+                0 => "no chat".to_owned(),
+                1 => "1 chat".to_owned(),
+                more => format!("{more} chats"),
             };
             (verbs, scope)
         }
@@ -576,9 +577,9 @@ pub(super) async fn accesses(
         .filter_map(|line| {
             let device = stopped(line)?;
             let word = if device.state == DeviceState::Suspended {
-                "Suspenso"
+                "Suspended"
             } else {
-                "Em quarentena"
+                "In quarantine"
             };
             Some((line.hermes.name.as_str(), word))
         })
@@ -624,21 +625,19 @@ pub(super) async fn accesses(
         let woken = together(&here, |verbs| verbs.wake);
         if woken > 1 {
             warnings.push(format!(
-                "{alias}: {woken} Hermes são acordados nas mesmas conversas."
+                "{alias}: {woken} Hermes are woken in the same chats."
             ));
         }
         let sending = together(&here, |verbs| verbs.send);
         if sending > 1 {
-            warnings.push(format!(
-                "{alias}: {sending} Hermes enviam nas mesmas conversas."
-            ));
+            warnings.push(format!("{alias}: {sending} Hermes send in the same chats."));
         }
         let sends = here
             .iter()
             .any(|access| Reach::of(access, |verbs| verbs.send).reaches_something());
         if number.command && sends {
             warnings.push(format!(
-                "{alias} está marcado como \"de comando\" e há Hermes com permissão de enviar nele."
+                "{alias} is marked as a command number and there are Hermes allowed to send on it."
             ));
         }
     }
@@ -664,16 +663,16 @@ mod tests {
     #[test]
     fn how_long_ago_is_said_in_the_largest_unit_that_fits() {
         let now = 1_800_000_000_000;
-        assert_eq!(ago(now, None), "nunca");
-        assert_eq!(ago(now, Some(now)), "agora");
-        assert_eq!(ago(now, Some(now - 59_000)), "agora");
-        assert_eq!(ago(now, Some(now - 60_000)), "há 1 min");
-        assert_eq!(ago(now, Some(now - 59 * 60_000)), "há 59 min");
-        assert_eq!(ago(now, Some(now - 3_600_000)), "há 1 h");
-        assert_eq!(ago(now, Some(now - 47 * 3_600_000)), "há 47 h");
-        assert_eq!(ago(now, Some(now - 48 * 3_600_000)), "há 2 dias");
+        assert_eq!(ago(now, None), "never");
+        assert_eq!(ago(now, Some(now)), "now");
+        assert_eq!(ago(now, Some(now - 59_000)), "now");
+        assert_eq!(ago(now, Some(now - 60_000)), "1 min ago");
+        assert_eq!(ago(now, Some(now - 59 * 60_000)), "59 min ago");
+        assert_eq!(ago(now, Some(now - 3_600_000)), "1 h ago");
+        assert_eq!(ago(now, Some(now - 47 * 3_600_000)), "47 h ago");
+        assert_eq!(ago(now, Some(now - 48 * 3_600_000)), "2 days ago");
         // A clock that went back does not print a negative time.
-        assert_eq!(ago(now, Some(now + 5_000)), "agora");
+        assert_eq!(ago(now, Some(now + 5_000)), "now");
     }
 
     #[test]

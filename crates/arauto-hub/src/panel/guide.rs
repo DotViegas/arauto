@@ -15,11 +15,11 @@ use super::html::Html;
 use super::view::{self, Frame, HermesPage, Over};
 
 /// The mascot, drawn by the project frame by frame: no value of anyone goes inside it.
-const DANCING: &str = include_str!("assets/mascote-danca.svg");
-const WAVING: &str = include_str!("assets/mascote-aceno.svg");
+const DANCING: &str = include_str!("assets/mascot-dancing.svg");
+const WAVING: &str = include_str!("assets/mascot-waving.svg");
 
 /// The names of the steps, in the path at the top.
-const STEPS: [&str; 4] = ["Nome", "Bloco", "Código", "Pronto"];
+const STEPS: [&str; 4] = ["Name", "Block", "Code", "Done"];
 
 /// How often a page that waits for the Hermes asks the hub again, in seconds.
 const WAITING_REFRESH_S: u32 = 3;
@@ -199,7 +199,7 @@ impl Screen {
 /// `MM:SS`, for a time left that the script of the panel then counts down.
 fn clock(html: &mut Html, seconds: i64) {
     let seconds = usize::try_from(seconds.max(0)).unwrap_or(0);
-    html.raw("<b data-segundos=\"").number(seconds).raw("\">");
+    html.raw("<b data-seconds=\"").number(seconds).raw("\">");
     let (minutes, rest) = (seconds / 60, seconds % 60);
     if minutes < 10 {
         html.raw("0");
@@ -213,9 +213,9 @@ fn clock(html: &mut Html, seconds: i64) {
 
 fn mascot(html: &mut Html, dancing: bool) {
     html.raw(if dancing {
-        "<div class=\"mascote dancando\" aria-hidden=\"true\">"
+        "<div class=\"mascot dancing\" aria-hidden=\"true\">"
     } else {
-        "<div class=\"mascote acenando\" aria-hidden=\"true\">"
+        "<div class=\"mascot waving\" aria-hidden=\"true\">"
     })
     .raw(if dancing { DANCING } else { WAVING })
     .raw("</div>");
@@ -224,12 +224,12 @@ fn mascot(html: &mut Html, dancing: bool) {
 /// The lines that light up as the hub observes each thing. `seen` of them are done and the
 /// next one is being waited for.
 fn observed(html: &mut Html, seen: usize, address: Option<&str>) {
-    html.raw("<ul class=\"etapas\">");
+    html.raw("<ul class=\"steps\">");
     for (index, label) in [
-        "Convite emitido",
-        "Um aparelho usou o convite",
-        "Código conferido e pedido aprovado",
-        "Conector confirmou a primeira credencial",
+        "Invite issued",
+        "A device used the invite",
+        "Code checked and request approved",
+        "The connector confirmed its first credential",
     ]
     .into_iter()
     .enumerate()
@@ -237,7 +237,7 @@ fn observed(html: &mut Html, seen: usize, address: Option<&str>) {
         html.raw(if index < seen {
             "<li class=\"ok\">"
         } else if index == seen {
-            "<li class=\"espera\">"
+            "<li class=\"waiting\">"
         } else {
             "<li>"
         })
@@ -246,10 +246,10 @@ fn observed(html: &mut Html, seen: usize, address: Option<&str>) {
             && seen > 1
             && let Some(address) = address
         {
-            html.raw(", de ").text(address);
+            html.raw(", from ").text(address);
         }
         if index == seen {
-            html.raw(": aguardando…");
+            html.raw(": waiting…");
         }
         html.raw("</li>");
     }
@@ -270,14 +270,14 @@ fn wait_address(html: &mut Html, name: &str) {
 fn body(html: &mut Html, screen: &Screen) {
     match screen {
         Screen::Name { typed, error } => {
-            html.raw("<h3>Que nome este Hermes vai ter no painel?</h3>")
-                .raw("<form id=\"guia-form\" method=\"post\" action=\"/hermes/connect\" autocomplete=\"off\">")
-                .raw("<div class=\"campo\"><label for=\"guia-nome\">Nome do Hermes</label>")
-                .raw("<input id=\"guia-nome\" name=\"name\" type=\"text\" maxlength=\"32\" spellcheck=\"false\" autocapitalize=\"none\" required autofocus value=\"")
+            html.raw("<h3>What name will this Hermes have in the panel?</h3>")
+                .raw("<form id=\"guide-form\" method=\"post\" action=\"/hermes/connect\" autocomplete=\"off\">")
+                .raw("<div class=\"field\"><label for=\"guide-name\">Name of the Hermes</label>")
+                .raw("<input id=\"guide-name\" name=\"name\" type=\"text\" maxlength=\"32\" spellcheck=\"false\" autocapitalize=\"none\" required autofocus value=\"")
                 .text(typed)
-                .raw("\"><p class=\"dica\">Minúsculas, números, hífen e sublinhado, até 32 caracteres, começando por letra ou número. O nome aparece no bloco e não muda depois.</p></div></form>");
+                .raw("\"><p class=\"hint\">Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.</p></div></form>");
             if let Some(error) = error {
-                html.raw("<p class=\"erro\" role=\"alert\">")
+                html.raw("<p class=\"error\" role=\"alert\">")
                     .raw(error)
                     .raw("</p>");
             }
@@ -290,39 +290,41 @@ fn body(html: &mut Html, screen: &Screen) {
             cancelled,
             closed_request,
         } => {
-            html.raw("<div class=\"centro preparo\">");
+            html.raw("<div class=\"center preparation\">");
             mascot(html, true);
-            html.raw("<h3 id=\"guia-preparo\" tabindex=\"-1\">Preparando conexão segura</h3><p class=\"dica\">O hub sorteou o convite de ")
+            html.raw("<h3 id=\"guide-preparing\" tabindex=\"-1\">Preparing a secure connection</h3><p class=\"hint\">The hub drew the invite of ")
                 .text(name)
-                .raw(".</p></div><div class=\"depois\"><p class=\"linha-prazo\">Convite para <b>")
+                .raw(".</p></div><div class=\"after\"><p class=\"deadline\">Invite for <b>")
                 .text(name)
-                .raw("</b> · vale por mais ");
+                .raw("</b> · valid for another ");
             clock(html, *seconds);
-            html.raw(" · uso único</p><div class=\"bloco\" id=\"guia-bloco\" aria-describedby=\"guia-como\"><pre id=\"guia-texto\">")
+            html.raw(" · single use</p><div class=\"block\" id=\"guide-block\" aria-describedby=\"guide-how\"><pre id=\"guide-text\">")
                 .text(text)
-                .raw("</pre><span class=\"selo\" aria-hidden=\"true\"><span>Copiado</span></span></div>")
-                .raw("<p class=\"dica\" id=\"guia-como\"><span class=\"com-script\">Clique no bloco para copiar. </span><span class=\"sem-script\">Selecione o texto todo e copie. </span>Ele só aparece aqui, uma vez.</p>")
-                .raw("<p class=\"copiado\" id=\"guia-copiado\" role=\"status\" hidden></p>");
+                .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>Copied</span></span></div>")
+                .raw("<p class=\"hint\" id=\"guide-how\"><span class=\"with-script\">Click the block to copy it. </span><span class=\"no-script\">Select the whole text and copy it. </span>It only appears here, once.</p>")
+                .raw("<p class=\"copied-note\" id=\"guide-copied\" role=\"status\" hidden></p>");
             if *cancelled {
-                html.raw("<p class=\"dica\">O convite emitido antes foi cancelado.</p>");
+                html.raw("<p class=\"hint\">The invite issued before was cancelled.</p>");
             }
             if *closed_request {
-                html.raw("<p class=\"dica\">O pedido que estava em andamento foi encerrado.</p>");
+                html.raw("<p class=\"hint\">The request that was in progress was closed.</p>");
             }
             if *reconnect {
-                html.raw("<p class=\"dica\">O aparelho em uso continua funcionando até o novo confirmar a primeira credencial.</p>");
+                html.raw("<p class=\"hint\">The device in use keeps working until the new one confirms its first credential.</p>");
             }
             html.raw("</div>");
         }
         Screen::NoConnector { name } => {
-            html.raw("<h3>Este hub não tem conector para servir</h3><p>O bloco manda o Hermes baixar o conector deste hub, e a pasta de downloads está vazia. Nada foi emitido. Emita o convite de ")
+            html.raw("<h3>This hub has no connector to serve</h3><p>The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of ")
                 .text(name)
-                .raw(" pelo comando <code>arauto-hub admin invite</code>, no servidor do hub.</p>");
+                .raw(" with the <code>arauto-hub admin invite</code> command, on the hub's server.</p>");
         }
         Screen::Waiting { name, .. } => {
-            html.raw("<h3>Aguardando o Hermes ").text(name).raw("</h3>");
+            html.raw("<h3>Waiting for the Hermes ")
+                .text(name)
+                .raw("</h3>");
             observed(html, 1, None);
-            html.raw("<p class=\"dica\">Cada etapa acende quando o hub de fato a observa. Se o Hermes pedir aprovação para rodar o comando, quem aprova é você, no canal de comando.</p>");
+            html.raw("<p class=\"hint\">Each step lights up when the hub actually observes it. If the Hermes asks for approval to run the command, you are the one who approves, in the command channel.</p>");
         }
         Screen::Code {
             name,
@@ -331,27 +333,27 @@ fn body(html: &mut Html, screen: &Screen) {
             error,
             ..
         } => {
-            html.raw("<h3>Um aparelho usou o convite de ")
+            html.raw("<h3>A device used the invite of ")
                 .text(name)
                 .raw("</h3>");
             observed(html, 2, facts.address.as_deref());
-            html.raw("<dl class=\"fatos\"><dt>Visto pelo hub</dt><dd>endereço ");
+            html.raw("<dl class=\"facts\"><dt>Seen by the hub</dt><dd>address ");
             match &facts.address {
                 Some(address) => html.text(address),
-                None => html.raw("desconhecido"),
+                None => html.raw("unknown"),
             };
             html.raw(", ")
                 .text(&facts.when)
-                .raw("</dd><dt>Dito pelo aparelho</dt><dd>máquina \"")
+                .raw("</dd><dt>Said by the device</dt><dd>machine \"")
                 .text(&facts.hostname)
-                .raw("\" · sistema \"")
+                .raw("\" · system \"")
                 .text(&facts.os)
                 .raw("\" · Hermes \"")
                 .text(&facts.hermes)
-                .raw("\" (não verificado)</dd></dl>")
-                .raw("<form id=\"guia-negar\" method=\"post\" action=\"/hermes/deny\" hidden>");
+                .raw("\" (not verified)</dd></dl>")
+                .raw("<form id=\"guide-deny\" method=\"post\" action=\"/hermes/deny\" hidden>");
             named(html, name);
-            html.raw("</form><form id=\"guia-form\" method=\"post\" action=\"/hermes/approve\" autocomplete=\"off\">");
+            html.raw("</form><form id=\"guide-form\" method=\"post\" action=\"/hermes/approve\" autocomplete=\"off\">");
             named(html, name);
             if let Some(last) = last_use {
                 html.raw("<input type=\"hidden\" name=\"seen_device\" value=\"")
@@ -362,21 +364,23 @@ fn body(html: &mut Html, screen: &Screen) {
                 }
                 html.raw("\"><input type=\"hidden\" name=\"seen_state\" value=\"")
                     .raw(last.state)
-                    .raw("\"><fieldset class=\"reconhece\"><legend>Último uso do aparelho atual: ")
+                    .raw(
+                        "\"><fieldset class=\"recognize\"><legend>Last use of the current device: ",
+                    )
                     .text(&last.when);
                 if let Some(address) = &last.address {
-                    html.raw(", de ").text(address);
+                    html.raw(", from ").text(address);
                 }
-                html.raw(". Você reconhece?</legend>")
-                    .raw("<label class=\"op\"><input type=\"radio\" name=\"use\" value=\"recognized\"><span>Reconheço</span></label>")
-                    .raw("<label class=\"op\"><input type=\"radio\" name=\"use\" value=\"not-recognized\"><span>Não reconheço</span></label>")
-                    .raw("<p class=\"dica\">Se o Hermes estava desligado e houve uso, alguém usou uma cópia.</p></fieldset>");
+                html.raw(". Do you recognize it?</legend>")
+                    .raw("<label class=\"option\"><input type=\"radio\" name=\"use\" value=\"recognized\"><span>I recognize it</span></label>")
+                    .raw("<label class=\"option\"><input type=\"radio\" name=\"use\" value=\"not-recognized\"><span>I do not recognize it</span></label>")
+                    .raw("<p class=\"hint\">If the Hermes was off and there was use, someone used a copy.</p></fieldset>");
             }
-            html.raw("<div class=\"campo\"><label for=\"guia-codigo\">Código de conferência</label>")
-                .raw("<input class=\"codigo\" id=\"guia-codigo\" name=\"code\" type=\"text\" inputmode=\"numeric\" maxlength=\"7\" placeholder=\"000-000\" spellcheck=\"false\" required autofocus>")
-                .raw("<p class=\"dica\">Digite o código que o Hermes respondeu no canal de comando. O painel nunca mostra este código.</p></div></form>");
+            html.raw("<div class=\"field\"><label for=\"guide-code\">Verification code</label>")
+                .raw("<input class=\"code\" id=\"guide-code\" name=\"code\" type=\"text\" inputmode=\"numeric\" maxlength=\"7\" placeholder=\"000-000\" spellcheck=\"false\" required autofocus>")
+                .raw("<p class=\"hint\">Type the code the Hermes answered in the command channel. The panel never shows this code.</p></div></form>");
             if let Some(error) = error {
-                html.raw("<p class=\"erro\" role=\"alert\">")
+                html.raw("<p class=\"error\" role=\"alert\">")
                     .text(error)
                     .raw("</p>");
             }
@@ -385,20 +389,20 @@ fn body(html: &mut Html, screen: &Screen) {
             html.raw("<h3>");
             match why {
                 Ended::Denied => html
-                    .raw("O pedido de ")
+                    .raw("The request of ")
                     .text(name)
-                    .raw(" foi negado</h3><p>O código foi digitado errado pela quinta vez. Para conectar, emita outro convite.</p>"),
+                    .raw(" was denied</h3><p>The code was typed wrong for the fifth time. To connect, issue another invite.</p>"),
                 Ended::Expired => html
-                    .raw("O pedido de ")
+                    .raw("The request of ")
                     .text(name)
-                    .raw(" venceu</h3><p>Os 10 minutos para digitar o código passaram. Para conectar, emita outro convite.</p>"),
+                    .raw(" expired</h3><p>The 10 minutes to type the code passed. To connect, issue another invite.</p>"),
                 Ended::Copied => html
-                    .raw("A identidade de ")
+                    .raw("The identity of ")
                     .text(name)
-                    .raw(" foi copiada</h3><p>Dois aparelhos se apresentaram com a mesma identidade antes da aprovação, e o pedido foi parado. Para conectar, emita outro convite.</p>"),
+                    .raw(" was copied</h3><p>Two devices showed up with the same identity before the approval, and the request was stopped. To connect, issue another invite.</p>"),
                 Ended::Nothing => html
                     .text(name)
-                    .raw(" não tem convite nem pedido aguardando</h3><p>O convite venceu, foi cancelado, ou o pedido já foi resolvido. Se o Hermes não respondeu um código, não aprove; se respondeu AR-102, outro aparelho usou o convite. Para conectar, emita outro convite.</p>"),
+                    .raw(" has no invite and no request waiting</h3><p>The invite expired, was cancelled, or the request was already resolved. If the Hermes answered no code, do not approve; if it answered AR-102, another device used the invite. To connect, issue another invite.</p>"),
             };
         }
         Screen::Done {
@@ -406,23 +410,23 @@ fn body(html: &mut Html, screen: &Screen) {
             connected,
             reconnect,
         } => {
-            html.raw("<div class=\"centro\">");
+            html.raw("<div class=\"center\">");
             mascot(html, false);
             html.raw("<h3>").text(name).raw(if *connected {
-                " está conectado</h3>"
+                " is connected</h3>"
             } else {
-                " foi aprovado</h3>"
+                " was approved</h3>"
             });
             observed(html, if *connected { 4 } else { 3 }, None);
             html.raw(match (*connected, *reconnect) {
-                (true, _) => "<p class=\"dica\">O que ele pode fazer em cada número está na aba Acessos.</p>",
-                (false, true) => "<p class=\"dica\">Assim que o conector confirmar, ele aparece como conectado. Os acessos que ele já tinha voltam a valer para este aparelho.</p>",
-                (false, false) => "<p class=\"dica\">Assim que o conector confirmar, ele aparece como conectado. Ele ainda não tem acesso a número nenhum.</p>",
+                (true, _) => "<p class=\"hint\">What it may do on each number is in the Accesses tab.</p>",
+                (false, true) => "<p class=\"hint\">As soon as the connector confirms, it shows as connected. The accesses it already had apply to this device again.</p>",
+                (false, false) => "<p class=\"hint\">As soon as the connector confirms, it shows as connected. It has no access to any number yet.</p>",
             })
             .raw("</div>");
         }
         Screen::Failed { sentence } => {
-            html.raw("<h3>O hub não fez o que foi pedido</h3><p>")
+            html.raw("<h3>The hub did not do what was asked</h3><p>")
                 .raw(sentence)
                 .raw("</p>");
         }
@@ -430,40 +434,40 @@ fn body(html: &mut Html, screen: &Screen) {
 }
 
 fn footer(html: &mut Html, screen: &Screen) {
-    html.raw("<div class=\"modal-pe\">");
+    html.raw("<div class=\"modal-foot\">");
     match screen {
         Screen::Name { .. } => {
-            html.raw("<button class=\"botao principal\" type=\"submit\" form=\"guia-form\">Gerar convite</button><a class=\"botao\" href=\"/\">Cancelar</a>");
+            html.raw("<button class=\"button primary\" type=\"submit\" form=\"guide-form\">Issue invite</button><a class=\"button\" href=\"/\">Cancel</a>");
         }
         Screen::Block { name, .. } => {
-            html.raw("<a class=\"botao principal apos-copiar surge\" id=\"guia-avancar\" href=\"");
+            html.raw("<a class=\"button primary after-copy appear\" id=\"guide-next\" href=\"");
             wait_address(html, name);
             html.raw(
-                "\">Próxima etapa</a><span>Depois de copiar, cole no canal de comando do Hermes ",
+                "\">Next step</a><span>After copying, paste it into the command channel of the Hermes ",
             )
             .text(name)
-            .raw(". Em nenhum outro lugar.</span>");
+            .raw(". Nowhere else.</span>");
         }
         Screen::Waiting { seconds, .. } => {
-            html.raw("<span>O convite vale por mais ");
+            html.raw("<span>The invite is valid for another ");
             clock(html, *seconds);
-            html.raw(". Esta tela se atualiza sozinha.</span>");
+            html.raw(". This screen refreshes by itself.</span>");
         }
         Screen::Code { seconds, .. } => {
-            html.raw("<button class=\"botao principal\" type=\"submit\" form=\"guia-form\">Aprovar</button><button class=\"botao\" type=\"submit\" form=\"guia-negar\">Negar</button><span>Confirme em ");
+            html.raw("<button class=\"button primary\" type=\"submit\" form=\"guide-form\">Approve</button><button class=\"button\" type=\"submit\" form=\"guide-deny\">Deny</button><span>Confirm within ");
             clock(html, *seconds);
             html.raw(".</span>");
         }
         Screen::Ended { name, .. } => {
             html.raw("<form method=\"post\" action=\"/hermes/invite\">");
             named(html, name);
-            html.raw("<button class=\"botao principal\" type=\"submit\">Emitir outro convite</button></form><a class=\"botao\" href=\"/\">Fechar</a>");
+            html.raw("<button class=\"button primary\" type=\"submit\">Issue another invite</button></form><a class=\"button\" href=\"/\">Close</a>");
         }
         Screen::Done { .. } => {
-            html.raw("<a class=\"botao principal\" href=\"/accesses\">Ver acessos</a><a class=\"botao\" href=\"/\">Concluir</a>");
+            html.raw("<a class=\"button primary\" href=\"/accesses\">See accesses</a><a class=\"button\" href=\"/\">Finish</a>");
         }
         Screen::NoConnector { .. } | Screen::Failed { .. } => {
-            html.raw("<a class=\"botao principal\" href=\"/\">Fechar</a>");
+            html.raw("<a class=\"button primary\" href=\"/\">Close</a>");
         }
     }
     html.raw("</div>");
@@ -482,33 +486,33 @@ pub fn page(frame: &Frame, hermes: &HermesPage, screen: &Screen) -> String {
         },
     );
     html.raw(if matches!(screen, Screen::Block { .. }) {
-        "<dialog open class=\"modal guia prepara\" id=\"guia\" aria-labelledby=\"t-guia\">"
+        "<dialog open class=\"modal guide preparing\" id=\"guide\" aria-labelledby=\"guide-title\">"
     } else {
-        "<dialog open class=\"modal guia\" id=\"guia\" aria-labelledby=\"t-guia\">"
+        "<dialog open class=\"modal guide\" id=\"guide\" aria-labelledby=\"guide-title\">"
     })
-    .raw("<div class=\"modal-topo\"><h2 id=\"t-guia\">");
+    .raw("<div class=\"modal-head\"><h2 id=\"guide-title\">");
     match screen.subject() {
-        Some((name, true)) => html.raw("Reconectar ").text(name),
-        Some((name, false)) => html.raw("Conectar ").text(name),
-        None => html.raw("Conectar Hermes"),
+        Some((name, true)) => html.raw("Reconnect ").text(name),
+        Some((name, false)) => html.raw("Connect ").text(name),
+        None => html.raw("Connect Hermes"),
     };
-    html.raw("</h2><a class=\"fechar\" href=\"/\" aria-label=\"Fechar\"><svg viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 2l10 10M12 2L2 12\"/></svg></a></div>")
-        .raw("<ol class=\"percurso\" aria-label=\"Etapas\">");
+    html.raw("</h2><a class=\"close\" href=\"/\" aria-label=\"Close\"><svg viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 2l10 10M12 2L2 12\"/></svg></a></div>")
+        .raw("<ol class=\"path\" aria-label=\"Steps\">");
     let step = screen.step();
     for (index, label) in STEPS.into_iter().enumerate() {
         html.raw(if index < step {
-            "<li class=\"feita\"><span class=\"bola\">"
+            "<li class=\"done\"><span class=\"dot\">"
         } else if index == step {
-            "<li class=\"atual\" aria-current=\"step\"><span class=\"bola\">"
+            "<li class=\"current\" aria-current=\"step\"><span class=\"dot\">"
         } else {
-            "<li><span class=\"bola\">"
+            "<li><span class=\"dot\">"
         })
         .number(index.saturating_add(1))
-        .raw("</span><span class=\"rot\">")
+        .raw("</span><span class=\"label\">")
         .raw(label)
         .raw("</span></li>");
     }
-    html.raw("</ol><div class=\"modal-corpo\">");
+    html.raw("</ol><div class=\"modal-body\">");
     body(&mut html, screen);
     html.raw("</div>");
     footer(&mut html, screen);
@@ -564,7 +568,7 @@ mod tests {
         for screen in [
             Screen::Name {
                 typed: hostile(),
-                error: Some("Use só minúsculas."),
+                error: Some("Use only lowercase letters."),
             },
             Screen::Block {
                 name: hostile(),
@@ -609,21 +613,21 @@ mod tests {
             reconnect: false,
         });
         assert!(waiting.contains("<meta http-equiv=\"refresh\" content=\"3\">"));
-        assert!(waiting.contains("<b data-segundos=\"61\">01:01</b>"));
-        assert_eq!(waiting.matches("<li class=\"feita\">").count(), 2);
+        assert!(waiting.contains("<b data-seconds=\"61\">01:01</b>"));
+        assert_eq!(waiting.matches("<li class=\"done\">").count(), 2);
         assert!(
             waiting.contains(
-                "<li class=\"atual\" aria-current=\"step\"><span class=\"bola\">3</span>"
+                "<li class=\"current\" aria-current=\"step\"><span class=\"dot\">3</span>"
             )
         );
         // What is under the guide cannot be reached while it is open.
-        assert!(waiting.contains("<div class=\"pagina\" inert>"));
+        assert!(waiting.contains("<div class=\"page\" inert>"));
 
         let code = shown(&Screen::Code {
             name: "ana".to_owned(),
             facts: Box::new(Facts {
                 address: None,
-                when: "agora".to_owned(),
+                when: "now".to_owned(),
                 hostname: "pc".to_owned(),
                 os: "linux".to_owned(),
                 hermes: "0.22".to_owned(),
@@ -634,7 +638,7 @@ mod tests {
         });
         // A page with a field being typed never reloads by itself.
         assert!(!code.contains("http-equiv"));
-        assert!(code.contains("<b data-segundos=\"0\">00:00</b>"));
+        assert!(code.contains("<b data-seconds=\"0\">00:00</b>"));
         assert!(
             !code.contains("name=\"use\""),
             "no question about a use there was not"
@@ -647,14 +651,14 @@ mod tests {
             typed: String::new(),
             error: None,
         });
-        assert!(name.contains("<h2 id=\"t-guia\">Conectar Hermes</h2>"));
-        assert!(!name.contains("class=\"feita\""));
+        assert!(name.contains("<h2 id=\"guide-title\">Connect Hermes</h2>"));
+        assert!(!name.contains("class=\"done\""));
         let done = shown(&Screen::Done {
             name: "ana".to_owned(),
             connected: true,
             reconnect: false,
         });
-        assert_eq!(done.matches("<li class=\"feita\">").count(), 3);
+        assert_eq!(done.matches("<li class=\"done\">").count(), 3);
         assert_eq!(done.matches("<li class=\"ok\">").count(), 4);
     }
 
@@ -668,11 +672,11 @@ mod tests {
             cancelled: false,
             closed_request: false,
         });
-        assert!(block.contains("class=\"modal guia prepara\""));
-        assert!(block.contains("<pre id=\"guia-texto\">the block</pre>"));
-        assert!(block.contains("class=\"botao principal apos-copiar surge\" id=\"guia-avancar\" href=\"/hermes/wait?name=ana\""));
-        assert!(block.contains("<h2 id=\"t-guia\">Conectar ana</h2>"));
-        assert!(!block.contains("foi cancelado") && !block.contains("continua funcionando"));
+        assert!(block.contains("class=\"modal guide preparing\""));
+        assert!(block.contains("<pre id=\"guide-text\">the block</pre>"));
+        assert!(block.contains("class=\"button primary after-copy appear\" id=\"guide-next\" href=\"/hermes/wait?name=ana\""));
+        assert!(block.contains("<h2 id=\"guide-title\">Connect ana</h2>"));
+        assert!(!block.contains("was cancelled") && !block.contains("keeps working"));
         assert!(
             !block.contains("http-equiv"),
             "the block is never asked for again"
