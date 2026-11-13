@@ -70,4 +70,4 @@ arauto-hub migrate --i-have-a-backup   aplica migrações num banco que já tem 
 arauto-hub admin ...            o que o painel faria, por comando
 ```
 
-A sequência de um primeiro uso está no guia de cada pasta.
+A sequência de um primeiro uso está no guia de cada pasta. O [roteiro do primeiro teste](primeiro-teste.md) traz, passo a passo, o que conferir numa instalação nova.
