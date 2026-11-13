@@ -125,6 +125,21 @@ async fn wait_page(browser: &Browser, cookie: &str, name: &str) -> String {
 }
 
 #[allow(clippy::too_many_lines)]
+/// The text of the block as `docs/02-como-funciona.md` has it, section 1, "The block": the
+/// first fenced text after that title, with its fields still between braces.
+fn approved_block() -> String {
+    let document = include_str!("../../../../docs/02-como-funciona.md").replace("\r\n", "\n");
+    let section = document
+        .split("\n### The block\n")
+        .nth(1)
+        .expect("the document has the section of the block");
+    let fenced = section
+        .split("\n```\n")
+        .nth(1)
+        .expect("the section has the text of the block");
+    format!("{fenced}\n")
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     let fixture = serving().await;
@@ -157,7 +172,7 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     assert!(page.contains("Preparing a secure connection"));
     let block = block_of(&page);
     assert!(
-        block.starts_with("Conecte este Hermes ao hub Arauto. Convite para: atendimento.\n"),
+        block.starts_with("Connect this Hermes to the Arauto hub. Invite for: atendimento.\n"),
         "{block}"
     );
     // The chain of the block: download into the folder of the connector, check the digest
@@ -175,12 +190,27 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
         fixture.hub_key_text()
     );
     assert!(block.contains(&join), "{block}");
-    assert!(block.contains("Depois me responda só com o código de conferência que ele mostrar."));
+    assert!(block.contains("Then answer me with only the verification code it shows."));
     assert!(
-        block.ends_with("não execute e avise o operador.\n"),
+        block.ends_with("do not execute it and tell the operator.\n"),
         "{block}"
     );
     let invite = invite_of(&block);
+    // The words are the ones of the document, which only change with the maintainer's
+    // approval: the block is that text with its fields filled, and nothing else.
+    let approved = approved_block()
+        .replace("{NAME}", "atendimento")
+        .replace("arauto-connector-{VERSION}", CONNECTOR)
+        .replace(
+            "{CONNECTOR_ADDRESS}",
+            &format!("http://127.0.0.1:1/v1/download/{CONNECTOR}"),
+        )
+        .replace("{SHA256}", CONNECTOR_SHA256)
+        .replace("{HUB}", "ws://127.0.0.1:1/v1/channel")
+        .replace("{HUB_KEY}", &fixture.hub_key_text())
+        .replace("{INVITE}", &invite);
+    assert!(!approved.contains('{'), "a field was left: {approved}");
+    assert_eq!(block, approved, "the block is not the text of the document");
     assert_eq!(count(&fixture, "hermes").await, 1);
     // The audit names the panel where the command names the system user.
     let audit = rows(&fixture, "audit").await.join("\n");

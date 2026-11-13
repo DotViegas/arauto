@@ -1,554 +1,586 @@
-# 04 — Segurança da conexão
+# 04 — Connection security
 
-**Estado: proposta v0.4**, a validar com um protótipo antes de implementar
-([12-roteiro.md](12-roteiro.md), Fase 1). Especifica como um Hermes entra, volta e sai do hub. Os
-termos estão no [glossário](glossario.md).
+**Status: proposal v0.4**, to be validated with a prototype before implementing
+([12-roteiro.md](12-roteiro.md), Phase 1). It specifies how a Hermes enters, comes back to and
+leaves the hub. The terms are in the [glossary](glossario.md).
 
-Este desenho já passou por várias rodadas de leitura crítica, e cada uma achou falhas que a anterior
-não viu. A v0.4 reúne as correções da terceira rodada em diante: o hub restaurado de cópia, o
-reconectar, o sair, os comandos repetidos, o código de conferência e a ordem de gravação do lado do
-hub. Ele só merece confiança depois do protótipo com rodadas sorteadas.
+This design has already gone through several rounds of critical reading, and each one found flaws
+the previous one did not see. v0.4 gathers the corrections from the third round onward: the hub
+restored from a backup, the reconnect, the leave, the repeated commands, the verification code and
+the order of writes on the hub's side. It only deserves trust after the prototype with randomized
+rounds.
 
-## Resumo
+## Summary
 
 ```
-CONVITE            15 minutos, 1 uso     só serve para PEDIR conexão
-CÓDIGO             6 dígitos             o admin DIGITA o que o Hermes respondeu
-IDENTIDADE         nasce no Hermes       a parte privada nunca sai da máquina
-CREDENCIAL LACRADA nasce no hub          para usar o hub é preciso trocá-la por outra
+INVITE             15 minutes, 1 use     only serves to ASK for a connection
+CODE               6 digits              the admin TYPES what the Hermes answered
+IDENTITY           born in Hermes        the private part never leaves the machine
+SEALED CREDENTIAL  born in the hub       to use the hub it has to be swapped for another
 ```
 
-| Pergunta | Resposta |
+| Question | Answer |
 |---|---|
-| O que passa pelo chat? | Só o convite, que morre no primeiro uso, e o código de conferência, que não é segredo. |
-| Quem cria os segredos? | A identidade nasce no conector. A credencial lacrada nasce na caixa preta do hub. |
-| Alguma pessoa vê um segredo duradouro? | Não. Nenhum aparece em tela, em registro ou em resposta de ferramenta. |
-| E se copiarem a credencial? | Quem usa a cópia é descoberto quando o aparelho verdadeiro volta a apresentar a dele. Os limites estão na seção 6. |
-| O que o desenho não resolve? | Conta de admin tomada, servidor do hub invadido e motor exposto. Ver a seção 6 e [05](05-modelo-de-ameacas.md). |
+| What goes through the chat? | Only the invite, which dies on the first use, and the verification code, which is not a secret. |
+| Who creates the secrets? | The identity is born in the connector. The sealed credential is born in the hub's vault. |
+| Does any person see a long-lived secret? | No. None appears on screen, in a log or in a tool response. |
+| What if the credential is copied? | Whoever uses the copy is found out when the real device presents its own again. The limits are in section 6. |
+| What does the design not solve? | A taken-over admin account, a breached hub server and an exposed engine. See section 6 and [05](05-modelo-de-ameacas.md). |
 
-## 1. Peças usadas
+## 1. Pieces used
 
-Nada de criptografia inventada. Cada passo usa uma peça conhecida.
+No invented cryptography. Each step uses a known piece.
 
-| Uso | Peça |
+| Use | Piece |
 |---|---|
-| Sorteio de todo segredo | Gerador do sistema operacional. Nada vem de data, hora, nome ou contador. |
-| Canal conector ↔ hub | Noise `XK_25519_ChaChaPoly_BLAKE2s`, por dentro do websocket. Uma suíte fixa, sem modo de reserva. Autenticação mútua e sigilo futuro. |
-| Identidade do aparelho e chave do hub | X25519. |
-| Convite | 32 bytes sorteados. O hub guarda só o resumo SHA-256. |
-| Código de conferência | HKDF-SHA-256 sobre o resumo do aperto de mãos e um número sorteado pelo hub, reduzido a seis dígitos sem viés. |
-| Lacre da credencial | AEAD XChaCha20-Poly1305, com a chave da organização. |
-| Assinatura das versões do conector | Ed25519. |
-| Login do painel | Passkey (WebAuthn). |
-| Troca da credencial | Rotação com detecção de reuso, o padrão da renovação de credenciais do OAuth (RFC 9700). |
+| Drawing of every secret | The operating system's generator. Nothing comes from date, time, name or counter. |
+| Connector ↔ hub channel | Noise `XK_25519_ChaChaPoly_BLAKE2s`, inside the websocket. One fixed suite, with no fallback mode. Mutual authentication and forward secrecy. |
+| Device identity and hub key | X25519. |
+| Invite | 32 randomly drawn bytes. The hub keeps only the SHA-256 digest. |
+| Verification code | HKDF-SHA-256 over the digest of the handshake and a number drawn by the hub, reduced to six digits without bias. |
+| Seal of the credential | AEAD XChaCha20-Poly1305, with the organization key. |
+| Signature of the connector's versions | Ed25519. |
+| Panel login | Passkey (WebAuthn). |
+| Swap of the credential | Rotation with reuse detection, the standard of credential renewal in OAuth (RFC 9700). |
 
-O canal é cifrado por dentro do websocket para não depender de quem termina o TLS. Em instalações
-reais o TLS termina num proxy que não é do projeto, e numa rede interna ele pode nem existir. Com o
-Noise, a segurança do canal é a mesma nos dois casos.
+The channel is encrypted inside the websocket so as not to depend on whoever terminates the TLS. In
+real installations the TLS terminates at a proxy that is not the project's, and in an internal
+network it may not even exist. With Noise, the security of the channel is the same in both cases.
 
-## 2. Chaves do hub
+## 2. Keys of the hub
 
-| Chave | Onde fica | Para que serve |
+| Key | Where it stays | What it is for |
 |---|---|---|
-| **Mestra** | Arquivo fora do banco e fora da cópia de segurança do banco. | Cifra as outras chaves e os segredos guardados no banco. |
-| **Da organização** | No banco, cifrada pela mestra. | Lacra as credenciais e cifra o arquivo de mensagens. |
-| **Do hub** (X25519) | No banco, cifrada pela mestra. | É por ela que o conector reconhece o hub. A parte pública vai em todo bloco. |
+| **Master** | A file outside the database and outside the backup of the database. | Encrypts the other keys and the secrets kept in the database. |
+| **Organization** | In the database, encrypted by the master key. | Seals the credentials and encrypts the message archive. |
+| **Hub** (X25519) | In the database, encrypted by the master key. | It is by it that the connector recognizes the hub. The public part goes in every block. |
 
-Trocar ou perder a chave do hub obriga a conectar todos os Hermes de novo. É um custo aceito:
-conectar é justamente o que o projeto torna barato. Antes, cada Hermes precisa de uma saída local,
-feita por uma pessoa (C10): o conector não troca de hub sozinho.
+Changing or losing the hub key forces every Hermes to be connected again. It is an accepted cost:
+connecting is exactly what the project makes cheap. Before that, each Hermes needs a local leave,
+done by a person (C10): the connector does not change hubs by itself.
 
-A chave de versões é do projeto, não do hub. Ela assina cada versão publicada do conector. Na
-primeira versão do projeto não há atualização automática: toda instalação passa pelo bloco, e a
-conferência é o resumo que vem nele ([11-conector.md](11-conector.md), seção 7).
+The release key belongs to the project, not to the hub. It signs each published version of the
+connector. In the first version of the project there is no automatic update: every installation
+goes through the block, and the check is the digest that comes in it
+([11-conector.md](11-conector.md), section 7).
 
-## 3. Fluxo
+## 3. Flow
 
-### C1. Criar o convite
+### C1. Creating the invite
 
-O admin clica "Conectar Hermes" e dá o nome. O hub sorteia 32 bytes: é o convite (`arc1` + base32).
-Guarda **só o resumo SHA-256** dele, com validade de 15 minutos. O convite aparece uma única vez,
-dentro do bloco.
+The admin clicks "Connect Hermes" and gives the name. The hub draws 32 bytes: that is the invite
+(`arc1` + base32). It keeps **only the SHA-256 digest** of it, valid for 15 minutes. The invite
+appears a single time, inside the block.
 
-Quem lê o banco não consegue usar o convite. Quando ele vence, o resumo é apagado: um relógio
-atrasado não o faz valer de novo.
+Whoever reads the database cannot use the invite. When it expires, the digest is erased: a clock
+that is behind does not make it valid again.
 
-### C2. O bloco
+### C2. The block
 
-O bloco traz o nome do Hermes, o endereço de download do conector numa versão exata, o resumo SHA-256
-dessa versão, o endereço do hub, a chave pública do hub e o convite. Não usa `curl | sh`. O texto
-proposto está em [02-como-funciona.md](02-como-funciona.md).
+The block carries the name of the Hermes, the download address of the connector in an exact version,
+the SHA-256 digest of that version, the address of the hub, the public key of the hub and the
+invite. It does not use `curl | sh`. The proposed text is in
+[02-como-funciona.md](02-como-funciona.md).
 
-O convite vai como argumento do conector. Não aparece em endereço, então não fica em registro de
-servidor nem é lido por pré-visualização. O endereço de download é público e não carrega segredo.
+The invite goes as an argument of the connector. It does not appear in an address, so it does not
+stay in a server log and is not read by a link preview. The download address is public and carries
+no secret.
 
-### C3. Inscrição
+### C3. Enrollment
 
-O conector:
+The connector:
 
-1. Sorteia a identidade do aparelho e a grava, numa pasta só daquele pedido, antes de falar com o
-   hub. **Convite novo, identidade nova:** uma identidade só é reaproveitada quando o mesmo convite é
-   apresentado de novo. O conector reconhece o mesmo convite pelo resumo dele, guardado na pasta do
-   pedido.
-2. Abre o aperto de mãos Noise XK. A chave estática do conector é a **identidade do aparelho**; a do
-   hub é a que veio no bloco. Um hub falso não completa o aperto de mãos.
-3. Envia, já cifrado para o hub: o convite e os dados do aparelho (nome da máquina, versão do
-   conector, versão do Hermes, sistema).
+1. Draws the device identity and saves it, in a folder only for that request, before talking to the
+   hub. **New invite, new identity:** an identity is only reused when the same invite is presented
+   again. The connector recognizes the same invite by its digest, kept in the folder of the
+   request.
+2. Opens the Noise XK handshake. The static key of the connector is the **device identity**; that
+   of the hub is the one that came in the block. A fake hub does not complete the handshake.
+3. Sends, already encrypted to the hub: the invite and the data of the device (machine name,
+   connector version, Hermes version, system).
 
-O hub procura o resumo do convite e decide:
+The hub looks up the digest of the invite and decides:
 
-| Situação | Resposta |
+| Situation | Response |
 |---|---|
-| Convite emitido e dentro do prazo | Cria o aparelho como **pendente**, marca o convite como usado e responde com o prazo de confirmação. |
-| Convite usado, mesma identidade, pedido ainda pendente | É o mesmo pedido. Não muda prazo nem tentativas. Passa a valer o código desta inscrição (C4). Na sexta inscrição o pedido é negado. |
-| Convite usado, mesma identidade, pedido já resolvido | Diz a situação exata a quem provou ser o mesmo: já aprovado (AR-104), negado (AR-301) ou vencido (AR-302, AR-303). Não muda nada. |
-| Convite usado, outra identidade, pedido ainda pendente | Recusa (AR-102) e **alerta o painel**: o bloco foi parar em outro lugar. O primeiro pedido não é tocado. |
-| Qualquer outro caso | Recusa única (AR-101), sem dizer por quê. Só gera registro na auditoria. |
+| Invite issued and within the deadline | Creates the device as **pending**, marks the invite as used and responds with the confirmation deadline. |
+| Invite used, same identity, request still pending | It is the same request. It changes neither the deadline nor the attempts. The code of this enrollment becomes the valid one (C4). On the sixth enrollment the request is denied. |
+| Invite used, same identity, request already resolved | Tells the exact situation to whoever proved to be the same: already approved (AR-104), denied (AR-301) or expired (AR-302, AR-303). It changes nothing. |
+| Invite used, another identity, request still pending | Refuses (AR-102) and **alerts the panel**: the block ended up somewhere else. The first request is not touched. |
+| Any other case | A single refusal (AR-101), without saying why. It only produces a record in the audit. |
 
-O convite só viaja cifrado, dentro de um canal que só o hub verdadeiro consegue abrir. No mesmo aperto
-de mãos o conector prova que tem a identidade que está inscrevendo.
+The invite only travels encrypted, inside a channel that only the real hub can open. In the same
+handshake the connector proves that it has the identity it is enrolling.
 
-Um convite encerrado **nunca derruba um Hermes conectado**.
+A closed invite **never brings down a connected Hermes**.
 
-**Um pedido por Hermes.** Só existe um pedido em andamento por Hermes. Gerar um convite novo para um
-Hermes cancela o convite emitido e encerra o pedido que estiver pendente, ou aprovado ainda sem
-credencial confirmada. Conta como pedido em andamento também o que foi à quarentena antes de
-confirmar a primeira credencial: o convite novo o encerra do mesmo jeito. O aparelho em uso não é
-tocado.
+**One request per Hermes.** There is only one request in progress per Hermes. Generating a new
+invite for a Hermes cancels the issued invite and closes the request that is pending, or approved
+and still without a confirmed credential. A request that went to quarantine before confirming the
+first credential also counts as a request in progress: the new invite closes it in the same way. The
+device in use is not touched.
 
-### C4. Código de conferência
+### C4. Verification code
 
-Os dois lados calculam, cada um por si, seis dígitos a partir de duas coisas: o resumo do aperto de
-mãos e um número que o hub sorteia e só envia, pelo canal já cifrado, depois da última mensagem do
-aperto de mãos. Sem esse número, quem se inscreve conseguiria escolher o próprio código, refazendo a
-última mensagem até dar o que quer. O hub **nunca envia nem mostra** o código.
+The two sides compute, each on its own, six digits from two things: the digest of the handshake and
+a number that the hub draws and only sends, through the already encrypted channel, after the last
+message of the handshake. Without that number, whoever enrolls would be able to choose their own
+code, redoing the last message until it gives what they want. The hub **never sends or shows** the
+code.
 
-- O conector mostra o código e termina.
-- O Hermes diz o código no canal de comando.
-- O admin digita o código no painel.
+- The connector shows the code and ends.
+- The Hermes says the code in the command channel.
+- The admin types the code in the panel.
 
-O painel só aprova se o que foi digitado bater com o pedido pendente **daquele Hermes**, que é um só
-(C3). Cinco erros encerram o pedido. O prazo é de 10 minutos a partir da primeira inscrição.
+The panel only approves if what was typed matches the pending request **of that Hermes**, which is
+only one (C3). Five errors close the request. The deadline is 10 minutes from the first enrollment.
 
-Se o comando do bloco rodar de novo no mesmo Hermes, há um aperto de mãos novo e, com ele, um código
-novo. **Vale o mais recente.** O conector diz, na resposta, que o código anterior deixou de valer. O
-hub aceita até cinco inscrições por pedido: com o sorteio do hub em cada uma, repetir não ajuda a
-chegar a um código escolhido.
+If the command of the block runs again on the same Hermes, there is a new handshake and, with it, a
+new code. **The most recent one is valid.** The connector says, in its response, that the previous
+code is no longer valid. The hub accepts up to five enrollments per request: with the hub's draw in
+each one, repeating does not help to reach a chosen code.
 
-Por que digitar em vez de comparar e clicar: quem obtiver o convite antes do uso consegue criar um
-pedido com o nome certo. Se bastasse um clique, esse pedido seria aprovado. Digitando, só é aprovado
-o pedido cujo código o Hermes verdadeiro disse.
+Why type instead of compare and click: whoever obtains the invite before its use can create a
+request with the right name. If a click were enough, that request would be approved. By typing, only
+the request whose code the real Hermes said is approved.
 
-O que o aparelho declara (nome da máquina, versão) aparece na tela como "informado pelo aparelho, não
-verificado". Não decide nada.
+What the device declares (machine name, version) appears on the screen as "informed by the device,
+not verified". It decides nothing.
 
-### C5. Aprovação
+### C5. Approval
 
-Com o código certo, o aparelho passa a **aprovado**. Numa primeira conexão, o Hermes fica **sem
-acesso a número nenhum**: os acessos são dados depois, na matriz ([08](08-permissoes.md)). Num
-reconectar, os acessos que o Hermes já tinha passam a valer para o aparelho novo assim que ele
-confirma a primeira credencial (C10).
+With the right code, the device becomes **approved**. On a first connection, the Hermes has **no
+access to any number**: the accesses are given afterwards, in the matrix ([08](08-permissoes.md)).
+On a reconnect, the accesses the Hermes already had start to apply to the new device as soon as it
+confirms the first credential (C10).
 
-Um aparelho aprovado está na **geração zero**: ainda não tem credencial **confirmada**. Continua na
-geração zero mesmo depois de o hub emitir a primeira, até o "gravei" dela. Ele recebe a primeira
-pela mesma troca de todas as outras (C7).
+An approved device is at **generation zero**: it does not have a **confirmed** credential yet. It
+stays at generation zero even after the hub issues the first one, until its "saved". It receives
+the first one through the same swap as all the others (C7).
 
-### C6. Registro no Hermes e espera
+### C6. Registration in Hermes and waiting
 
-Ao fim da inscrição o conector se registra no Hermes como servidor de ferramentas, pelo comando
-oficial (`hermes mcp add`). A entrada não contém segredo: só o caminho do programa e o argumento
-`mcp`. É a única mudança que fica na configuração do Hermes.
+At the end of the enrollment the connector registers itself in Hermes as a tool server, through the
+official command (`hermes mcp add`). The entry contains no secret: only the path of the program and
+the argument `mcp`. It is the only change that stays in Hermes's configuration.
 
-O Hermes inicia o conector em menos de um minuto. Enquanto o aparelho está pendente, o conector abre
-o canal **em espera**: prova a identidade, não tem ferramenta nenhuma de WhatsApp e aguarda.
+Hermes starts the connector in less than a minute. While the device is pending, the connector opens
+the channel **waiting**: it proves the identity, has no WhatsApp tool at all and waits.
 
-| O que acontece com o pedido | O que o conector faz |
+| What happens to the request | What the connector does |
 |---|---|
-| Aprovado | Faz a primeira troca ali mesmo (C7). |
-| Negado ou vencido | Mostra o código do erro. Se a pasta **daquele pedido** ainda não tem credencial, descarta a pasta e, se não há outro aparelho, remove o registro. |
-| Aparece uma segunda conexão em espera com a mesma identidade, e a primeira responde | O hub nega o pedido e alerta: a identidade foi copiada antes da aprovação. |
+| Approved | Does the first swap right there (C7). |
+| Denied or expired | Shows the error code. If the folder **of that request** does not have a credential yet, it discards the folder and, if there is no other device, removes the registration. |
+| A second waiting connection appears with the same identity, and the first one responds | The hub denies the request and alerts: the identity was copied before the approval. |
 
-**O conector nunca descarta, por informação do hub, uma pasta que já tem credencial.** Só descarta
-um pedido que ainda não recebeu nenhuma. As pastas que sobram quando outro aparelho assume são caso
-à parte: saem por decisão do conector, depois de o novo assumir e de o hub responder (C10).
+**The connector never discards, on information from the hub, a folder that already has a
+credential.** It only discards a request that has not received any yet. The folders left over when
+another device takes over are a separate case: they go by decision of the connector, after the new
+one takes over and after the hub responds (C10).
 
-Se a inscrição deu certo e o registro no Hermes falhou (AR-601), o pedido continua de pé no hub.
-Repetir o comando tenta o registro de novo.
+If the enrollment worked and the registration in Hermes failed (AR-601), the request stays standing
+in the hub. Repeating the command tries the registration again.
 
-### C7. A troca da credencial
+### C7. The swap of the credential
 
-Toda conexão de canal de um aparelho aprovado ou ativo começa por uma troca. A sessão do canal só
-existe depois dela. As conexões curtas do `join` e do `leave` não são de canal (C9).
+Every channel connection of an approved or active device begins with a swap. The channel session
+only exists after it. The short connections of `join` and of `leave` are not channel connections
+(C9).
 
 ```
-conector -> hub     aperto de mãos (prova a identidade) + a credencial que tem
-hub                 confere que quem apresentou continua na linha
-hub                 grava a nova como pendente
-hub -> conector     credencial NOVA
-conector            grava a nova, de forma durável
-conector -> hub     "gravei"
-hub                 grava: a nova passa a valer; a anterior morre
-                    só agora a sessão serve ferramentas e avisos
+connector -> hub    handshake (proves the identity) + the credential it has
+hub                 checks that whoever presented is still on the line
+hub                 saves the new one as pending
+hub -> connector    NEW credential
+connector           saves the new one, durably
+connector -> hub    "saved"
+hub                 saves: the new one comes into force; the previous one dies
+                    only now does the session serve tools and notices
 ```
 
-**Regras**
+**Rules**
 
-1. Toda credencial emitida tem uma geração nova e um identificador sorteado dentro do lacre. O lacre
-   amarra a organização, a identidade do aparelho e a geração.
-2. O hub guarda, por aparelho, a geração e o resumo da **vigente** e da **pendente**, e a maior
-   geração já emitida, inclusive depois de o aparelho ser encerrado. Compara o resumo, não só o
-   número: depois de uma restauração do hub, um número de geração pode se repetir.
-3. O hub só julga a credencial de quem provou a identidade no aperto de mãos **e** respondeu a uma
-   conferência na mesma conexão. Uma tentativa abandonada, que chega atrasada pela rede, não responde
-   e é descartada sem consequência. O conector encerra uma tentativa antes de abrir outra.
-4. **A sessão só serve ferramentas e avisos depois do "gravei".** Quem quer usar o hub tem de
-   confirmar a troca, e confirmar mata a credencial anterior. É isso que faz o uso de uma cópia
-   aparecer quando o aparelho verdadeiro volta. Os limites estão na seção 6.
-5. O conector só diz "gravei" depois de a gravação estar garantida em disco, no arquivo e na pasta.
-6. O hub só envia a credencial nova depois de gravar, de forma durável, a pendente e a maior geração.
-   Só abre a sessão depois de gravar a promoção.
-7. Um "gravei" que não se refere à pendente é recusado, e a conexão é fechada.
-8. **Depois da geração zero, o hub nunca emite credencial só pela identidade.**
+1. Every issued credential has a new generation and a randomly drawn identifier inside the seal.
+   The seal binds the organization, the device identity and the generation.
+2. The hub keeps, per device, the generation and the digest of the **current** one and of the
+   **pending** one, and the highest generation ever issued, even after the device is closed. It
+   compares the digest, not only the number: after a restoration of the hub, a generation number
+   may repeat.
+3. The hub only judges the credential of whoever proved the identity in the handshake **and**
+   answered a check on the same connection. An abandoned attempt, which arrives late through the
+   network, does not answer and is discarded without consequence. The connector closes one attempt
+   before opening another.
+4. **The session only serves tools and notices after the "saved".** Whoever wants to use the hub
+   has to confirm the swap, and confirming kills the previous credential. That is what makes the
+   use of a copy show up when the real device comes back. The limits are in section 6.
+5. The connector only says "saved" after the write is guaranteed on disk, in the file and in the
+   folder.
+6. The hub only sends the new credential after saving, durably, the pending one and the highest
+   generation. It only opens the session after saving the promotion.
+7. A "saved" that does not refer to the pending one is refused, and the connection is closed.
+8. **After generation zero, the hub never issues a credential on identity alone.**
 
-**O que o hub faz com o que o conector apresenta**
+**What the hub does with what the connector presents**
 
-Vale para aparelho aprovado ou ativo. Em qualquer outro estado o hub responde a situação do
-aparelho e não troca nada. Duas conferências valem em todos os estados:
+It applies to an approved or active device. In any other state the hub responds with the situation
+of the device and swaps nothing. Two checks apply in all states:
 
-- Um lacre válido de geração maior do que o banco conhece é assunto de C11: pode ser prova de
-  restauração.
-- Um aparelho revogado, substituído ou vencido por inatividade que apresenta um lacre válido **mais
-  antigo** do que a última vigente e a última pendente gera o alerta "reuso depois do
-  encerramento": alguém usou uma cópia, e o aparelho foi encerrado antes de o verdadeiro voltar.
+- A valid seal of a generation higher than the database knows is a matter for C11: it may be proof
+  of restoration.
+- A device that was revoked, replaced or expired by inactivity and that presents a valid seal
+  **older** than the last current one and the last pending one produces the alert "reuse after the
+  closing": someone used a copy, and the device was closed before the real one came back.
 
-| O conector apresenta | O hub |
+| The connector presents | The hub |
 |---|---|
-| A vigente (ou nada, se o aparelho está na geração zero) | Aceita e emite uma nova, que passa a ser a pendente. Se já havia uma pendente, ela é descartada. |
-| A pendente | Aceita, promove a pendente a vigente, e a vigente anterior morre. Emite outra. |
-| Qualquer outra já emitida, ou nada quando o aparelho já passou da geração zero | Quarentena e alerta, com o motivo "reuso" (C9). |
-| Um lacre que não abre, ou que é de outro aparelho | Quarentena e alerta, com o motivo "credencial ilegível". |
-| Um lacre válido, de geração maior do que todas as que o hub conhece | É prova de que o hub voltou de uma cópia antiga. Liga o modo restaurado (C11). |
+| The current one (or nothing, if the device is at generation zero) | Accepts and issues a new one, which becomes the pending one. If there already was a pending one, it is discarded. |
+| The pending one | Accepts, promotes the pending one to current, and the previous current one dies. Issues another. |
+| Any other one already issued, or nothing when the device is already past generation zero | Quarantine and alert, with the reason "reuse" (C9). |
+| A seal that does not open, or that belongs to another device | Quarantine and alert, with the reason "unreadable credential". |
+| A valid seal, of a generation higher than all the ones the hub knows | It is proof that the hub came back from an old backup. Turns on restored mode (C11). |
 
-A troca é em duas fases para uma queda no meio não trancar o Hermes do lado de fora:
+The swap has two phases so that a drop in the middle does not lock the Hermes outside:
 
-| Onde caiu | O que o conector tem | Na volta |
+| Where it dropped | What the connector has | On the way back |
 |---|---|---|
-| Antes de gravar a nova | A vigente | Apresenta a vigente e recebe outra. |
-| Na primeira troca, antes de gravar a primeira | Nada | Apresenta nada. O aparelho continua na geração zero e recebe outra. |
-| Depois de gravar, antes de o hub ouvir o "gravei" | A pendente | Apresenta a pendente, e o hub a promove. |
+| Before saving the new one | The current one | Presents the current one and receives another. |
+| On the first swap, before saving the first one | Nothing | Presents nothing. The device stays at generation zero and receives another. |
+| After saving, before the hub hears the "saved" | The pending one | Presents the pending one, and the hub promotes it. |
 
-Uma conexão que termina sem "gravei" fica registrada. Três em 24 horas do mesmo aparelho geram
-alerta, mesmo com conexões confirmadas no meio: pode ser rede ruim, pode ser alguém testando uma
-cópia.
+A connection that ends without "saved" is recorded. Three in 24 hours from the same device produce
+an alert, even with confirmed connections in between: it may be a bad network, it may be someone
+testing a copy.
 
-**A troca de 24 horas.** A cada 24 horas o hub repete a troca dentro da sessão aberta, sem derrubar o
-canal. Vale como apresentada a vigente. A sessão continua servindo enquanto o conector grava. O hub
-não emite outra enquanto houver uma pendente sem confirmação: se o "gravei" não chegar em 60
-segundos, ele fecha a conexão, e na volta valem as linhas de sempre.
+**The 24-hour swap.** Every 24 hours the hub repeats the swap inside the open session, without
+bringing down the channel. The current one counts as presented. The session keeps serving while the
+connector saves. The hub does not issue another while there is a pending one without confirmation:
+if the "saved" does not arrive in 60 seconds, it closes the connection, and on the way back the
+usual rows apply.
 
-Um Hermes que perde o arquivo da credencial e mantém a identidade cai na terceira linha da tabela:
-quarentena, e a saída é reconectar.
+A Hermes that loses the credential file and keeps the identity falls into the third row of the
+table: quarantine, and the way out is to reconnect.
 
-### C8. Uso
+### C8. Use
 
-Pelo canal passam chamadas de ferramenta (Hermes → hub) e avisos (hub → Hermes).
+Through the channel pass tool calls (Hermes → hub) and notices (hub → Hermes).
 
-- **Autorização a cada chamada.** O hub confere o estado do aparelho e o acesso (Hermes, número,
-  verbo, conversa) em toda chamada e em todo aviso. Tirar um acesso vale na chamada seguinte.
-- **O hub não manda texto livre.** O aviso é um ponteiro: qual número, qual conversa, quantas
-  mensagens. A frase que acorda o Hermes é fixa e fica no conector.
-- **As descrições das ferramentas ficam no conector.** O hub só diz quais nomes estão liberados.
-- **O conector não executa comando do hub.** Não existe mensagem do hub que rode algo na máquina do
-  Hermes, nem que apague um aparelho que já funcionou. A primeira versão não tem atualização
-  empurrada pelo hub.
-- **A versão é conferida logo depois do aperto de mãos, antes da troca.** Um conector abaixo da
-  versão mínima recebe AR-401 e nada mais. A exceção é o pedido de encerramento (`leave`), aceito em
-  qualquer versão. Mensagem de quem ainda não provou a identidade não muda estado nenhum no hub.
+- **Authorization on every call.** The hub checks the state of the device and the access (Hermes,
+  number, verb, chat) on every call and on every notice. Taking an access away applies on the next
+  call.
+- **The hub does not send free text.** The notice is a pointer: which number, which chat, how many
+  messages. The sentence that wakes the Hermes is fixed and stays in the connector.
+- **The descriptions of the tools stay in the connector.** The hub only says which names are
+  allowed.
+- **The connector does not execute a command from the hub.** There is no message from the hub that
+  runs something on Hermes's machine, nor one that erases a device that has already worked. The
+  first version has no update pushed by the hub.
+- **The version is checked right after the handshake, before the swap.** A connector below the
+  minimum version receives AR-401 and nothing else. The exception is the closing request (`leave`),
+  accepted in any version. A message from whoever has not proved the identity yet changes no state
+  at all in the hub.
 
-### C9. Quando o hub deixa de confiar na credencial
+### C9. When the hub stops trusting the credential
 
-Há um só canal por aparelho ([11-conector.md](11-conector.md) explica como isso é garantido do lado
-do Hermes). O canal é a conexão que o líder mantém, em espera ou em sessão. As conexões curtas do
-`join` (inscrição) e do `leave` (pedido de encerramento) provam a identidade, levam um único pedido
-e fecham: não apresentam credencial, não viram sessão e não contam como conexão dupla.
+There is only one channel per device ([11-conector.md](11-conector.md) explains how this is
+guaranteed on Hermes's side). The channel is the connection the leader keeps, waiting or in
+session. The short connections of `join` (enrollment) and of `leave` (closing request) prove the
+identity, carry a single request and close: they do not present a credential, do not become a
+session and do not count as a double connection.
 
-Com isso, dois sinais significam cópia:
+With that, two signs mean a copy:
 
-| Sinal | Resposta |
+| Sign | Response |
 |---|---|
-| **Reuso:** chega uma credencial que já foi trocada, ou nenhuma quando deveria haver | Quarentena e alerta. |
-| **Conexão dupla:** chega uma apresentação que seria aceita (uma credencial, ou nada na geração zero) enquanto outra conexão do mesmo aparelho responde | Recusa a segunda, quarentena e alerta. |
+| **Reuse:** a credential arrives that was already swapped, or none when there should be one | Quarantine and alert. |
+| **Double connection:** a presentation arrives that would be accepted (a credential, or nothing at generation zero) while another connection of the same device responds | Refuses the second one, quarantine and alert. |
 
-A quarentena também vem sem cópia, quando o arquivo da credencial se perde ou se estraga.
+Quarantine also comes without a copy, when the credential file is lost or damaged.
 
-Antes de tratar como conexão dupla, o hub testa a conexão antiga. Se ela não responder em 3 segundos,
-é dada por morta: a antiga é fechada e a nova segue. **Toda vez que isso acontece com uma sessão que
-estava servindo, o painel alerta**: "a conexão de {nome} foi tomada por outra, vinda de {endereço}".
-O teste e o batimento viajam por dentro do canal cifrado: um proxy no caminho não responde por eles.
+Before treating it as a double connection, the hub tests the old connection. If it does not respond
+in 3 seconds, it is taken for dead: the old one is closed and the new one goes on. **Every time this
+happens to a session that was serving, the panel alerts**: "the connection of {name} was taken by
+another, coming from {address}". The test and the heartbeat travel inside the encrypted channel: a
+proxy on the path does not answer for them.
 
-O conector verdadeiro percebe que foi dado por morto de dois jeitos: pelo fechamento que o hub envia,
-ou, se a rede dele está sendo segurada, pela falta de batimento, em até 90 segundos. Nos dois casos
-ele **reconecta na hora**. Se alguém tomou o lugar dele, aparece nessa volta: como reuso, se o outro
-já trocou a credencial, ou como conexão dupla, se ainda não trocou.
+The real connector notices that it was taken for dead in two ways: by the close the hub sends, or,
+if its network is being held, by the lack of heartbeat, in up to 90 seconds. In both cases it
+**reconnects at once**. If someone took its place, it shows up on that return: as reuse, if the
+other one has already swapped the credential, or as a double connection, if it has not swapped yet.
 
-Portanto: com o Hermes verdadeiro ligado, em versão que o hub aceita e alcançando o hub, a cópia é
-barrada em segundos; no pior caso, quando a conexão dele estava muda sem ele saber, em até 90
-segundos. Não é assim quando quem tem a cópia também segura a rede do verdadeiro: ela é descoberta
-quando ele voltar a falar com o hub. E quem segura a rede pode esperar a conexão do verdadeiro cair
-por falta de batimento antes de entrar: aí não há conexão tomada, e o painel mostra só uma volta
-vinda de outro endereço. Também não é assim quando o conector verdadeiro ficou abaixo da versão
-mínima: ele para de usar o canal e não apresenta mais a credencial dele (seção 6, item 3).
+Therefore: with the real Hermes on, in a version the hub accepts and reaching the hub, the copy is
+stopped in seconds; in the worst case, when its connection was silent without it knowing, in up to
+90 seconds. It is not so when whoever has the copy also holds the network of the real one: the copy
+is found out when the real one talks to the hub again. And whoever holds the network can wait for
+the connection of the real one to drop for lack of heartbeat before coming in: then there is no
+taken connection, and the panel shows only a return coming from another address. It is also not so
+when the real connector fell below the minimum version: it stops using the channel and no longer
+presents its credential (section 6, item 3).
 
-Rede ou país novo gera alerta, nunca bloqueio: endereços residenciais e de operadora mudam. Esse
-alerta e o das trocas sem confirmação (C7) podem ser provocados por quem controla a rede: sozinhos,
-não são motivo para revogar.
+A new network or country produces an alert, never a block: residential and carrier addresses
+change. This alert and the one for swaps without confirmation (C7) can be provoked by whoever
+controls the network: alone, they are not a reason to revoke.
 
-### C10. Quarentena, revogar, reconectar e sair
+### C10. Quarantine, revoke, reconnect and leave
 
-**Quarentena.** O hub deixou de confiar na credencial daquele aparelho. Canal fechado, chamadas
-negadas, avisos retidos. Não existe "liberar": depois de um sinal de cópia não há como saber qual
-lado é o verdadeiro. A saída é reconectar ou revogar.
+**Quarantine.** The hub stopped trusting the credential of that device. Channel closed, calls
+denied, notices held. There is no "release": after a sign of a copy there is no way of knowing
+which side is the real one. The way out is to reconnect or to revoke.
 
-**Revogar.** Revogar um Hermes encerra tudo o que é dele: o aparelho, o pedido em andamento (pendente
-ou aprovado) e o convite emitido. O aparelho passa a revogado e a linha é mantida como registro. O
-canal cai em segundos e a chamada seguinte já é negada. O conector para de usar o canal e mostra
-AR-502. Ele não apaga nada; a limpeza é feita por `leave` ou pelo próximo `join`.
+**Revoke.** Revoking a Hermes closes everything that is its own: the device, the request in progress
+(pending or approved) and the issued invite. The device becomes revoked and the line is kept as a
+record. The channel drops in seconds and the next call is already denied. The connector stops using
+the channel and shows AR-502. It erases nothing; the cleanup is done by `leave` or by the next
+`join`.
 
-**Reconectar.** Convite novo para o mesmo Hermes, com um aparelho antigo ainda na pasta:
+**Reconnect.** A new invite for the same Hermes, with an old device still in the folder:
 
-1. Cada aparelho tem a sua pasta, com identidade, credencial e dados do hub. O `join` cria a pasta
-   do pedido novo, sem tocar na do aparelho atual.
-2. Enquanto o pedido novo não é aprovado, o aparelho atual segue como está. Se o pedido for negado ou
-   vencer, só a pasta do pedido é descartada.
-3. Ao aprovar, o painel mostra o último uso do aparelho atual, com data e endereço, e pergunta se o
-   admin o reconhece. Se o Hermes esteve desligado e houve uso, alguém usou uma cópia. Se o admin
-   não reconhece, sai o alerta de cópia e a aprovação segue. O aparelho antigo, se estava ativo, vai
-   para a quarentena ali mesmo; se já estava suspenso ou em quarentena, fica como está. Quando o
-   aparelho anterior venceu por inatividade, o painel mostra o último uso dele do mesmo jeito, e ele
-   segue vencido.
-4. Confirmada a primeira credencial do aparelho novo, o hub o passa a ativo e passa o antigo a
-   **substituído** na mesma gravação, venha ele de ativo, de suspenso ou de quarentena. O conector
-   passa a usar a pasta nova numa única troca de nome.
-5. **Uma máquina, um aparelho.** Se o convite era de outra linha do painel, o hub não tem aparelho
-   antigo para substituir. Por isso, ao assumir o aparelho novo, o conector pede o encerramento do
-   antigo, a não ser que o hub já o tenha dado como substituído, e de cada outra identidade que
-   tenha sobrado na pasta, como um pedido encerrado que já tinha credencial. "Já encerrado" e "não
-   conheço este aparelho" valem como confirmação. Cada pasta só é apagada depois da resposta do
-   hub; até lá, o líder repete o pedido a cada partida e a cada vez que o canal volta. O alerta
-   desse encerramento mostra o último uso do aparelho antigo, como no passo 3. Quando ninguém pede
-   o encerramento, o aparelho antigo segue ativo no hub sem máquina, até o admin revogar: é o caso
-   da saída local e o da pasta antiga perdida (máquina refeita) com convite de outra linha do
-   painel.
+1. Each device has its own folder, with identity, credential and data of the hub. The `join`
+   creates the folder of the new request, without touching that of the current device.
+2. While the new request is not approved, the current device goes on as it is. If the request is
+   denied or expires, only the folder of the request is discarded.
+3. When approving, the panel shows the last use of the current device, with date and address, and
+   asks whether the admin recognizes it. If the Hermes was off and there was use, someone used a
+   copy. If the admin does not recognize it, the copy alert goes out and the approval goes on. The
+   old device, if it was active, goes to quarantine right there; if it was already suspended or in
+   quarantine, it stays as it is. When the previous device expired by inactivity, the panel shows
+   its last use in the same way, and it stays expired.
+4. Once the first credential of the new device is confirmed, the hub makes it active and makes the
+   old one **replaced** in the same write, whether it comes from active, from suspended or from
+   quarantine. The connector starts using the new folder in a single rename.
+5. **One machine, one device.** If the invite was from another line of the panel, the hub has no
+   old device to replace. So, on taking over the new device, the connector asks for the closing of
+   the old one, unless the hub has already given it as replaced, and of each other identity that
+   is left over in the folder, such as a closed request that already had a credential. "Already
+   closed" and "I do not know this device" count as confirmation. Each folder is only erased after
+   the hub's response; until then, the leader repeats the request on every start and every time
+   the channel comes back. The alert of that closing shows the last use of the old device, as in
+   step 3. When nobody asks for the closing, the old device stays active in the hub with no
+   machine, until the admin revokes it: that is the case of the local leave and that of the old
+   folder lost (rebuilt machine) with an invite from another line of the panel.
 
-Os acessos são do Hermes, não do aparelho, e passam a valer para o aparelho novo.
+The accesses belong to the Hermes, not to the device, and start to apply to the new device.
 
-**Sair.** O comando `leave` pede ao hub o encerramento do próprio aparelho, espera a resposta e só
-então apaga os arquivos e remove o registro.
+**Leave.** The `leave` command asks the hub for the closing of the device itself, waits for the
+response and only then erases the files and removes the registration.
 
-- O pedido vale para **cada identidade** que houver na pasta: o aparelho atual e, se houver, um
-  pedido em andamento. O conector só apaga depois de todas as respostas.
-- Se o líder tem o canal aberto, o pedido vai por ele. Se não tem (aparelho em quarentena, suspenso,
-  revogado, ou conector parado), o `leave` abre uma conexão curta, prova a identidade e pede.
-- "Já encerrado" e "não conheço este aparelho" valem como confirmação.
-- Se o hub não responde, o conector **não apaga a identidade**: avisa com AR-505 que a saída ficou
-  pendente e que o aparelho precisa ser revogado no painel.
-- **Todo encerramento pedido pelo próprio aparelho gera alerta no painel**, com o endereço de onde
-  veio e o último uso do aparelho. Sem isso, quem usou uma cópia poderia encerrar o aparelho para
-  apagar o rastro.
+- The request applies to **each identity** there is in the folder: the current device and, if there
+  is one, a request in progress. The connector only erases after all the responses.
+- If the leader has the channel open, the request goes through it. If it does not (device in
+  quarantine, suspended, revoked, or connector stopped), `leave` opens a short connection, proves
+  the identity and asks.
+- "Already closed" and "I do not know this device" count as confirmation.
+- If the hub does not respond, the connector **does not erase the identity**: it warns with AR-505
+  that the leave is pending and that the device needs to be revoked in the panel.
+- **Every closing asked for by the device itself produces an alert in the panel**, with the address
+  it came from and the last use of the device. Without that, whoever used a copy could close the
+  device to erase the trail.
 
-**Saída local.** `leave --local` apaga os arquivos e o registro sem falar com o hub. Existe para
-quando o hub não existe mais ou trocou de chave. É para uma pessoa rodar: o aparelho continua
-valendo no hub até ser revogado no painel.
+**Local leave.** `leave --local` erases the files and the registration without talking to the hub.
+It exists for when the hub no longer exists or changed its key. It is for a person to run: the
+device stays valid in the hub until it is revoked in the panel.
 
-Quem tem a identidade de um aparelho consegue encerrá-lo. É negação de serviço, do mesmo tipo de
-apresentar uma cópia antiga, e o alerta mostra de onde veio.
+Whoever has the identity of a device can close it. It is denial of service, of the same kind as
+presenting an old copy, and the alert shows where it came from.
 
-### C11. Hub restaurado de cópia
+### C11. Hub restored from a backup
 
-Um hub que volta de uma cópia de segurança antiga esquece o que aconteceu depois dela: aprovações,
-trocas de credencial, quarentenas, reconexões, revogações e mudanças de acesso. Para ele, uma
-credencial que já tinha morrido volta a valer e um aparelho revogado volta a estar ativo.
+A hub that comes back from an old backup forgets what happened after it: approvals, credential
+swaps, quarantines, reconnections, revocations and access changes. To it, a credential that had
+already died is valid again and a revoked device is active again.
 
-**Como percebe.** De dois jeitos:
+**How it notices.** In two ways:
 
-- Uma **marca fora do banco**, ao lado da chave-mestra: o número do último evento de segurança da
-  auditoria. Conta todo evento que muda quem pode o quê: convite usado ou cancelado, aprovação e
-  negação, troca de credencial confirmada, quarentena, reconexão, revogação, mudança de acesso e
-  mudança de admin. A marca só avança depois de o evento estar garantido em disco no banco: uma
-  queda entre os dois deixa a marca um evento atrás. Isso não acusa restauração à toa; o custo é não
-  perceber uma restauração que perca só aquele último evento. Na partida, banco atrás da marca, ou
-  banco com dados e marca ausente, quer dizer que ele voltou de uma cópia.
-- Um **lacre válido que o banco não explica**: de geração maior do que todas as que ele conhece
-  daquele aparelho, ou de um aparelho que ele não conhece. Só o hub cria credenciais, e ele grava a
-  geração antes de enviar (C7, regra 6). Lacre válido que o banco desconhece é banco atrasado. Não
-  vale para aparelho já marcado por uma restauração anterior (abaixo).
+- A **mark outside the database**, beside the master key: the number of the last security event of
+  the audit. It counts every event that changes who may do what: invite used or canceled, approval
+  and denial, confirmed credential swap, quarantine, reconnection, revocation, access change and
+  admin change. The mark only advances after the event is guaranteed on disk in the database: a
+  drop between the two leaves the mark one event behind. This does not accuse a restoration for
+  nothing; the cost is not noticing a restoration that loses only that last event. At start, a
+  database behind the mark, or a database with data and a missing mark, means that it came back
+  from a backup.
+- A **valid seal the database does not explain**: of a generation higher than all the ones it knows
+  for that device, or from a device it does not know. Only the hub creates credentials, and it
+  saves the generation before sending (C7, rule 6). A valid seal the database does not know is a
+  database that is behind. It does not apply to a device already marked by a previous restoration
+  (below).
 
-Se o servidor inteiro for restaurado de uma imagem, a marca volta junto e só o segundo jeito
-funciona: o hub só percebe quando conecta um aparelho que trocou de credencial, ou que foi conectado,
-depois da imagem.
+If the whole server is restored from an image, the mark comes back with it and only the second way
+works: the hub only notices when a device connects that swapped its credential, or that was
+connected, after the image.
 
-**O que faz: liga o modo restaurado.**
+**What it does: it turns on restored mode.**
 
-- **Todos os aparelhos ativos ficam suspensos**, e as sessões abertas são fechadas. O hub não sabe
-  mais quais credenciais valem, quais aparelhos foram trocados e quais foram revogados. Um aparelho
-  suspenso recebe AR-506, para de usar o canal e não apaga nada.
-- **Convites emitidos e pedidos em andamento são encerrados**: os pendentes e os aprovados ainda sem
-  credencial confirmada. Um pedido que já estava em quarentena fica como está. Um convite já usado
-  depois da cópia voltaria a valer pelo resto do prazo.
-- **Todo aparelho que já existia no banco fica marcado**, em qualquer estado. Um aparelho marcado
-  não serve mais de prova de restauração: um lacre de geração maior vindo dele não liga o modo de
-  novo, só gera registro. O resto continua valendo para ele: o AR-504 com a listagem (abaixo) e o
-  alerta de reuso depois do encerramento (C7).
-- **A numeração da auditoria continua a partir da marca.** O banco volta a ficar à frente dela, e
-  reiniciar o hub não acusa a mesma restauração de novo. Ligar o modo é uma única gravação no banco
-  (suspensões, encerramentos, marcações e o primeiro evento novo), e só depois a marca avança. Se a
-  marca estava ausente, a numeração segue do último número do banco e o hub recria a marca.
-- **Não existe "reativar".** Cada Hermes sai do suspenso por **reconectar**, com convite novo, ou é
-  **revogado**. Reconectar cria identidade e credencial novas, e com isso deixa de servir qualquer
-  cópia dos arquivos antigos do conector, tirada antes ou depois da cópia de segurança do hub.
-- O painel mostra, em qualquer tela: "O hub voltou de uma cópia de {data}. O que foi aprovado,
-  revogado, reconectado ou mudado nos acessos depois disso se perdeu. Reconecte cada Hermes e confira
-  os acessos e a lista de admins."
-- Um aparelho que o banco não conhece, ou que no banco era um pedido encerrado pela restauração, e
-  que apresenta um lacre válido, é um Hermes conectado ou reconectado depois da cópia. Recebe AR-504
-  e **não apaga nada**; o painel o lista, com a hora, o endereço e o que ele declara, e guarda a
-  identidade dele. O caminho dele também é reconectar.
-- O modo termina quando não resta aparelho suspenso.
+- **All active devices become suspended**, and the open sessions are closed. The hub no longer
+  knows which credentials are valid, which devices were replaced and which were revoked. A
+  suspended device receives AR-506, stops using the channel and erases nothing.
+- **Issued invites and requests in progress are closed**: the pending ones and the approved ones
+  still without a confirmed credential. A request that was already in quarantine stays as it is. An
+  invite already used after the backup would be valid again for the rest of the deadline.
+- **Every device that already existed in the database is marked**, in any state. A marked device no
+  longer serves as proof of restoration: a seal of a higher generation coming from it does not turn
+  the mode on again, it only produces a record. The rest still applies to it: AR-504 with the
+  listing (below) and the alert of reuse after the closing (C7).
+- **The numbering of the audit continues from the mark.** The database is ahead of it again, and
+  restarting the hub does not accuse the same restoration again. Turning on the mode is a single
+  write in the database (suspensions, closings, markings and the first new event), and only then
+  does the mark advance. If the mark was missing, the numbering goes on from the last number of the
+  database and the hub recreates the mark.
+- **There is no "reactivate".** Each Hermes leaves suspended by **reconnecting**, with a new invite,
+  or is **revoked**. Reconnecting creates a new identity and credential, and with that any copy of
+  the old files of the connector stops being of use, whether taken before or after the hub's
+  backup.
+- The panel shows, on any screen: "The hub came back from a backup of {date}. What was approved,
+  revoked, reconnected or changed in the accesses after that was lost. Reconnect each Hermes and
+  check the accesses and the list of admins."
+- A device that the database does not know, or that in the database was a request closed by the
+  restoration, and that presents a valid seal, is a Hermes connected or reconnected after the
+  backup. It receives AR-504 and **erases nothing**; the panel lists it, with the time, the address
+  and what it declares, and keeps its identity. Its path is also to reconnect.
+- The mode ends when no suspended device is left.
 
-**Restauração nova com o modo ligado.** Banco atrás da marca, ou banco com dados e marca ausente,
-numa partida, ou lacre de geração maior vindo de um aparelho criado depois do início do modo, é
-outra restauração: o modo recomeça e vale para todos os aparelhos, inclusive os criados durante o
-anterior. Um lacre de geração maior vindo de aparelho marcado, ou um lacre de desconhecido já
-listado, não recomeça o modo: só gera registro.
+**New restoration with the mode on.** A database behind the mark, or a database with data and a
+missing mark, at a start, or a seal of a higher generation coming from a device created after the
+beginning of the mode, is another restoration: the mode starts over and applies to all devices,
+including the ones created during the previous one. A seal of a higher generation coming from a
+marked device, or a seal from an unknown one already listed, does not start the mode over: it only
+produces a record.
 
-Mesmo com a cópia contínua do banco de controle ([03](03-arquitetura.md), seção 8), em que a perda é
-de minutos, todos reconectam: o hub não tem como saber o que perdeu. É um custo parecido com o de
-trocar a chave do hub, aceito pelo mesmo motivo.
+Even with the continuous backup of the control database ([03](03-arquitetura.md), section 8), in
+which the loss is of minutes, everyone reconnects: the hub has no way of knowing what it lost. It is
+a cost similar to that of changing the hub key, accepted for the same reason.
 
-**Em aberto.** Depois de terminado o modo, ainda pode aparecer pela primeira vez um aparelho que o
-banco não conhece, com um lacre válido da linha do tempo perdida. Ele pareceria prova de uma
-restauração nova e suspenderia todos outra vez. Falta decidir como distinguir: uma ideia é gravar no
-lacre a data de emissão e tratar como sobra o que foi emitido antes do fim da última restauração
-tratada. É entrega da Fase 1.
+**Open.** After the mode has ended, a device the database does not know may still appear for the
+first time, with a valid seal from the lost timeline. It would look like proof of a new restoration
+and would suspend everyone once more. It remains to decide how to tell them apart: one idea is to
+write the issue date in the seal and treat as a leftover what was issued before the end of the last
+handled restoration. It is a deliverable of Phase 1.
 
-## 4. O que cada lado guarda
+## 4. What each side keeps
 
-**No hub**
+**In the hub**
 
-| Dado | Como |
+| Data | How |
 |---|---|
-| Convite | Só o resumo SHA-256, o prazo e o estado. O resumo é apagado quando o convite vence. |
-| Identidade do aparelho | Só a parte pública. |
-| Credencial lacrada | Só a geração e o resumo da vigente e da pendente, e a maior geração emitida. |
-| Login dos admins | Passkeys, que são chaves públicas. Não há senha. |
-| Sessão do painel | Só o resumo do identificador. |
-| Chave do hub, chave da organização, credencial do motor | Cifradas com a chave-mestra, que fica fora do banco. |
-| Arquivo de mensagens | Cifrado com a chave da organização. |
-| Fora do banco | A chave-mestra e a marca da auditoria. |
+| Invite | Only the SHA-256 digest, the deadline and the state. The digest is erased when the invite expires. |
+| Device identity | Only the public part. |
+| Sealed credential | Only the generation and the digest of the current one and of the pending one, and the highest generation issued. |
+| Login of the admins | Passkeys, which are public keys. There is no password. |
+| Panel session | Only the digest of the identifier. |
+| Hub key, organization key, engine credential | Encrypted with the master key, which stays outside the database. |
+| Message archive | Encrypted with the organization key. |
+| Outside the database | The master key and the audit mark. |
 
-**No Hermes**, na pasta `~/.arauto`, que só o dono lê: para cada aparelho, a identidade e a
-credencial mais recente que o conector recebeu, e dados sem segredo. A lista completa está em
-[11-conector.md](11-conector.md), seção 2.
+**In Hermes**, in the folder `~/.arauto`, which only the owner reads: for each device, the identity
+and the most recent credential the connector received, and data with no secret. The complete list is
+in [11-conector.md](11-conector.md), section 2.
 
-## 5. O que o desenho se propõe a garantir
+## 5. What the design sets out to guarantee
 
-Vale enquanto o hub, a conta do admin e o gerador do sistema estiverem íntegros. São metas do desenho:
-só viram garantia depois dos testes da Fase 1 e da Fase 4.
+It holds while the hub, the admin's account and the system's generator are intact. These are goals
+of the design: they only become a guarantee after the tests of Phase 1 and Phase 4.
 
-1. Chat ou bloco vazado depois da conexão não contém nada que conecte.
-2. Vazado antes do uso, não dá acesso sem um admin autenticado digitar o código do invasor.
-3. A parte privada da identidade nasce no Hermes e nunca é transmitida nem mostrada.
-4. Nenhum segredo duradouro passa pelo chat, aparece em tela ou entra em registro.
-5. Quem leva para fora uma cópia dos arquivos do conector e a usa é descoberto quando o aparelho
-   verdadeiro volta a apresentar a credencial dele. Se o Hermes verdadeiro está ligado, com o
-   conector em versão que o hub aceita, e alcança o hub, isso acontece em segundos; no pior caso, em
-   até 90 segundos. O hub alerta e o aparelho fica parado: em quarentena ou, se quem copiou já o
-   tinha encerrado, revogado.
-6. Uma cópia deixa de dar acesso depois da primeira troca confirmada que vier depois dela.
-7. Revogar e mudar acesso valem na chamada seguinte.
-8. Um Hermes só alcança os números que lhe foram dados. Pelo canal, um aparelho não faz nada de
-   admin: no máximo pede o próprio encerramento.
-9. No canal entre conector e hub, quem termina o TLS no caminho só vê dado cifrado.
-10. Quem só lê o banco do hub não consegue se passar por um Hermes.
+1. A chat or block leaked after the connection contains nothing that connects.
+2. Leaked before its use, it gives no access without an authenticated admin typing the attacker's
+   code.
+3. The private part of the identity is born in Hermes and is never transmitted or shown.
+4. No long-lived secret goes through the chat, appears on screen or goes into a log.
+5. Whoever takes a copy of the connector's files outside and uses it is found out when the real
+   device presents its credential again. If the real Hermes is on, with the connector in a version
+   the hub accepts, and reaches the hub, this happens in seconds; in the worst case, in up to 90
+   seconds. The hub alerts and the device stays stopped: in quarantine or, if whoever copied had
+   already closed it, revoked.
+6. A copy stops giving access after the first confirmed swap that comes after it.
+7. Revoking and changing access apply on the next call.
+8. A Hermes only reaches the numbers that were given to it. Through the channel, a device does
+   nothing of an admin: at most it asks for its own closing.
+9. On the channel between connector and hub, whoever terminates the TLS on the path only sees
+   encrypted data.
+10. Whoever only reads the hub's database cannot pass for a Hermes.
 
-## 6. O que não é garantido
+## 6. What is not guaranteed
 
-1. **"A LLM não alcança a credencial."** No modo rápido, o terminal da LLM roda com o mesmo usuário
-   do Hermes: lê e grava os arquivos do conector. O que vale: ela não abre o lacre, não precisa do
-   segredo, e quem levar uma cópia para fora é descoberto quando o aparelho verdadeiro voltar. Mas um
-   processo que continua na máquina e grava na pasta consegue devolver a credencial nova antes de o
-   conector voltar, e aí não há sinal. A garantia forte é do modo blindado.
-2. **"Ninguém tem acesso."** Quem administra a máquina do Hermes lê os arquivos. O sentido verdadeiro
-   é: ninguém precisa ver, digitar ou guardar o segredo.
-3. **Uma cópia usada com o Hermes verdadeiro desligado funciona até ele voltar.** Não há limite de
-   tempo. Se ele nunca voltar, a cópia nunca é descoberta. O prazo de inatividade, de 30 dias
-   ([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)), só pega a cópia usada pela primeira vez
-   depois do prazo. Conta como desligado o Hermes cujo
-   conector ficou abaixo da versão mínima do hub: ele para de usar o canal, e uma cópia usada com um
-   conector atual funciona até o admin reconectar esse Hermes. No reconectar, o uso da cópia pode
-   não aparecer como cópia (item 4). Está decidido que o hub passa a conferir a credencial desse
-   conector antes de recusar a versão ([decisoes/0030](decisoes/0030-conector-desatualizado.md));
-   enquanto a Fase 1 não fixar como, vale este limite.
-4. **Se o Hermes verdadeiro volta como aparelho novo, o uso da cópia não aparece como cópia.**
-   Acontece quando ele reconecta numa máquina refeita, sem os arquivos antigos. A cópia perde o
-   acesso, e o que resta é o admin reconhecer, na aprovação, o último uso do aparelho antigo.
-5. **Quem tem a cópia e também segura a rede do Hermes verdadeiro usa o hub enquanto segurar.** Se
-   entrar com a conexão do verdadeiro ainda aberta, o painel alerta que ela foi tomada. Se esperar
-   essa conexão cair antes de entrar, o painel só mostra uma volta vinda de outro endereço. A
-   quarentena só vem quando o verdadeiro falar com o hub.
-6. **Quem tem uma cópia antiga, ou só a identidade, consegue tirar o Hermes do ar.** Não ganha acesso,
-   mas provoca a quarentena ou o encerramento. Por isso a pasta do conector deve ficar fora das
-   cópias de segurança do volume do Hermes.
-7. **Depois de o hub voltar de uma cópia antiga**, tudo o que foi revogado, trocado ou retirado
-   depois dela se perde. O hub suspende todos os aparelhos ativos e cada Hermes reconecta (C11). Mas uma
-   restauração do servidor inteiro por imagem só é percebida quando conecta um aparelho que trocou de
-   credencial, ou que foi conectado, depois dela: até lá, uma credencial que já tinha morrido volta a
-   valer e um aparelho revogado volta a funcionar. Um admin removido depois da cópia volta a ter
-   acesso até ser removido de novo. E, depois de tratada a restauração, um aparelho da linha do tempo
-   perdida que o hub nunca viu ainda consegue suspender todos uma vez (C11, Em aberto).
-8. Uma LLM manipulada usa as ferramentas que o Hermes já tem, sem roubar nada. Protocolo de conexão
-   não resolve isso; só acesso mínimo, limites e auditoria.
-9. Uma LLM já manipulada na hora da conexão pode mentir o código ou rodar outra coisa. Contra isso,
-   só uma pessoa rodando o comando, ou o modo blindado.
-10. A cópia da credencial pode sair pela própria ferramenta de envio, sem nenhum comando de rede que
-    a guarda do Hermes veja.
-11. Conta de admin tomada ou servidor do hub invadido derrubam tudo.
-12. Em toda instalação pelo bloco, o resumo do conector vem do painel. Um hub invadido indica um
-    programa falso. Por isso o resumo também fica publicado nas versões do projeto.
-13. Quem lê o chat em tempo real consegue atrapalhar a conexão. Não consegue entrar. Quem controla o
-    caminho de rede entre o Hermes e o hub impede a conexão enquanto controlar: o desenho protege
-    quem entra e o que passa, não a disponibilidade.
-14. Engenharia social que leve o admin a digitar o código de outro aparelho.
-15. Revogar um Hermes não desliga uma cópia das sessões do motor. Quem as copiou é um dispositivo
-    conectado ao número, e só sai pelo celular.
-16. O painel depende do TLS de quem instala. O canal cifrado por dentro protege o conector, não o
-    navegador do admin.
-17. Se a pasta do conector for compartilhada entre dois Hermes, ou o sistema de arquivos não tiver
-    trava, o hub trata os dois como cópia e põe o aparelho em quarentena.
-18. Um arquivo de credencial perdido ou estragado leva à quarentena, mesmo sem cópia nenhuma.
+1. **"The LLM does not reach the credential."** In quick mode, the LLM's terminal runs as the same
+   user as Hermes: it reads and writes the connector's files. What holds: it does not open the
+   seal, it does not need the secret, and whoever takes a copy outside is found out when the real
+   device comes back. But a process that stays on the machine and writes in the folder can put the
+   new credential back before the connector returns, and then there is no sign. The strong
+   guarantee belongs to shielded mode.
+2. **"Nobody has access."** Whoever administers Hermes's machine reads the files. The true meaning
+   is: nobody needs to see, type or keep the secret.
+3. **A copy used with the real Hermes off works until it comes back.** There is no time limit. If
+   it never comes back, the copy is never found out. The inactivity period, of 30 days
+   ([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)), only catches the copy used for the
+   first time after the period. A Hermes whose
+   connector fell below the hub's minimum version counts as off: it stops using the channel, and a
+   copy used with a current connector works until the admin reconnects that Hermes. On the
+   reconnect, the use of the copy may not show up as a copy (item 4). It is decided that the hub
+   will check the credential of that connector before refusing the version
+   ([decisoes/0030](decisoes/0030-conector-desatualizado.md)); while Phase 1 does not fix how, this
+   limit holds.
+4. **If the real Hermes comes back as a new device, the use of the copy does not show up as a
+   copy.** It happens when it reconnects on a rebuilt machine, without the old files. The copy
+   loses access, and what is left is for the admin to recognize, at approval, the last use of the
+   old device.
+5. **Whoever has the copy and also holds the network of the real Hermes uses the hub for as long as
+   they hold it.** If they come in with the connection of the real one still open, the panel
+   alerts that it was taken. If they wait for that connection to drop before coming in, the panel
+   only shows a return coming from another address. Quarantine only comes when the real one talks
+   to the hub.
+6. **Whoever has an old copy, or only the identity, can take the Hermes off the air.** They gain no
+   access, but provoke the quarantine or the closing. That is why the connector's folder should
+   stay out of the backups of Hermes's volume.
+7. **After the hub comes back from an old backup**, everything that was revoked, swapped or taken
+   away after it is lost. The hub suspends all active devices and each Hermes reconnects (C11). But
+   a restoration of the whole server from an image is only noticed when a device connects that
+   swapped its credential, or that was connected, after it: until then, a credential that had
+   already died is valid again and a revoked device works again. An admin removed after the backup
+   has access again until removed again. And, after the restoration has been handled, a device from
+   the lost timeline that the hub never saw can still suspend everyone once (C11, Open).
+8. A manipulated LLM uses the tools Hermes already has, without stealing anything. A connection
+   protocol does not solve that; only minimal access, limits and audit do.
+9. An LLM already manipulated at the time of the connection can lie about the code or run something
+   else. Against that, only a person running the command, or shielded mode.
+10. The copy of the credential can go out through the sending tool itself, with no network command
+    that Hermes's guard sees.
+11. A taken-over admin account or a breached hub server bring everything down.
+12. In every installation through the block, the digest of the connector comes from the panel. A
+    breached hub points to a fake program. That is why the digest is also published in the
+    project's releases.
+13. Whoever reads the chat in real time can disturb the connection. They cannot get in. Whoever
+    controls the network path between Hermes and the hub prevents the connection for as long as
+    they control it: the design protects who gets in and what passes, not availability.
+14. Social engineering that leads the admin to type the code of another device.
+15. Revoking a Hermes does not turn off a copy of the engine sessions. Whoever copied them is a
+    linked device of the number, and only leaves through the phone.
+16. The panel depends on the TLS of whoever installs. The channel encrypted on the inside protects
+    the connector, not the admin's browser.
+17. If the connector's folder is shared between two Hermes, or the file system has no lock, the hub
+    treats the two as a copy and puts the device in quarantine.
+18. A lost or damaged credential file leads to quarantine, even with no copy at all.
 
-## 7. A provar antes de implementar
+## 7. To be proven before implementing
 
-A lista única do que precisa ser provado está em [12-roteiro.md](12-roteiro.md), Fase 1. Dela
-dependem, neste documento: o registro do conector no Hermes (C6), a troca da credencial com quedas,
-atrasos e um conector que nunca confirma (C7), o reconectar com queda no meio (C10), a restauração
-do hub (C11) e o tamanho das mensagens do canal, que no Noise é de 64 KB cada.
+The single list of what needs to be proven is in [12-roteiro.md](12-roteiro.md), Phase 1. On it
+depend, in this document: the registration of the connector in Hermes (C6), the swap of the
+credential with drops, delays and a connector that never confirms (C7), the reconnect with a drop
+in the middle (C10), the restoration of the hub (C11) and the size of the channel's messages, which
+in Noise is 64 KB each.
 
-Ainda não estão escritos, e são entregas da Fase 1: o formato das mensagens do canal, a conferência
-da regra 3, o conteúdo exato do lacre, a função exata do código de conferência e o tratamento das
-credenciais que sobram de uma restauração já tratada (C11). Fica também para a Fase 1 o modo como o
-hub confere a credencial de um conector abaixo da versão mínima antes de recusá-lo: a regra está
-decidida ([decisoes/0030](decisoes/0030-conector-desatualizado.md)), falta a ordem das mensagens
-(seção 6, item 3).
+Not yet written, and deliverables of Phase 1: the format of the channel's messages, the check of
+rule 3, the exact content of the seal, the exact function of the verification code and the handling
+of the credentials left over from an already handled restoration (C11). Also left for Phase 1 is the
+way the hub checks the credential of a connector below the minimum version before refusing it: the
+rule is decided ([decisoes/0030](decisoes/0030-conector-desatualizado.md)), the order of the
+messages is missing (section 6, item 3).
 
-## 8. Alternativas consideradas
+## 8. Alternatives considered
 
-**TLS 1.3 com desafio assinado, sem Noise.** É mais simples de implementar e basta quando o proxy é
-de quem instala. Fica mais fraca em dois casos comuns: rede interna sem TLS e proxy de terceiro que
-termina o TLS. Ficou como plano B, registrada em
+**TLS 1.3 with a signed challenge, without Noise.** It is simpler to implement and is enough when
+the proxy belongs to whoever installs. It is weaker in two common cases: an internal network without
+TLS and a third-party proxy that terminates the TLS. It stayed as plan B, recorded in
 [decisoes/0012-canal-cifrado-por-dentro.md](decisoes/0012-canal-cifrado-por-dentro.md).
 
-**O fluxo de aparelho que o Hermes já tem** (OAuth, RFC 8628). Não instala nada e não põe segredo no
-chat. Mas a credencial ficaria guardada pelo Hermes sem troca com detecção de reuso, não há como
-acordar o Hermes por ele, e o hub teria de ser um servidor de autorização. Pode servir, mais adiante,
-a agentes que só consultam.
+**The device flow Hermes already has** (OAuth, RFC 8628). It installs nothing and puts no secret in
+the chat. But the credential would be kept by Hermes without a swap with reuse detection, there is
+no way to wake Hermes through it, and the hub would have to be an authorization server. It may
+serve, later on, agents that only query.

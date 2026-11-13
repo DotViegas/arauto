@@ -28,6 +28,8 @@ server, in a container or behind a proxy, and never connected a real Hermes.
   structure and changed its words.
 - **On 13/11/2026: the screens speak the nine languages of the README.** English is the source;
   the other eight are translations of it.
+- **On 13/11/2026: the English wording of the 02 was approved,** and with it the text of the
+  block in English.
 
 ## Decision
 
@@ -108,8 +110,9 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
   same audit and the same mark. Only the order of the screens belongs to the panel.
 - **The invite appears once,** in the answer of the form that issued it. No address opened by a
   read issues, shows or spends an invite, and the database keeps storing only the digest.
-- **The text of the block is the one proposed in the 02,** word for word; the panel only fills in
-  the fields. Where the 02 writes `arauto-connector-{VERSION}`, the name of the file the hub serves
+- **The text of the block is the one proposed in the 02,** word for word, in English; the panel
+  only fills in the fields. A test compares the block of the panel with the text of the document
+  and fails when one changes without the other. Where the 02 writes `arauto-connector-{VERSION}`, the name of the file the hub serves
   goes, with the SHA-256 calculated from the bytes served.
 - **Without a connector to serve, the panel makes no block** and issues nothing: it says to use
   the command. With more than one connector for Linux in the folder, the block uses the first by
@@ -194,10 +197,10 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
 
 1. **The name "entry code".** It entered the glossary as a proposal. The alternative is to widen
    the "installation code".
-2. **The text of the block.** The panel uses the one proposed in the 02, which is still in
-   Portuguese: its English wording waits for the maintainer's approval, with the rest of the 02.
-   The command prints another, in English, with the same command lines. It remains to choose one,
-   or to say that they are two on purpose.
+2. **The text of the block.** The panel uses the one proposed in the 02. The command does not
+   print that text: it prints the address of the hub, its key, the invite and the same command
+   lines, with no sentence addressed to the Hermes. It remains to make the command print the
+   block of the 02, or to say that they are two on purpose.
 3. **The [04-seguranca-conexao.md](../04-seguranca-conexao.md)** says, in two tables, that the
    login of the panel is by passkey. It was not changed: it changes only with approval.
 
