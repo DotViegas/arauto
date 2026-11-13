@@ -23,16 +23,16 @@ estão em [0031](decisoes/0031-banco-postgresql.md),
 | Pergunta | Resposta |
 |---|---|
 | O que o MVP faz? | Conecta Hermes ao hub, deixa um Hermes mandar recado a outro e usar números de WhatsApp, e acorda o Hermes quando chega algo. |
-| Como se administra? | Por um comando no servidor do hub. O painel começou em 12/11/2026, só com telas de leitura ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)); as ações do painel e a passkey vêm depois. |
+| Como se administra? | Por um comando no servidor do hub. O painel começou em 12/11/2026: telas de leitura e, desde 13/11/2026, o guia de conectar Hermes ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). Parear, dar acesso e a passkey vêm depois. |
 | Onde roda em desenvolvimento? | Direto pelo `cargo`, com um PostgreSQL local. Sem container. |
 | Onde roda em produção? | Em container, em Linux, com PostgreSQL, por um arquivo de composição. |
-| O que fica de fora? | As ações do painel e a passkey, o arquivo de mensagens, a assinatura das versões e o modo blindado. |
+| O que fica de fora? | A passkey e o resto das ações do painel, o arquivo de mensagens, a assinatura das versões e o modo blindado. |
 
 ## 1. O que entra e o que não entra
 
 | Entra | Não entra, e fica para depois |
 |---|---|
-| Convite, inscrição, código digitado, aprovação | As ações do painel e a passkey ([07-telas.md](07-telas.md)). As telas de leitura entraram em 12/11/2026. |
+| Convite, inscrição, código digitado, aprovação | A passkey e o resto das ações do painel ([07-telas.md](07-telas.md)). As telas de leitura entraram em 12/11/2026 e o guia de conectar Hermes em 13/11/2026. |
 | Canal Noise, troca da credencial, quarentena, revogar, reconectar, sair | Aviso ao admin por fora ([decisão 0025](decisoes/0025-aviso-por-fora-do-painel.md)) |
 | Modo restaurado ([04](04-seguranca-conexao.md), C11), com a marca fora do banco | O ponto em aberto do C11 (a data de emissão do lacre) |
 | Líder único e repassadoras | Modo blindado |
@@ -44,7 +44,8 @@ estão em [0031](decisoes/0031-banco-postgresql.md),
 | Teto de envio (20 por minuto, por Hermes e por número) e tetos de recado | Autoridade privada no TLS do conector |
 
 **Administração no MVP.** Tudo o que muda algo é
-feito por `arauto-hub admin`, rodado por uma pessoa **na máquina do hub**. Quem roda esse comando já
+feito por `arauto-hub admin`, rodado por uma pessoa **na máquina do hub**, ou pelo painel, que chama
+as mesmas funções e só é aberto por um código que esse comando emite. Quem roda esse comando já
 tem o banco e a chave-mestra nas mãos; ele não cria um caminho mais fraco. O hub e o comando são o
 mesmo programa e usam as mesmas funções de gravação.
 
@@ -69,9 +70,12 @@ mesmo programa e usam as mesmas funções de gravação.
 **O painel, no hub, em 12/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta). O hub serve o painel
 numa terceira porta, desligada por padrão. Entra-se com um código de entrada: o comando acima o
 mostra uma vez, ele vale 10 minutos e uma entrada, e é digitado na tela, nunca mostrado por ela. O
-painel tem três telas, só de leitura (Hermes, WhatsApps e Acessos), e a faixa de alertas. Nada muda
-por ele: não existe endereço na rede que mude o estado do hub sem passar pelo comando. Foi testado
-só pelos testes automáticos; nunca rodou num servidor.
+painel tem três telas de leitura (Hermes, WhatsApps e Acessos), a faixa de alertas e, desde
+13/11/2026, o guia de conectar Hermes: nome, bloco, código digitado e aprovação, pelas mesmas funções
+do `hermes add`, do `invite`, do `approve` e do `deny`. Parear e dar acesso continuam só pelo
+comando. Por decisão de quem mantém, a sessão do painel age sem passkey enquanto ela não existir, e
+por isso o painel fica fechado, alcançado por túnel. Foi testado só pelos testes automáticos; nunca
+rodou num servidor nem conectou um Hermes de verdade.
 
 - Ao aprovar um reconectar, o comando mostra o último uso do aparelho atual e exige `--recognized`
   ou `--not-recognized` (04, C10). Sem uma das duas, não aprova. No hub, o comando sempre imprime o
@@ -299,14 +303,14 @@ deploy/               Dockerfile e arquivo de composição
 ```
 
 Módulos do hub ([03-arquitetura.md](03-arquitetura.md), seção 3): `enrollment`, `channel`, `vault`,
-`core`, `engine`, e o novo `peers`. O `archive` não existe no MVP; o `panel` entrou em 12/11/2026, só com telas de leitura. No código, em
+`core`, `engine`, e o novo `peers`. O `archive` não existe no MVP; o `panel` entrou em 12/11/2026, com as telas de leitura, e ganhou o guia de conectar Hermes em 13/11/2026. No código, em
 11/11/2026: a inscrição mora dentro de `channel`, e há mais `repo` (os repositórios), `audit`,
 `mark`, `restore`, `admin`, `config` e `db`. `engine` e `peers` vêm no M3 e no M2.
 
 | Peça | Biblioteca |
 |---|---|
 | Servidor e websocket do hub | `axum`, `hyper`, `hyper-util`, `tokio` |
-| Painel | Páginas escritas pelo próprio hub, sem biblioteca de modelos e sem script ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)) |
+| Painel | Páginas escritas pelo próprio hub, sem biblioteca de modelos; um arquivo de script do próprio painel, e nenhum script dentro de página ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)) |
 | Websocket do conector | `tokio-tungstenite`, com `rustls` e as autoridades públicas embutidas |
 | Banco | `sqlx` (PostgreSQL), consultas em tempo de execução |
 | Noise | `snow` |
@@ -490,7 +494,7 @@ leituras até quem mantém o projeto decidir. Os pontos do canal estão em
 
 | Ponto | Leitura do texto | Leitura do código |
 |---|---|---|
-| **A entrada do painel sem passkey** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). | O [04](04-seguranca-conexao.md) e a [decisão 0019](decisoes/0019-painel-com-passkey.md): o login do painel é por passkey, e o primeiro admin nasce do código de instalação. | A passkey ainda não existe. Entra-se com um código de entrada de uso único, emitido por comando na máquina do hub, e toda sessão do painel é do "admin local". O painel só lê, o que mantém a regra de que, com a sessão do painel sozinha, só se vê. |
+| **A entrada do painel sem passkey** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). | O [04](04-seguranca-conexao.md) e a [decisão 0019](decisoes/0019-painel-com-passkey.md): o login do painel é por passkey, e o primeiro admin nasce do código de instalação. | A passkey ainda não existe. Entra-se com um código de entrada de uso único, emitido por comando na máquina do hub, e toda sessão do painel é do "admin local". Desde 13/11/2026 essa sessão também conecta Hermes, sem passkey: é a mudança de 12/11/2026 na decisão 0019, a pedido de quem mantém, com o painel fechado enquanto durar. |
 | **A conferência da marca fora da trava** (seção 2, regra 9). | "Sob uma trava de arquivo entre processos, confere [...] antes de gravar um evento de segurança, e depois avança a marca." | A trava cobre só a leitura e a regravação do arquivo da marca. A conferência lê o arquivo sem trava: ele é trocado inteiro, e qualquer valor que já esteve em disco serve à comparação. Segurar a trava durante a transação do banco poria todo evento de segurança em fila e impediria juntar as gravações. A revisão não achou intercalação ruim; ou o texto passa a dizer isso, ou o código passa a segurar a trava. |
 | **`--recognized` digitado antes de ver o último uso** (seção 1). | O comando mostra o último uso e exige `--recognized` ou `--not-recognized`. | O comando sempre imprime o último uso antes do resultado, mas quem digita `--recognized` por hábito escreve a opção antes de ver a tela. Fechar isso pede mudar a linha de comando, por exemplo exigindo junto a data do último uso mostrada. |
 | **Eventos sem organização no `audit --tail`.** | Toda leitura é filtrada pela organização (seção 2, regra 2). | A leitura de uma organização traz também os eventos sem organização: o início do modo restaurado, que pode ter como alvo um aparelho de outra organização e conta aparelhos de todas, e as recusas agregadas de convites que ninguém emitiu. Com uma organização só, como no MVP, não vaza nada. Com duas, o admin de uma leria identificador e contagens da outra. A saída seria um comando próprio para os eventos da instalação, ou tirar do evento o alvo e as contagens de outras organizações. |

@@ -9,9 +9,12 @@ use std::collections::{BTreeSet, HashMap};
 
 use uuid::Uuid;
 
+use arauto_protocol::names::HermesName;
+
+use super::guide::{Ended, Facts, LastUse, Screen};
 use super::view::{
     AccessPage, AccessRow, Cell, EngineLine, Frame, HermesPage, HermesRow, Notice, NumberRow,
-    NumbersPage, Tone,
+    NumbersPage, RowAction, Tone,
 };
 use crate::admin::render;
 use crate::channel::Hub;
@@ -284,9 +287,104 @@ pub(super) async fn hermes(hub: &Hub, organization: ResolvedOrg) -> Result<Herme
                 )
             },
             explain,
+            action: if line.request.is_some() || line.invite_expires_at.is_some() {
+                RowAction::Continue
+            } else if line.in_use.is_some() {
+                RowAction::Reconnect
+            } else {
+                RowAction::Connect
+            },
         });
     }
     Ok(page)
+}
+
+/// Where the guide of the Hermes `name` is, by what the hub observed so far. `None` when
+/// there is no Hermes with that name. Only reads: asking again changes nothing.
+pub(super) async fn guide(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    name: &HermesName,
+) -> Result<Option<Screen>, RepoError> {
+    let lines = repo::hermes::list(hub.pool(), organization, false).await?;
+    let Some(line) = lines.iter().find(|line| line.hermes.name == *name) else {
+        return Ok(None);
+    };
+    let now = hub.now_ms();
+    let left =
+        |until: Option<i64>| until.map_or(0, |until| until.saturating_sub(now).max(0) / 1_000);
+    let name = name.as_str().to_owned();
+    let reconnect = line.in_use.is_some();
+    let view = repo::approval::request_of(hub.pool(), organization, &line.hermes.name).await?;
+    if let Some(view) = view {
+        let request = &view.request;
+        match request.state {
+            DeviceState::Pending => {
+                return Ok(Some(Screen::Code {
+                    name,
+                    facts: Box::new(Facts {
+                        address: request.enrolled_from.clone(),
+                        when: ago(now, Some(request.state_since)),
+                        hostname: request.declared.hostname.as_str().to_owned(),
+                        os: request.declared.os.as_str().to_owned(),
+                        hermes: request.declared.hermes_version.as_str().to_owned(),
+                    }),
+                    last_use: view.replaces.as_ref().map(|last| {
+                        Box::new(LastUse {
+                            device: last.device,
+                            at: last.at,
+                            state: last.state.as_str(),
+                            when: last.at.map_or_else(
+                                || "nunca".to_owned(),
+                                |at| format!("{} ({})", ago(now, Some(at)), render::time(at)),
+                            ),
+                            address: last.address.clone(),
+                        })
+                    }),
+                    error: None,
+                    seconds: left(request.confirm_until),
+                }));
+            }
+            DeviceState::Approved => {
+                return Ok(Some(Screen::Done {
+                    name,
+                    connected: false,
+                    reconnect,
+                }));
+            }
+            DeviceState::Quarantined => {
+                return Ok(Some(Screen::Ended {
+                    name,
+                    why: Ended::Copied,
+                }));
+            }
+            _ => {}
+        }
+    }
+    // A deadline passed when the time of the hub reached it.
+    if line.invite_expires_at.is_some_and(|until| until > now) {
+        return Ok(Some(Screen::Waiting {
+            name,
+            seconds: left(line.invite_expires_at),
+            reconnect,
+        }));
+    }
+    let connected = line
+        .in_use
+        .as_ref()
+        .is_some_and(|device| device.state == DeviceState::Active);
+    Ok(Some(if connected {
+        Screen::Done {
+            name,
+            connected: true,
+            reconnect: false,
+        }
+    } else {
+        Screen::Ended {
+            name,
+            why: Ended::Nothing,
+        }
+    }))
 }
 
 fn number_state(state: NumberState) -> (Tone, &'static str) {

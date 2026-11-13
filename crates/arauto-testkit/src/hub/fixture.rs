@@ -54,6 +54,8 @@ pub struct Fixture {
     pub settings: ChannelSettings,
     /// The clock of the hub.
     pub clock: Arc<dyn Clock>,
+    /// The files the hub serves for download, read when it starts.
+    pub downloads: Downloads,
 }
 
 /// The settings of the served tests: the documented values, a sweep every 200 ms, and the
@@ -116,6 +118,7 @@ impl Fixture {
             running: None,
             settings,
             clock,
+            downloads: Downloads::empty(),
         }
     }
 
@@ -125,7 +128,7 @@ impl Fixture {
             &support::config(&self.installation, ClientIpSource::Socket),
             Options {
                 settings: self.settings.clone(),
-                downloads: Downloads::empty(),
+                downloads: self.downloads.clone(),
                 purposes: Served,
             },
             Arc::clone(&self.clock),
@@ -153,7 +156,7 @@ impl Fixture {
                 &config,
                 Options {
                     settings: self.settings.clone(),
-                    downloads: Downloads::empty(),
+                    downloads: self.downloads.clone(),
                     purposes: Served,
                 },
                 Arc::clone(&self.clock),

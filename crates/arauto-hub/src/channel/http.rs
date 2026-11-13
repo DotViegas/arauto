@@ -106,6 +106,24 @@ impl Downloads {
     fn get(&self, name: &str) -> Option<&Bytes> {
         self.files.get(name)
     }
+
+    /// The files of the list, by name, with the SHA-256 of each: what a block says of the
+    /// file it tells a Hermes to download, computed from the bytes the hub serves.
+    #[must_use]
+    pub fn listed(&self) -> Vec<crate::download::Listed> {
+        let mut listed: Vec<crate::download::Listed> = self
+            .files
+            .iter()
+            .map(|(name, content)| crate::download::Listed {
+                name: name.clone(),
+                size: content.len() as u64,
+                sha256: data_encoding::HEXLOWER
+                    .encode(&<sha2::Sha256 as sha2::Digest>::digest(content)),
+            })
+            .collect();
+        listed.sort_by(|a, b| a.name.cmp(&b.name));
+        listed
+    }
 }
 
 /// Which port a connection came in by.

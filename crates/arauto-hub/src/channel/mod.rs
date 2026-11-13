@@ -650,6 +650,10 @@ pub async fn start<P: Purposes>(
         None => None,
     };
     let panel_addr = panel.as_ref().map(|(_, address)| *address);
+    let panel_state = config
+        .panel
+        .as_ref()
+        .map(|panel| PanelState::new(&panel.url, &config.public_url, &options.downloads));
     let hub = Arc::new(Hub {
         pool,
         sweep_pool,
@@ -678,10 +682,7 @@ pub async fn start<P: Purposes>(
             settings.sends_per_minute,
             arauto_protocol::limits::WHATSAPP_SEND_WINDOW_MS,
         ),
-        panel: config
-            .panel
-            .as_ref()
-            .map(|panel| PanelState::new(&panel.url)),
+        panel: panel_state,
         settings,
     });
     let purposes = Arc::new(options.purposes);

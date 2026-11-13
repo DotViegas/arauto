@@ -16,6 +16,7 @@ use arauto_testkit::hub::support::{PANEL_HOST, PANEL_ORIGIN};
 #[path = "../whatsapp/world.rs"]
 mod world;
 
+mod connect;
 mod entry;
 mod pages;
 mod session;

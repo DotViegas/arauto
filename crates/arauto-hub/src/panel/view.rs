@@ -13,9 +13,36 @@ const LOGO: &str = include_str!("assets/logo.svg");
 
 const HEAD: &str = "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">\
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-<title>Painel Arauto[IA]</title><link rel=\"stylesheet\" href=\"/assets/panel.css\"></head><body>";
+<title>Painel Arauto[IA]</title><link rel=\"stylesheet\" href=\"/assets/panel.css\">";
 
-const TAIL: &str = "</body></html>";
+pub(super) const TAIL: &str = "</body></html>";
+
+/// What stands over a page of the panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Over {
+    /// Nothing: the page is the whole screen.
+    Nothing,
+    /// A guide, in a window: the page under it cannot be reached while it is open.
+    Guide {
+        /// Every how many seconds the page asks the hub again, when it waits for something.
+        refresh: Option<u32>,
+    },
+}
+
+/// The head of a page. Only a page with a guide loads the script of the panel, and it loads
+/// it by its address: no page carries a script of its own.
+fn head(html: &mut Html, over: Over) {
+    html.raw(HEAD);
+    if let Over::Guide { refresh } = over {
+        if let Some(seconds) = refresh {
+            html.raw("<meta http-equiv=\"refresh\" content=\"")
+                .number(usize::try_from(seconds).unwrap_or(usize::MAX))
+                .raw("\">");
+        }
+        html.raw("<script src=\"/assets/panel.js\"></script>");
+    }
+    html.raw("</head><body>");
+}
 
 /// How a state reads at a glance: the color of the dot, never the only sign of it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +122,19 @@ pub struct HermesRow {
     pub seen: String,
     /// What the admin needs to know about a Hermes that stopped.
     pub explain: Option<String>,
+    /// What the button of its line does.
+    pub action: RowAction,
+}
+
+/// What the admin can do from the line of a Hermes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowAction {
+    /// It has no device and no invite: issue its first invite.
+    Connect,
+    /// An invite or a request is in progress: go back to the guide.
+    Continue,
+    /// It has a device: issue an invite for another one.
+    Reconnect,
 }
 
 /// The page of the Hermes.
@@ -183,8 +223,8 @@ pub struct AccessPage {
 #[must_use]
 pub fn sign_in(refusal: Option<&'static str>) -> String {
     let mut html = Html::new();
-    html.raw(HEAD)
-        .raw("<main class=\"entrada\">")
+    head(&mut html, Over::Nothing);
+    html.raw("<main class=\"entrada\">")
         .raw(LOGO)
         .raw("<h1>Entrar no painel</h1><form class=\"cartao\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\">")
         .raw("<div class=\"campo\"><label for=\"code\">Código de entrada</label>")
@@ -195,14 +235,18 @@ pub fn sign_in(refusal: Option<&'static str>) -> String {
             .raw("</p>");
     }
     html.raw("<p class=\"dica\">Gere o código no servidor do hub, com <code>arauto-hub admin panel code</code>. Ele vale 10 minutos e uma entrada.</p>")
-        .raw("<div><button class=\"botao\" type=\"submit\">Entrar</button></div></form></main>")
+        .raw("<div><button class=\"botao principal\" type=\"submit\">Entrar</button></div></form></main>")
         .raw(TAIL);
     html.finish()
 }
 
-fn open(html: &mut Html, frame: &Frame, tab: Tab) {
-    html.raw(HEAD)
-        .raw("<div class=\"pagina\"><header class=\"topo\">")
+fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
+    head(html, over);
+    html.raw(if over == Over::Nothing {
+        "<div class=\"pagina\"><header class=\"topo\">"
+    } else {
+        "<div class=\"pagina\" inert><header class=\"topo\">"
+    })
         .raw(LOGO)
         .raw("<div class=\"quem\"><span>admin</span><form method=\"post\" action=\"/sign-out\"><button class=\"sair\" type=\"submit\">Sair</button></form></div></header>");
     let alerts = frame.restored.is_some() || !frame.notices.is_empty() || frame.unknown_devices > 0;
@@ -256,9 +300,9 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab) {
     html.raw("</nav><main>");
 }
 
+/// Ends the page, up to where a window over it would go.
 fn close(html: &mut Html) {
-    html.raw("</main><p class=\"rodape\">Nesta versão o painel só mostra. Conectar, parear e dar acesso continuam pelo comando <code>arauto-hub admin</code>, no servidor do hub.</p></div>")
-        .raw(TAIL);
+    html.raw("</main><p class=\"rodape\">Nesta versão o painel conecta Hermes. Parear números e dar acesso continuam pelo comando <code>arauto-hub admin</code>, no servidor do hub.</p></div>");
 }
 
 fn state(html: &mut Html, tone: Tone, label: &'static str) {
@@ -287,26 +331,35 @@ fn names(html: &mut Html, list: &[String], none: &'static str) {
 #[must_use]
 pub fn hermes(frame: &Frame, page: &HermesPage) -> String {
     let mut html = Html::new();
-    open(&mut html, frame, Tab::Hermes);
-    html.raw("<div class=\"cabeca\"><h1>Seus Hermes e os <b>[números]</b> deles</h1><p class=\"contadores\">")
+    hermes_into(&mut html, frame, page, Over::Nothing);
+    html.raw(TAIL);
+    html.finish()
+}
+
+/// Writes the page of the Hermes up to where a window over it would go.
+pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, over: Over) {
+    open(html, frame, Tab::Hermes, over);
+    html.raw("<div class=\"cabeca\"><div><h1>Seus Hermes e os <b>[números]</b> deles</h1><p class=\"contadores\">")
         .number(page.connected)
         .raw(if page.connected == 1 { " conectado · " } else { " conectados · " })
         .number(page.waiting)
         .raw(" aguardando · ")
         .number(page.stopped)
-        .raw(" em alerta</p></div><div class=\"quadro\"><table class=\"lista\"><thead><tr>")
+        .raw(" em alerta</p></div><a class=\"botao principal\" href=\"/hermes/connect\">Conectar Hermes</a></div>")
+        .raw("<div class=\"quadro\"><table class=\"lista\"><thead><tr>")
         .raw("<th scope=\"col\">Hermes</th><th scope=\"col\">Estado</th><th scope=\"col\">Números</th>")
-        .raw("<th scope=\"col\">Acordado</th><th scope=\"col\">Conector</th><th scope=\"col\">Visto</th></tr></thead><tbody>");
+        .raw("<th scope=\"col\">Acordado</th><th scope=\"col\">Conector</th><th scope=\"col\">Visto</th>")
+        .raw("<th scope=\"col\"><span class=\"so-leitor\">Ações</span></th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"vazio\"><td colspan=\"6\">Nenhum Hermes ainda. Crie o primeiro com <code>arauto-hub admin hermes add NOME</code> e conecte com <code>arauto-hub admin invite NOME</code>.</td></tr>");
+        html.raw("<tr class=\"vazio\"><td colspan=\"7\">Nenhum Hermes ainda. Conecte o primeiro pelo botão \"Conectar Hermes\".</td></tr>");
     }
     for row in &page.rows {
         html.raw("<tr><td><span class=\"nome\">")
             .text(&row.name)
             .raw("</span></td><td>");
-        state(&mut html, row.tone, row.state);
+        state(html, row.tone, row.state);
         html.raw("</td><td class=\"linha2\">");
-        names(&mut html, &row.numbers, "nenhum");
+        names(html, &row.numbers, "nenhum");
         html.raw("</td><td class=\"so-largo\">")
             .raw(if row.woken { "sim" } else { "não" })
             .raw("</td><td class=\"so-largo fixa\">");
@@ -316,23 +369,39 @@ pub fn hermes(frame: &Frame, page: &HermesPage) -> String {
         };
         html.raw("</td><td class=\"so-largo num\">")
             .text(&row.seen)
-            .raw("</td></tr>");
+            .raw("</td><td class=\"c-acoes\"><div class=\"acoes\">");
+        match row.action {
+            RowAction::Continue => {
+                html.raw("<a class=\"botao\" href=\"/hermes/wait?name=")
+                    .text(&row.name)
+                    .raw("\">Continuar</a>");
+            }
+            RowAction::Connect | RowAction::Reconnect => {
+                html.raw("<form method=\"post\" action=\"/hermes/invite\"><input type=\"hidden\" name=\"name\" value=\"")
+                    .text(&row.name)
+                    .raw(if row.action == RowAction::Connect {
+                        "\"><button class=\"botao\" type=\"submit\">Conectar</button></form>"
+                    } else {
+                        "\"><button class=\"botao\" type=\"submit\">Reconectar</button></form>"
+                    });
+            }
+        }
+        html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
-            html.raw("<tr class=\"explica\"><td colspan=\"6\">")
+            html.raw("<tr class=\"explica\"><td colspan=\"7\">")
                 .text(explain)
                 .raw("</td></tr>");
         }
     }
     html.raw("</tbody></table></div><p class=\"nota\">\"Números\" são os que o Hermes alcança. O conector é o que o aparelho declarou: não é verificado.</p>");
-    close(&mut html);
-    html.finish()
+    close(html);
 }
 
 /// The page of the numbers.
 #[must_use]
 pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     let mut html = Html::new();
-    open(&mut html, frame, Tab::Numbers);
+    open(&mut html, frame, Tab::Numbers, Over::Nothing);
     html.raw("<div class=\"cabeca\"><h1>WhatsApps</h1><p class=\"contadores\">");
     match &page.engine {
         Some(engine) => {
@@ -373,6 +442,7 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     }
     html.raw("</tbody></table></div><p class=\"nota\">A última mensagem aparece só com o tempo, sem conteúdo. O painel lista o que passa pelo hub: outros dispositivos conectados ao mesmo número só aparecem no celular.</p>");
     close(&mut html);
+    html.raw(TAIL);
     html.finish()
 }
 
@@ -380,7 +450,7 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
 #[must_use]
 pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
     let mut html = Html::new();
-    open(&mut html, frame, Tab::Accesses);
+    open(&mut html, frame, Tab::Accesses, Over::Nothing);
     html.raw("<div class=\"cabeca\"><h1>Acessos</h1><p class=\"contadores\">Nas linhas, os Hermes. Nas colunas, os números.</p></div>");
     if page.rows.is_empty() || page.numbers.is_empty() {
         html.raw("<div class=\"quadro\"><table class=\"lista\"><tbody><tr class=\"vazio\"><td>")
@@ -391,6 +461,7 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
             })
             .raw("</td></tr></tbody></table></div>");
         close(&mut html);
+        html.raw(TAIL);
         return html.finish();
     }
     html.raw("<div class=\"quadro\"><div class=\"rola\"><table class=\"matriz\"><thead><tr><th scope=\"col\">Hermes</th>");
@@ -444,6 +515,7 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
         html.raw("</ul></div>");
     }
     close(&mut html);
+    html.raw(TAIL);
     html.finish()
 }
 
@@ -493,6 +565,7 @@ mod tests {
                 connector: Some(HOSTILE.to_owned()),
                 seen: HOSTILE.to_owned(),
                 explain: Some(HOSTILE.to_owned()),
+                action: RowAction::Reconnect,
             }],
             connected: 0,
             waiting: 0,
@@ -500,8 +573,9 @@ mod tests {
         };
         let page = hermes(&frame, &hermes_page);
         clean(&page);
-        // Six values of the row, three of the frame... every one came out escaped.
-        assert_eq!(page.matches("&lt;script&gt;").count(), 8);
+        // The values of the row (its name twice: in the list and in the form of its button),
+        // and the ones of the frame: every one came out escaped.
+        assert_eq!(page.matches("&lt;script&gt;").count(), 9);
 
         let numbers_page = NumbersPage {
             rows: vec![NumberRow {
@@ -545,7 +619,10 @@ mod tests {
             sign_in(None),
             sign_in(Some("Código inválido ou vencido.")),
         ] {
-            assert!(!page.contains("<script"), "the panel has no script");
+            assert!(
+                !page.contains("<script"),
+                "a page without a guide loads no script"
+            );
             assert!(
                 !page.contains(" style=\""),
                 "the policy of the page blocks inline styles"

@@ -18,3 +18,4 @@ O login do painel é por passkey, e não há senha. Toda ação que muda algo pe
 - O painel fica em endereço separado da porta dos conectores e, por padrão, só em rede privada ([0028](0028-painel-fechado-por-padrao.md)).
 - Todo texto vindo de aparelho ou do WhatsApp é escapado na tela.
 - O painel continua dependendo do TLS de quem instala.
+- **Mudança de 12/11/2026, a pedido de quem mantém:** enquanto a passkey não existir, entra-se no painel com um código de entrada, e a sessão do painel aberta por ele pode agir (conectar Hermes, parear, dar acesso). Nesse período o painel fica fechado: a porta dele só é alcançada na própria máquina do hub, por túnel. A passkey, no login e em toda ação que muda algo, volta a valer antes de o painel ser aberto à internet. O que isso deixa sem proteção está na [0040](0040-painel-dentro-do-hub.md).

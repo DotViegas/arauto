@@ -51,7 +51,7 @@ quem instala.
 
 | Módulo | Responsabilidade |
 |---|---|
-| `panel` | Telas e ações do admin. No hub, em 12/11/2026: só as telas de leitura ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| `panel` | Telas e ações do admin. No hub, em 13/11/2026: as telas de leitura e o guia de conectar Hermes ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 | `enrollment` | Recebe pedidos de conexão e serve o download do conector. |
 | `channel` | O websocket com cada conector: aperto de mãos, troca da credencial, chamadas e avisos. |
 | `vault` | A caixa preta: sorteia, lacra e abre credenciais. Único módulo que toca a chave-mestra. |

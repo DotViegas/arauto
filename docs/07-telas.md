@@ -2,11 +2,13 @@
 
 **Estado: proposta.** O que cada tela mostra, o que se faz nela e como ela fica vazia ou com erro.
 
-**No hub, em 12/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta): existem
-a T1, a T4 e a T6, **só de leitura**, e a faixa de alertas. As ações descritas nelas, as outras
-telas e a passkey ainda são desenho; onde uma tela vazia manda fazer algo, o hub diz o comando
-`arauto-hub admin` que faz. A T0 não existe: entra-se com um código de entrada, emitido por comando
-na máquina do hub. A sessão do painel já dura 12 horas, ou 30 minutos sem uso.
+**No hub, em 13/11/2026** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md), proposta): existem
+a T1, a T4 e a T6, de leitura, a faixa de alertas, e a T2 com a T3, num guia só, em janela sobre a
+lista: nome, bloco, código e pronto. Na T1 cada linha tem um botão (conectar, continuar ou
+reconectar); revogar, excluir e "pode ser acordado" ainda são só do comando. As outras telas e a
+passkey ainda são desenho. A T0 não existe: entra-se com um código de entrada, emitido por comando
+na máquina do hub. A sessão do painel já dura 12 horas, ou 30 minutos sem uso, e, enquanto a passkey
+não existe, é ela que autoriza as ações.
 
 ## Resumo
 

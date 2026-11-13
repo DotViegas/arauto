@@ -43,4 +43,4 @@ protótipo, ou está **pendente**.
 | 0036 | [Windows só para desenvolvimento; Linux na produção](0036-windows-so-para-desenvolvimento.md) | proposta |
 | 0038 | [O motor e os números no primeiro MVP](0038-motor-e-numeros-no-mvp.md) | proposta |
 | 0039 | [A matriz de acessos e as ferramentas de WhatsApp no primeiro MVP](0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md) | proposta |
-| 0040 | [O painel dentro do hub: porta própria, entrada por código e telas de leitura](0040-painel-dentro-do-hub.md) | proposta |
+| 0040 | [O painel dentro do hub: porta própria, entrada por código e as primeiras telas](0040-painel-dentro-do-hub.md) | proposta |

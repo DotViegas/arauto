@@ -1,4 +1,4 @@
-/* The panel of the Arauto hub. One sheet, no script, served by the hub itself.
+/* The panel of the Arauto hub. One sheet, served by the hub itself.
    Three sizes of type: 12, 15 and 28. The brand face (Poppins) is for the title, the tabs and
    the main button; inside a list the quieter face (Atkinson Hyperlegible) is used. */
 
@@ -27,6 +27,9 @@
   --quadro: #F2F2F2;
   --quadro-realce: #E4E4E4;
   --quadro-filete: #DADADA;
+  --modal: #FFFFFF;
+  --modal-realce: #F2F2F2;
+  --veu: rgba(9, 9, 9, .55);
   --t-titulo: 28px;
   --t-corpo: 15px;
   --t-etiqueta: 12px;
@@ -42,6 +45,7 @@
     --ok: #4CC97F; --atencao: #F0A83A; --grave: #FF6B6B;
     --grave-fundo: #2A1416; --atencao-fundo: #2B2110;
     --quadro: #171717; --quadro-realce: #262626; --quadro-filete: #2E2E2E;
+    --modal: #1C1C1C; --modal-realce: #2B2B2B; --veu: rgba(0, 0, 0, .72);
   }
 }
 
@@ -56,7 +60,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-h1, p, ul { margin: 0; }
+h1, h2, h3, p, ul, ol, dl, dd { margin: 0; }
 ul { padding: 0; list-style: none; }
 b { font-weight: 600; }
 a { color: inherit; text-decoration: none; }
@@ -102,7 +106,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .abas a[aria-current="page"] { color: var(--forte); font-weight: 600; border-bottom-color: var(--roxo-texto); }
 
 /* the title and its counters */
-.cabeca { padding: 32px 0 20px; }
+.cabeca { display: flex; align-items: center; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; padding: 32px 0 20px; }
 h1 { font-size: var(--t-titulo); font-weight: 800; letter-spacing: -0.03em; word-spacing: 0.08em; line-height: 1.2; color: var(--forte); }
 h1 b { font-weight: 800; color: var(--roxo-texto); }
 .contadores { margin-top: 2px; }
@@ -164,12 +168,140 @@ code { font-family: var(--f-fixa); }
 }
 .dica { color: var(--texto); font-size: var(--t-etiqueta); }
 .erro { color: var(--grave); font-weight: 600; }
+
+/* a button: quiet by default; the one main action of a screen is purple */
 .botao {
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: 44px; padding: 0 20px; border: 1px solid var(--roxo); border-radius: 10px;
-  background: var(--roxo); color: var(--sobre-roxo); font-family: var(--f-marca); font-weight: 600;
+  min-height: 34px; padding: 0 12px;
+  border: 1px solid var(--borda); border-radius: 8px;
+  background: var(--fundo); color: var(--forte); white-space: nowrap;
 }
-.botao:hover { filter: brightness(1.12); }
+.botao:hover { border-color: var(--forte); }
+.botao.principal {
+  min-height: 44px; padding: 0 20px; border-radius: 10px;
+  border-color: var(--roxo); background: var(--roxo); color: var(--sobre-roxo);
+  font-family: var(--f-marca); font-weight: 600;
+}
+.botao.principal:hover { border-color: var(--roxo); filter: brightness(1.12); }
+.acoes { display: flex; gap: 8px; justify-content: flex-end; }
+.acoes form { margin: 0; }
+
+/* a modal: every window that changes something opens like this, over the screen */
+.modal {
+  position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 10;
+  width: min(640px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 0;
+  border: 0; border-radius: 16px; background: var(--modal); color: var(--forte);
+  font-family: var(--f-lista); box-shadow: 0 0 0 100vmax var(--veu); overflow: hidden;
+}
+.modal[open] { display: flex; flex-direction: column; }
+.modal-topo { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 16px 8px 24px; }
+.modal h2 { font-family: var(--f-marca); font-size: var(--t-corpo); font-weight: 600; }
+.fechar {
+  flex: none; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: var(--texto);
+}
+.fechar:hover { background: var(--modal-realce); color: var(--forte); }
+.fechar svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.modal-corpo { display: grid; gap: 16px; align-content: start; min-height: 250px; padding: 8px 24px 24px; overflow-y: auto; }
+.modal-pe { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 16px 24px; border-top: 1px solid var(--filete); }
+.modal-pe form { margin: 0; }
+.modal-corpo form { display: grid; gap: 16px; }
+.modal-corpo form[hidden] { display: none; }
+.modal-pe .botao { min-height: 40px; padding: 0 18px; border-radius: 10px; }
+.modal-pe span { color: var(--texto); font-size: var(--t-etiqueta); }
+.modal h3 { font-family: var(--f-marca); font-size: var(--t-corpo); font-weight: 600; color: var(--forte); }
+.modal h3:focus { outline: none; }
+.modal .campo input { font-family: var(--f-lista); }
+.modal .campo input.codigo { max-width: 180px; font-family: var(--f-fixa); letter-spacing: .12em; }
+.modal fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.modal legend { padding: 0; color: var(--forte); }
+.op { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; cursor: pointer; }
+.op input { flex: none; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--roxo-texto); }
+
+/* the path at the top of a guide: a line and circles; the line up to the current step, and
+   the circle of that step, are purple */
+.percurso { display: flex; list-style: none; padding: 8px 24px 16px; }
+.percurso li {
+  flex: 1; position: relative; display: grid; justify-items: center; gap: 6px;
+  font-family: var(--f-marca); font-size: var(--t-etiqueta); color: var(--texto); text-align: center;
+}
+.percurso li + li::before, .percurso li + li::after { content: ""; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; }
+.percurso li + li::before { background: var(--filete); }
+.percurso li + li::after { background: var(--roxo-texto); transform: scaleX(0); transform-origin: left center; }
+.percurso li.feita::after { transform: scaleX(1); }
+.percurso li.atual::after { animation: percurso-enche .5s ease both; }
+@keyframes percurso-enche { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.bola {
+  position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--filete); background: var(--modal); color: var(--texto); font-weight: 600;
+}
+.percurso li.feita .bola { border-color: var(--roxo); background: var(--roxo); color: var(--sobre-roxo); }
+.percurso li.atual .bola { animation: bola-acende .3s ease .25s both; }
+@keyframes bola-acende {
+  from { border-color: var(--filete); background: var(--modal); color: var(--texto); }
+  to { border-color: var(--roxo); background: var(--roxo); color: var(--sobre-roxo); }
+}
+.percurso li.atual { color: var(--forte); font-weight: 600; }
+
+.centro { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 20px 0 8px; }
+.centro .dica { max-width: 44ch; font-size: var(--t-corpo); }
+/* The mascot is a strip of frames drawn on the pixel grid. The window shows one frame at a
+   time and the strip moves in jumps (steps): nothing slides, turns or stretches. */
+.mascote { width: 144px; aspect-ratio: 396 / 286; overflow: hidden; margin-bottom: 8px; }
+.mascote svg { display: block; height: 100%; width: auto; }
+.mascote.dancando svg { animation: mascote-fita 1.2s steps(8) infinite; }
+.mascote.acenando svg { animation: mascote-fita 1.4s steps(2) infinite; }
+@keyframes mascote-fita { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+
+/* the block: shown once, copied with one click */
+.depois { display: grid; gap: 16px; }
+.linha-prazo { color: var(--texto); }
+.linha-prazo b, .modal-pe b { font-variant-numeric: tabular-nums; }
+.bloco { position: relative; border: 1px solid var(--borda); border-radius: 12px; background: var(--modal-realce); transition: border-color .2s ease; }
+.js .bloco { cursor: pointer; }
+.bloco:hover { border-color: var(--forte); }
+.bloco pre {
+  margin: 0; padding: 14px 16px; max-height: 210px; overflow: auto;
+  font-family: var(--f-fixa); font-size: var(--t-etiqueta); line-height: 1.6;
+  white-space: pre-wrap; overflow-wrap: anywhere; color: var(--forte);
+}
+.bloco.copiou { border-color: var(--roxo-texto); animation: bloco-brilho .7s ease-out; }
+@keyframes bloco-brilho { 0% { box-shadow: 0 0 0 0 var(--roxo-texto); } 100% { box-shadow: 0 0 0 12px transparent; } }
+.selo { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; }
+.selo span { padding: 10px 20px; border-radius: 999px; background: var(--roxo); color: var(--sobre-roxo); font-family: var(--f-marca); font-weight: 600; }
+.bloco.copiou .selo { animation: selo-copiado 1.5s ease forwards; }
+@keyframes selo-copiado {
+  0% { opacity: 0; transform: scale(.8); }
+  14% { opacity: 1; transform: scale(1.06); }
+  24%, 78% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+.copiado { color: var(--ok); font-weight: 600; }
+.surge { animation: surge .4s ease; }
+@keyframes surge { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* With the script of the panel: the mascot first, the block after it; and the way on only
+   after the block was copied. Without it, the block is simply there. */
+.preparo { display: none; }
+.js .guia.prepara .preparo { display: grid; }
+.js .guia.prepara .depois, .js .guia.prepara .modal-pe { display: none; }
+.js .guia:not(.ja-copiou) .apos-copiar { display: none; }
+.com-script { display: none; }
+.js .com-script { display: inline; }
+.js .sem-script { display: none; }
+.so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.etapas { list-style: none; padding: 0; display: grid; gap: 10px; }
+.etapas li { display: flex; align-items: baseline; gap: 10px; color: var(--texto); }
+.etapas li::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--borda); }
+.etapas li.ok { color: var(--forte); }
+.etapas li.ok::before { border-color: var(--ok); background: var(--ok); }
+.etapas li.espera { color: var(--forte); }
+.etapas li.espera::before { border-color: var(--atencao); animation: etapa-pulsa 1s ease-in-out infinite; }
+@keyframes etapa-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.fatos { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 16px; }
+.fatos dt { color: var(--texto); }
+.fatos dd { overflow-wrap: anywhere; }
 
 @media (max-width: 960px) {
   .cabeca { padding: 24px 0 8px; }
@@ -183,6 +315,16 @@ code { font-family: var(--f-fixa); }
   .lista td.so-largo { display: none; }
   .lista tr.explica, .lista tr.vazio { display: block; padding: 0 0 8px; }
   .lista tr.explica td { padding: 14px 16px; }
+  .lista td.c-acoes { grid-column: 1 / -1; padding-top: 8px; }
+  .acoes { justify-content: flex-start; }
+  .acoes .botao { min-height: 44px; padding: 0 16px; }
+  .modal { width: calc(100% - 16px); max-height: calc(100% - 16px); }
+  .percurso { padding: 4px 8px 12px; }
+  .fatos { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .fatos dd { margin-bottom: 8px; }
+  .modal-topo { padding-left: 16px; }
+  .modal-corpo { padding: 8px 16px 20px; }
+  .modal-pe { padding: 12px 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

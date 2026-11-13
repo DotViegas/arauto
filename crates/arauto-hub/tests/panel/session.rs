@@ -116,7 +116,8 @@ async fn every_answer_tells_the_browser_to_do_no_more_than_show_it() {
             assert!(policy.contains(part), "{part}: {policy}");
         }
         assert!(!policy.contains("unsafe"), "{policy}");
-        assert!(!policy.contains("script-src"), "no script runs: {policy}");
+        // The one script that runs is a file of the panel: none written in a page.
+        assert!(policy.contains("script-src 'self';"), "{policy}");
         assert_eq!(answer.header("x-content-type-options"), Some("nosniff"));
         assert_eq!(answer.header("x-frame-options"), Some("DENY"));
         assert_eq!(answer.header("referrer-policy"), Some("no-referrer"));
@@ -129,7 +130,7 @@ async fn every_answer_tells_the_browser_to_do_no_more_than_show_it() {
         );
         assert!(
             !answer.text().contains("<script"),
-            "the panel has no script"
+            "a page without a guide loads no script"
         );
     }
     assert_eq!(
@@ -237,7 +238,7 @@ async fn signing_out_ends_that_session_and_no_other() {
 }
 
 /// Every row of every table of the hub, as text.
-async fn everything(fixture: &Fixture) -> Vec<(String, Vec<String>)> {
+pub async fn everything(fixture: &Fixture) -> Vec<(String, Vec<String>)> {
     let tables: Vec<String> = sqlx::query_scalar(
         "SELECT tablename::text FROM pg_tables WHERE schemaname = current_schema() ORDER BY 1",
     )

@@ -16,10 +16,11 @@ const FORM_MAX: usize = 4 * 1024;
 /// How long the body of a form may take to arrive.
 const FORM_READ: Duration = Duration::from_secs(5);
 
-/// What a page of the panel may load: its own sheet, its own fonts, and nothing else. No
-/// script runs, nothing is framed, and a form only posts back to the panel.
-const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; style-src 'self'; font-src 'self'; \
-     img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+/// What a page of the panel may load: its own sheet, its own fonts, its own script file, and
+/// nothing else. No script written inside a page runs, nothing is framed, and a form only
+/// posts back to the panel.
+const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; \
+     font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 
 /// The headers every answer of the panel carries.
 fn guarded(mut response: Response<Body>, cache: &'static str) -> Response<Body> {
@@ -74,7 +75,17 @@ pub(super) fn see_other(to: &'static str) -> Response<Body> {
     guarded(response, "no-store")
 }
 
-/// A file of the panel itself: the sheet and the fonts.
+/// "See the other address", for an address made of a name the hub already checked. One that
+/// is not a header value leads to the first page.
+pub(super) fn see_other_to(to: &str) -> Response<Body> {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = StatusCode::SEE_OTHER;
+    let location = HeaderValue::from_str(to).unwrap_or_else(|_| HeaderValue::from_static("/"));
+    response.headers_mut().insert(header::LOCATION, location);
+    guarded(response, "no-store")
+}
+
+/// A file of the panel itself: the sheet, the fonts and the script.
 pub(super) fn file(content_type: &'static str, bytes: &'static [u8]) -> Response<Body> {
     let mut response = Response::new(Body::from(bytes));
     response
@@ -138,6 +149,17 @@ impl FormError {
     }
 }
 
+/// A form sent by a page of the panel, as it came. What was typed in it is erased from
+/// memory when it is dropped.
+pub(super) struct Form(Zeroizing<Vec<u8>>);
+
+impl Form {
+    /// The value of a field, decoded. A field that did not come, or is not text, is none.
+    pub(super) fn field(&self, name: &str) -> Option<Zeroizing<String>> {
+        field_of(&self.0, name)
+    }
+}
+
 /// Reads one field of a form sent by a page of the panel. What was typed is erased from
 /// memory when the caller drops it.
 pub(super) async fn form_field(
@@ -145,6 +167,16 @@ pub(super) async fn form_field(
     body: Incoming,
     field: &str,
 ) -> Result<Option<Zeroizing<String>>, FormError> {
+    Ok(form(headers, body).await?.field(field))
+}
+
+/// The value of `field` in the query of an address.
+pub(super) fn query_field(query: Option<&str>, field: &str) -> Option<Zeroizing<String>> {
+    field_of(query?.as_bytes(), field)
+}
+
+/// Reads a form sent by a page of the panel: small, and of the one type a form of a page has.
+pub(super) async fn form(headers: &HeaderMap, body: Incoming) -> Result<Form, FormError> {
     let essence = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
@@ -169,7 +201,7 @@ pub(super) async fn form_field(
         }
         Ok(Err(_)) | Err(_) => return Err(FormError::NotRead),
     };
-    Ok(field_of(&bytes, field))
+    Ok(Form(bytes))
 }
 
 /// The value of `field` in a form body, decoded. A value that is not text is none.
@@ -289,10 +321,9 @@ mod tests {
             assert!(policy.contains("frame-ancestors 'none'"));
             assert!(policy.contains("form-action 'self'"));
             assert!(!policy.contains("unsafe"), "{policy}");
-            assert!(
-                !policy.contains("script-src"),
-                "no script runs in the panel"
-            );
+            // The one script that runs is a file of the panel: none written in a page.
+            assert!(policy.contains("script-src 'self';"), "{policy}");
+            assert_eq!(policy.matches("script-src").count(), 1, "{policy}");
             assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
             assert_eq!(headers[header::X_FRAME_OPTIONS], "DENY");
             assert_eq!(headers[header::REFERRER_POLICY], "no-referrer");

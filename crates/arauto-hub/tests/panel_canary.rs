@@ -1,8 +1,9 @@
 //! The canary of the secrets of the panel (`docs/15-mvp.md`, section 7;
 //! `docs/decisoes/0040-painel-dentro-do-hub.md`): entry codes are issued, typed wrong and
-//! right, sessions are opened, used, closed and left to end, with every log of the process
-//! captured. No entry code and no identifier of a session may appear in the log, in the
-//! errors the log carries, in the audit, in the alerts or in the rows of the panel.
+//! right, sessions are opened, used, closed and left to end, and a Hermes is connected through
+//! the guide, with every log of the process captured. No entry code, no identifier of a
+//! session, no invite and no verification code may appear in the log, in the errors the log
+//! carries, in the audit, in the alerts or in the rows of the panel and of the invites.
 //!
 //! A binary of its own: the log of the process is captured from its first line, at every
 //! level, and no other test writes into it.
@@ -12,11 +13,14 @@ use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use arauto_hub::channel::Downloads;
 use arauto_hub::repo::panel::SESSION_IDLE_MS;
 use arauto_protocol::clock::{Clock, ManualClock, SystemClock};
+use arauto_protocol::invite::Invite;
+use arauto_testkit::device::{self, Enrolled};
 use arauto_testkit::http::{self, Response};
 use arauto_testkit::hub::fixture::{self, Fixture};
-use arauto_testkit::hub::support::{PANEL_HOST, PANEL_ORIGIN};
+use arauto_testkit::hub::support::{self, PANEL_HOST, PANEL_ORIGIN};
 use data_encoding::{BASE32_NOPAD, BASE64, BASE64_NOPAD, BASE64URL_NOPAD, HEXLOWER, HEXUPPER};
 
 const PATIENCE: Duration = Duration::from_secs(15);
@@ -65,6 +69,35 @@ fn leaks(text: &str, secrets: &[(String, String)]) -> Vec<String> {
         .collect()
 }
 
+/// A verification code shows up as `123-456`, or as six digits standing alone.
+fn has_code(text: &str, code: &str) -> bool {
+    let digits: String = code.chars().filter(char::is_ascii_digit).collect();
+    if text.contains(code) {
+        return true;
+    }
+    text.match_indices(digits.as_str()).any(|(at, _)| {
+        let before = text[..at].chars().next_back();
+        let after = text[at + digits.len()..].chars().next();
+        !before.is_some_and(|c| c.is_ascii_digit()) && !after.is_some_and(|c| c.is_ascii_digit())
+    })
+}
+
+/// The invite inside the block a page shows.
+fn invite_of(page: &str) -> String {
+    let start = page
+        .find("<pre id=\"guia-texto\">")
+        .expect("the page shows a block");
+    let end = start + page[start..].find("</pre>").unwrap();
+    let text = page[start..end].replace("&quot;", "\"");
+    let line = text
+        .lines()
+        .find(|line| line.contains(" join \""))
+        .expect("the block has the line of the join");
+    let invite = line.split('"').nth_back(1).unwrap().to_owned();
+    assert!(Invite::parse(&invite).is_ok());
+    invite
+}
+
 #[test]
 fn the_detector_sees_a_planted_secret() {
     let secret = [0x5au8; 32];
@@ -72,6 +105,9 @@ fn the_detector_sees_a_planted_secret() {
         let secrets = vec![("planted".to_owned(), written.clone())];
         assert_eq!(leaks(&format!("x {written} y"), &secrets), ["planted"]);
     }
+    assert!(has_code("the code 028-213 was typed", "028-213"));
+    assert!(has_code(r#"{"code":"028213"}"#, "028-213"));
+    assert!(!has_code("at 1800000282130", "028-213"));
 }
 
 /// An entry code, as the command shows it, with every way it could have been written.
@@ -152,8 +188,22 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         .init();
 
     let clock = ManualClock::new(SystemClock.now_ms());
-    let mut fixture = Fixture::with_clock(fixture::settings(), Arc::new(clock.clone())).await;
+    // A hub that serves a connector: the panel makes a block for it.
+    let mut fixture = Fixture::stopped(
+        support::install().await,
+        fixture::settings(),
+        Arc::new(clock.clone()),
+    )
+    .await;
+    fixture.downloads = Downloads::empty()
+        .with_file(
+            "arauto-connector-linux-x86_64",
+            bytes::Bytes::from_static(b"abc"),
+        )
+        .unwrap();
+    fixture.start().await;
     let mut secrets: Vec<(String, String)> = Vec::new();
+    let mut codes: Vec<String> = Vec::new();
 
     // A code that is cancelled by the next one, typed after it died; a code typed wrong, in
     // an address, by a request that is not of the panel; and then typed right.
@@ -232,6 +282,46 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     // One more is issued and never typed: its digest stays in the database.
     code(&fixture, "untyped code", &mut secrets).await;
 
+    // A Hermes connected through the guide: the block is shown, the invite is used, and a
+    // code is typed wrong, out of the format and right. An invite that another one replaces
+    // is a secret too.
+    let replaced = invite_of(
+        &post(&fixture, "/hermes/connect", Some(&last), "name=canario")
+            .await
+            .text(),
+    );
+    let invite = invite_of(
+        &post(&fixture, "/hermes/invite", Some(&last), "name=canario")
+            .await
+            .text(),
+    );
+    assert_ne!(replaced, invite);
+    secrets.push(("replaced invite".to_owned(), replaced));
+    secrets.push(("invite".to_owned(), invite.clone()));
+    let device = fixture.device();
+    let Enrolled::Code(right) = device
+        .enroll(&Invite::parse(&invite).unwrap(), device::declared())
+        .await
+        .unwrap()
+    else {
+        panic!("enrolled");
+    };
+    let right = right.to_string();
+    let wrong = if right == "735-194" {
+        "735-195"
+    } else {
+        "735-194"
+    };
+    for typed in [wrong, "73519", right.as_str()] {
+        let form = format!("name=canario&code={typed}");
+        let answer = post(&fixture, "/hermes/approve", Some(&last), &form).await;
+        assert!(answer.status == 200 || answer.status == 303);
+    }
+    assert_eq!(fixture.state_of(&device).await.0, "approved");
+    get(&fixture, "/hermes/wait?name=canario", Some(&last)).await;
+    codes.push(right);
+    codes.push(wrong.to_owned());
+
     let log = captured.text();
     assert!(
         log.len() > 1_000,
@@ -239,7 +329,7 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         log.len()
     );
     let mut stored = String::new();
-    for table in ["panel_entry", "panel_session", "audit", "alert"] {
+    for table in ["panel_entry", "panel_session", "audit", "alert", "invite"] {
         let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT row_to_json(t)::text FROM {table} t"
         )))
@@ -249,11 +339,19 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         stored.push_str(&rows.join("\n"));
         stored.push('\n');
     }
-    for action in ["panel.code_issued", "panel.signed_in", "panel.signed_out"] {
+    for action in [
+        "panel.code_issued",
+        "panel.signed_in",
+        "panel.signed_out",
+        "invite.issued",
+    ] {
         assert!(stored.contains(action), "{action} is in the audit");
     }
     for (place, text) in [("log", &log), ("the database", &stored)] {
         let found = leaks(text, &secrets);
         assert!(found.is_empty(), "{place} holds: {found:?}");
+        for code in &codes {
+            assert!(!has_code(text, code), "{place} holds a verification code");
+        }
     }
 }

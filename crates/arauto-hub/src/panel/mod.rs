@@ -9,7 +9,8 @@
 //! | `GET /` | the Hermes |
 //! | `GET /whatsapps` | the numbers |
 //! | `GET /accesses` | the matrix of accesses |
-//! | `GET /assets/{file}` | the sheet and the fonts of the panel |
+//! | `GET /assets/{file}` | the sheet, the fonts and the script of the panel |
+//! | `/hermes/...` | the guide that connects a Hermes ([`connect`]) |
 //!
 //! What holds for every request:
 //!
@@ -23,12 +24,16 @@
 //!   the `Origin` of the panel, and the cookie of the session is not sent across sites.
 //! - **No secret is shown.** The entry code is typed, never displayed; the identifier of the
 //!   session lives in a cookie no script can read, and the hub keeps only its SHA-256.
-//! - **Every value is escaped** ([`html`]), and no script runs: the pages have none.
+//! - **Every value is escaped** ([`html`]). No page carries a script: a page with a guide
+//!   loads the one script file of the panel, which only helps the screen.
 //!
-//! This first delivery only reads. What it shows is what `arauto-hub admin` shows, through
-//! the same repository functions.
+//! What the pages show is what `arauto-hub admin` shows, through the same repository
+//! functions; what they change, they change by the functions that command calls.
 
+pub mod block;
+mod connect;
 mod data;
+pub mod guide;
 mod html;
 mod http;
 pub mod secret;
@@ -46,10 +51,11 @@ use uuid::Uuid;
 
 use self::secret::{EntryCode, SessionSecret};
 use crate::audit::AuditError;
-use crate::channel::Hub;
 use crate::channel::client_ip::client_ip;
+use crate::channel::{Downloads, Hub};
 use crate::config::PublicUrl;
 use crate::db::{self, ResolvedOrg};
+use crate::download::Listed;
 use crate::repo::panel::{PanelSession, SESSION_IDLE_MS, SESSION_VALIDITY_MS, SignIn};
 use crate::repo::{self, RepoError};
 
@@ -68,6 +74,11 @@ const ASSETS: &[(&str, &str, &[u8])] = &[
         "panel.css",
         "text/css; charset=utf-8",
         include_bytes!("assets/panel.css"),
+    ),
+    (
+        "panel.js",
+        "text/javascript; charset=utf-8",
+        include_bytes!("assets/panel.js"),
     ),
     (
         "poppins-400.woff2",
@@ -111,12 +122,17 @@ pub struct PanelState {
     seen: DashMap<Uuid, i64>,
     /// The minute being counted and how many entry codes were looked up in it.
     attempts: Mutex<(i64, u32)>,
+    /// The address of the hub that goes in a block: the one the connectors reach.
+    hub_url: PublicUrl,
+    /// The connector a block tells a Hermes to download, when the hub serves one.
+    connector: Option<Listed>,
 }
 
 impl PanelState {
-    /// The panel reached at `url`.
+    /// The panel reached at `url`, of a hub the connectors reach at `hub_url` and that
+    /// serves `downloads`.
     #[must_use]
-    pub fn new(url: &PublicUrl) -> Self {
+    pub fn new(url: &PublicUrl, hub_url: &PublicUrl, downloads: &Downloads) -> Self {
         let secure = url.is_secure();
         Self {
             origin: url.origin(),
@@ -131,6 +147,8 @@ impl PanelState {
             secure,
             seen: DashMap::new(),
             attempts: Mutex::new((0, 0)),
+            hub_url: hub_url.clone(),
+            connector: block::connector(&downloads.listed()).cloned(),
         }
     }
 
@@ -265,6 +283,9 @@ pub(crate) async fn route(
         (false, "/sign-in") => sign_in(&hub, panel, peer, &parts.headers, body).await,
         (false, "/sign-out") => sign_out(&hub, panel, peer, &parts.headers).await,
         (true, "/" | "/whatsapps" | "/accesses") => page(&hub, panel, &parts.headers, path).await,
+        (_, path) if path.starts_with("/hermes/") => {
+            connect::answer(&hub, panel, &parts, body).await
+        }
         _ => return http::plain(StatusCode::NOT_FOUND, "not found\n"),
     };
     answer.unwrap_or_else(|error| failed(&error))
@@ -369,7 +390,47 @@ mod tests {
     use super::*;
 
     fn panel(url: &str) -> PanelState {
-        PanelState::new(&PublicUrl::parse(url).unwrap())
+        PanelState::new(
+            &PublicUrl::parse(url).unwrap(),
+            &PublicUrl::parse("https://hub.example.com").unwrap(),
+            &Downloads::empty(),
+        )
+    }
+
+    #[test]
+    fn a_block_downloads_the_connector_the_hub_serves() {
+        let serves = Downloads::empty()
+            .with_file(
+                "arauto-connector-linux-x86_64",
+                bytes::Bytes::from_static(b"abc"),
+            )
+            .unwrap();
+        let panel = PanelState::new(
+            &PublicUrl::parse("http://localhost:8445").unwrap(),
+            &PublicUrl::parse("https://hub.example.com").unwrap(),
+            &serves,
+        );
+        let connector = panel.connector.unwrap();
+        assert_eq!(connector.name, "arauto-connector-linux-x86_64");
+        // The SHA-256 of the three bytes the hub serves under that name.
+        assert_eq!(
+            connector.sha256,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            panel.hub_url.channel_url(),
+            "wss://hub.example.com/v1/channel"
+        );
+        // A program for Windows is no connector a block can chain.
+        let windows_only = Downloads::empty()
+            .with_file("arauto-connector-windows-x86_64.exe", bytes::Bytes::new())
+            .unwrap();
+        let panel = PanelState::new(
+            &PublicUrl::parse("http://localhost:8445").unwrap(),
+            &PublicUrl::parse("https://hub.example.com").unwrap(),
+            &windows_only,
+        );
+        assert!(panel.connector.is_none());
     }
 
     #[test]
@@ -435,6 +496,7 @@ mod tests {
             names,
             [
                 "panel.css",
+                "panel.js",
                 "poppins-400.woff2",
                 "poppins-600.woff2",
                 "poppins-800.woff2",
@@ -443,7 +505,33 @@ mod tests {
             ]
         );
         let sheet = std::str::from_utf8(ASSETS[0].2).unwrap();
-        for (name, kind, bytes) in ASSETS.iter().skip(1) {
+        // The script helps the screen and nothing else: it writes no markup, runs no text,
+        // reads no cookie and calls no address.
+        let script = std::str::from_utf8(ASSETS[1].2).unwrap();
+        assert_eq!(ASSETS[1].1, "text/javascript; charset=utf-8");
+        for forbidden in [
+            "innerHTML",
+            "outerHTML",
+            "insertAdjacentHTML",
+            "document.write",
+            "eval(",
+            "Function(",
+            "document.cookie",
+            "fetch(",
+            "XMLHttpRequest",
+            "WebSocket",
+            "sendBeacon",
+            "localStorage",
+            "http://",
+            "https://",
+            "location",
+        ] {
+            assert!(
+                !script.contains(forbidden),
+                "the script of the panel has {forbidden}"
+            );
+        }
+        for (name, kind, bytes) in ASSETS.iter().skip(2) {
             assert_eq!(*kind, "font/woff2");
             assert!(bytes.starts_with(b"wOF2"), "{name}");
             assert!(

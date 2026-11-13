@@ -43,7 +43,7 @@ completos não estão publicados. Revisão de pessoas, de fora, ainda não houve
 | Um contato do WhatsApp | Escrever o que o Hermes vai ler. |
 | A LLM do Hermes, manipulada | Rodar comandos e ler arquivos com o usuário do Hermes. |
 | Alguém na rede | Ver, atrasar e alterar o tráfego entre Hermes e hub, inclusive no proxy que termina o TLS. |
-| Alguém com a sessão do painel roubada | Ver o painel. Não tem a passkey. |
+| Alguém com a sessão do painel roubada | Ver o painel. Não tem a passkey. **No hub, em 13/11/2026, a passkey ainda não existe: essa pessoa também conecta e reconecta Hermes, enquanto a sessão valer** ([decisão 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 | Quem lê o banco ou a cópia de segurança do hub | Tudo o que estiver gravado ali. |
 | Quem invade o servidor do hub | Tudo o que o hub pode. |
 
@@ -61,7 +61,7 @@ completos não estão publicados. Revisão de pessoas, de fora, ainda não houve
 | Proxy que termina o TLS do painel | Ver e alterar o que o admin faz no navegador. | O painel é um site: depende do TLS de quem instala. |
 | Domínio ou DNS do hub | Indisponibilidade para os conectores. | O conector só aceita o hub cuja chave veio no bloco. |
 | Banco do hub, só lido | Nenhuma credencial de Hermes ou de admin. | Só há chaves públicas e resumos; o resto está cifrado com chave fora do banco. |
-| Sessão do painel | Ver o painel. | Toda ação que muda algo pede a passkey na hora. |
+| Sessão do painel | Ver o painel. | Toda ação que muda algo pede a passkey na hora. No hub, em 13/11/2026, sem passkey: o que limita é o painel fechado (só por túnel) e o prazo da sessão. |
 | **Conta do admin** | **Tudo.** | É uma raiz. |
 | **Servidor do hub** | **Tudo daquele hub.** | É uma raiz. |
 | **Volume de sessões do motor** | **O próprio WhatsApp.** | É uma raiz. |

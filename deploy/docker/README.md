@@ -72,8 +72,12 @@ de proxies errada e o modo restaurado. Para mais detalhe, ponha `RUST_LOG=debug`
 
 ## Abrir o painel (opcional)
 
-O painel mostra os Hermes, os números e os acessos. Ele **só lê**: tudo o que muda algo continua
-pelo comando. Vem desligado, e **ainda não foi provado num servidor**.
+O painel mostra os Hermes, os números e os acessos, e conecta um Hermes, passo a passo. Parear
+números e dar acesso continuam pelo comando. Vem desligado, e **ainda não foi provado num
+servidor**.
+
+Ainda não há passkey: quem está com a sessão do painel aberta pode conectar e reconectar Hermes.
+Por isso, deixe o painel fechado, como abaixo, e saia dele ao terminar.
 
 1. No `arauto.env`, tire o comentário de `ARAUTO_LISTEN_PANEL` e de `ARAUTO_PANEL_URL`, e rode
    `docker compose --env-file arauto.env up -d`.
@@ -89,8 +93,9 @@ reinicia.
 
 A porta do painel é publicada só em `127.0.0.1` do servidor. Dentro do Docker, quem está numa rede
 do hub (o motor de WhatsApp, por exemplo) alcança a tela de entrada; sem o código, não passa dela.
-Para abrir o painel sem túnel, dê a ele um endereço próprio no seu proxy, com TLS, que não seja o
-dos conectores, e ponha esse endereço no `ARAUTO_PANEL_URL`. O risco de abri-lo é seu.
+Abrir o painel sem túnel (um endereço próprio no seu proxy, com TLS, que não seja o dos
+conectores) é possível, mas **não é recomendado enquanto a passkey não existir**. O risco de abri-lo
+é seu.
 
 ## 3. Conectar o primeiro Hermes
 

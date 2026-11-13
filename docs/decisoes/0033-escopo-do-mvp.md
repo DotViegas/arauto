@@ -24,5 +24,6 @@ Três pontos são proposta de quem escreve, a confirmar por quem mantém:
 - Enquanto não houver painel, a regra da passkey em toda ação que muda algo não tem onde ser aplicada: quem administra é quem tem acesso ao servidor.
 - O MVP não é uma versão publicada. Nada é aberto ao público antes da Fase 7.
 - **Mudança de 12/11/2026, a pedido de quem mantém:** o painel começou antes do fim do MVP, pelas
-  telas de leitura. Como ele entra no hub, e o que ainda falta decidir, está na
-  [0040](0040-painel-dentro-do-hub.md), que é proposta. Tudo o que muda algo continua pelo comando.
+  telas de leitura e pelo guia de conectar Hermes. Como ele entra no hub, e o que ainda falta
+  decidir, está na [0040](0040-painel-dentro-do-hub.md), que é proposta. Parear e dar acesso
+  continuam pelo comando.
