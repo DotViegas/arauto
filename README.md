@@ -1,7 +1,30 @@
-# Arauto
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/arauto-ia-escuro.svg">
+    <img src="docs/marca/arauto-ia-claro.svg" alt="Arauto[IA]" width="440">
+  </picture>
+</p>
 
-Dá a cada agente Hermes acesso controlado a números de WhatsApp e deixa um Hermes mandar recado a
-outro, com um lugar só para conectar agentes, parear números e dizer quem acessa o quê.
+<p align="center">
+  <b>Dá a cada agente Hermes acesso controlado a números de WhatsApp<br>
+  e deixa um Hermes mandar recado a outro.</b><br>
+  Um lugar só para conectar agentes, parear números e dizer quem acessa o quê.
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/selos-escuro.svg">
+    <img src="docs/marca/selos-claro.svg" alt="Gratuito. Licença Apache-2.0. Feito em Rust. Primeiro MVP em construção." width="507">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="docs/01-visao.md">Visão</a> ·
+  <a href="docs/02-como-funciona.md">Como funciona</a> ·
+  <a href="docs/04-seguranca-conexao.md">Segurança da conexão</a> ·
+  <a href="docs/15-mvp.md">O primeiro MVP</a> ·
+  <a href="docs/glossario.md">Glossário</a>
+</p>
 
 > **Estado: primeiro MVP em construção.** O desenho está nestes documentos; o código está começando
 > e ainda não há versão para uso ([docs/15-mvp.md](docs/15-mvp.md)). O projeto é gratuito e o código
@@ -12,12 +35,12 @@ vínculo com os autores do Hermes Agent nem com o WhatsApp.
 
 ## Em uma tela
 
-```
- PAINEL                        HERMES
- "Conectar Hermes"   ──────►   você cola um bloco no canal de comando dele
- digita o código     ◄──────   ele instala o conector e responde um código de conferência
- marca os acessos              ele passa a ler e agir nos números que você liberou
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/em-uma-tela-escuro.svg">
+    <img src="docs/marca/em-uma-tela-claro.svg" width="687" alt="Em três passos. 1: no painel, você escolhe Conectar Hermes e cola um bloco no canal de comando do Hermes. 2: ele instala o conector e responde um código de conferência, que você digita no painel. 3: você marca os acessos e ele passa a ler e agir nos números que você liberou.">
+  </picture>
+</p>
 
 - **Conectar é copiar e colar.** Um convite de uso único, válido por 15 minutos.
 - **Nenhum segredo duradouro passa pelo chat.** As credenciais são criadas pelas duas máquinas e
@@ -97,3 +120,9 @@ As decisões têm três estados: decidida, proposta e pendente.
 - **Relato de falha:** pelo relato privado do GitHub, quando o repositório for aberto
   ([SECURITY.md](SECURITY.md)).
 - **Quem mantém e como contribuir:** a definir antes de o repositório ser aberto ao público.
+
+<p align="center">
+  <img src="docs/marca/mascote-pixel-acenando.svg" alt="O mascote do Arauto, em pixel, acenando" width="108">
+</p>
+
+<p align="center"><sub>O arauto é quem leva e anuncia as mensagens.</sub></p>
