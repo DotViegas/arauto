@@ -570,7 +570,7 @@ async fn every_table_of_the_retention_is_purged_and_the_days_are_the_documented_
         days,
         [
             ("channel_connection", Some(90)),
-            ("engine_event", Some(1)),
+            ("engine_event", Some(2)),
             ("notice", Some(7)),
             ("peer_message", Some(30)),
             ("tool_call", Some(7)),

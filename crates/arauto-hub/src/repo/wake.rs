@@ -2,7 +2,8 @@
 //! (`docs/08-permissoes.md`, section 4; `docs/09-contrato-mcp.md`, section 5;
 //! `docs/10-maquinas-de-estado.md`, section 5).
 //!
-//! A message wakes a Hermes when, at that moment: the number is connected; the Hermes may be
+//! A message wakes a Hermes when, at that moment: the number is in use (connected, or coming
+//! back: its notices then wait for it in the queue); the Hermes may be
 //! woken and has an active device; and the matrix gives it the verb "be woken" in that chat
 //! (the line of the chat when there is one, which replaces the verbs of the number whole;
 //! otherwise the verbs of the number, with the scope "all", and only in a chat with one
@@ -76,15 +77,23 @@ async fn notify(
 ) -> Result<Vec<Uuid>, RepoError> {
     // The messages of a number are handled one at a time, under the lock of the number: two
     // at once would both create the pending notice of the same chat.
-    let connected: Option<bool> = sqlx::query_scalar(
-        "SELECT state = 'connected' FROM number \
-         WHERE organization_id = $1 AND id = $2 FOR NO KEY UPDATE",
+    // A number that is coming back (`reconnecting`, `failed`) still makes its notices: they
+    // wait in the queue and leave when it is connected again. One the admin took out of use
+    // (unpaired, disconnected, another telephone, removed) makes none.
+    let state: Option<String> = sqlx::query_scalar(
+        "SELECT state FROM number WHERE organization_id = $1 AND id = $2 FOR NO KEY UPDATE",
     )
     .bind(organization.id())
     .bind(number)
     .fetch_optional(&mut *connection)
     .await?;
-    if connected != Some(true) {
+    let state = state.unwrap_or_default();
+    if !matches!(state.as_str(), "connected" | "reconnecting" | "failed") {
+        tracing::info!(
+            number = %number,
+            state = %state,
+            "a message arrived on a number that is not in use: it wakes nobody"
+        );
         return Ok(Vec::new());
     }
     let woken: Vec<(Uuid, i32)> = sqlx::query_as(
@@ -94,7 +103,9 @@ async fn notify(
          LEFT JOIN access_chat c ON c.access_id = a.id AND c.chat_id = $3 \
          WHERE a.organization_id = $1 AND a.number_id = $2 \
            AND h.deleted_at IS NULL AND h.can_be_woken \
-           AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake AND ch.kind = 'contact') \
+           AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake AND ch.kind = 'contact' \
+                        AND NOT (ch.hidden_id AND EXISTS (SELECT 1 FROM access_chat x \
+                                                          WHERE x.access_id = a.id))) \
            AND EXISTS (SELECT 1 FROM device d \
                        WHERE d.organization_id = $1 AND d.hermes_id = a.hermes_id \
                          AND d.state = 'active') \

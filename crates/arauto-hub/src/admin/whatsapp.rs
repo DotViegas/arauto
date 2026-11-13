@@ -399,10 +399,22 @@ impl Session {
                     )
                     .await?;
                     transaction.commit().await?;
-                    return Ok(match change.map(|(_, to)| to) {
-                        Some(NumberState::NumberSwapped) => PairOutcome::Swapped,
-                        _ => PairOutcome::Connected,
-                    });
+                    // What happened is what the row says now, whoever wrote it: this loop,
+                    // an event of the engine or the supervision. An engine that works and
+                    // does not name its telephone yet is asked again.
+                    let state = match change {
+                        Some((_, to)) => to,
+                        None => repo::number::by_alias(&self.pool, self.organization, &alias)
+                            .await?
+                            .map_or(NumberState::Pairing, |number| number.state),
+                    };
+                    match state {
+                        NumberState::Connected => return Ok(PairOutcome::Connected),
+                        NumberState::NumberSwapped => return Ok(PairOutcome::Swapped),
+                        NumberState::Unpaired => return Ok(PairOutcome::Expired),
+                        NumberState::Failed => return Ok(PairOutcome::Failed),
+                        _ => {}
+                    }
                 }
                 Some(EngineStatus::Failed) => {
                     let _ = engine.client.stop(&number.session).await;

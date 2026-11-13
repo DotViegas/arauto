@@ -341,14 +341,23 @@ impl Waha {
     }
 
     async fn post_sent(&self, path: &str, body: &Value) -> Result<Sent, EngineError> {
-        let value = self
-            .json(
+        let answer = self
+            .http
+            .send(
                 Call::new(Method::POST, path.to_owned(), Expect::Json(JSON_ANSWER_MAX)).json(body),
             )
             .await?;
-        Ok(Sent {
-            id: id_field(value.get("id")).and_then(|id| EngineMessageId::parse(&id).ok()),
-        })
+        let answer = check(answer)?;
+        // The engine said the message left. A body the hub cannot read does not undo that:
+        // the sending is done, without the identifier of the new message.
+        let id = serde_json::from_slice::<Value>(&answer.body)
+            .ok()
+            .and_then(|value| id_field(value.get("id")))
+            .and_then(|id| EngineMessageId::parse(&id).ok());
+        if id.is_none() {
+            tracing::warn!("the engine sent a message and did not say its identifier");
+        }
+        Ok(Sent { id })
     }
 }
 

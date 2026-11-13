@@ -127,12 +127,14 @@ pub fn next(state: NumberState, trigger: Trigger) -> Option<NumberState> {
                 expected_phone,
             },
         ) => {
-            if expected_phone == Some(true) {
-                N::Connected
-            } else {
-                // An account that is another telephone, or that the engine does not name, is
-                // not taken for the expected one: the admin decides.
-                N::NumberSwapped
+            match expected_phone {
+                Some(true) => N::Connected,
+                // An account that is another telephone is not taken for the expected one:
+                // the admin decides.
+                Some(false) => N::NumberSwapped,
+                // The engine says it works and does not say which telephone yet: nothing is
+                // decided on a telephone nobody read. The pairing goes on until it is told.
+                None => return None,
             }
         }
         (
@@ -165,6 +167,14 @@ pub fn next(state: NumberState, trigger: Trigger) -> Option<NumberState> {
         (N::NumberSwapped, Trigger::Confirm) => N::Connected,
         (N::NumberSwapped, Trigger::Unpair) => N::Unpaired,
         (N::Failed, Trigger::Restart) => N::Reconnecting,
+        // The engine recovered by itself, with the telephone the hub expects.
+        (
+            N::Failed,
+            Trigger::Status {
+                status: S::Working,
+                expected_phone: Some(true),
+            },
+        ) => N::Connected,
         _ => return None,
     };
     (next != state || next == N::Pairing).then_some(next)
@@ -213,7 +223,12 @@ mod tests {
                 status(S::Working, Some(false)),
                 Some(N::NumberSwapped),
             ),
-            (N::Pairing, status(S::Working, None), Some(N::NumberSwapped)),
+            (N::Pairing, status(S::Working, None), None),
+            (
+                N::Failed,
+                status(S::Working, Some(true)),
+                Some(N::Connected),
+            ),
             (N::Pairing, Trigger::PairingExpired, Some(N::Unpaired)),
             (
                 N::Connected,

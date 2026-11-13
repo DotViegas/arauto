@@ -1313,7 +1313,10 @@ pub async fn lease(
         "SELECT n.id, n.count, m.alias, n.chat_id, \
                 (h.can_be_woken AND m.state = 'connected' \
                  AND COALESCE(c.can_wake, \
-                              a.scope = 'all' AND a.can_wake AND ch.kind = 'contact', FALSE)) \
+                              a.scope = 'all' AND a.can_wake AND ch.kind = 'contact' \
+                              AND NOT (ch.hidden_id AND EXISTS (SELECT 1 FROM access_chat x \
+                                                                WHERE x.access_id = a.id)), \
+                              FALSE)) \
          FROM notice n \
          JOIN hermes h ON h.id = n.hermes_id \
          JOIN number m ON m.id = n.number_id \
@@ -1322,6 +1325,7 @@ pub async fn lease(
          LEFT JOIN access_chat c ON c.access_id = a.id AND c.chat_id = n.chat_id \
          WHERE n.organization_id = $1 AND n.hermes_id = $2 AND n.kind = 'whatsapp' \
            AND n.state = 'pending' AND n.not_before <= $3 \
+           AND m.state NOT IN ('reconnecting', 'failed', 'pairing') \
            AND NOT EXISTS (SELECT 1 FROM notice s \
                            WHERE s.hermes_id = n.hermes_id AND s.chat_id = n.chat_id \
                              AND s.id <> n.id AND s.sent_at > $3 - $4) \

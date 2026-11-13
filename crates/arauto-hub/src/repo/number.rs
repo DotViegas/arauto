@@ -48,6 +48,9 @@ pub struct Number {
     pub config_digest: Option<Vec<u8>>,
     /// The newest message recorded, in milliseconds of the engine.
     pub last_message_at: Option<i64>,
+    /// Up to when the catch-up read everything, in milliseconds of the hub. Only the
+    /// catch-up moves it.
+    pub caught_up_until: Option<i64>,
     /// When it was added.
     pub created_at: i64,
     phone_enc: Vec<u8>,
@@ -91,6 +94,7 @@ struct Row {
     pairing_until: Option<i64>,
     config_digest: Option<Vec<u8>>,
     last_message_at: Option<i64>,
+    caught_up_until: Option<i64>,
     created_at: i64,
     phone_enc: Vec<u8>,
 }
@@ -99,7 +103,8 @@ struct Row {
 macro_rules! columns {
     () => {
         "id, engine_id, session_name, alias, command, state, state_since, paired_at, \
-         pairing_until, config_digest, last_message_at, created_at, phone_enc"
+         pairing_until, config_digest, last_message_at, caught_up_until, created_at, \
+         phone_enc"
     };
 }
 
@@ -122,6 +127,7 @@ impl TryFrom<Row> for Number {
             pairing_until: row.pairing_until,
             config_digest: row.config_digest,
             last_message_at: row.last_message_at,
+            caught_up_until: row.caught_up_until,
             created_at: row.created_at,
             phone_enc: row.phone_enc,
         })
@@ -134,6 +140,8 @@ fn numbers(rows: Vec<Row>) -> Result<Vec<Number>, RepoError> {
 
 /// What [`add`] did.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// One value at a time, moved once to whoever asked: boxing the number buys nothing.
+#[allow(clippy::large_enum_variant)]
 pub enum AddOutcome {
     /// The number was added, unpaired.
     Added(Number),
@@ -310,6 +318,8 @@ pub async fn by_session(
 
 /// What a change of state asked by the admin did.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// One value at a time, moved once to whoever asked: boxing the number buys nothing.
+#[allow(clippy::large_enum_variant)]
 pub enum ChangeOutcome {
     /// The number went from the first state to the second.
     Changed(Number, NumberState),
@@ -592,8 +602,31 @@ pub async fn config_applied(
     Ok(())
 }
 
-/// Moves forward the newest message recorded of `number`, where the next catch-up starts.
-/// It never goes back.
+/// Moves forward the cursor of the catch-up of `number`: up to `until`, in milliseconds of
+/// the hub, a whole round read everything. It never goes back.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn caught_up(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    number: Uuid,
+    until: i64,
+) -> Result<(), RepoError> {
+    sqlx::query(
+        "UPDATE number SET caught_up_until = GREATEST(COALESCE(caught_up_until, $3), $3) \
+         WHERE organization_id = $1 AND id = $2",
+    )
+    .bind(organization.id())
+    .bind(number)
+    .bind(until)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Records that a message of the time `at_ms` was recorded for the number: what the screens
+/// show as its last message. It never goes back.
 ///
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.

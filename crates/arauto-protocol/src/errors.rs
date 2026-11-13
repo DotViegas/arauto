@@ -102,6 +102,7 @@ error_codes! {
     Ar710 = "AR-710", "Too many calls at the same time. Try again in a moment.";
     Ar711 = "AR-711", "Invalid argument. Check the description of the tool and call again.";
     Ar712 = "AR-712", "Message not found: it does not exist, is outside what this Hermes can use, or WhatsApp no longer allows it.";
+    Ar713 = "AR-713", "The result of the sending is unknown: the message may have been sent. Read the chat before sending it again.";
 }
 
 impl ErrorCode {
@@ -201,12 +202,12 @@ mod tests {
     use std::collections::HashSet;
 
     /// The catalog of `docs/11-conector.md`, section 8, written a second time.
-    const CATALOG: [&str; 38] = [
+    const CATALOG: [&str; 39] = [
         "AR-101", "AR-102", "AR-104", "AR-105", "AR-201", "AR-202", "AR-203", "AR-204", "AR-205",
         "AR-206", "AR-207", "AR-208", "AR-301", "AR-302", "AR-303", "AR-401", "AR-402", "AR-501",
         "AR-502", "AR-503", "AR-504", "AR-505", "AR-506", "AR-507", "AR-601", "AR-602", "AR-701",
         "AR-702", "AR-703", "AR-704", "AR-705", "AR-706", "AR-707", "AR-708", "AR-709", "AR-710",
-        "AR-711", "AR-712",
+        "AR-711", "AR-712", "AR-713",
     ];
 
     fn every_phrase() -> Vec<(ErrorCode, String)> {

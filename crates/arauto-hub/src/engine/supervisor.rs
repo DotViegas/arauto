@@ -177,8 +177,18 @@ async fn supervise_number(
         tracing::warn!(%error, number = %number.id, "the session of the engine was not started");
     }
     if state == NumberState::Connected && info.status == EngineStatus::Working {
-        let since = number.last_message_at.unwrap_or(now);
-        catch_up(hub, organization, engine, key, number, since).await?;
+        // From where the last whole round ended, never from the newest message recorded: a
+        // message that arrives as the hub comes back would hide what arrived while it was
+        // away. The margin covers a clock of the engine a little behind the one of the hub;
+        // what is read twice is one row, by the key of the event.
+        let since = number
+            .caught_up_until
+            .or(number.last_message_at)
+            .unwrap_or(now)
+            .saturating_sub(CATCH_UP_MARGIN_MS);
+        if catch_up(hub, organization, engine, key, number, since).await? {
+            number::caught_up(hub.pool(), organization, number.id, now).await?;
+        }
     }
     Ok(())
 }
@@ -225,7 +235,12 @@ async fn corrected(
     Ok(())
 }
 
-/// Records the messages of `number` since `since` that the hub does not have yet.
+/// How far before its cursor each round of the catch-up reads again.
+const CATCH_UP_MARGIN_MS: i64 = 2 * 60 * 1_000;
+
+/// Records the messages of `number` since `since` that the hub does not have yet. Returns
+/// whether the round was whole: every chat was read, and no list came cut by its ceiling.
+/// Only a whole round moves the cursor of the number.
 async fn catch_up(
     hub: &Hub,
     organization: ResolvedOrg,
@@ -233,7 +248,7 @@ async fn catch_up(
     key: &OrganizationKey,
     number: &Number,
     since: i64,
-) -> Result<(), RepoError> {
+) -> Result<bool, RepoError> {
     let settings = hub.engines().settings();
     let now = hub.now_ms();
     let since = since.max(now.saturating_sub(settings.catch_up_horizon_ms));
@@ -241,15 +256,17 @@ async fn catch_up(
         Page::new(settings.catch_up_chats, 0),
         Page::new(settings.catch_up_messages, 0),
     ) else {
-        return Ok(());
+        return Ok(false);
     };
     let chats = match engine.client.chats(&number.session, chats).await {
         Ok(chats) => chats,
         Err(error) => {
             tracing::warn!(%error, number = %number.id, "the catch-up could not list the chats");
-            return Ok(());
+            return Ok(false);
         }
     };
+    // A list as long as its ceiling may have been cut: the next round reads the same span.
+    let mut whole = chats.len() < settings.catch_up_chats as usize;
     let mut recorded = 0usize;
     for chat in chats {
         if chat.last.as_ref().is_some_and(|last| last.at_ms < since) {
@@ -268,9 +285,13 @@ async fn catch_up(
             Ok(found) => found,
             Err(error) => {
                 tracing::warn!(%error, number = %number.id, "the catch-up could not read a chat");
+                whole = false;
                 continue;
             }
         };
+        if found.len() >= settings.catch_up_messages as usize {
+            whole = false;
+        }
         let mut transaction = hub.pool().begin().await?;
         let mut woken = Vec::new();
         for message in found.iter().filter(|message| message.at_ms >= since) {
@@ -318,7 +339,7 @@ async fn catch_up(
     if recorded > 0 {
         tracing::info!(number = %number.id, recorded, "the catch-up recorded messages");
     }
-    Ok(())
+    Ok(whole)
 }
 
 /// A message found by the catch-up, in the shape of the event the engine would have sent:

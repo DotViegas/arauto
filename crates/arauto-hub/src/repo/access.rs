@@ -248,8 +248,26 @@ pub async fn chat_line(
     .bind(chat)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(|(read, send, modify, wake)| verbs_of(read, send, modify, wake)))
+    if let Some((read, send, modify, wake)) = row {
+        return Ok(Some(verbs_of(read, send, modify, wake)));
+    }
+    // A chat under a hidden identifier, in an access that has lines: one of those lines may
+    // be about this very person (given by telephone), and the hub cannot tell. It counts as
+    // a chat with a line that blocks it, until the admin gives this chat a line of its own.
+    let blocked: Option<bool> = sqlx::query_scalar(HIDDEN_AND_LINED)
+        .bind(organization.id())
+        .bind(access)
+        .bind(chat)
+        .fetch_optional(pool)
+        .await?;
+    Ok((blocked == Some(true)).then(|| verbs_of(false, false, false, false)))
 }
+
+/// Whether the chat `$3` is under a hidden identifier and the access `$2` has some line.
+const HIDDEN_AND_LINED: &str = "\
+    SELECT ch.hidden_id AND EXISTS (SELECT 1 FROM access_chat x \
+                                    WHERE x.organization_id = $1 AND x.access_id = $2) \
+    FROM chat ch WHERE ch.organization_id = $1 AND ch.id = $3";
 
 /// Every line of the access `access`, by chat.
 ///
@@ -268,10 +286,29 @@ pub async fn chat_lines(
     .bind(access)
     .fetch_all(pool)
     .await?;
-    Ok(rows
+    let mut lines: HashMap<Uuid, Verbs> = rows
         .into_iter()
         .map(|(chat, read, send, modify, wake)| (chat, verbs_of(read, send, modify, wake)))
-        .collect())
+        .collect();
+    // As in [`chat_line`]: with any line, the chats under a hidden identifier are blocked.
+    if !lines.is_empty() {
+        let hidden: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT ch.id FROM chat ch \
+             JOIN access a ON a.organization_id = ch.organization_id \
+                          AND a.number_id = ch.number_id \
+             WHERE ch.organization_id = $1 AND a.id = $2 AND ch.hidden_id",
+        )
+        .bind(organization.id())
+        .bind(access)
+        .fetch_all(pool)
+        .await?;
+        for chat in hidden {
+            lines
+                .entry(chat)
+                .or_insert_with(|| verbs_of(false, false, false, false));
+        }
+    }
+    Ok(lines)
 }
 
 /// The numbers the Hermes `name` has an access to, each with the words of its verbs: what

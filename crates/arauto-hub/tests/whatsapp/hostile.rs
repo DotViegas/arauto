@@ -53,7 +53,8 @@ async fn a_slow_engine_is_cut_at_the_deadline_and_holds_no_other_number() {
         let answer = adapter.chats(&quick, page()).await;
         (answer, started.elapsed())
     });
-    assert_eq!(slow_answer, Err(EngineError::Unavailable(Cause::Timeout)));
+    // The request left and the answer did not come: what was asked may have been done.
+    assert_eq!(slow_answer, Err(EngineError::Unavailable(Cause::NoAnswer)));
     assert!(
         started.elapsed() < Duration::from_secs(5),
         "the deadline of the call held"

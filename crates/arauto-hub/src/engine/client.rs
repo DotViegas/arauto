@@ -140,7 +140,8 @@ impl HttpClient {
     pub(crate) async fn send(&self, call: Call) -> Result<Answer, EngineError> {
         match tokio::time::timeout(self.deadlines.call, self.exchange(call)).await {
             Ok(answer) => answer,
-            Err(_) => Err(EngineError::Unavailable(Cause::Timeout)),
+            // The whole call ran out of time: the request may have left.
+            Err(_) => Err(EngineError::Unavailable(Cause::NoAnswer)),
         }
     }
 
@@ -187,10 +188,11 @@ impl HttpClient {
         let request = request
             .body(body)
             .map_err(|_| EngineError::Invalid("request"))?;
+        // From here on the request may have reached the engine.
         let response = sender
             .send_request(request)
             .await
-            .map_err(|_| EngineError::Unavailable(Cause::Connect))?;
+            .map_err(|_| EngineError::Unavailable(Cause::NoAnswer))?;
 
         let status = response.status();
         if status.is_server_error() {
@@ -228,7 +230,7 @@ impl HttpClient {
                 if error.is::<http_body_util::LengthLimitError>() {
                     EngineError::Unavailable(Cause::TooLarge)
                 } else {
-                    EngineError::Unavailable(Cause::Connect)
+                    EngineError::Unavailable(Cause::NoAnswer)
                 }
             })?
             .to_bytes();

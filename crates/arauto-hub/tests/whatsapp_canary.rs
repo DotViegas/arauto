@@ -256,8 +256,12 @@ async fn no_secret_of_the_whatsapp_reaches_the_log_the_errors_the_audit_or_the_a
         world.fake.fail("/api", fault);
         let failed = client.messages(&name, &chat_id, query).await.unwrap_err();
         errors.push_str(&written(&failed));
-        let failed = client.send_text(&name, &to_send).await.unwrap_err();
-        errors.push_str(&written(&failed));
+        // A sending the engine accepted with a body the hub cannot read is a sending done,
+        // without the identifier of the message: only the other faults are errors.
+        match client.send_text(&name, &to_send).await {
+            Err(failed) => errors.push_str(&written(&failed)),
+            Ok(sent) => assert!(sent.id.is_none(), "{sent:?}"),
+        }
         let failed = client
             .check_number(&name, &contact_phone)
             .await

@@ -85,6 +85,15 @@ impl From<EngineError> for Refusal {
 
 type Answer = Result<Value, Refusal>;
 
+/// The failure of a sending, after the request may have left: the engine may have sent the
+/// message, and saying "unavailable" would make the Hermes send it again (AR-713).
+fn after_sending(error: EngineError) -> Refusal {
+    match error {
+        EngineError::Unavailable(cause) if !cause.before_request() => ErrorCode::Ar713.into(),
+        other => other.into(),
+    }
+}
+
 /// A failure of the hub itself, logged without any value of the call: AR-205.
 fn failed(error: &RepoError, what: &'static str) -> Refusal {
     tracing::error!(%error, "{what}");
@@ -336,6 +345,18 @@ impl<'a> Call<'a> {
         Ok((Reached { chat, engine_chat }, message))
     }
 
+    /// A sending to a telephone asks WhatsApp about that telephone before anything else,
+    /// and that question is what the send limit is for: it takes its place here, before the
+    /// engine hears of it, whatever becomes of the call. Returns whether the place was taken.
+    fn spend_for_a_phone(&self, op: &WhatsappOp, to: &Recipient) -> Result<bool, Refusal> {
+        if matches!(to, Recipient::Phone(_)) {
+            self.spend(op)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Where a sending goes, with the verb send there: a chat of the hub, or a telephone,
     /// whose exact form the engine gives. A telephone whose chat the hub does not have yet is
     /// a chat that exists when the engine has a message in it; otherwise it is a new chat,
@@ -431,9 +452,14 @@ impl<'a> Call<'a> {
         .map_err(|error| failed(&error, "a chat could not be recorded"))
     }
 
-    /// What a sending answers: the chat and the new message.
+    /// What a sending answers: the chat and the new message. A failure of the hub here does
+    /// not undo the sending: the answer says that its result is unknown (AR-713), so the
+    /// Hermes reads the chat instead of sending again.
     async fn sent(&self, destination: &Destination, id: Option<&EngineMessageId>) -> Answer {
-        let chat = self.chat_of(destination).await?;
+        let chat = self
+            .chat_of(destination)
+            .await
+            .map_err(|_| Refusal::from(ErrorCode::Ar713))?;
         Ok(json!({
             "number": self.alias(),
             "chat": chat.as_hyphenated().to_string(),
@@ -477,6 +503,7 @@ impl<'a> Call<'a> {
             }
             WhatsappOp::SendText(send) => {
                 let engine = self.authorized().await?;
+                let by_phone = self.spend_for_a_phone(op, &send.to)?;
                 let destination = self.destination(&engine, &send.to).await?;
                 let reply_to = match &send.reply_to {
                     Some(given) => Some(self.reply_in(&destination, given).await?),
@@ -493,16 +520,20 @@ impl<'a> Call<'a> {
                     reply_to,
                     mentions,
                 };
-                self.spend(op)?;
+                if !by_phone {
+                    self.spend(op)?;
+                }
                 let sent = engine
                     .engine
                     .client
                     .send_text(engine.session, &text)
-                    .await?;
+                    .await
+                    .map_err(after_sending)?;
                 self.sent(&destination, sent.id.as_ref()).await
             }
             WhatsappOp::SendFile(send) => {
                 let engine = self.authorized().await?;
+                let by_phone = self.spend_for_a_phone(op, &send.to)?;
                 let destination = self.destination(&engine, &send.to).await?;
                 let file = SendFile {
                     chat: destination.engine_chat.clone(),
@@ -527,12 +558,15 @@ impl<'a> Call<'a> {
                         .map(|caption| MessageBody::to_send(caption.expose()))
                         .transpose()?,
                 };
-                self.spend(op)?;
+                if !by_phone {
+                    self.spend(op)?;
+                }
                 let sent = engine
                     .engine
                     .client
                     .send_file(engine.session, &file)
-                    .await?;
+                    .await
+                    .map_err(after_sending)?;
                 self.sent(&destination, sent.id.as_ref()).await
             }
             WhatsappOp::MarkRead { chat } => {
@@ -574,14 +608,22 @@ impl<'a> Call<'a> {
                 // Reading in the chat of the message, and sending in the other.
                 let (_, message) = self.message(message, Verb::Read).await?;
                 let engine = self.authorized().await?;
+                let by_phone = self.spend_for_a_phone(op, to)?;
                 let destination = self.destination(&engine, to).await?;
-                self.spend(op)?;
+                if !by_phone {
+                    self.spend(op)?;
+                }
                 let sent = engine
                     .engine
                     .client
                     .forward(engine.session, &message, &destination.engine_chat)
                     .await
-                    .map_err(message_error)?;
+                    .map_err(|error| match error {
+                        EngineError::Unavailable(cause) if !cause.before_request() => {
+                            Refusal::from(ErrorCode::Ar713)
+                        }
+                        other => message_error(other),
+                    })?;
                 self.sent(&destination, sent.id.as_ref()).await
             }
             WhatsappOp::EditMessage { message, text } => {

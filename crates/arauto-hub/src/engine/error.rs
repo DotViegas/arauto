@@ -10,8 +10,11 @@ pub enum Cause {
     NotConfigured,
     /// The connection did not open.
     Connect,
-    /// The answer did not come in time.
+    /// The connection did not open in time.
     Timeout,
+    /// The request left, and the answer did not come whole or in time: what was asked may
+    /// have been done.
+    NoAnswer,
     /// The engine answered with an error of its own (5xx), or an unexpected status.
     Status(u16),
     /// The engine refused the key of its API.
@@ -32,13 +35,26 @@ impl Cause {
         match self {
             Cause::NotConfigured => "not configured",
             Cause::Connect => "no connection",
-            Cause::Timeout => "no answer in time",
+            Cause::Timeout => "no connection in time",
+            Cause::NoAnswer => "the request left and no answer came",
             Cause::Status(_) => "an error status",
             Cause::KeyRefused => "the key was refused",
             Cause::Malformed => "a malformed answer",
             Cause::TooLarge => "an answer above the ceiling",
             Cause::ContentType => "an answer of another type",
         }
+    }
+}
+
+impl Cause {
+    /// Whether the request certainly never reached the engine: nothing was done there. For
+    /// every other cause the engine may have done what was asked.
+    #[must_use]
+    pub const fn before_request(self) -> bool {
+        matches!(
+            self,
+            Cause::NotConfigured | Cause::Connect | Cause::Timeout | Cause::KeyRefused
+        )
     }
 }
 

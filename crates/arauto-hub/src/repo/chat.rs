@@ -39,6 +39,14 @@ pub async fn find(
     .await?)
 }
 
+/// Whether the engine names this chat by a hidden identifier instead of a telephone. The
+/// same person may show up as a telephone in one place and as a hidden identifier in
+/// another, and the hub has no way to tell that the two are one: such a chat is a chat of
+/// its own, and it is marked.
+fn is_hidden(engine_chat: &EngineChatId) -> bool {
+    engine_chat.as_str().ends_with("@lid")
+}
+
 /// The chat of `number` that the engine knows as `engine_chat`, created when the hub did not
 /// have it yet. Two calls at once give the same chat.
 ///
@@ -76,14 +84,15 @@ pub async fn resolve(
         engine_chat.as_str().as_bytes(),
     )?;
     sqlx::query(
-        "INSERT INTO chat (id, organization_id, number_id, kind, created_at) \
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO chat (id, organization_id, number_id, kind, created_at, hidden_id) \
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(chat)
     .bind(organization.id())
     .bind(number)
     .bind(engine_chat.kind().as_str())
     .bind(now)
+    .bind(is_hidden(engine_chat))
     .execute(&mut *connection)
     .await?;
     let inserted: Option<Uuid> = sqlx::query_scalar(

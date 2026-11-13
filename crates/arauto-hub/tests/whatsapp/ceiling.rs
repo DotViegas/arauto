@@ -168,3 +168,81 @@ async fn the_count_is_of_the_hermes_and_not_of_the_session() {
         .await);
     assert_eq!(world.fake.sent().len(), 21);
 }
+
+#[tokio::test]
+async fn a_sending_to_a_telephone_takes_its_place_before_whatsapp_is_asked() {
+    let (world, _clock, mut agent, _chat) = ready().await;
+    world.fake.forget_received();
+    // Telephones nobody talked to, on an access that may not start chats: each call is
+    // refused after WhatsApp is asked about the telephone. That question is what the limit
+    // is for, so each one takes its place.
+    for n in 0..20 {
+        let to = format!("+{}", phone(300 + n));
+        let outcome = agent
+            .call("whatsapp_send_text", json!({"to": to, "text": "x"}))
+            .await;
+        assert!(refused(&outcome).is_some(), "{n}: {outcome:?}");
+        assert_ne!(refused(&outcome), Some(ErrorCode::Ar704), "{n}");
+    }
+    let asked = |world: &World| {
+        world
+            .fake
+            .received()
+            .iter()
+            .filter(|request| request.path.contains("check-exists"))
+            .count()
+    };
+    let before = asked(&world);
+    assert!(before > 0, "the engine was asked about the telephones");
+    // The twenty-first is stopped by the limit, and WhatsApp is not asked.
+    let to = format!("+{}", phone(399));
+    let outcome = agent
+        .call("whatsapp_send_text", json!({"to": to, "text": "x"}))
+        .await;
+    assert_eq!(refused(&outcome), Some(ErrorCode::Ar704));
+    assert_eq!(asked(&world), before, "nothing was asked past the limit");
+}
+
+#[tokio::test]
+async fn a_sending_whose_answer_did_not_come_is_unknown_and_never_unavailable() {
+    use arauto_testkit::engine::Fault;
+    let (world, _clock, mut agent, chat) = ready().await;
+    let send = json!({"to": chat, "text": "once"});
+
+    // The engine took the request and did not answer in time: the message may have left.
+    world.fake.fail(
+        "/api/sendText",
+        Fault::Slow(std::time::Duration::from_secs(30)),
+    );
+    let outcome = agent.call("whatsapp_send_text", send.clone()).await;
+    assert_eq!(refused(&outcome), Some(ErrorCode::Ar713), "{outcome:?}");
+
+    // The engine answered that it sent, with a body the hub cannot use: the message left,
+    // and the answer never says "unavailable", which would make the Hermes send it again.
+    for fault in [Fault::Malformed, Fault::WrongType] {
+        world.fake.fail("/api/sendText", fault);
+        let outcome = agent.call("whatsapp_send_text", send.clone()).await;
+        match outcome {
+            arauto_protocol::message::CallOutcome::Ok(sent) => {
+                assert!(sent.as_map()["message_id"].is_null());
+            }
+            refused_outcome => assert_eq!(
+                refused(&refused_outcome),
+                Some(ErrorCode::Ar713),
+                "{refused_outcome:?}"
+            ),
+        }
+    }
+
+    // An engine that took the request and answered with an error of its own may have sent
+    // it too: unknown, not unavailable. (An engine that is not reached at all is the one
+    // that is "unavailable": `hostile::an_engine_that_is_not_there_is_unavailable`.)
+    world.fake.heal();
+    world.fake.fail("/api/sendText", Fault::ServerError);
+    let outcome = agent.call("whatsapp_send_text", send.clone()).await;
+    assert_eq!(refused(&outcome), Some(ErrorCode::Ar713), "{outcome:?}");
+
+    // And with the engine well again, the same sending goes through.
+    world.fake.heal();
+    ok(agent.call("whatsapp_send_text", send).await);
+}

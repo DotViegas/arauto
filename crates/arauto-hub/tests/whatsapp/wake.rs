@@ -471,3 +471,112 @@ async fn a_group_wakes_only_by_a_line_of_its_own() {
     );
     assert_eq!(pointer(&next_notice(&mut whole).await).2, 1);
 }
+
+#[tokio::test]
+async fn a_number_that_is_coming_back_keeps_its_notices_until_it_is_connected() {
+    let world = World::new().await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    let mut agent = wakeable(&world).await;
+    world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &agent, "balcao").await;
+    let status = |status: &str, after_ms: i64| {
+        world
+            .fake
+            .envelope_at(
+                session,
+                "session.status",
+                json!({"status": status, "statuses": []}),
+                None,
+                SystemClock.now_ms() + after_ms,
+            )
+            .unwrap()
+    };
+
+    // The engine is starting again: the number is coming back, not out of use.
+    let starting = status("STARTING", 1_000);
+    assert_eq!(world.fake.deliver(session, &starting).await.unwrap(), 200);
+    assert_eq!(
+        world.state("balcao").await,
+        arauto_hub::core::number::NumberState::Reconnecting
+    );
+    let received = message(&chat_of(101), "3EB0AB0001", now_s(), false, "hello");
+    assert_eq!(
+        world
+            .fake
+            .emit(session, "message.any", received)
+            .await
+            .unwrap(),
+        200
+    );
+    // The notice is made and waits: it neither leaves nor is thrown away.
+    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+    assert_eq!(
+        notices(&world).await,
+        [(agent.name.clone(), "pending".to_owned(), 1)]
+    );
+
+    let working = status("WORKING", 2_000);
+    assert_eq!(world.fake.deliver(session, &working).await.unwrap(), 200);
+    let notice = next_notice(&mut agent).await;
+    assert_eq!(pointer(&notice).2, 1);
+}
+
+#[tokio::test]
+async fn a_chat_under_a_hidden_identifier_never_escapes_a_line_of_the_admin() {
+    let world = World::new().await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    // The same person, as the engine may name it in an event: a hidden identifier.
+    let hidden = "123456789012345@lid";
+    let from_hidden = |id: &'static str| {
+        let received = message(hidden, id, now_s(), false, "hello");
+        world.fake.emit(session, "message.any", received)
+    };
+
+    // No line at all: the number is open, and a hidden identifier wakes like anyone.
+    let mut open = wakeable(&world).await;
+    world.grant(&open.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &open, "balcao").await;
+    // One line that blocks a person by telephone: the hub cannot tell whether the hidden
+    // identifier is that person, so it is blocked too.
+    let mut lined = wakeable(&world).await;
+    world.grant(&lined.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &lined, "balcao").await;
+    world
+        .line(
+            &lined.name,
+            "balcao",
+            &chat_of(103),
+            verbs(false, false, false, false),
+        )
+        .await;
+
+    assert_eq!(from_hidden("3EB0AC0001").await.unwrap(), 200);
+    let notice = next_notice(&mut open).await;
+    let hidden_chat = pointer(&notice).1;
+    assert_eq!(notices_while_quiet(&mut lined).await, 0);
+    // Nor does it read or write there: the chat is the one that does not exist.
+    let read = lined
+        .call(
+            "whatsapp_read_chat",
+            json!({"number": "balcao", "chat": hidden_chat}),
+        )
+        .await;
+    assert_eq!(
+        crate::agent::refused(&read),
+        Some(arauto_protocol::errors::ErrorCode::Ar705)
+    );
+
+    // A line of its own, given by the admin for that chat, opens it.
+    world
+        .line(
+            &lined.name,
+            "balcao",
+            hidden,
+            verbs(true, false, false, true),
+        )
+        .await;
+    assert_eq!(from_hidden("3EB0AC0002").await.unwrap(), 200);
+    assert_eq!(pointer(&next_notice(&mut lined).await).1, hidden_chat);
+}
