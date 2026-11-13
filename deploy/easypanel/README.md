@@ -6,6 +6,7 @@ on the server.
 | File | What it is |
 |---|---|
 | [`compose.yaml`](compose.yaml) | The hub and PostgreSQL 16, with the volumes and the networks. |
+| [`defaults.env`](defaults.env) | The values the recipe starts with. What you set in Environment wins. |
 
 ## What is left to prove
 
@@ -20,7 +21,8 @@ server. The first use is the test.
 2. In **Source**, choose **Git**: the address of the repository, the branch, and
    `deploy/easypanel/compose.yaml` as the path of the Compose file. Easypanel builds the image of
    the hub from the repository (a few minutes the first time).
-3. In **Environment**, set the two addresses, with `https://` and only the name:
+3. In **Environment**, turn on **Create .env file** and set the two addresses, with `https://`
+   and only the name:
 
    ```
    ARAUTO_PUBLIC_URL=https://arauto.example.org

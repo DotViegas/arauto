@@ -1,9 +1,9 @@
 # The Arauto hub and its database, for a Compose service of Easypanel.
 #
 # Everything is set on the screens of Easypanel: this file goes in "Source", the two
-# addresses go in "Environment" and in "Domains". No command is needed before the first
-# start: the hub installs itself on the empty database and writes an installation code in its
-# log. See README.md beside this file.
+# addresses go in "Environment" (with "Create .env file" on) and in "Domains". No command is
+# needed before the first start: the hub installs itself on the empty database and writes an
+# installation code in its log. See README.md beside this file.
 #
 # What is NOT here, on purpose: the WhatsApp engine. It belongs to whoever installs.
 
@@ -16,26 +16,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # What can be changed, in this order: the defaults of this recipe, then what is set in
+    # Environment of Easypanel, which it writes in the `.env` at the root of the repository
+    # (turn on "Create .env file"). The two addresses of the hub are set there.
+    env_file:
+      - path: defaults.env
+        required: true
+      - path: ../../.env
+        required: false
     environment:
       # The password in this address is the one the database is born with: the same for
       # everyone, and reachable only from the network of this composition. At the first
       # access of the admin the hub replaces it with one nobody sees and keeps the new one in
       # its data folder. Leave the line below as it is.
       ARAUTO_DATABASE_URL: postgres://arauto:arauto-first-start@postgres:5432/arauto
-      ARAUTO_DATABASE_PASSWORD: rotate-at-first-access
-      # The address the connectors reach from outside: the domain that points to port 8443.
-      ARAUTO_PUBLIC_URL: ${ARAUTO_PUBLIC_URL:?set ARAUTO_PUBLIC_URL in Environment}
-      # The address YOU open in the browser: the domain that points to port 8445. It is not
-      # the one above. A passkey is bound to it: change it and every passkey stops working.
-      ARAUTO_PANEL_URL: ${ARAUTO_PANEL_URL:?set ARAUTO_PANEL_URL in Environment}
       ARAUTO_LISTEN_PANEL: 0.0.0.0:8445
-      # The proxy of Easypanel, as the hub sees it: the network both are on. The default is
-      # the one seen on one installation of Easypanel, on 13/11/2026; it may differ on yours.
-      # With a wrong list the hub still starts and says so once in its log, with the address
-      # that is missing: put it in Environment.
+      # Behind the proxy of Easypanel the address of each connector comes in a header.
       ARAUTO_CLIENT_IP_SOURCE: forwarded
-      ARAUTO_TRUSTED_PROXIES: ${ARAUTO_TRUSTED_PROXIES:-10.11.0.0/16}
-      RUST_LOG: ${RUST_LOG:-info}
     volumes:
       # The master key, the audit mark and the password of the database. NOT the volume of
       # the database, and NOT in its backup.
@@ -83,4 +80,4 @@ networks:
     internal: true
   # Shared with the WhatsApp engine of whoever installs.
   engine:
-    name: ${ARAUTO_ENGINE_NETWORK:-arauto-engine}
+    name: arauto-engine
