@@ -43,4 +43,5 @@ prototype, or is **pending**.
 | 0036 | [Windows only for development; Linux in production](0036-windows-so-para-desenvolvimento.md) | proposal |
 | 0038 | [The engine and the numbers in the first MVP](0038-motor-e-numeros-no-mvp.md) | proposal |
 | 0039 | [The access matrix and the WhatsApp tools in the first MVP](0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md) | proposal |
-| 0040 | [The panel inside the hub: its own port, entry by code and the first screens](0040-painel-dentro-do-hub.md) | proposal |
+| 0040 | [The panel inside the hub: its own port, entry by passkey and the first screens](0040-painel-dentro-do-hub.md) | proposal |
+| 0041 | [The password of the database, drawn by the hub](0041-senha-do-banco-sorteada-pelo-hub.md) | proposal |

@@ -56,11 +56,11 @@ use uuid::Uuid;
 
 use self::passkey::{RelyingParty, StoredPasskey};
 use self::secret::{EntryCode, SessionSecret};
-use crate::audit::AuditError;
+use crate::audit::{Actor, AuditError};
 use crate::channel::client_ip::client_ip;
 use crate::channel::{Downloads, Hub};
-use crate::config::PublicUrl;
-use crate::db::{self, ResolvedOrg};
+use crate::config::{PasswordRotation, PublicUrl};
+use crate::db::{self, ResolvedOrg, Rotated, RotationError, When};
 use crate::download::Listed;
 use crate::repo::panel::{
     NewPasskey, PanelSession, Registered, SESSION_IDLE_MS, SESSION_VALIDITY_MS, SignIn,
@@ -466,6 +466,9 @@ async fn register(
     };
     let now = hub.now_ms();
     let address = client_ip(hub.client_ip_source(), peer, headers).ok();
+    // Read before the passkey is kept: whether this one is the first of the installation.
+    let first = hub.storage().password_rotation == PasswordRotation::AtFirstAccess
+        && !repo::panel::has_passkey(hub.pool(), organization).await?;
     let kept = repo::panel::register_passkey(
         hub.pool(),
         hub.mark(),
@@ -477,10 +480,51 @@ async fn register(
     )
     .await;
     match kept {
-        Ok(Registered::Kept { .. }) => Ok(http::see_other("/")),
+        Ok(Registered::Kept { .. }) => {
+            if first {
+                replace_database_password(hub, organization).await;
+            }
+            Ok(http::see_other("/"))
+        }
         Ok(Registered::NoSession) => Ok(http::see_other("/sign-in")),
         Ok(Registered::Repeated) => Ok(refused()),
         Err(error) => security_failed(hub, organization, error).await,
+    }
+}
+
+/// The first passkey of the installation is kept: when `ARAUTO_DATABASE_PASSWORD` asks for it,
+/// the hub replaces the provisional password of its database role with one it draws, which
+/// nobody sees ([`db::rotate_password`]). The pools of this hub use it from then on.
+///
+/// A failure does not undo the registration: it goes to the log, without the password, and
+/// `arauto-hub admin database rotate-password` does the same later.
+async fn replace_database_password(hub: &Hub, organization: ResolvedOrg) {
+    let replaced = db::rotate_password(
+        hub.storage(),
+        &[hub.pool(), hub.sweep_pool()],
+        hub.mark(),
+        Actor::System,
+        When::FirstAccess,
+        hub.now_ms(),
+    )
+    .await;
+    match replaced {
+        Ok(Rotated::Replaced) => tracing::info!(
+            "the password of the database role was replaced by one the hub drew; it is kept \
+             in the data folder"
+        ),
+        Ok(Rotated::NotAsked | Rotated::AlreadyReplaced) => {}
+        // The database came back from a copy, or the audit mark did not follow: what every
+        // security write does then.
+        Err(RotationError::Audit(
+            error @ (AuditError::Restored(_) | AuditError::MarkNotAdvanced { .. }),
+        )) => {
+            hub.security_write_failed(organization, None, RepoError::from(error))
+                .await;
+        }
+        Err(error) => {
+            tracing::error!(%error, "the password of the database role was not replaced");
+        }
     }
 }
 

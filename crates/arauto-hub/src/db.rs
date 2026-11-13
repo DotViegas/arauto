@@ -11,20 +11,30 @@
 //!   business data takes. Only the entry functions of this module build one.
 //! - **The durable transaction** ([`begin_durable`]) is the one of security events and of the
 //!   credential swap.
+//! - **The password of the role** the hub connects as can be replaced by one the hub draws
+//!   and keeps in the data folder ([`rotate_password`], [`crate::db_password`]); the program
+//!   opens every pool with [`open`], which uses it.
 //!
 //! Time never comes from the database: no SQL here or in the migrations calls its clock.
 
 use std::future::Future;
+use std::str::FromStr;
 use std::time::Duration;
 
+use arauto_platform::LockError;
 use arauto_protocol::invite::InviteDigest;
 use arauto_protocol::noise::PublicKey;
 use sqlx::migrate::{MigrateError, Migrator};
-use sqlx::postgres::{PgPool, PgPoolOptions};
-use sqlx::{Executor, PgExecutor, Postgres, Transaction};
+use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
+use sqlx::{AssertSqlSafe, ConnectOptions, Executor, PgExecutor, Postgres, Transaction};
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
-use crate::config::DatabaseUrl;
+use crate::audit::{self, Action, Actor, AuditError, Details, Event};
+use crate::config::{DatabaseUrl, PasswordRotation, StorageConfig};
+use crate::db_password::{self, DatabasePasswordError, DatabaseTarget, FirstAttempt, NextStep};
+use crate::lock_wait::acquire_within;
+use crate::mark::Mark;
 use crate::panel::secret::PanelDigest;
 
 /// The migrations, embedded in the program at build time.
@@ -121,6 +131,11 @@ pub enum DbError {
     /// Applying the migrations failed.
     #[error("could not apply the migrations: {0}")]
     Migrate(#[source] MigrateError),
+
+    /// The password of the database role kept in the data folder could not be read or
+    /// settled.
+    #[error(transparent)]
+    Password(#[from] DatabasePasswordError),
 }
 
 const fn on_off(on: bool) -> &'static str {
@@ -148,8 +163,10 @@ impl Default for PoolOptions {
     }
 }
 
-/// Opens the pool. Every connection of it has `lock_timeout` at 5 seconds and
-/// `idle_in_transaction_session_timeout` at 30.
+/// Opens the pool on an address as given. The program opens its pools with [`open`], which
+/// uses the password kept in the data folder; this one is for the tests and the tools that
+/// hold an address of their own. Every connection of the pool has `lock_timeout` at 5
+/// seconds and `idle_in_transaction_session_timeout` at 30.
 ///
 /// The database is reached directly: a pooler in transaction mode would drop these settings.
 ///
@@ -157,6 +174,12 @@ impl Default for PoolOptions {
 /// [`DbError::Connect`] when the address is wrong or the database does not answer. The
 /// address is never part of the error.
 pub async fn connect(url: &DatabaseUrl, options: PoolOptions) -> Result<PgPool, DbError> {
+    let target = PgConnectOptions::from_str(url.expose()).map_err(DbError::Connect)?;
+    connect_to(&target, options).await
+}
+
+/// The pool of `options`, with the settings of every connection.
+fn pool_options(options: PoolOptions) -> PgPoolOptions {
     PgPoolOptions::new()
         .max_connections(options.size)
         .acquire_timeout(options.acquire_timeout)
@@ -166,9 +189,82 @@ pub async fn connect(url: &DatabaseUrl, options: PoolOptions) -> Result<PgPool, 
                 Ok(())
             })
         })
-        .connect(url.expose())
+}
+
+async fn connect_to(target: &PgConnectOptions, options: PoolOptions) -> Result<PgPool, DbError> {
+    pool_options(options)
+        .connect_with(target.clone())
         .await
         .map_err(DbError::Connect)
+}
+
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, DatabasePasswordError> + Send + 'static,
+) -> Result<T, DatabasePasswordError> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|_| DatabasePasswordError::Task)?
+}
+
+/// Opens the pool of the hub: every place of the program that opens the database comes here.
+///
+/// The address is the one of `ARAUTO_DATABASE_URL`, with the password of `database.secret`
+/// when the data folder has that file ([`StorageConfig::database_target`]). When the file
+/// `database.secret.next` is there too, a replacement of the password stopped in the middle
+/// ([`rotate_password`]), and the database may or may not have the new password:
+///
+/// - the password in use works: the database never had the new one, and the file of the new
+///   one goes away;
+/// - PostgreSQL refuses the password in use (and only then: a network error says nothing about
+///   the password): the new one is tried, and when it works it is put under
+///   `database.secret`, which finishes the replacement.
+///
+/// The decision is [`db_password::next_step`].
+///
+/// # Errors
+/// [`DbError::Connect`] when the database does not take the connection, with the error of the
+/// password in use; [`DbError::Password`] when a file of the password is damaged or cannot be
+/// settled. Neither the address nor a password is ever part of the error.
+pub async fn open(storage: &StorageConfig, options: PoolOptions) -> Result<PgPool, DbError> {
+    let dir = storage.data_dir.clone();
+    let (current, next) = blocking(move || {
+        Ok((
+            db_password::read_current(&dir)?,
+            db_password::read_next(&dir)?,
+        ))
+    })
+    .await?;
+    let normal = db_password::target(&storage.database_url, current.as_ref())?;
+    let first = connect_to(normal.options(), options).await;
+    let attempt = match &first {
+        Ok(_) => FirstAttempt::Connected,
+        Err(DbError::Connect(error)) => db_password::classify(error),
+        Err(_) => FirstAttempt::Failed,
+    };
+    let dir = storage.data_dir.clone();
+    match (db_password::next_step(attempt, next.is_some()), next) {
+        (NextStep::Keep { discard_next: true }, _) => {
+            // The pool is good: a leftover that stays is tried again at the next opening.
+            if let Err(error) = blocking(move || db_password::discard_next(&dir)).await {
+                tracing::warn!(%error, "the file of a database password never used stays");
+            }
+            first
+        }
+        (NextStep::TryNext, Some(next)) => {
+            let target = normal.with_password(&next);
+            match connect_to(target.options(), options).await {
+                Ok(pool) => {
+                    blocking(move || db_password::promote(&dir, &next)).await?;
+                    tracing::info!(
+                        "a replacement of the database password stopped halfway was finished"
+                    );
+                    Ok(pool)
+                }
+                Err(_) => first,
+            }
+        }
+        _ => first,
+    }
 }
 
 // ---------------------------------------------------------------------------- durability
@@ -652,6 +748,250 @@ pub async fn begin_durable(pool: &PgPool) -> Result<Transaction<'static, Postgre
         .execute(&mut *transaction)
         .await?;
     Ok(transaction)
+}
+
+// ---------------------------------------------------------------------------- the password of the role
+
+/// How long a replacement of the password waits for another one that is running.
+const PASSWORD_LOCK_PATIENCE: Duration = Duration::from_secs(5);
+
+/// When [`rotate_password`] is called.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum When {
+    /// A person asked for it: `arauto-hub admin database rotate-password`. It always replaces.
+    Asked,
+    /// The first passkey of the installation was just registered. It replaces only when
+    /// `ARAUTO_DATABASE_PASSWORD` asks for it and the data folder keeps no password yet.
+    FirstAccess,
+}
+
+impl When {
+    const fn word(self) -> &'static str {
+        match self {
+            When::Asked => "asked",
+            When::FirstAccess => "first_access",
+        }
+    }
+}
+
+/// What [`rotate_password`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rotated {
+    /// The password was replaced and is kept in the data folder.
+    Replaced,
+    /// [`When::FirstAccess`], and the configuration does not ask for it. Nothing was done.
+    NotAsked,
+    /// [`When::FirstAccess`], and the data folder already keeps a password: the hub never
+    /// replaces it twice by itself. Nothing was done.
+    AlreadyReplaced,
+}
+
+/// What went wrong while replacing the password of the role. No variant carries a password.
+#[derive(Debug, thiserror::Error)]
+pub enum RotationError {
+    /// Another replacement is running right now. Nothing was done.
+    #[error("the database password is being replaced by another command: {0}")]
+    Busy(LockError),
+
+    /// A file of the password could not be read or written. When this comes before the
+    /// database was told, nothing was done.
+    #[error(transparent)]
+    Password(#[from] DatabasePasswordError),
+
+    /// The database refused. Nothing was done.
+    #[error(transparent)]
+    Db(#[from] DbError),
+
+    /// The security write refused (nothing was done), or it is committed and the audit mark
+    /// did not follow ([`AuditError::MarkNotAdvanced`]): then the password **is** replaced,
+    /// kept in the data folder and in use by this process.
+    #[error(transparent)]
+    Audit(#[from] AuditError),
+
+    /// The database has the new password and this process uses it, and it could not be put
+    /// under `database.secret`: it waits in `database.secret.next`, which the next opening of
+    /// the database puts in place.
+    #[error(
+        "the database password was replaced and is in use, and could not be kept under its \
+         name ({0}); it waits in database.secret.next, which the next start of the hub puts \
+         in place"
+    )]
+    NotKept(DatabasePasswordError),
+
+    /// The commit of the replacement failed on the way, and the database may have either
+    /// password. The new one waits in `database.secret.next`: the next opening of the
+    /// database finds out which one works and settles the files.
+    #[error(
+        "the database did not confirm the replacement of its password ({0}); restart the hub: \
+         it finds out which password the database has"
+    )]
+    Unknown(AuditError),
+
+    /// A replacement stopped halfway and was not settled yet: `database.secret.next` is
+    /// there, and the database may have its password. Nothing was done.
+    #[error(
+        "a replacement of the database password stopped halfway and database.secret.next is \
+         still there: restart the hub, which settles it, and then try again"
+    )]
+    Unsettled,
+}
+
+/// Replaces the password of the database role of the hub with one it draws, which nobody ever
+/// sees, and keeps it in the data folder (`docs/04-seguranca-conexao.md`: a long-lived secret
+/// never passes through a person).
+///
+/// The steps, in an order that leaves a hub that can still connect wherever it stops:
+///
+/// 1. the new password is drawn and written to `database.secret.next`, durably;
+/// 2. `ALTER ROLE ... PASSWORD`, on the role the hub connects as, in a security write with
+///    its audit event (`database.password_replaced`): both or neither;
+/// 3. the file goes under `database.secret`, durably;
+/// 4. every pool of `pools` opens its next connections with the new password, so the process
+///    that replaced it never needs a restart. The connections already open stay as they are.
+///
+/// The statement that carries the password runs on a connection of its own, whose statements
+/// are never logged. A process that did not replace the password (a hub that runs while the
+/// command does) keeps its open connections, and its new ones are refused until it restarts.
+///
+/// # Errors
+/// [`RotationError`]: nothing was done, except with [`RotationError::NotKept`] and
+/// [`AuditError::MarkNotAdvanced`], which say the password is replaced.
+pub async fn rotate_password(
+    storage: &StorageConfig,
+    pools: &[&PgPool],
+    mark: &Mark,
+    actor: Actor,
+    when: When,
+    now: i64,
+) -> Result<Rotated, RotationError> {
+    if when == When::FirstAccess && storage.password_rotation != PasswordRotation::AtFirstAccess {
+        return Ok(Rotated::NotAsked);
+    }
+    let dir = storage.data_dir.clone();
+    let _replacing = tokio::task::spawn_blocking(move || {
+        acquire_within(
+            &dir.join(db_password::DATABASE_SECRET_LOCK_FILE),
+            PASSWORD_LOCK_PATIENCE,
+        )
+    })
+    .await
+    .map_err(|_| DatabasePasswordError::Task)?
+    .map_err(RotationError::Busy)?;
+
+    // Read under the lock: the password in use is the one of the file, whoever wrote it.
+    let dir = storage.data_dir.clone();
+    let (current, unsettled) = blocking(move || {
+        Ok((
+            db_password::read_current(&dir)?,
+            dir.join(db_password::DATABASE_SECRET_NEXT_FILE).exists(),
+        ))
+    })
+    .await?;
+    if when == When::FirstAccess && current.is_some() {
+        return Ok(Rotated::AlreadyReplaced);
+    }
+    // The database may have the password of that file: it is never written over.
+    if unsettled {
+        return Err(RotationError::Unsettled);
+    }
+    let old = db_password::target(&storage.database_url, current.as_ref())?;
+    let new = db_password::DatabasePassword::generate()?;
+
+    let (dir, next) = (storage.data_dir.clone(), new.clone());
+    blocking(move || db_password::write_next(&dir, &next)).await?;
+
+    let committed = match alter_role(&old, &new, mark, actor, when, now).await {
+        // The database has the new password.
+        Altered::Committed(committed) => committed,
+        Altered::NotCommitted(error) => {
+            // The database kept the password in use: the new one goes away.
+            let dir = storage.data_dir.clone();
+            if let Err(leftover) = blocking(move || db_password::discard_next(&dir)).await {
+                tracing::warn!(error = %leftover, "the file of a database password never used stays");
+            }
+            return Err(RotationError::Audit(error));
+        }
+        // The new password stays in its file: the next opening finds out which one the
+        // database has.
+        Altered::Unknown(error) => return Err(RotationError::Unknown(error)),
+    };
+
+    // The database has the new password from here on.
+    let (dir, kept) = (storage.data_dir.clone(), new.clone());
+    let promoted = blocking(move || db_password::promote(&dir, &kept)).await;
+    let replaced = old.with_password(&new);
+    for pool in pools {
+        pool.set_connect_options(replaced.options().clone());
+    }
+    match (promoted, committed) {
+        (Err(error), _) => Err(RotationError::NotKept(error)),
+        (Ok(()), Err(error)) => Err(RotationError::Audit(error)),
+        (Ok(()), Ok(())) => Ok(Rotated::Replaced),
+    }
+}
+
+/// How step 2 of [`rotate_password`] ended.
+enum Altered {
+    /// The database has the new password. An error here is
+    /// [`AuditError::MarkNotAdvanced`].
+    Committed(Result<(), AuditError>),
+    /// The database kept the password in use.
+    NotCommitted(AuditError),
+    /// The commit failed on the way: the database may have either password.
+    Unknown(AuditError),
+}
+
+/// Step 2 of [`rotate_password`]: the statement and its event, in one security write, on a
+/// connection of its own that logs no statement and is closed at the end.
+async fn alter_role(
+    old: &DatabaseTarget,
+    new: &db_password::DatabasePassword,
+    mark: &Mark,
+    actor: Actor,
+    when: When,
+    now: i64,
+) -> Altered {
+    let quiet = match pool_options(PoolOptions {
+        size: 1,
+        acquire_timeout: PASSWORD_LOCK_PATIENCE,
+    })
+    .connect_with(old.options().clone().disable_statement_logging())
+    .await
+    {
+        Ok(quiet) => quiet,
+        Err(error) => return Altered::NotCommitted(DbError::Connect(error).into()),
+    };
+    let written = async {
+        let mut write = audit::begin_security(&quiet, mark).await?;
+        let role: String = sqlx::query_scalar("SELECT current_user::text")
+            .fetch_one(write.connection())
+            .await?;
+        // The role is quoted as an identifier; the password is hexadecimal by construction,
+        // so it never closes its quotes.
+        let statement = Zeroizing::new(format!(
+            "ALTER ROLE \"{}\" PASSWORD '{}'",
+            role.replace('"', "\"\""),
+            new.expose()
+        ));
+        sqlx::raw_sql(AssertSqlSafe(statement.as_str()))
+            .execute(write.connection())
+            .await?;
+        let event = Event::new(Action::DatabasePasswordReplaced, actor)
+            .with(Details::new().word("when", when.word()));
+        write.record(now, &event).await?;
+        Ok::<_, AuditError>(write)
+    }
+    .await;
+    let altered = match written {
+        Err(error) => Altered::NotCommitted(error),
+        Ok(write) => match write.commit().await {
+            Ok(_) => Altered::Committed(Ok(())),
+            Err(error @ AuditError::MarkNotAdvanced { .. }) => Altered::Committed(Err(error)),
+            Err(error) => Altered::Unknown(error),
+        },
+    };
+    quiet.close().await;
+    altered
 }
 
 #[cfg(test)]

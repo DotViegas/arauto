@@ -7,9 +7,9 @@
 
 **Do not open a public issue for a security flaw.**
 
-The channel will be GitHub's private vulnerability reporting, in the security tab of the repository
-([decision 0027](docs/decisoes/0027-canal-de-relato-de-falha.md)). It comes into existence when the
-repository is opened to the public. Until then, the project has no version in use by third parties.
+The channel is GitHub's private vulnerability reporting, in the security tab of the repository
+([decision 0027](docs/decisoes/0027-canal-de-relato-de-falha.md)). The repository is public since
+13/11/2026; the project still has no version for use by third parties.
 
 When reporting, include: what you achieved, the steps to repeat it, the version of the hub and of
 the connector and what an attacker would gain.

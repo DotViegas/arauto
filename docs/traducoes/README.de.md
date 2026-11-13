@@ -44,7 +44,7 @@
 
 > **Stand: erstes MVP im Aufbau.** Der Entwurf steht in diesen Dokumenten; der Code steht am
 > Anfang, und es gibt noch keine nutzbare Version ([docs/15-mvp.md](../15-mvp.md)). Das Projekt ist
-> kostenlos, und der Code wird unter der Apache-2.0-Lizenz offengelegt
+> kostenlos, und der Code ist unter der Apache-2.0-Lizenz offen
 > ([Entscheidung 0015](../decisoes/0015-licenca.md)).
 
 Hermes Agent ist ein KI-Agent von Nous Research. Arauto ist ein unabhängiges Projekt: Es steht in

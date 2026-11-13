@@ -44,7 +44,7 @@
 
 > **Estado: primeiro MVP em construção.** O desenho está nestes documentos; o código está começando
 > e ainda não há versão para uso ([docs/15-mvp.md](../15-mvp.md)). O projeto é gratuito e o código
-> será aberto, sob a licença Apache-2.0 ([decisão 0015](../decisoes/0015-licenca.md)).
+> é aberto, sob a licença Apache-2.0 ([decisão 0015](../decisoes/0015-licenca.md)).
 
 O Hermes Agent é um agente de IA da Nous Research. O Arauto é um projeto independente: não tem
 vínculo com os autores do Hermes Agent nem com o WhatsApp.

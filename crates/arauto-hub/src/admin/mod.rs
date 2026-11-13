@@ -237,6 +237,11 @@ pub enum AdminError {
     /// The engine says the telephone has no WhatsApp.
     #[error("the engine says that telephone has no WhatsApp")]
     NoWhatsapp,
+
+    /// The password of the database role was not replaced, or was replaced and something
+    /// after it failed (the text says which).
+    #[error(transparent)]
+    DatabasePassword(db::RotationError),
 }
 
 impl From<RepoError> for AdminError {

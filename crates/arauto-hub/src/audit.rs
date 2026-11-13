@@ -174,6 +174,9 @@ actions! {
     PanelSignedOut => "panel.signed_out", false;
     /// A passkey was registered for an admin, in a session of the panel.
     PanelPasskeyRegistered => "panel.passkey_registered", true;
+    /// The password of the database role of the hub was replaced by one the hub drew. The
+    /// event says when; never the password, nor anything computed from it.
+    DatabasePasswordReplaced => "database.password_replaced", true;
 }
 
 impl fmt::Display for Action {
@@ -639,6 +642,8 @@ mod tests {
             "panel.signed_in",
             // A passkey is what opens such a session from then on.
             "panel.passkey_registered",
+            // Who can open the database is who can do anything.
+            "database.password_replaced",
         ]
         .into_iter()
         .collect();

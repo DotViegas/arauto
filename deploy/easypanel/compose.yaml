@@ -1,0 +1,86 @@
+# The Arauto hub and its database, for a Compose service of Easypanel.
+#
+# Everything is set on the screens of Easypanel: this file goes in "Source", the two
+# addresses go in "Environment" and in "Domains". No command is needed before the first
+# start: the hub installs itself on the empty database and writes an installation code in its
+# log. See README.md beside this file.
+#
+# What is NOT here, on purpose: the WhatsApp engine. It belongs to whoever installs.
+
+services:
+  hub:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # The password in this address is the one the database is born with: the same for
+      # everyone, and reachable only from the network of this composition. At the first
+      # access of the admin the hub replaces it with one nobody sees and keeps the new one in
+      # its data folder. Leave the line below as it is.
+      ARAUTO_DATABASE_URL: postgres://arauto:arauto-first-start@postgres:5432/arauto
+      ARAUTO_DATABASE_PASSWORD: rotate-at-first-access
+      # The address the connectors reach from outside: the domain that points to port 8443.
+      ARAUTO_PUBLIC_URL: ${ARAUTO_PUBLIC_URL:?set ARAUTO_PUBLIC_URL in Environment}
+      # The address YOU open in the browser: the domain that points to port 8445. It is not
+      # the one above. A passkey is bound to it: change it and every passkey stops working.
+      ARAUTO_PANEL_URL: ${ARAUTO_PANEL_URL:?set ARAUTO_PANEL_URL in Environment}
+      ARAUTO_LISTEN_PANEL: 0.0.0.0:8445
+      # The proxy of Easypanel, as the hub sees it: the network both are on. The default is
+      # the one seen on one installation of Easypanel, on 13/11/2026; it may differ on yours.
+      # With a wrong list the hub still starts and says so once in its log, with the address
+      # that is missing: put it in Environment.
+      ARAUTO_CLIENT_IP_SOURCE: forwarded
+      ARAUTO_TRUSTED_PROXIES: ${ARAUTO_TRUSTED_PROXIES:-10.11.0.0/16}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      # The master key, the audit mark and the password of the database. NOT the volume of
+      # the database, and NOT in its backup.
+      - arauto-data:/var/lib/arauto
+    networks:
+      - internal
+      # The network the WhatsApp engine shares: it reaches http://hub:8444, never published.
+      - engine
+    # Each connector holds one connection open.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # The hub lets the calls in progress answer for up to 10 seconds before it stops.
+    stop_grace_period: 20s
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arauto
+      # Only used when the database is created. See ARAUTO_DATABASE_URL above.
+      POSTGRES_PASSWORD: arauto-first-start
+      POSTGRES_DB: arauto
+    # The hub refuses a database that does not force its writes to disk: leave fsync on.
+    command: ["postgres", "-c", "fsync=on", "-c", "synchronous_commit=on", "-c", "full_page_writes=on"]
+    volumes:
+      - arauto-postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arauto -d arauto"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 60s
+
+volumes:
+  arauto-data:
+  arauto-postgres:
+
+networks:
+  # The hub and its database, and nothing else. No port of the database is published.
+  internal:
+    internal: true
+  # Shared with the WhatsApp engine of whoever installs.
+  engine:
+    name: ${ARAUTO_ENGINE_NETWORK:-arauto-engine}

@@ -5,6 +5,7 @@ to all of them is on this page.
 
 | Folder | For whom | Status |
 |---|---|---|
+| [`easypanel/`](easypanel/README.md) | A server with Easypanel, set up on its screens, with no terminal. | Written with the code, as a proposal. **Not yet followed on a server.** |
 | [`docker/`](docker/README.md) | A server with Docker and Docker Compose. It is the recommended path. | Written. **Not yet built or tested on a server**: see "What is left to prove", in the guide. |
 | [`proxy/`](proxy/README.md) | Whoever needs an example of a proxy in front of the hub (Caddy or NGINX). | Examples written, not tested. |
 | [`kubernetes/`](kubernetes/README.md) | Whoever runs on Kubernetes. | Only the list of what the manifests need to guarantee. The manifests have not been written. |
@@ -55,7 +56,8 @@ that the command `admin invite` shows ([docs/02-como-funciona.md](../docs/02-com
 | Variable | What for |
 |---|---|
 | `ARAUTO_DATABASE_URL` | The PostgreSQL database. It carries the password: it never appears in a log. |
-| `ARAUTO_DATA_DIR` | The folder of the master key and of the audit mark. |
+| `ARAUTO_DATA_DIR` | The folder of the master key, of the audit mark and, once the hub replaced it, of the password of the database. |
+| `ARAUTO_DATABASE_PASSWORD` | Optional. `rotate-at-first-access`: at the first passkey of the panel, the hub replaces the password of `ARAUTO_DATABASE_URL` with one it draws and keeps in the data folder ([decision 0041](../docs/decisoes/0041-senha-do-banco-sorteada-pelo-hub.md)). |
 | `ARAUTO_LISTEN` | The address of the port of the connectors. |
 | `ARAUTO_LISTEN_INTERNAL` | The address of the internal port. |
 | `ARAUTO_LISTEN_PANEL` | The address of the port of the panel. Without it, the panel stays off. |
@@ -76,6 +78,8 @@ arauto-hub migrate --i-have-a-backup   applies migrations to a database that alr
 arauto-hub admin ...            the administration, by command
 arauto-hub admin panel code     issues an installation code of the panel (10 minutes, one use):
                                 it only opens the registration of a passkey
+arauto-hub admin database rotate-password
+                                replaces the password of the database with one nobody sees
 ```
 
 The sequence of a first use is in the guide of each folder. The [walkthrough of the first test](primeiro-teste.md) brings, step by step, what to check in a new installation.

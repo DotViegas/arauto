@@ -12,7 +12,8 @@ use std::time::Duration;
 use arauto_hub::admin::{self, InitOutcome};
 use arauto_hub::channel::{self, ChannelSettings, Downloads, Hub, Options, Purposes, Running};
 use arauto_hub::config::{
-    ClientIpSource, DatabaseUrl, PanelConfig, PublicUrl, ServeConfig, StorageConfig,
+    ClientIpSource, DatabaseUrl, PanelConfig, PasswordRotation, PublicUrl, ServeConfig,
+    StorageConfig,
 };
 use arauto_hub::db::{PoolOptions, ResolvedOrg};
 use arauto_protocol::clock::SystemClock;
@@ -100,6 +101,7 @@ pub fn config(installation: &Installation, client_ip: ClientIpSource) -> ServeCo
             database_url: installation.url.clone(),
             data_dir: installation.data_dir.clone(),
             allow_unsafe_db: false,
+            password_rotation: PasswordRotation::Never,
         },
         listen: local,
         listen_internal: local,

@@ -17,8 +17,12 @@ use arauto_testkit::passkey::SoftAuthenticator;
 #[path = "../whatsapp/world.rs"]
 mod world;
 
+#[path = "../repo/role.rs"]
+mod role;
+
 mod access;
 mod connect;
+mod database;
 mod entry;
 mod language;
 mod pages;

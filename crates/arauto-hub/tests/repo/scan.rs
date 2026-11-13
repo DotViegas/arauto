@@ -228,6 +228,12 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
         "begin_durable",
         "opens a transaction; runs no query of business data",
     ),
+    (
+        "db.rs",
+        "rotate_password",
+        "task of the installation: the password of the database role is one for every \
+         organization; the pools are only given its new password",
+    ),
     // The audit: the organization of an event is in the event.
     (
         "audit.rs",

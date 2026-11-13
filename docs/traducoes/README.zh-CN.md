@@ -42,7 +42,7 @@
   <img src="../marca/capa.webp" alt="Arauto 的吉祥物站在山丘上，背对着我们看日落" width="100%">
 </p>
 
-> **状态：第一个 MVP 正在开发中。** 设计写在这些文档里；代码刚刚起步，目前还没有可用的版本（[docs/15-mvp.md](../15-mvp.md)）。本项目免费，代码将以 Apache-2.0 许可证开源（[决定 0015](../decisoes/0015-licenca.md)）。
+> **状态：第一个 MVP 正在开发中。** 设计写在这些文档里；代码刚刚起步，目前还没有可用的版本（[docs/15-mvp.md](../15-mvp.md)）。本项目免费，代码以 Apache-2.0 许可证开源（[决定 0015](../decisoes/0015-licenca.md)）。
 
 Hermes Agent 是 Nous Research 的 AI 智能体。Arauto 是一个独立项目：与 Hermes Agent 的作者以及 WhatsApp 均无关联。
 

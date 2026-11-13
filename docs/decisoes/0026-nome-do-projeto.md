@@ -15,6 +15,7 @@ Checked on 10/11/2026: the name is free on crates.io and on PyPI and taken on np
 ## Consequences
 
 - **Blocks:** the opening of the repository to the public ([roadmap](../12-roteiro.md), Phase 7). The trademark registration needs to be checked before that.
+- **Change of 13/11/2026, at the maintainer's request:** the repository was opened to the public with the trademark registration still not checked. If the name is taken, it changes after the opening.
 - The change was applied to the documents on 10/11/2026, all at once, approved by the maintainer. It reached the name in the texts, the programs (`arauto-hub` and `arauto-connector`), the connector's folder (`~/.arauto`), the tool server (`arauto`) and the prefix of the error codes (`AR-`).
 - The form of each of these names follows the language decision ([0016](0016-idioma.md)): the commands, the files of the connector, the modules of the hub and the tools got their English form in the same change.
 - In the brand, the name is written Arauto[IA].

@@ -26,7 +26,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arauto_protocol::errors::ErrorCode;
-use sqlx::postgres::PgListener;
+use sqlx::postgres::{PgListener, PgPoolOptions};
 use uuid::Uuid;
 
 use super::Hub;
@@ -316,9 +316,27 @@ pub(crate) async fn listener(hub: Arc<Hub>) {
 }
 
 /// A connection of its own, outside the pool, listening on the channel of the admin command.
+/// It is opened with the options the pool of the hub opens its connections with now: after
+/// the password of the database is replaced, with the new one.
 async fn connect(hub: &Hub) -> Option<PgListener> {
-    let mut listener = match PgListener::connect(hub.database_url().expose()).await {
-        Ok(listener) => listener,
+    let options = (*hub.pool().connect_options()).clone();
+    // One connection, kept for as long as it lives: what `PgListener::connect` does with an
+    // address.
+    let own = PgPoolOptions::new()
+        .max_connections(1)
+        .max_lifetime(None)
+        .idle_timeout(None)
+        .connect_with(options)
+        .await;
+    let listener = match own {
+        Ok(own) => PgListener::connect_with(&own).await,
+        Err(error) => Err(error),
+    };
+    let mut listener = match listener {
+        Ok(mut listener) => {
+            listener.ignore_pool_close_event(true);
+            listener
+        }
         Err(_) => {
             // The address is not part of the message: it may carry a password.
             tracing::warn!("the listener of the admin notices could not connect");

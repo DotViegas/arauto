@@ -12,6 +12,7 @@
 //! | `ARAUTO_ALLOW_UNSAFE_DB` | `1` lets the hub start on a database with `fsync` off. For tests only. |
 //! | `ARAUTO_LISTEN_PANEL` | Optional: the address of the port of the panel. Without it there is no panel. |
 //! | `ARAUTO_PANEL_URL` | With the panel: the address the admin opens it at, in the browser. |
+//! | `ARAUTO_DATABASE_PASSWORD` | Optional: `rotate-at-first-access` makes the hub replace the password of its database role with one it draws, right after the first passkey of the panel. Never set, never by itself. |
 //!
 //! Each command asks only for what it uses: [`StorageConfig`] for the commands that open the
 //! database and the data folder, [`PublicUrl`] for the command that shows the block, and
@@ -22,6 +23,8 @@
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+
+use crate::db_password::{self, DatabasePasswordError, DatabaseTarget};
 
 /// The name of each variable.
 pub mod names {
@@ -45,6 +48,8 @@ pub mod names {
     pub const LISTEN_PANEL: &str = "ARAUTO_LISTEN_PANEL";
     /// The address the admin opens the panel at.
     pub const PANEL_URL: &str = "ARAUTO_PANEL_URL";
+    /// Whether the hub replaces the password of its database role by itself.
+    pub const DATABASE_PASSWORD: &str = "ARAUTO_DATABASE_PASSWORD";
 }
 
 /// The longest public address accepted.
@@ -128,20 +133,42 @@ impl fmt::Debug for DatabaseUrl {
     }
 }
 
+/// Whether the hub replaces the password of its database role by itself
+/// (`ARAUTO_DATABASE_PASSWORD`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PasswordRotation {
+    /// Never by itself: only `arauto-hub admin database rotate-password` replaces it. The
+    /// default.
+    #[default]
+    Never,
+    /// Once, right after the first passkey of the installation is registered in the panel,
+    /// and only while the data folder keeps no password of its own.
+    AtFirstAccess,
+}
+
+impl PasswordRotation {
+    /// The value of `ARAUTO_DATABASE_PASSWORD` that asks for [`PasswordRotation::AtFirstAccess`].
+    pub const AT_FIRST_ACCESS: &'static str = "rotate-at-first-access";
+}
+
 /// What every command that touches the state of the hub needs: `init`, `migrate`, `admin`
 /// and `serve`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageConfig {
-    /// The database.
+    /// The database, as given. Open it with [`crate::db::open`], which uses the password of
+    /// the data folder when there is one ([`StorageConfig::database_target`]).
     pub database_url: DatabaseUrl,
     /// The folder of the master key and of the audit mark.
     pub data_dir: PathBuf,
     /// The explicit test option: start even when the database does not force writes to disk.
     pub allow_unsafe_db: bool,
+    /// Whether the hub replaces the password of its database role by itself.
+    pub password_rotation: PasswordRotation,
 }
 
 impl StorageConfig {
-    /// Reads `ARAUTO_DATABASE_URL`, `ARAUTO_DATA_DIR` and `ARAUTO_ALLOW_UNSAFE_DB`.
+    /// Reads `ARAUTO_DATABASE_URL`, `ARAUTO_DATA_DIR`, `ARAUTO_ALLOW_UNSAFE_DB` and
+    /// `ARAUTO_DATABASE_PASSWORD`.
     ///
     /// # Errors
     /// [`ConfigError`] with every variable that is missing or wrong.
@@ -149,6 +176,20 @@ impl StorageConfig {
         let mut problems = Vec::new();
         let storage = read_storage(env, &mut problems);
         finish(storage, problems)
+    }
+
+    /// Where the database is reached now: the address of `ARAUTO_DATABASE_URL`, with its
+    /// password replaced by the one of `database.secret` when the data folder has that file
+    /// ([`crate::db_password`]). The file is read at each call, so a password replaced since
+    /// the last one is seen. It blocks the calling thread.
+    ///
+    /// # Errors
+    /// [`DatabasePasswordError::Damaged`] when the file is there and holds no password (its
+    /// content is not shown); [`DatabasePasswordError::Address`] when PostgreSQL does not take
+    /// the address.
+    pub fn database_target(&self) -> Result<DatabaseTarget, DatabasePasswordError> {
+        let current = db_password::read_current(&self.data_dir)?;
+        db_password::target(&self.database_url, current.as_ref())
     }
 }
 
@@ -468,10 +509,29 @@ fn read_storage(env: &impl Lookup, problems: &mut Vec<Problem>) -> Option<Storag
             None
         }
     };
+    // The value is not repeated: whoever mistakes this variable for the password itself would
+    // see it printed.
+    let password_rotation = match value(env, names::DATABASE_PASSWORD).as_deref() {
+        None => Some(PasswordRotation::Never),
+        Some(PasswordRotation::AT_FIRST_ACCESS) => Some(PasswordRotation::AtFirstAccess),
+        Some(_) => {
+            problems.push(Problem {
+                variable: names::DATABASE_PASSWORD,
+                what: format!(
+                    "is either not set or {}; it is not the password: it says whether the hub \
+                     replaces the password of its database role, once, right after the first \
+                     passkey of the panel",
+                    PasswordRotation::AT_FIRST_ACCESS
+                ),
+            });
+            None
+        }
+    };
     Some(StorageConfig {
         database_url: database_url?,
         data_dir: data_dir?,
         allow_unsafe_db: allow_unsafe_db?,
+        password_rotation: password_rotation?,
     })
 }
 
@@ -969,6 +1029,99 @@ mod tests {
             let error = ServeConfig::read(&env(&pairs)).unwrap_err();
             assert_eq!(variables(&error), [names::ALLOW_UNSAFE_DB], "{other:?}");
         }
+    }
+
+    #[test]
+    fn the_hub_replaces_its_database_password_only_when_asked_with_the_exact_word() {
+        assert_eq!(
+            ServeConfig::read(&env(&FULL))
+                .unwrap()
+                .storage
+                .password_rotation,
+            PasswordRotation::Never
+        );
+        let on = with(names::DATABASE_PASSWORD, "rotate-at-first-access");
+        assert_eq!(
+            ServeConfig::read(&env(&on))
+                .unwrap()
+                .storage
+                .password_rotation,
+            PasswordRotation::AtFirstAccess
+        );
+        let blank = with(names::DATABASE_PASSWORD, " ");
+        assert_eq!(
+            ServeConfig::read(&env(&blank))
+                .unwrap()
+                .storage
+                .password_rotation,
+            PasswordRotation::Never
+        );
+        // Anything else is a mistake, said without repeating the value: it may be a password.
+        for other in [
+            "s3cr3t-database-pass",
+            "rotate",
+            "ROTATE-AT-FIRST-ACCESS",
+            " rotate-at-first-access",
+            "1",
+            "never",
+        ] {
+            let pairs: Vec<(&str, &str)> = FULL
+                .iter()
+                .copied()
+                .chain([(names::DATABASE_PASSWORD, other)])
+                .collect();
+            let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+            assert_eq!(variables(&error), [names::DATABASE_PASSWORD], "{other:?}");
+            assert!(!error.to_string().contains("s3cr3t"), "{error}");
+            assert!(!format!("{error:?}").contains("s3cr3t"), "{error:?}");
+        }
+        // Every command reads it: the admin command replaces the password too.
+        let storage = [
+            (
+                names::DATABASE_URL,
+                "postgres://arauto@127.0.0.1:5432/arauto",
+            ),
+            (names::DATA_DIR, "data"),
+            (names::DATABASE_PASSWORD, "rotate-at-first-access"),
+        ];
+        assert_eq!(
+            StorageConfig::read(&env(&storage))
+                .unwrap()
+                .password_rotation,
+            PasswordRotation::AtFirstAccess
+        );
+    }
+
+    #[test]
+    fn the_database_is_reached_with_the_password_of_the_data_folder_when_it_has_one() {
+        use sqlx::ConnectOptions;
+        let dir = tempfile::tempdir().unwrap();
+        let storage = StorageConfig {
+            database_url: DatabaseUrl::new(
+                "postgres://arauto:provisional@db.example.com/arauto".to_owned(),
+            ),
+            data_dir: dir.path().to_path_buf(),
+            allow_unsafe_db: false,
+            password_rotation: PasswordRotation::Never,
+        };
+        let password_of = |storage: &StorageConfig| {
+            storage
+                .database_target()
+                .unwrap()
+                .options()
+                .to_url_lossy()
+                .password()
+                .map(str::to_owned)
+        };
+        assert_eq!(password_of(&storage).as_deref(), Some("provisional"));
+        let kept = "0123456789abcdef".repeat(4);
+        std::fs::write(dir.path().join("database.secret"), &kept).unwrap();
+        assert_eq!(password_of(&storage).as_deref(), Some(kept.as_str()));
+        // A damaged file stops the hub: it never falls back to the provisional password.
+        std::fs::write(dir.path().join("database.secret"), "s3cr3t-but-damaged").unwrap();
+        let error = storage.database_target().unwrap_err();
+        assert!(error.to_string().contains("database.secret"), "{error}");
+        assert!(!error.to_string().contains("s3cr3t-but-damaged"), "{error}");
     }
 
     #[test]

@@ -750,9 +750,45 @@ pub fn panel_code(
     Report::done(text)
 }
 
+/// `admin database rotate-password`: where the new password is kept. It takes no password:
+/// the screen cannot show one.
+#[must_use]
+pub fn database_password(kept_in: &std::path::Path) -> Report {
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "The password of the database role of the hub was replaced by one the hub drew. Nobody \
+         has seen it, and it is never shown."
+    );
+    let _ = writeln!(
+        text,
+        "It is kept in {}, readable only by the user the hub runs as. Keep that file with \
+         the master key: without it, the hub cannot open its database.",
+        escape(&kept_in.display().to_string())
+    );
+    let _ = writeln!(
+        text,
+        "A hub that is running keeps the connections it has and cannot open new ones: \
+         restart it."
+    );
+    Report::done(text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_replacement_of_the_database_password_says_where_it_is_kept() {
+        let report = database_password(std::path::Path::new("/var/lib/arauto/database.secret"));
+        assert!(report.done);
+        assert!(
+            report.text.contains("/var/lib/arauto/database.secret"),
+            "{}",
+            report.text
+        );
+        assert!(report.text.contains("never shown"), "{}", report.text);
+    }
 
     #[test]
     fn an_untrusted_text_reaches_the_terminal_as_plain_ascii() {

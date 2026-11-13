@@ -8,6 +8,7 @@
 //! |---|---|
 //! | [`config`] | The environment variables, read and checked; each command asks only for what it uses. |
 //! | [`db`] | The connection pool, the durability check, the migrations, the resolved organization and the durable transaction. |
+//! | [`db_password`] | The password of the database role, drawn by the hub and kept in the data folder. |
 //! | [`vault`] | The black box: the only module that touches the master key. Seals and opens credentials, keys and message texts. |
 //! | [`mark`] | The audit mark, the number kept outside the database that tells a restored database apart. |
 //! | [`audit`] | The closed catalog of actions and the two ways of writing an event. |
@@ -30,6 +31,7 @@ pub mod channel;
 pub mod config;
 pub mod core;
 pub mod db;
+pub mod db_password;
 pub mod download;
 pub mod engine;
 pub mod mark;

@@ -1,4 +1,4 @@
-# 0040 — The panel inside the hub: its own port, entry by code and the first screens
+# 0040 — The panel inside the hub: its own port, entry by passkey and the first screens
 
 **Status:** proposal · **Date:** 12/11/2026, with the code of the first delivery of the panel in
 the hub (read-only screens); 13/11/2026, with the second (connecting a Hermes), the third
@@ -99,6 +99,8 @@ chosen by the maintainer; it was replaced on 13/11/2026 by what is below.
 - **Pieces used:** the library above, SHA-256 with a fixed prefix for each use, the system
   generator, and a cookie `HttpOnly` and `SameSite=Strict` (with `Secure` and the prefix `__Host-`
   when the address of the panel is `https`). No cipher of our own.
+- **The first passkey can replace the password of the database** with one the hub draws and
+  nobody sees, when the installation asks for it ([0041](0041-senha-do-banco-sorteada-pelo-hub.md)).
 - **A hub that starts on an empty database installs itself:** it does what `arauto-hub init`
   does, by the same function and with the same refusals. A database that has anything in it is
   not touched by this, and a migration is never applied by the start.

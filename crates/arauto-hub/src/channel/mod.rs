@@ -63,7 +63,7 @@ use self::registry::{Registry, Status};
 use self::settings::duration;
 use crate::admin::{self, AdminError};
 use crate::audit::AuditError;
-use crate::config::{ClientIpSource, DatabaseUrl, ServeConfig};
+use crate::config::{ClientIpSource, ServeConfig, StorageConfig};
 use crate::db::{self, DbError, PoolOptions, ResolvedOrg, SystemTask};
 use crate::engine::{self, Engines};
 use crate::mark::Mark;
@@ -195,7 +195,9 @@ pub struct Hub {
     pool: PgPool,
     /// The sweep reads through this pool, apart from the one of the connections.
     sweep_pool: PgPool,
-    database_url: DatabaseUrl,
+    /// The database and the data folder, as configured: where the password of the role is
+    /// replaced from.
+    storage: StorageConfig,
     mark: Mark,
     vault: Vault,
     clock: Arc<dyn Clock>,
@@ -389,8 +391,8 @@ impl Hub {
         &self.refusals
     }
 
-    pub(crate) fn database_url(&self) -> &DatabaseUrl {
-        &self.database_url
+    pub(crate) fn storage(&self) -> &StorageConfig {
+        &self.storage
     }
 
     /// Asks the sweep to run now, instead of at its next turn.
@@ -603,9 +605,9 @@ pub async fn start<P: Purposes>(
     clock: Arc<dyn Clock>,
 ) -> Result<Running, ServeError> {
     let settings = options.settings;
-    let pool = db::connect(&config.storage.database_url, settings.pool).await?;
-    let sweep_pool = db::connect(
-        &config.storage.database_url,
+    let pool = db::open(&config.storage, settings.pool).await?;
+    let sweep_pool = db::open(
+        &config.storage,
         PoolOptions {
             size: settings::SWEEP_POOL_SIZE,
             acquire_timeout: settings.pool.acquire_timeout,
@@ -657,7 +659,7 @@ pub async fn start<P: Purposes>(
     let hub = Arc::new(Hub {
         pool,
         sweep_pool,
-        database_url: config.storage.database_url.clone(),
+        storage: config.storage.clone(),
         mark,
         vault,
         clock,

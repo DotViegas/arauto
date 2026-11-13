@@ -163,6 +163,18 @@ enum InstalledCommand {
         #[command(subcommand)]
         command: PanelCommand,
     },
+    /// The database of the hub.
+    Database {
+        #[command(subcommand)]
+        command: DatabaseCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum DatabaseCommand {
+    /// Replaces the password of the database role with one the hub draws. Nobody sees it: it
+    /// is kept in the data folder, and the hub uses it from then on.
+    RotatePassword,
 }
 
 #[derive(Debug, Subcommand)]
@@ -459,7 +471,7 @@ async fn run(command: Command) -> anyhow::Result<Report> {
         size: 2,
         acquire_timeout: Duration::from_secs(5),
     };
-    let pool = db::connect(&storage.database_url, options).await?;
+    let pool = db::open(&storage, options).await?;
     let mark = Mark::new(&storage.data_dir);
     match command {
         StoredCommand::Init => {
@@ -561,7 +573,7 @@ async fn install_if_new(storage: &StorageConfig) -> anyhow::Result<()> {
         size: 2,
         acquire_timeout: Duration::from_secs(5),
     };
-    let pool = db::connect(&storage.database_url, options).await?;
+    let pool = db::open(storage, options).await?;
     let installed = admin::install_if_new(
         &pool,
         &storage.data_dir,
@@ -593,7 +605,7 @@ async fn first_access(config: &ServeConfig) {
             size: 2,
             acquire_timeout: Duration::from_secs(5),
         };
-        let pool = db::connect(&config.storage.database_url, options).await?;
+        let pool = db::open(&config.storage, options).await?;
         let session =
             Session::open(pool.clone(), Mark::new(&config.storage.data_dir), os_user()).await;
         let issued = match session {
@@ -989,6 +1001,9 @@ async fn run_installed(
                 .map(|url| url.origin());
             render::panel_code(&session.panel_code(now).await?, address.as_deref(), now)
         }
+        InstalledCommand::Database {
+            command: DatabaseCommand::RotatePassword,
+        } => render::database_password(&session.rotate_database_password(storage, now).await?),
     })
 }
 
@@ -1135,6 +1150,7 @@ mod tests {
             "arauto-hub admin link remove vendas suporte --both",
             "arauto-hub admin link list",
             "arauto-hub admin panel code",
+            "arauto-hub admin database rotate-password",
             "arauto-hub dev-reset --yes-erase-everything",
         ] {
             let parsed = Cli::try_parse_from(line.split(' '));
@@ -1160,6 +1176,8 @@ mod tests {
             "arauto-hub admin link",
             "arauto-hub admin panel",
             "arauto-hub admin panel code abcd-efgh",
+            "arauto-hub admin database",
+            "arauto-hub admin database rotate-password 0123456789abcdef",
         ] {
             assert!(Cli::try_parse_from(line.split(' ')).is_err(), "{line}");
         }

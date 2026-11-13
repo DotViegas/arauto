@@ -44,7 +44,7 @@
 
 > **Status: first MVP in progress.** The design is in these documents; the code is just getting
 > started and there is no usable release yet ([docs/15-mvp.md](docs/15-mvp.md)). The project is free
-> and the code will be open, under the Apache-2.0 license
+> and the code is open, under the Apache-2.0 license
 > ([decision 0015](docs/decisoes/0015-licenca.md)).
 
 Hermes Agent is an AI agent from Nous Research. Arauto is an independent project: it is not

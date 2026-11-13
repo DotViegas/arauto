@@ -14,3 +14,4 @@ Apache-2.0. It allows use, change and redistribution by any person or organizati
 
 - The text of the license is in the file [LICENSE](../../LICENSE), at the root of the repository.
 - It is left to the opening of the repository ([roadmap](../12-roteiro.md), Phase 7) to say in whose name the copyright notice goes out.
+- **Change of 13/11/2026, at the maintainer's request:** the repository was opened to the public before the other items of Phase 7. The holder of the copyright is still to be decided; the license holds without it.
