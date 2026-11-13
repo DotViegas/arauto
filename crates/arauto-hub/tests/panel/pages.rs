@@ -55,7 +55,7 @@ async fn an_empty_hub_says_what_to_do_first() {
 
     let hermes = page(&browser, &cookie, "/").await;
     assert!(hermes.contains("No Hermes yet"));
-    assert!(hermes.contains("0 connected · 0 waiting · 0 on alert"));
+    assert!(hermes.contains("Connected: 0 · Waiting: 0 · On alert: 0"));
     assert!(
         !hermes.contains("class=\"alerts\""),
         "nothing to warn about"
@@ -106,7 +106,7 @@ async fn the_page_of_the_hermes_shows_each_one_in_its_state() {
         );
     }
     assert!(
-        shown.contains("1 connected · 3 waiting · 0 on alert"),
+        shown.contains("Connected: 1 · Waiting: 3 · On alert: 0"),
         "{shown}"
     );
     assert!(line(&shown, &connected).contains(">now</td>"));
@@ -120,7 +120,7 @@ async fn the_page_of_the_hermes_shows_each_one_in_its_state() {
     for _ in 0..200 {
         let shown = page(&browser, &cookie, "/").await;
         if line(&shown, &connected).contains("<span class=\"state idle\">Disconnected</span>") {
-            assert!(shown.contains("0 connected · 3 waiting · 0 on alert"));
+            assert!(shown.contains("Connected: 0 · Waiting: 3 · On alert: 0"));
             gone = true;
             break;
         }
@@ -250,7 +250,7 @@ async fn a_hub_that_came_back_from_a_copy_says_so_and_still_lets_the_admin_in() 
         line.contains("<span class=\"state bad\">Suspended</span>"),
         "{line}"
     );
-    assert!(shown.contains("0 connected · 0 waiting · 1 on alert"));
+    assert!(shown.contains("Connected: 0 · Waiting: 0 · On alert: 1"));
     assert!(shown.contains(&format!(
         "{name} is suspended and only comes back with a new invite"
     )));

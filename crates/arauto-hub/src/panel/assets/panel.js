@@ -1,6 +1,7 @@
 // The script of the panel of the Arauto hub. It only helps the screen: every step of a guide
 // is a page of the hub and works without it. It never writes markup, never reads a cookie and
-// never talks to anything but the clipboard of whoever clicks.
+// never talks to anything but the clipboard of whoever clicks. It has no sentence of its
+// own: what it says comes from the page, in the language of the page.
 (function () {
   'use strict';
   var root = document.documentElement;
@@ -17,21 +18,16 @@
     else run();
   }
 
-  function joined(parts) {
-    if (parts.length <= 1) return parts.join('');
-    return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
-  }
-
   // The editor of an access: what cannot be marked is greyed out, and the sentence under the
-  // form says what the form means while it is filled. The hub checks it all again on saving.
+  // form says what the form means while it is filled. The pieces of the sentence come from
+  // the page; the hub checks it all again on saving.
   function editor() {
     var form = document.getElementById('editor-form');
     var said = document.getElementById('editor-sentence');
     if (!form || !said) return;
-    var hermes = form.getAttribute('data-hermes');
-    var number = form.getAttribute('data-number');
-    var lines = parseInt(form.getAttribute('data-lines'), 10) || 0;
+    function piece(name) { return form.getAttribute('data-' + name) || ''; }
     function field(name) { return form.querySelector('input[name="' + name + '"]'); }
+    var lines = parseInt(piece('lines'), 10) || 0;
     var all = form.querySelector('input[name="scope"][value="all"]');
     var read = field('read'), send = field('send'), modify = field('modify');
     var wake = field('wake'), start = field('start'), wait = field('wait');
@@ -46,27 +42,21 @@
       var text;
       var none = !(read.checked || send.checked || modify.checked || wake.checked);
       if (!all.checked) {
-        text = 'The Hermes ' + hermes + ' only reaches the chosen chats of the number ' + number + ': ' +
-          lines + ' today. What it may do in each one is in its line.';
+        text = piece('chosen');
       } else if (none) {
-        text = 'The Hermes ' + hermes + ' has no access to the number ' + number + '.';
+        text = piece('none');
       } else {
-        var can = [], rest = [];
-        if (read.checked) can.push('read'); else rest.push('does not read');
-        if (send.checked) can.push('send'); else rest.push('does not send');
-        if (modify.checked) can.push('modify'); else rest.push('does not modify');
         var seconds = parseInt(wait.value, 10);
         if (isNaN(seconds)) seconds = 0;
-        rest.push(wake.checked ? 'is woken after ' + seconds + ' s of silence in the chat' : 'is not woken');
-        if (can.length) {
-          text = 'The Hermes ' + hermes + ' may ' + joined(can) + ' in every chat of the number ' + number +
-            '. It ' + joined(rest) + '.';
-        } else {
-          text = 'The Hermes ' + hermes + ' ' + joined(rest) + ' in every chat of the number ' + number + '.';
-        }
-        if (start.checked) text += ' It may start a chat with someone who never talked to the number.';
-        if (lines === 1) text += ' 1 chat has its own rule.';
-        if (lines > 1) text += ' ' + lines + ' chats have their own rule.';
+        var parts = [
+          piece(read.checked ? 'read' : 'read-not'),
+          piece(send.checked ? 'send' : 'send-not'),
+          piece(modify.checked ? 'modify' : 'modify-not'),
+          wake.checked ? piece('woken').split('{seconds}').join(String(seconds)) : piece('woken-not')
+        ];
+        if (start.checked) parts.push(piece('starts'));
+        if (lines > 0) parts.push(piece('own-rules'));
+        text = piece('head') + ' ' + parts.join(' · ') + '.';
       }
       said.textContent = text;
     }
@@ -115,9 +105,7 @@
       void block.offsetWidth; // the animation starts again at every click
       block.classList.add('copied');
       if (said) {
-        said.textContent = copied
-          ? 'Copied to the clipboard.'
-          : 'The text is selected. Copy it with Ctrl+C.';
+        said.textContent = guide.getAttribute(copied ? 'data-copied' : 'data-selected') || '';
         said.hidden = false;
       }
       if (!copied) {

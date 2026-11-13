@@ -78,7 +78,7 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
     );
     let matrix = page(&browser, &cookie, &saved_at).await;
     assert!(matrix.contains(&format!(
-        "<p class=\"status\" role=\"status\">Saved: The Hermes {ana} may read and send in every chat of the number balcao. It does not modify and is woken after 9 s of silence in the chat.</p>"
+        "<p class=\"status\" role=\"status\">Saved: The Hermes {ana} on the number balcao, in every chat: reads · sends · does not modify · is woken after 9 s of silence.</p>"
     )), "{matrix}");
     assert!(
         matrix.contains("<span>R</span><span>S</span><span class=\"off\">M</span><span>W</span>")
@@ -115,9 +115,11 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
         accesses(&world).await,
         [("all".to_owned(), true, true, true, false, true, 9_000)]
     );
-    assert!(page(&browser, &cookie, &saved_at).await.contains(
-        "It is not woken. It may start a chat with someone who never talked to the number."
-    ));
+    assert!(
+        page(&browser, &cookie, &saved_at)
+            .await
+            .contains("is not woken · may start chats.")
+    );
 
     // Only chosen chats: the lines of the chats are of the command, and the page says so.
     let saved = browser
@@ -128,11 +130,11 @@ async fn the_editor_saves_an_access_by_the_functions_of_the_command() {
     let matrix = page(&browser, &cookie, &saved_at).await;
     assert!(
         matrix.contains(&format!(
-            "Saved: The Hermes {ana} only reaches the chosen chats of the number balcao: 0 today."
+            "Saved: The Hermes {ana} only reaches the chosen chats of the number balcao. Chats with a line: 0."
         )),
         "{matrix}"
     );
-    assert!(matrix.contains("no chat"));
+    assert!(matrix.contains("chosen chats: 0"));
 
     // No verb on every chat: the access goes.
     let saved = browser

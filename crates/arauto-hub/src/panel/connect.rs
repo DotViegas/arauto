@@ -25,6 +25,7 @@ use axum::http::{Method, Response, StatusCode};
 use hyper::body::Incoming;
 
 use super::guide::{self, Ended, Screen};
+use super::text::{self, Lang, k};
 use super::{PanelState, block, data, http, session_of};
 use crate::admin::{self, AdminError};
 use crate::channel::Hub;
@@ -35,22 +36,31 @@ use crate::repo::approval::{ApproveOutcome, LastUse, Recognition, Recognized};
 
 use arauto_protocol::names::{HermesName, NameError};
 
-const NAME_TAKEN: &str = "There already is a Hermes with that name. To link another device to it, use the button on its line.";
-const NAME_RETIRED: &str =
-    "That name belonged to a Hermes that was removed, and a name is never reused. Choose another.";
-const USE_NOT_ANSWERED: &str = "Before the code, say whether you recognize the last use of the current device. Nothing was counted.";
-const USE_CHANGED: &str = "The current device was used while you were answering. See its last use now and answer again. Nothing was approved.";
-const CODE_FORMAT: &str = "The code has 6 digits, like 123-456. Nothing was counted.";
-const RESTORED: &str = "The database came back from an older backup and the hub has not handled it yet. Nothing was written. Restart the hub: it turns the restored mode on, and then each Hermes is reconnected with a new invite.";
-const FAILED: &str = "Something failed in the hub and nothing was done. See the hub's log.";
+const NAME_TAKEN: &str = k(
+    "There already is a Hermes with that name. To link another device to it, use the button on its line.",
+);
+const NAME_RETIRED: &str = k(
+    "That name belonged to a Hermes that was removed, and a name is never reused. Choose another.",
+);
+const USE_NOT_ANSWERED: &str = k(
+    "Before the code, say whether you recognize the last use of the current device. Nothing was counted.",
+);
+const USE_CHANGED: &str = k(
+    "The current device was used while you were answering. See its last use now and answer again. Nothing was approved.",
+);
+const CODE_FORMAT: &str = k("The code has 6 digits, like 123-456. Nothing was counted.");
+const RESTORED: &str = k(
+    "The database came back from an older backup and the hub has not handled it yet. Nothing was written. Restart the hub: it turns the restored mode on, and then each Hermes is reconnected with a new invite.",
+);
+const FAILED: &str = k("Something failed in the hub and nothing was done. See the hub's log.");
 
 /// Why a name was refused, in the words of the form.
 const fn name_error(error: NameError) -> &'static str {
     match error {
-        NameError::Length => "The name has from 1 to 32 characters.",
-        NameError::FirstCharacter => "The name starts with a lowercase letter or a digit.",
-        NameError::Character => "Use only lowercase letters, digits, hyphen and underscore.",
-        NameError::Reserved => "That name is reserved. Choose another.",
+        NameError::Length => k("The name has from 1 to 32 characters."),
+        NameError::FirstCharacter => k("The name starts with a lowercase letter or a digit."),
+        NameError::Character => k("Use only lowercase letters, digits, hyphen and underscore."),
+        NameError::Reserved => k("That name is reserved. Choose another."),
     }
 }
 
@@ -58,11 +68,12 @@ const fn name_error(error: NameError) -> &'static str {
 async fn shown(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     status: StatusCode,
     screen: &Screen,
 ) -> Result<Response<Body>, RepoError> {
-    let frame = data::frame(hub, organization).await?;
-    let hermes = data::hermes(hub, organization).await?;
+    let frame = data::frame(hub, organization, lang).await?;
+    let hermes = data::hermes(hub, organization, lang).await?;
     Ok(http::page(status, guide::page(&frame, &hermes, screen)))
 }
 
@@ -71,6 +82,7 @@ async fn shown(
 async fn failed(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     error: AdminError,
 ) -> Result<Response<Body>, RepoError> {
     let (status, sentence) = match &error {
@@ -78,7 +90,14 @@ async fn failed(
         _ => (StatusCode::INTERNAL_SERVER_ERROR, FAILED),
     };
     tracing::error!(%error, "the panel could not do what was asked");
-    shown(hub, organization, status, &Screen::Failed { sentence }).await
+    shown(
+        hub,
+        organization,
+        lang,
+        status,
+        &Screen::Failed { sentence },
+    )
+    .await
 }
 
 /// Where the guide of a Hermes goes on.
@@ -91,6 +110,7 @@ async fn issue(
     hub: &Hub,
     panel: &PanelState,
     organization: ResolvedOrg,
+    lang: Lang,
     admin: &admin::Session,
     name: &HermesName,
 ) -> Result<Response<Body>, RepoError> {
@@ -98,16 +118,16 @@ async fn issue(
         let screen = Screen::NoConnector {
             name: name.as_str().to_owned(),
         };
-        return shown(hub, organization, StatusCode::OK, &screen).await;
+        return shown(hub, organization, lang, StatusCode::OK, &screen).await;
     };
     let now = hub.now_ms();
     let issued = match admin.invite(name.as_str(), &panel.hub_url, now).await {
         Ok(issued) => issued,
         Err(AdminError::NoSuchHermes) => return Ok(http::see_other("/")),
-        Err(error) => return failed(hub, organization, error).await,
+        Err(error) => return failed(hub, organization, lang, error).await,
     };
     let Some(text) = block::text(&issued, connector) else {
-        return failed(hub, organization, AdminError::Task).await;
+        return failed(hub, organization, lang, AdminError::Task).await;
     };
     let screen = Screen::Block {
         name: name.as_str().to_owned(),
@@ -117,7 +137,7 @@ async fn issue(
         cancelled: issued.issued.cancelled.is_some(),
         closed_request: issued.issued.closed_request.is_some(),
     };
-    shown(hub, organization, StatusCode::OK, &screen).await
+    shown(hub, organization, lang, StatusCode::OK, &screen).await
 }
 
 /// The screen of the code again, with what the last answer got wrong. When the request is no
@@ -125,16 +145,17 @@ async fn issue(
 async fn code_again(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     name: &HermesName,
     said: String,
 ) -> Result<Response<Body>, RepoError> {
-    let Some(mut screen) = data::guide(hub, organization, name).await? else {
+    let Some(mut screen) = data::guide(hub, organization, lang, name).await? else {
         return Ok(http::see_other("/"));
     };
     if let Screen::Code { error, .. } = &mut screen {
         *error = Some(said);
     }
-    shown(hub, organization, StatusCode::OK, &screen).await
+    shown(hub, organization, lang, StatusCode::OK, &screen).await
 }
 
 /// Whether the last use the form says it showed is the one the device has now.
@@ -156,6 +177,7 @@ fn same_use(last: &LastUse, form: &http::Form) -> bool {
 async fn approve(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     admin: &admin::Session,
     name: &HermesName,
     form: &http::Form,
@@ -163,7 +185,7 @@ async fn approve(
     // The request as it is now, with the last use of the device it would replace.
     let view = match admin.request(name.as_str()).await {
         Ok(view) => view.filter(|view| view.request.state == DeviceState::Pending),
-        Err(error) => return failed(hub, organization, error).await,
+        Err(error) => return failed(hub, organization, lang, error).await,
     };
     // Nothing waits for a code: the page of the guide says what there is instead.
     let Some(view) = view else {
@@ -176,10 +198,24 @@ async fn approve(
     };
     let recognition = match (&view.replaces, answer) {
         (Some(_), None) => {
-            return code_again(hub, organization, name, USE_NOT_ANSWERED.to_owned()).await;
+            return code_again(
+                hub,
+                organization,
+                lang,
+                name,
+                text::tr(lang, USE_NOT_ANSWERED).to_owned(),
+            )
+            .await;
         }
         (Some(last), Some(_)) if !same_use(last, form) => {
-            return code_again(hub, organization, name, USE_CHANGED.to_owned()).await;
+            return code_again(
+                hub,
+                organization,
+                lang,
+                name,
+                text::tr(lang, USE_CHANGED).to_owned(),
+            )
+            .await;
         }
         (Some(last), Some(answer)) => Some(Recognized {
             answer,
@@ -199,25 +235,59 @@ async fn approve(
         Ok(ApproveOutcome::Approved(_) | ApproveOutcome::NoRequest) => Ok(wait_of(name)),
         Ok(ApproveOutcome::NotFound) | Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
         Ok(ApproveOutcome::WrongCode { attempts }) => {
-            let said = format!(
-                "The code does not match. Attempt {attempts} of {}. Type the last code the Hermes answered.",
-                crate::repo::approval::CODE_ATTEMPTS_MAX
+            let said = text::fill(
+                lang,
+                k(
+                    "The code does not match. Attempt {attempts} of {max}. Type the last code the Hermes answered.",
+                ),
+                &[
+                    ("attempts", &attempts.to_string()),
+                    ("max", &crate::repo::approval::CODE_ATTEMPTS_MAX.to_string()),
+                ],
             );
-            code_again(hub, organization, name, said).await
+            code_again(hub, organization, lang, name, said).await
         }
         Ok(ApproveOutcome::Denied { .. }) => {
-            shown(hub, organization, StatusCode::OK, &ended(Ended::Denied)).await
+            shown(
+                hub,
+                organization,
+                lang,
+                StatusCode::OK,
+                &ended(Ended::Denied),
+            )
+            .await
         }
         Ok(ApproveOutcome::Expired { .. }) => {
-            shown(hub, organization, StatusCode::OK, &ended(Ended::Expired)).await
+            shown(
+                hub,
+                organization,
+                lang,
+                StatusCode::OK,
+                &ended(Ended::Expired),
+            )
+            .await
         }
         Ok(ApproveOutcome::NeedsRecognition(_)) => {
-            code_again(hub, organization, name, USE_CHANGED.to_owned()).await
+            code_again(
+                hub,
+                organization,
+                lang,
+                name,
+                text::tr(lang, USE_CHANGED).to_owned(),
+            )
+            .await
         }
         Err(AdminError::InvalidCode) => {
-            code_again(hub, organization, name, CODE_FORMAT.to_owned()).await
+            code_again(
+                hub,
+                organization,
+                lang,
+                name,
+                text::tr(lang, CODE_FORMAT).to_owned(),
+            )
+            .await
         }
-        Err(error) => failed(hub, organization, error).await,
+        Err(error) => failed(hub, organization, lang, error).await,
     }
 }
 
@@ -232,6 +302,7 @@ pub(super) async fn answer(
     let Some((organization, session)) = session_of(hub, panel, &parts.headers).await? else {
         return Ok(http::see_other("/sign-in"));
     };
+    let lang = super::lang_of(&parts.headers);
     let reads = parts.method == Method::GET;
     let path = parts.uri.path();
     match (reads, path) {
@@ -240,7 +311,7 @@ pub(super) async fn answer(
                 typed: String::new(),
                 error: None,
             };
-            return shown(hub, organization, StatusCode::OK, &screen).await;
+            return shown(hub, organization, lang, StatusCode::OK, &screen).await;
         }
         (true, "/hermes/wait") => {
             let name = http::query_field(parts.uri.query(), "name")
@@ -248,8 +319,8 @@ pub(super) async fn answer(
             let Some(name) = name else {
                 return Ok(http::see_other("/"));
             };
-            return match data::guide(hub, organization, &name).await? {
-                Some(screen) => shown(hub, organization, StatusCode::OK, &screen).await,
+            return match data::guide(hub, organization, lang, &name).await? {
+                Some(screen) => shown(hub, organization, lang, StatusCode::OK, &screen).await,
                 None => Ok(http::see_other("/")),
             };
         }
@@ -282,25 +353,39 @@ pub(super) async fn answer(
             Ok(name) => name,
             Err(error) => {
                 let screen = again(name_error(error));
-                return shown(hub, organization, StatusCode::OK, &screen).await;
+                return shown(hub, organization, lang, StatusCode::OK, &screen).await;
             }
         };
         // Without a connector to serve there is no block: the line is not created either.
         if panel.connector.is_none() {
-            return issue(hub, panel, organization, &admin, &name).await;
+            return issue(hub, panel, organization, lang, &admin, &name).await;
         }
         return match admin.hermes_add(name.as_str(), now).await {
-            Ok(_) => issue(hub, panel, organization, &admin, &name).await,
+            Ok(_) => issue(hub, panel, organization, lang, &admin, &name).await,
             Err(AdminError::InvalidName(error)) => {
-                shown(hub, organization, StatusCode::OK, &again(name_error(error))).await
+                shown(
+                    hub,
+                    organization,
+                    lang,
+                    StatusCode::OK,
+                    &again(name_error(error)),
+                )
+                .await
             }
             Err(AdminError::NameTaken) => {
-                shown(hub, organization, StatusCode::OK, &again(NAME_TAKEN)).await
+                shown(hub, organization, lang, StatusCode::OK, &again(NAME_TAKEN)).await
             }
             Err(AdminError::NameRetired) => {
-                shown(hub, organization, StatusCode::OK, &again(NAME_RETIRED)).await
+                shown(
+                    hub,
+                    organization,
+                    lang,
+                    StatusCode::OK,
+                    &again(NAME_RETIRED),
+                )
+                .await
             }
-            Err(error) => failed(hub, organization, error).await,
+            Err(error) => failed(hub, organization, lang, error).await,
         };
     }
     // The other forms are about a Hermes that exists, by its name.
@@ -308,11 +393,11 @@ pub(super) async fn answer(
         return Ok(http::see_other("/"));
     };
     match path {
-        "/hermes/invite" => issue(hub, panel, organization, &admin, &name).await,
-        "/hermes/approve" => approve(hub, organization, &admin, &name, &form).await,
+        "/hermes/invite" => issue(hub, panel, organization, lang, &admin, &name).await,
+        "/hermes/approve" => approve(hub, organization, lang, &admin, &name, &form).await,
         _ => match admin.deny(name.as_str(), now).await {
             Ok(_) | Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
-            Err(error) => failed(hub, organization, error).await,
+            Err(error) => failed(hub, organization, lang, error).await,
         },
     }
 }

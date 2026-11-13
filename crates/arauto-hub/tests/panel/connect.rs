@@ -208,7 +208,7 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     assert!(asks_code.contains("A device used the invite of atendimento"));
     assert!(asks_code.contains("<li class=\"ok\">A device used the invite, from 127.0.0.1"));
     assert!(asks_code.contains(
-        "machine \"test-host\" · system \"test-os\" · Hermes \"0.0.0-test\" (not verified)"
+        "machine &quot;test-host&quot; · system &quot;test-os&quot; · Hermes &quot;0.0.0-test&quot; (not verified)"
     ));
     assert!(
         !asks_code.contains("http-equiv"),
@@ -275,7 +275,7 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     assert_eq!(done.matches("<li class=\"ok\">").count(), 4);
     let list = browser.get("/", Some(&cookie)).await.text();
     assert!(list.contains("<span class=\"state\">Connected</span>"));
-    assert!(list.contains("1 connected · 0 waiting · 0 on alert"));
+    assert!(list.contains("Connected: 1 · Waiting: 0 · On alert: 0"));
     drop(session);
 }
 
@@ -717,7 +717,7 @@ async fn what_a_device_says_of_itself_is_shown_as_text() {
 
     let page = wait_page(&browser, &cookie, &name).await;
     assert!(
-        page.contains("machine \"&lt;script&gt;alert(1)&lt;/script&gt;\""),
+        page.contains("machine &quot;&lt;script&gt;alert(1)&lt;/script&gt;&quot;"),
         "{page}"
     );
     assert!(page.contains("&quot;&gt;&lt;img src=x onerror=alert(2)&gt;"));

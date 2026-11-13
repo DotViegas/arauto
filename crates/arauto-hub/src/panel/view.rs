@@ -1,19 +1,15 @@
 //! The pages of the panel: what each one shows, as HTML.
 //!
 //! A page is written from plain values that [`super::data`] reads: nothing here touches the
-//! database. Every value goes through [`Html::text`]; the markup is the `raw` part.
-//!
-//! The words of the pages are in Portuguese, as in the prototype the maintainer approved.
-//! They are text of a new screen, so they are a proposal (`docs/07-telas.md`).
+//! database. Every value goes through [`Html::text`]; the markup is the `raw` part; and
+//! every sentence of the screen goes through [`Html::t`] or [`Html::fill`], which write it in
+//! the language of the page ([`super::text`]).
 
-use super::html::Html;
+use super::html::{Arg, Html};
+use super::text::{Lang, k, tr};
 
 /// The logo, written by the project: no value of anyone goes inside it.
 const LOGO: &str = include_str!("assets/logo.svg");
-
-const HEAD: &str = "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">\
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-<title>Painel Arauto[IA]</title><link rel=\"stylesheet\" href=\"/assets/panel.css\">";
 
 pub(super) const TAIL: &str = "</body></html>";
 
@@ -32,7 +28,12 @@ pub enum Over {
 /// The head of a page. Only a page with a guide loads the script of the panel, and it loads
 /// it by its address: no page carries a script of its own.
 fn head(html: &mut Html, over: Over) {
-    html.raw(HEAD);
+    let lang = html.lang();
+    html.raw("<!doctype html><html lang=\"")
+        .raw(lang.tag())
+        .raw("\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Arauto[IA] · ")
+        .t(k("Panel"))
+        .raw("</title><link rel=\"stylesheet\" href=\"/assets/panel.css\">");
     if let Over::Guide { refresh } = over {
         if let Some(seconds) = refresh {
             html.raw("<meta http-equiv=\"refresh\" content=\"")
@@ -42,6 +43,28 @@ fn head(html: &mut Html, over: Over) {
         html.raw("<script src=\"/assets/panel.js\"></script>");
     }
     html.raw("</head><body>");
+}
+
+/// The form that changes the language of the panel: every language by its own name.
+fn language(html: &mut Html) {
+    let current = html.lang();
+    html.raw("<form class=\"language\" method=\"post\" action=\"/language\"><label for=\"lang\">")
+        .t(k("Language"))
+        .raw("</label><select id=\"lang\" name=\"lang\">");
+    for lang in Lang::ALL {
+        html.raw("<option value=\"")
+            .raw(lang.tag())
+            .raw(if lang == current {
+                "\" selected>"
+            } else {
+                "\">"
+            })
+            .raw(lang.name())
+            .raw("</option>");
+    }
+    html.raw("</select><button class=\"button\" type=\"submit\">")
+        .t(k("Change"))
+        .raw("</button></form>");
 }
 
 /// How a state reads at a glance: the color of the dot, never the only sign of it.
@@ -73,9 +96,10 @@ impl Tone {
 pub struct Notice {
     /// Whether it is of the kind that stops a Hermes or a number.
     pub grave: bool,
-    /// What it is about, in a few fixed words.
+    /// What it is about, in a few fixed words: a sentence of the screens.
     pub lead: &'static str,
-    /// The sentence. It may carry a name or an address that came from outside.
+    /// The sentence, already in the language of the page. It may carry a name or an address
+    /// that came from outside.
     pub text: String,
 }
 
@@ -93,6 +117,8 @@ pub enum Tab {
 /// What every page of a session shows around its own content.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Frame {
+    /// The language of the page.
+    pub lang: Lang,
     /// The sentence of the restored mode, while it is on (C11).
     pub restored: Option<String>,
     /// The alerts nobody marked as seen, the newest first.
@@ -110,7 +136,7 @@ pub struct HermesRow {
     pub name: String,
     /// The color of its state.
     pub tone: Tone,
-    /// Its state, in words.
+    /// Its state: a sentence of the screens.
     pub state: &'static str,
     /// The aliases of the numbers it reaches.
     pub numbers: Vec<String>,
@@ -167,7 +193,7 @@ pub struct NumberRow {
     pub phone: Option<String>,
     /// The color of its state.
     pub tone: Tone,
-    /// Its state, in words.
+    /// Its state: a sentence of the screens.
     pub state: &'static str,
     /// Whether the admin marked it as a command channel.
     pub command: bool,
@@ -209,8 +235,8 @@ pub struct Cell {
 pub struct AccessRow {
     /// The Hermes.
     pub hermes: String,
-    /// The state of a Hermes whose device does not serve: its accesses are kept and none
-    /// applies.
+    /// The state of a Hermes whose device does not serve, as a sentence of the screens: its
+    /// accesses are kept and none applies.
     pub stopped: Option<&'static str>,
     /// One cell per number, in the order of the columns. `None`: no access.
     pub cells: Vec<Option<Cell>>,
@@ -229,24 +255,37 @@ pub struct AccessPage {
     pub saved: Option<String>,
 }
 
-/// The page where the entry code is typed.
+/// The letters of the four verbs in the matrix: the initials of read, send, modify and be
+/// woken, in each language.
+pub(super) const VERB_LETTERS: [&str; 4] = [k("R"), k("S"), k("M"), k("W")];
+
+/// The page where the entry code is typed. `refusal` is a sentence of the screens.
 #[must_use]
-pub fn sign_in(refusal: Option<&'static str>) -> String {
-    let mut html = Html::new();
+pub fn sign_in(lang: Lang, refusal: Option<&'static str>) -> String {
+    let mut html = Html::new(lang);
     head(&mut html, Over::Nothing);
     html.raw("<main class=\"entry\">")
         .raw(LOGO)
-        .raw("<h1>Sign in to the panel</h1><form class=\"card\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\">")
-        .raw("<div class=\"field\"><label for=\"code\">Entry code</label>")
-        .raw("<input id=\"code\" name=\"code\" type=\"password\" inputmode=\"text\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"64\" required autofocus></div>");
+        .raw("<h1>")
+        .t(k("Sign in to the panel"))
+        .raw("</h1><form class=\"card\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\"><div class=\"field\"><label for=\"code\">")
+        .t(k("Entry code"))
+        .raw("</label><input id=\"code\" name=\"code\" type=\"password\" inputmode=\"text\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"64\" required autofocus></div>");
     if let Some(refusal) = refusal {
         html.raw("<p class=\"error\" role=\"alert\">")
-            .raw(refusal)
+            .t(refusal)
             .raw("</p>");
     }
-    html.raw("<p class=\"hint\">Issue the code on the hub's server, with <code>arauto-hub admin panel code</code>. It is valid for 10 minutes and for one sign-in.</p>")
-        .raw("<div><button class=\"button primary\" type=\"submit\">Sign in</button></div></form></main>")
-        .raw(TAIL);
+    html.raw("<p class=\"hint\">")
+        .fill(
+            k("Issue the code on the hub's server, with {command}. It is valid for 10 minutes and for one sign-in."),
+            &[("command", Arg::Code("arauto-hub admin panel code"))],
+        )
+        .raw("</p><div><button class=\"button primary\" type=\"submit\">")
+        .t(k("Sign in"))
+        .raw("</button></div></form>");
+    language(&mut html);
+    html.raw("</main>").raw(TAIL);
     html.finish()
 }
 
@@ -257,11 +296,15 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
     } else {
         "<div class=\"page\" inert><header class=\"top\">"
     })
-        .raw(LOGO)
-        .raw("<div class=\"who\"><span>admin</span><form method=\"post\" action=\"/sign-out\"><button class=\"sign-out\" type=\"submit\">Sign out</button></form></div></header>");
+    .raw(LOGO)
+    .raw("<div class=\"who\"><span>admin</span><form method=\"post\" action=\"/sign-out\"><button class=\"sign-out\" type=\"submit\">")
+    .t(k("Sign out"))
+    .raw("</button></form></div></header>");
     let alerts = frame.restored.is_some() || !frame.notices.is_empty() || frame.unknown_devices > 0;
     if alerts {
-        html.raw("<ul class=\"alerts\" aria-label=\"Alerts\">");
+        html.raw("<ul class=\"alerts\" aria-label=\"")
+            .t(k("Alerts"))
+            .raw("\">");
         if let Some(restored) = &frame.restored {
             html.raw("<li class=\"alert restored\">")
                 .text(restored)
@@ -273,59 +316,84 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
             } else {
                 "<li class=\"alert\"><span class=\"state wait\">"
             })
-            .raw(notice.lead)
+            .t(notice.lead)
             .raw(":</span> ")
             .text(&notice.text)
             .raw("</li>");
         }
         if frame.unknown_devices > 0 {
-            html.raw("<li class=\"alert bad\"><span class=\"state bad\">Unknown devices:</span> ")
-                .number(frame.unknown_devices)
-                .raw(" presented a valid credential the database does not explain. The way back for each one is a new invite. See them with <code>arauto-hub admin alerts</code>.</li>");
+            html.raw("<li class=\"alert bad\"><span class=\"state bad\">")
+                .t(k("Unknown devices"))
+                .raw(":</span> ")
+                .fill(
+                    k("{n} presented a valid credential the database does not explain. The way back for each one is a new invite. See them with {command}."),
+                    &[
+                        ("n", Arg::Number(frame.unknown_devices)),
+                        ("command", Arg::Code("arauto-hub admin alerts")),
+                    ],
+                )
+                .raw("</li>");
         }
         if frame.more_notices > 0 {
-            html.raw("<li class=\"alert\"><span class=\"more\">And ")
-                .number(frame.more_notices)
-                .raw(
-                    " more alert(s). See them all with <code>arauto-hub admin alerts</code>.</span></li>",
-                );
+            html.raw("<li class=\"alert\"><span class=\"more\">")
+                .fill(
+                    k("More alerts: {n}. See them all with {command}."),
+                    &[
+                        ("n", Arg::Number(frame.more_notices)),
+                        ("command", Arg::Code("arauto-hub admin alerts")),
+                    ],
+                )
+                .raw("</span></li>");
         }
         html.raw("</ul>");
     }
-    html.raw("<nav class=\"tabs\" aria-label=\"Panel\">");
+    html.raw("<nav class=\"tabs\" aria-label=\"")
+        .t(k("Panel"))
+        .raw("\">");
+    // Hermes and WhatsApp are names: they are the same in every language.
     for (this, address, label) in [
-        (Tab::Hermes, "<a href=\"/\"", "Hermes"),
-        (Tab::Numbers, "<a href=\"/whatsapps\"", "WhatsApps"),
-        (Tab::Accesses, "<a href=\"/accesses\"", "Accesses"),
+        (Tab::Hermes, "<a href=\"/\"", None),
+        (Tab::Numbers, "<a href=\"/whatsapps\"", None),
+        (Tab::Accesses, "<a href=\"/accesses\"", Some(k("Accesses"))),
     ] {
-        html.raw(address)
-            .raw(if this == tab {
-                " aria-current=\"page\">"
-            } else {
-                ">"
-            })
-            .raw(label)
-            .raw("</a>");
+        html.raw(address).raw(if this == tab {
+            " aria-current=\"page\">"
+        } else {
+            ">"
+        });
+        match (label, this) {
+            (Some(label), _) => html.t(label),
+            (None, Tab::Numbers) => html.raw("WhatsApps"),
+            (None, _) => html.raw("Hermes"),
+        };
+        html.raw("</a>");
     }
     html.raw("</nav><main>");
 }
 
 /// Ends the page, up to where a window over it would go.
 fn close(html: &mut Html) {
-    html.raw("</main><p class=\"footer\">In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the <code>arauto-hub admin</code> command, on the hub's server.</p></div>");
+    html.raw("</main><p class=\"footer\">")
+        .fill(
+            k("In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server."),
+            &[("command", Arg::Code("arauto-hub admin"))],
+        )
+        .raw("</p>");
+    language(html);
+    html.raw("</div>");
 }
 
 fn state(html: &mut Html, tone: Tone, label: &'static str) {
     html.raw("<span class=\"")
         .raw(tone.state_class())
         .raw("\">")
-        .raw(label)
+        .t(label)
         .raw("</span>");
 }
 
-fn names(html: &mut Html, list: &[String], none: &'static str) {
+fn names(html: &mut Html, list: &[String]) {
     if list.is_empty() {
-        html.raw(none);
+        html.t(k("none"));
         return;
     }
     for (index, name) in list.iter().enumerate() {
@@ -340,7 +408,7 @@ fn names(html: &mut Html, list: &[String], none: &'static str) {
 /// each one is connected now, which only the running hub knows.
 #[must_use]
 pub fn hermes(frame: &Frame, page: &HermesPage) -> String {
-    let mut html = Html::new();
+    let mut html = Html::new(frame.lang);
     hermes_into(&mut html, frame, page, Over::Nothing);
     html.raw(TAIL);
     html.finish()
@@ -349,19 +417,38 @@ pub fn hermes(frame: &Frame, page: &HermesPage) -> String {
 /// Writes the page of the Hermes up to where a window over it would go.
 pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, over: Over) {
     open(html, frame, Tab::Hermes, over);
-    html.raw("<div class=\"heading\"><div><h1>Your Hermes and their <b>[numbers]</b></h1><p class=\"counters\">")
-        .number(page.connected)
-        .raw(" connected · ")
-        .number(page.waiting)
-        .raw(" waiting · ")
-        .number(page.stopped)
-        .raw(" on alert</p></div><a class=\"button primary\" href=\"/hermes/connect\">Connect Hermes</a></div>")
-        .raw("<div class=\"frame\"><table class=\"list\"><thead><tr>")
-        .raw("<th scope=\"col\">Hermes</th><th scope=\"col\">State</th><th scope=\"col\">Numbers</th>")
-        .raw("<th scope=\"col\">Can be woken</th><th scope=\"col\">Connector</th><th scope=\"col\">Seen</th>")
-        .raw("<th scope=\"col\"><span class=\"sr-only\">Actions</span></th></tr></thead><tbody>");
+    html.raw("<div class=\"heading\"><div><h1>")
+        .bracketed(k("Your Hermes and their [numbers]"))
+        .raw("</h1><p class=\"counters\">")
+        .fill(
+            k("Connected: {connected} · Waiting: {waiting} · On alert: {stopped}"),
+            &[
+                ("connected", Arg::Number(page.connected)),
+                ("waiting", Arg::Number(page.waiting)),
+                ("stopped", Arg::Number(page.stopped)),
+            ],
+        )
+        .raw("</p></div><a class=\"button primary\" href=\"/hermes/connect\">")
+        .t(k("Connect Hermes"))
+        .raw("</a></div><div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">Hermes</th><th scope=\"col\">")
+        .t(k("State"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Numbers"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Can be woken"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Connector"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Seen"))
+        .raw("</th><th scope=\"col\"><span class=\"sr-only\">")
+        .t(k("Actions"))
+        .raw("</span></th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"empty\"><td colspan=\"7\">No Hermes yet. Connect the first one with the \"Connect Hermes\" button.</td></tr>");
+        html.raw("<tr class=\"empty\"><td colspan=\"7\">")
+            .t(k(
+                "No Hermes yet. Connect the first one with the \"Connect Hermes\" button.",
+            ))
+            .raw("</td></tr>");
     }
     for row in &page.rows {
         html.raw("<tr><td><span class=\"name\">")
@@ -369,9 +456,9 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
             .raw("</span></td><td>");
         state(html, row.tone, row.state);
         html.raw("</td><td class=\"second-line\">");
-        names(html, &row.numbers, "none");
+        names(html, &row.numbers);
         html.raw("</td><td class=\"wide-only\">")
-            .raw(if row.woken { "yes" } else { "no" })
+            .t(if row.woken { k("yes") } else { k("no") })
             .raw("</td><td class=\"wide-only mono\">");
         match &row.connector {
             Some(version) => html.text(version),
@@ -384,22 +471,28 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
             RowAction::Continue => {
                 html.raw("<a class=\"button\" href=\"/hermes/wait?name=")
                     .text(&row.name)
-                    .raw("\">Continue</a>");
+                    .raw("\">")
+                    .t(k("Continue"))
+                    .raw("</a>");
             }
             RowAction::Connect | RowAction::Reconnect => {
                 html.raw("<form method=\"post\" action=\"/hermes/invite\"><input type=\"hidden\" name=\"name\" value=\"")
                     .text(&row.name)
-                    .raw(if row.action == RowAction::Connect {
-                        "\"><button class=\"button\" type=\"submit\">Connect</button></form>"
+                    .raw("\"><button class=\"button\" type=\"submit\">")
+                    .t(if row.action == RowAction::Connect {
+                        k("Connect")
                     } else {
-                        "\"><button class=\"button\" type=\"submit\">Reconnect</button></form>"
-                    });
+                        k("Reconnect")
+                    })
+                    .raw("</button></form>");
             }
         }
         if row.action.has_something() {
             html.raw("<a class=\"button danger\" href=\"/hermes/revoke?name=")
                 .text(&row.name)
-                .raw("\">Revoke</a>");
+                .raw("\">")
+                .t(k("Revoke"))
+                .raw("</a>");
         }
         html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
@@ -408,41 +501,64 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
                 .raw("</td></tr>");
         }
     }
-    html.raw("</tbody></table></div><p class=\"note\">\"Numbers\" are the ones the Hermes reaches. The connector is what the device declared: it is not verified.</p>");
+    html.raw("</tbody></table></div><p class=\"note\">")
+        .t(k("\"Numbers\" are the ones the Hermes reaches. The connector is what the device declared: it is not verified."))
+        .raw("</p>");
     close(html);
 }
 
 /// The page of the numbers.
 #[must_use]
 pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
-    let mut html = Html::new();
+    let mut html = Html::new(frame.lang);
     open(&mut html, frame, Tab::Numbers, Over::Nothing);
     html.raw("<div class=\"heading\"><h1>WhatsApps</h1><p class=\"counters\">");
     match &page.engine {
         Some(engine) => {
             html.raw("<span class=\"")
                 .raw(engine.tone.state_class())
-                .raw("\">Engine</span> ")
+                .raw("\">")
+                .t(k("Engine"))
+                .raw("</span> ")
                 .text(&engine.text);
         }
         None => {
-            html.raw(
-                "There is no engine yet. Set it with <code>arauto-hub admin engine set</code>.",
+            html.fill(
+                k("There is no engine yet. Set it with {command}."),
+                &[("command", Arg::Code("arauto-hub admin engine set"))],
             );
         }
     }
-    html.raw("</p></div><div class=\"frame\"><table class=\"list\"><thead><tr>")
-        .raw("<th scope=\"col\">Alias</th><th scope=\"col\">Number</th><th scope=\"col\">State</th>")
-        .raw("<th scope=\"col\">Hermes with access</th><th scope=\"col\">Last message</th></tr></thead><tbody>");
+    html.raw("</p></div><div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">")
+        .t(k("Alias"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Number"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("State"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Hermes with access"))
+        .raw("</th><th scope=\"col\">")
+        .t(k("Last message"))
+        .raw("</th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"empty\"><td colspan=\"5\">No number yet. Add one with <code>arauto-hub admin number add ALIAS PHONE</code>.</td></tr>");
+        html.raw("<tr class=\"empty\"><td colspan=\"5\">")
+            .fill(
+                k("No number yet. Add one with {command}."),
+                &[(
+                    "command",
+                    Arg::Code("arauto-hub admin number add ALIAS PHONE"),
+                )],
+            )
+            .raw("</td></tr>");
     }
     for row in &page.rows {
         html.raw("<tr><td><span class=\"name\">")
             .text(&row.alias)
             .raw("</span>");
         if row.command {
-            html.raw("<span class=\"tag\">command</span>");
+            html.raw("<span class=\"tag\">")
+                .t(k("command"))
+                .raw("</span>");
         }
         html.raw("</td><td class=\"wide-only mono\">");
         match &row.phone {
@@ -452,12 +568,14 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
         html.raw("</td><td>");
         state(&mut html, row.tone, row.state);
         html.raw("</td><td class=\"second-line\">");
-        names(&mut html, &row.hermes, "none");
+        names(&mut html, &row.hermes);
         html.raw("</td><td class=\"wide-only num\">")
             .text(&row.last_message)
             .raw("</td></tr>");
     }
-    html.raw("</tbody></table></div><p class=\"note\">The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.</p>");
+    html.raw("</tbody></table></div><p class=\"note\">")
+        .t(k("The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone."))
+        .raw("</p>");
     close(&mut html);
     html.raw(TAIL);
     html.finish()
@@ -466,7 +584,7 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
 /// The page of the accesses: the matrix. Each cell leads to the editor of that access.
 #[must_use]
 pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
-    let mut html = Html::new();
+    let mut html = Html::new(frame.lang);
     accesses_into(&mut html, frame, page, Over::Nothing);
     html.raw(TAIL);
     html.finish()
@@ -474,14 +592,21 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
 
 /// Writes the page of the accesses up to where a window over it would go.
 pub(super) fn accesses_into(html: &mut Html, frame: &Frame, page: &AccessPage, over: Over) {
+    let lang = html.lang();
     open(html, frame, Tab::Accesses, over);
-    html.raw("<div class=\"heading\"><div><h1>Accesses</h1><p class=\"counters\">Hermes in the rows, numbers in the columns. Click a cell to change it.</p></div></div>");
+    html.raw("<div class=\"heading\"><div><h1>")
+        .t(k("Accesses"))
+        .raw("</h1><p class=\"counters\">")
+        .t(k(
+            "Hermes in the rows, numbers in the columns. Click a cell to change it.",
+        ))
+        .raw("</p></div></div>");
     if page.rows.is_empty() || page.numbers.is_empty() {
         html.raw("<div class=\"frame\"><table class=\"list\"><tbody><tr class=\"empty\"><td>")
-            .raw(if page.rows.is_empty() {
-                "Connect a Hermes first."
+            .t(if page.rows.is_empty() {
+                k("Connect a Hermes first.")
             } else {
-                "Add a WhatsApp first."
+                k("Add a WhatsApp first.")
             })
             .raw("</td></tr></tbody></table></div>");
         close(html);
@@ -506,8 +631,10 @@ pub(super) fn accesses_into(html: &mut Html, frame: &Frame, page: &AccessPage, o
             html.raw("<td colspan=\"")
                 .number(page.numbers.len())
                 .raw("\"><span class=\"state bad\">")
-                .raw(stopped)
-                .raw("</span><span class=\"kept\"> (accesses kept)</span></td></tr>");
+                .t(stopped)
+                .raw("</span><span class=\"kept\"> ")
+                .t(k("(accesses kept)"))
+                .raw("</span></td></tr>");
             continue;
         }
         for (cell, (alias, _)) in row.cells.iter().zip(&page.numbers) {
@@ -517,32 +644,44 @@ pub(super) fn accesses_into(html: &mut Html, frame: &Frame, page: &AccessPage, o
                 .text(alias)
                 .raw("\"><span class=\"verbs\">");
             let verbs = cell.as_ref().map_or([false; 4], |cell| cell.verbs);
-            for (granted, letter) in verbs.iter().zip(["R", "S", "M", "W"]) {
+            for (granted, letter) in verbs.iter().zip(VERB_LETTERS) {
                 html.raw(if *granted {
                     "<span>"
                 } else {
                     "<span class=\"off\">"
                 })
-                .raw(letter)
+                .t(letter)
                 .raw("</span>");
             }
             html.raw("</span><span class=\"scope\">");
             match cell {
                 Some(cell) => html.text(&cell.scope),
-                None => html.raw("no access"),
+                None => html.t(k("no access")),
             };
             html.raw("</span></a></td>");
         }
         html.raw("</tr>");
     }
-    html.raw("</tbody></table></div></div><p class=\"note\"><b>R</b> read · <b>S</b> send · <b>M</b> modify · <b>W</b> be woken.</p>");
+    html.raw("</tbody></table></div></div><p class=\"note\">")
+        .fill(
+            k("{r} read · {s} send · {m} modify · {w} be woken."),
+            &[
+                ("r", Arg::Strong(tr(lang, VERB_LETTERS[0]))),
+                ("s", Arg::Strong(tr(lang, VERB_LETTERS[1]))),
+                ("m", Arg::Strong(tr(lang, VERB_LETTERS[2]))),
+                ("w", Arg::Strong(tr(lang, VERB_LETTERS[3]))),
+            ],
+        )
+        .raw("</p>");
     if let Some(saved) = &page.saved {
-        html.raw("<p class=\"status\" role=\"status\">Saved: ")
-            .text(saved)
+        html.raw("<p class=\"status\" role=\"status\">")
+            .fill(k("Saved: {what}"), &[("what", Arg::Text(saved))])
             .raw("</p>");
     }
     if !page.warnings.is_empty() {
-        html.raw("<div class=\"warnings\"><b>Warnings that block nothing</b><ul>");
+        html.raw("<div class=\"warnings\"><b>")
+            .t(k("Warnings that block nothing"))
+            .raw("</b><ul>");
         for warning in &page.warnings {
             html.raw("<li>").text(warning).raw("</li>");
         }
@@ -573,10 +712,11 @@ mod tests {
 
     fn hostile_frame() -> Frame {
         Frame {
+            lang: Lang::En,
             restored: Some(HOSTILE.to_owned()),
             notices: vec![Notice {
                 grave: true,
-                lead: "Connection taken",
+                lead: k("Connection taken"),
                 text: HOSTILE.to_owned(),
             }],
             more_notices: 2,
@@ -591,7 +731,7 @@ mod tests {
             rows: vec![HermesRow {
                 name: HOSTILE.to_owned(),
                 tone: Tone::Bad,
-                state: "In quarantine",
+                state: k("In quarantine"),
                 numbers: vec![HOSTILE.to_owned(), HOSTILE.to_owned()],
                 woken: true,
                 connector: Some(HOSTILE.to_owned()),
@@ -614,7 +754,7 @@ mod tests {
                 alias: HOSTILE.to_owned(),
                 phone: Some(HOSTILE.to_owned()),
                 tone: Tone::Ok,
-                state: "Connected",
+                state: k("Connected"),
                 command: true,
                 hermes: vec![HOSTILE.to_owned()],
                 last_message: HOSTILE.to_owned(),
@@ -643,14 +783,19 @@ mod tests {
     }
 
     #[test]
-    fn the_pages_say_when_there_is_nothing_and_never_run_a_script() {
+    fn the_pages_say_when_there_is_nothing_and_carry_no_script_of_their_own() {
         let empty = Frame::default();
         for page in [
             hermes(&empty, &HermesPage::default()),
             numbers(&empty, &NumbersPage::default()),
             accesses(&empty, &AccessPage::default()),
-            sign_in(None),
-            sign_in(Some("Invalid or expired code.")),
+            sign_in(Lang::En, None),
+            sign_in(
+                Lang::En,
+                Some(k(
+                    "Invalid or expired code. Issue another one on the hub's server.",
+                )),
+            ),
         ] {
             assert!(
                 !page.contains("<script"),
@@ -662,13 +807,30 @@ mod tests {
             );
             assert!(!page.contains("javascript:"));
             assert!(page.contains("/assets/panel.css"));
+            assert!(page.starts_with("<!doctype html><html lang=\"en\">"));
+            // Every page lets the person change the language, with each one by its own name.
+            assert!(
+                page.contains("<form class=\"language\" method=\"post\" action=\"/language\">")
+            );
+            assert!(page.contains("<option value=\"en\" selected>English</option>"));
+            assert!(page.contains("<option value=\"pt-BR\">Português</option>"));
+            assert!(page.contains("<option value=\"ja\">日本語</option>"));
         }
         assert!(hermes(&empty, &HermesPage::default()).contains("No Hermes yet"));
         assert!(numbers(&empty, &NumbersPage::default()).contains("No number yet"));
         assert!(accesses(&empty, &AccessPage::default()).contains("Connect a Hermes first"));
+        assert!(
+            hermes(&empty, &HermesPage::default())
+                .contains("Connected: 0 · Waiting: 0 · On alert: 0")
+        );
         // The band of alerts only exists when there is something to say.
         assert!(!hermes(&empty, &HermesPage::default()).contains("class=\"alerts\""));
         assert!(hermes(&hostile_frame(), &HermesPage::default()).contains("class=\"alerts\""));
+        // The word between brackets in the title is the one the brand colors.
+        assert!(
+            hermes(&empty, &HermesPage::default())
+                .contains("<h1>Your Hermes and their <b>[numbers]</b></h1>")
+        );
     }
 
     #[test]
@@ -689,7 +851,7 @@ mod tests {
                 },
                 AccessRow {
                     hermes: "antigo".to_owned(),
-                    stopped: Some("In quarantine"),
+                    stopped: Some(k("In quarantine")),
                     cells: Vec::new(),
                 },
             ],
@@ -714,6 +876,9 @@ mod tests {
         );
         assert!(html.contains("no access"));
         assert!(html.contains("<td colspan=\"2\"><span class=\"state bad\">In quarantine</span>"));
+        assert!(
+            html.contains("<b>R</b> read · <b>S</b> send · <b>M</b> modify · <b>W</b> be woken.")
+        );
         assert!(!html.contains("class=\"warnings\""));
     }
 }

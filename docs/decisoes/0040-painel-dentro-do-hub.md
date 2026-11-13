@@ -1,8 +1,8 @@
 # 0040 — The panel inside the hub: its own port, entry by code and the first screens
 
 **Status:** proposal · **Date:** 12/11/2026, with the code of the first delivery of the panel in
-the hub (read-only screens); 13/11/2026, with the second (connecting a Hermes) and the third
-(accesses and revoking)
+the hub (read-only screens); 13/11/2026, with the second (connecting a Hermes), the third
+(accesses and revoking) and the screens in nine languages
 
 ## Context
 
@@ -26,6 +26,8 @@ server, in a container or behind a proxy, and never connected a real Hermes.
 - **On 13/11/2026: the text of the screens is in English,** like everything else that is versioned
   ([0016](0016-idioma.md)). The prototype that was approved was in Portuguese; the screens kept its
   structure and changed its words.
+- **On 13/11/2026: the screens speak the nine languages of the README.** English is the source;
+  the other eight are translations of it.
 
 ## Decision
 
@@ -142,8 +144,38 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
 - **The address that says "Saved" only reads:** it carries the Hermes and the number, and the page
   writes the access as it is in the database at that moment.
 
+### The languages of the screens
+
+- **Nine languages, the ones of the README:** English, Portuguese, Spanish, French, German,
+  Russian, Hindi, Simplified Chinese and Japanese.
+- **Which one a page comes in:** the one the person chose in the panel; without a choice, the
+  first one the browser prefers (`Accept-Language`) that the panel speaks; without that, English.
+- **The choice is a cookie that holds the tag of a language and nothing else** (`arauto-panel-lang`,
+  one year). It is set by a form, with the same `Origin` check of every form, and needs no panel
+  session: the entry screen has the same form. Nothing about it is written in the hub. A value
+  that is not one of the nine tags chooses nothing, in the form and in the cookie.
+- **English is the source, inside the code.** Each sentence of a screen is marked where it is
+  written, and each language has one file with the pairs "English sentence, translation". A
+  sentence without a translation is shown in English.
+- **A translation is text, never markup.** It passes through the same escape as any value; what a
+  sentence carries inside it (a name, a number, a command, a deadline) is put in by the program, in
+  the place the translation marks.
+- **A test reads the code and fails** when a sentence of a screen is not marked, when a language
+  lacks one, translates one that no screen says, changes what the sentence carries, or brings
+  markup. It also fails when two answers offered side by side (revoke and cancel, approve and deny)
+  read the same in some language.
+- **The script has no sentence of its own:** what it writes on the screen comes from the page, in
+  the language of the page.
+- **What does not change with the language:** the names (Hermes, WhatsApps, the name of each
+  Hermes and of each number), the commands, the codes like `AR-102`, the text of the block, what
+  `arauto-hub admin` prints, the audit and the log of the hub.
+
 ## What is not guaranteed
 
+- **The eight translations were written by a language model and were not reviewed by native
+  speakers of each language.** They were seen only in photos of some screens of a test hub. A
+  sentence may be wrong or read badly, and the English one is the one that counts.
+- No language written from right to left is in the list, and the screens were never drawn for one.
 - The entry code does not identify a person. Whoever runs the command already has the database and
   the master key; every panel session belongs to the "local admin".
 - **A stolen panel session acts while it is valid** (12 hours, or 30 minutes without use). With it

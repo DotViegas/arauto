@@ -19,6 +19,7 @@ mod world;
 mod access;
 mod connect;
 mod entry;
+mod language;
 mod pages;
 mod session;
 

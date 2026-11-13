@@ -11,7 +11,8 @@
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
-use super::html::Html;
+use super::html::{Arg, Html};
+use super::text::k;
 use super::view::{self, Frame, HermesPage, Over};
 
 /// The mascot, drawn by the project frame by frame: no value of anyone goes inside it.
@@ -19,7 +20,15 @@ const DANCING: &str = include_str!("assets/mascot-dancing.svg");
 const WAVING: &str = include_str!("assets/mascot-waving.svg");
 
 /// The names of the steps, in the path at the top.
-const STEPS: [&str; 4] = ["Name", "Block", "Code", "Done"];
+const STEPS: [&str; 4] = [k("Name"), k("Block"), k("Code"), k("Done")];
+
+/// What the hub observes, one after the other, while a Hermes connects.
+const OBSERVED: [&str; 4] = [
+    k("Invite issued"),
+    k("A device used the invite"),
+    k("Code checked and request approved"),
+    k("The connector confirmed its first credential"),
+];
 
 /// How often a page that waits for the Hermes asks the hub again, in seconds.
 const WAITING_REFRESH_S: u32 = 3;
@@ -113,7 +122,7 @@ pub enum Screen {
         facts: Box<Facts>,
         /// On a reconnect, the last use of the device in use.
         last_use: Option<Box<LastUse>>,
-        /// What the last answer got wrong.
+        /// What the last answer got wrong, already in the language of the page.
         error: Option<String>,
         /// For how many seconds the code is still accepted.
         seconds: i64,
@@ -196,21 +205,6 @@ impl Screen {
     }
 }
 
-/// `MM:SS`, for a time left that the script of the panel then counts down.
-fn clock(html: &mut Html, seconds: i64) {
-    let seconds = usize::try_from(seconds.max(0)).unwrap_or(0);
-    html.raw("<b data-seconds=\"").number(seconds).raw("\">");
-    let (minutes, rest) = (seconds / 60, seconds % 60);
-    if minutes < 10 {
-        html.raw("0");
-    }
-    html.number(minutes).raw(":");
-    if rest < 10 {
-        html.raw("0");
-    }
-    html.number(rest).raw("</b>");
-}
-
 fn mascot(html: &mut Html, dancing: bool) {
     html.raw(if dancing {
         "<div class=\"mascot dancing\" aria-hidden=\"true\">"
@@ -225,31 +219,23 @@ fn mascot(html: &mut Html, dancing: bool) {
 /// next one is being waited for.
 fn observed(html: &mut Html, seen: usize, address: Option<&str>) {
     html.raw("<ul class=\"steps\">");
-    for (index, label) in [
-        "Invite issued",
-        "A device used the invite",
-        "Code checked and request approved",
-        "The connector confirmed its first credential",
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    for (index, label) in OBSERVED.into_iter().enumerate() {
         html.raw(if index < seen {
             "<li class=\"ok\">"
         } else if index == seen {
             "<li class=\"waiting\">"
         } else {
             "<li>"
-        })
-        .raw(label);
-        if index == 1
-            && seen > 1
-            && let Some(address) = address
-        {
-            html.raw(", from ").text(address);
-        }
+        });
+        match address {
+            Some(address) if index == 1 && seen > 1 => html.fill(
+                k("A device used the invite, from {address}"),
+                &[("address", Arg::Text(address))],
+            ),
+            _ => html.t(label),
+        };
         if index == seen {
-            html.raw(": waiting…");
+            html.raw(": ").t(k("waiting…"));
         }
         html.raw("</li>");
     }
@@ -263,22 +249,31 @@ fn named(html: &mut Html, name: &str) {
         .raw("\">");
 }
 
-fn wait_address(html: &mut Html, name: &str) {
-    html.raw("/hermes/wait?name=").text(name);
+fn hint(html: &mut Html, sentence: &'static str) {
+    html.raw("<p class=\"hint\">").t(sentence).raw("</p>");
 }
 
+#[allow(clippy::too_many_lines)]
 fn body(html: &mut Html, screen: &Screen) {
     match screen {
         Screen::Name { typed, error } => {
-            html.raw("<h3>What name will this Hermes have in the panel?</h3>")
-                .raw("<form id=\"guide-form\" method=\"post\" action=\"/hermes/connect\" autocomplete=\"off\">")
-                .raw("<div class=\"field\"><label for=\"guide-name\">Name of the Hermes</label>")
-                .raw("<input id=\"guide-name\" name=\"name\" type=\"text\" maxlength=\"32\" spellcheck=\"false\" autocapitalize=\"none\" required autofocus value=\"")
+            html.raw("<h3>")
+                .t(k("What name will this Hermes have in the panel?"))
+                .raw("</h3><form id=\"guide-form\" method=\"post\" action=\"/hermes/connect\" autocomplete=\"off\"><div class=\"field\"><label for=\"guide-name\">")
+                .t(k("Name of the Hermes"))
+                .raw("</label><input id=\"guide-name\" name=\"name\" type=\"text\" maxlength=\"32\" spellcheck=\"false\" autocapitalize=\"none\" required autofocus value=\"")
                 .text(typed)
-                .raw("\"><p class=\"hint\">Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.</p></div></form>");
+                .raw("\">");
+            hint(
+                html,
+                k(
+                    "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
+                ),
+            );
+            html.raw("</div></form>");
             if let Some(error) = error {
                 html.raw("<p class=\"error\" role=\"alert\">")
-                    .raw(error)
+                    .t(error)
                     .raw("</p>");
             }
         }
@@ -292,39 +287,69 @@ fn body(html: &mut Html, screen: &Screen) {
         } => {
             html.raw("<div class=\"center preparation\">");
             mascot(html, true);
-            html.raw("<h3 id=\"guide-preparing\" tabindex=\"-1\">Preparing a secure connection</h3><p class=\"hint\">The hub drew the invite of ")
-                .text(name)
-                .raw(".</p></div><div class=\"after\"><p class=\"deadline\">Invite for <b>")
-                .text(name)
-                .raw("</b> · valid for another ");
-            clock(html, *seconds);
-            html.raw(" · single use</p><div class=\"block\" id=\"guide-block\" aria-describedby=\"guide-how\"><pre id=\"guide-text\">")
+            html.raw("<h3 id=\"guide-preparing\" tabindex=\"-1\">")
+                .t(k("Preparing a secure connection"))
+                .raw("</h3><p class=\"hint\">")
+                .fill(k("The hub drew the invite of {name}."), &[("name", Arg::Text(name))])
+                .raw("</p></div><div class=\"after\"><p class=\"deadline\">")
+                .fill(
+                    k("Invite for {name} · valid for another {time} · single use"),
+                    &[("name", Arg::Strong(name)), ("time", Arg::Clock(*seconds))],
+                )
+                .raw("</p><div class=\"block\" id=\"guide-block\" aria-describedby=\"guide-how\"><pre id=\"guide-text\">")
                 .text(text)
-                .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>Copied</span></span></div>")
-                .raw("<p class=\"hint\" id=\"guide-how\"><span class=\"with-script\">Click the block to copy it. </span><span class=\"no-script\">Select the whole text and copy it. </span>It only appears here, once.</p>")
-                .raw("<p class=\"copied-note\" id=\"guide-copied\" role=\"status\" hidden></p>");
+                .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>")
+                .t(k("Copied"))
+                .raw("</span></span></div><p class=\"hint\" id=\"guide-how\"><span class=\"with-script\">")
+                .t(k("Click the block to copy it."))
+                .raw(" </span><span class=\"no-script\">")
+                .t(k("Select the whole text and copy it."))
+                .raw(" </span>")
+                .t(k("It only appears here, once."))
+                .raw("</p><p class=\"copied-note\" id=\"guide-copied\" role=\"status\" hidden></p>");
             if *cancelled {
-                html.raw("<p class=\"hint\">The invite issued before was cancelled.</p>");
+                hint(html, k("The invite issued before was cancelled."));
             }
             if *closed_request {
-                html.raw("<p class=\"hint\">The request that was in progress was closed.</p>");
+                hint(html, k("The request that was in progress was closed."));
             }
             if *reconnect {
-                html.raw("<p class=\"hint\">The device in use keeps working until the new one confirms its first credential.</p>");
+                hint(
+                    html,
+                    k(
+                        "The device in use keeps working until the new one confirms its first credential.",
+                    ),
+                );
             }
             html.raw("</div>");
         }
         Screen::NoConnector { name } => {
-            html.raw("<h3>This hub has no connector to serve</h3><p>The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of ")
-                .text(name)
-                .raw(" with the <code>arauto-hub admin invite</code> command, on the hub's server.</p>");
+            html.raw("<h3>")
+                .t(k("This hub has no connector to serve"))
+                .raw("</h3><p>")
+                .fill(
+                    k("The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server."),
+                    &[
+                        ("name", Arg::Text(name)),
+                        ("command", Arg::Code("arauto-hub admin invite")),
+                    ],
+                )
+                .raw("</p>");
         }
         Screen::Waiting { name, .. } => {
-            html.raw("<h3>Waiting for the Hermes ")
-                .text(name)
+            html.raw("<h3>")
+                .fill(
+                    k("Waiting for the Hermes {name}"),
+                    &[("name", Arg::Text(name))],
+                )
                 .raw("</h3>");
             observed(html, 1, None);
-            html.raw("<p class=\"hint\">Each step lights up when the hub actually observes it. If the Hermes asks for approval to run the command, you are the one who approves, in the command channel.</p>");
+            hint(
+                html,
+                k(
+                    "Each step lights up when the hub actually observes it. If the Hermes asks for approval to run the command, you are the one who approves, in the command channel.",
+                ),
+            );
         }
         Screen::Code {
             name,
@@ -333,25 +358,37 @@ fn body(html: &mut Html, screen: &Screen) {
             error,
             ..
         } => {
-            html.raw("<h3>A device used the invite of ")
-                .text(name)
+            let lang = html.lang();
+            html.raw("<h3>")
+                .fill(
+                    k("A device used the invite of {name}"),
+                    &[("name", Arg::Text(name))],
+                )
                 .raw("</h3>");
             observed(html, 2, facts.address.as_deref());
-            html.raw("<dl class=\"facts\"><dt>Seen by the hub</dt><dd>address ");
-            match &facts.address {
-                Some(address) => html.text(address),
-                None => html.raw("unknown"),
-            };
-            html.raw(", ")
-                .text(&facts.when)
-                .raw("</dd><dt>Said by the device</dt><dd>machine \"")
-                .text(&facts.hostname)
-                .raw("\" · system \"")
-                .text(&facts.os)
-                .raw("\" · Hermes \"")
-                .text(&facts.hermes)
-                .raw("\" (not verified)</dd></dl>")
-                .raw("<form id=\"guide-deny\" method=\"post\" action=\"/hermes/deny\" hidden>");
+            let address = facts
+                .address
+                .as_deref()
+                .unwrap_or_else(|| super::text::tr(lang, k("unknown")));
+            html.raw("<dl class=\"facts\"><dt>")
+                .t(k("Seen by the hub"))
+                .raw("</dt><dd>")
+                .fill(
+                    k("address {address}, {when}"),
+                    &[("address", Arg::Text(address)), ("when", Arg::Text(&facts.when))],
+                )
+                .raw("</dd><dt>")
+                .t(k("Said by the device"))
+                .raw("</dt><dd>")
+                .fill(
+                    k("machine \"{host}\" · system \"{os}\" · Hermes \"{version}\" (not verified)"),
+                    &[
+                        ("host", Arg::Text(&facts.hostname)),
+                        ("os", Arg::Text(&facts.os)),
+                        ("version", Arg::Text(&facts.hermes)),
+                    ],
+                )
+                .raw("</dd></dl><form id=\"guide-deny\" method=\"post\" action=\"/hermes/deny\" hidden>");
             named(html, name);
             html.raw("</form><form id=\"guide-form\" method=\"post\" action=\"/hermes/approve\" autocomplete=\"off\">");
             named(html, name);
@@ -364,21 +401,38 @@ fn body(html: &mut Html, screen: &Screen) {
                 }
                 html.raw("\"><input type=\"hidden\" name=\"seen_state\" value=\"")
                     .raw(last.state)
-                    .raw(
-                        "\"><fieldset class=\"recognize\"><legend>Last use of the current device: ",
-                    )
-                    .text(&last.when);
-                if let Some(address) = &last.address {
-                    html.raw(", from ").text(address);
-                }
-                html.raw(". Do you recognize it?</legend>")
-                    .raw("<label class=\"option\"><input type=\"radio\" name=\"use\" value=\"recognized\"><span>I recognize it</span></label>")
-                    .raw("<label class=\"option\"><input type=\"radio\" name=\"use\" value=\"not-recognized\"><span>I do not recognize it</span></label>")
-                    .raw("<p class=\"hint\">If the Hermes was off and there was use, someone used a copy.</p></fieldset>");
+                    .raw("\"><fieldset class=\"recognize\"><legend>");
+                match &last.address {
+                    Some(address) => html.fill(
+                        k("Last use of the current device: {when}, from {address}. Do you recognize it?"),
+                        &[("when", Arg::Text(&last.when)), ("address", Arg::Text(address))],
+                    ),
+                    None => html.fill(
+                        k("Last use of the current device: {when}. Do you recognize it?"),
+                        &[("when", Arg::Text(&last.when))],
+                    ),
+                };
+                html.raw("</legend><label class=\"option\"><input type=\"radio\" name=\"use\" value=\"recognized\"><span>")
+                    .t(k("I recognize it"))
+                    .raw("</span></label><label class=\"option\"><input type=\"radio\" name=\"use\" value=\"not-recognized\"><span>")
+                    .t(k("I do not recognize it"))
+                    .raw("</span></label>");
+                hint(
+                    html,
+                    k("If the Hermes was off and there was use, someone used a copy."),
+                );
+                html.raw("</fieldset>");
             }
-            html.raw("<div class=\"field\"><label for=\"guide-code\">Verification code</label>")
-                .raw("<input class=\"code\" id=\"guide-code\" name=\"code\" type=\"text\" inputmode=\"numeric\" maxlength=\"7\" placeholder=\"000-000\" spellcheck=\"false\" required autofocus>")
-                .raw("<p class=\"hint\">Type the code the Hermes answered in the command channel. The panel never shows this code.</p></div></form>");
+            html.raw("<div class=\"field\"><label for=\"guide-code\">")
+                .t(k("Verification code"))
+                .raw("</label><input class=\"code\" id=\"guide-code\" name=\"code\" type=\"text\" inputmode=\"numeric\" maxlength=\"7\" placeholder=\"000-000\" spellcheck=\"false\" required autofocus>");
+            hint(
+                html,
+                k(
+                    "Type the code the Hermes answered in the command channel. The panel never shows this code.",
+                ),
+            );
+            html.raw("</div></form>");
             if let Some(error) = error {
                 html.raw("<p class=\"error\" role=\"alert\">")
                     .text(error)
@@ -386,24 +440,35 @@ fn body(html: &mut Html, screen: &Screen) {
             }
         }
         Screen::Ended { name, why } => {
-            html.raw("<h3>");
-            match why {
-                Ended::Denied => html
-                    .raw("The request of ")
-                    .text(name)
-                    .raw(" was denied</h3><p>The code was typed wrong for the fifth time. To connect, issue another invite.</p>"),
-                Ended::Expired => html
-                    .raw("The request of ")
-                    .text(name)
-                    .raw(" expired</h3><p>The 10 minutes to type the code passed. To connect, issue another invite.</p>"),
-                Ended::Copied => html
-                    .raw("The identity of ")
-                    .text(name)
-                    .raw(" was copied</h3><p>Two devices showed up with the same identity before the approval, and the request was stopped. To connect, issue another invite.</p>"),
-                Ended::Nothing => html
-                    .text(name)
-                    .raw(" has no invite and no request waiting</h3><p>The invite expired, was cancelled, or the request was already resolved. If the Hermes answered no code, do not approve; if it answered AR-102, another device used the invite. To connect, issue another invite.</p>"),
+            let (title, said) = match why {
+                Ended::Denied => (
+                    k("The request of {name} was denied"),
+                    k(
+                        "The code was typed wrong for the fifth time. To connect, issue another invite.",
+                    ),
+                ),
+                Ended::Expired => (
+                    k("The request of {name} expired"),
+                    k("The 10 minutes to type the code passed. To connect, issue another invite."),
+                ),
+                Ended::Copied => (
+                    k("The identity of {name} was copied"),
+                    k(
+                        "Two devices showed up with the same identity before the approval, and the request was stopped. To connect, issue another invite.",
+                    ),
+                ),
+                Ended::Nothing => (
+                    k("{name} has no invite and no request waiting"),
+                    k(
+                        "The invite expired, was cancelled, or the request was already resolved. If the Hermes answered no code, do not approve; if it answered AR-102, another device used the invite. To connect, issue another invite.",
+                    ),
+                ),
             };
+            html.raw("<h3>")
+                .fill(title, &[("name", Arg::Text(name))])
+                .raw("</h3><p>")
+                .t(said)
+                .raw("</p>");
         }
         Screen::Done {
             name,
@@ -412,22 +477,36 @@ fn body(html: &mut Html, screen: &Screen) {
         } => {
             html.raw("<div class=\"center\">");
             mascot(html, false);
-            html.raw("<h3>").text(name).raw(if *connected {
-                " is connected</h3>"
-            } else {
-                " was approved</h3>"
-            });
+            html.raw("<h3>")
+                .fill(
+                    if *connected {
+                        k("{name} is connected")
+                    } else {
+                        k("{name} was approved")
+                    },
+                    &[("name", Arg::Text(name))],
+                )
+                .raw("</h3>");
             observed(html, if *connected { 4 } else { 3 }, None);
-            html.raw(match (*connected, *reconnect) {
-                (true, _) => "<p class=\"hint\">What it may do on each number is in the Accesses tab.</p>",
-                (false, true) => "<p class=\"hint\">As soon as the connector confirms, it shows as connected. The accesses it already had apply to this device again.</p>",
-                (false, false) => "<p class=\"hint\">As soon as the connector confirms, it shows as connected. It has no access to any number yet.</p>",
-            })
-            .raw("</div>");
+            hint(
+                html,
+                match (*connected, *reconnect) {
+                    (true, _) => k("What it may do on each number is in the Accesses tab."),
+                    (false, true) => k(
+                        "As soon as the connector confirms, it shows as connected. The accesses it already had apply to this device again.",
+                    ),
+                    (false, false) => k(
+                        "As soon as the connector confirms, it shows as connected. It has no access to any number yet.",
+                    ),
+                },
+            );
+            html.raw("</div>");
         }
         Screen::Failed { sentence } => {
-            html.raw("<h3>The hub did not do what was asked</h3><p>")
-                .raw(sentence)
+            html.raw("<h3>")
+                .t(k("The hub did not do what was asked"))
+                .raw("</h3><p>")
+                .t(sentence)
                 .raw("</p>");
         }
     }
@@ -437,37 +516,64 @@ fn footer(html: &mut Html, screen: &Screen) {
     html.raw("<div class=\"modal-foot\">");
     match screen {
         Screen::Name { .. } => {
-            html.raw("<button class=\"button primary\" type=\"submit\" form=\"guide-form\">Issue invite</button><a class=\"button\" href=\"/\">Cancel</a>");
+            html.raw("<button class=\"button primary\" type=\"submit\" form=\"guide-form\">")
+                .t(k("Issue invite"))
+                .raw("</button><a class=\"button\" href=\"/\">")
+                .t(k("Cancel"))
+                .raw("</a>");
         }
         Screen::Block { name, .. } => {
-            html.raw("<a class=\"button primary after-copy appear\" id=\"guide-next\" href=\"");
-            wait_address(html, name);
-            html.raw(
-                "\">Next step</a><span>After copying, paste it into the command channel of the Hermes ",
-            )
-            .text(name)
-            .raw(". Nowhere else.</span>");
+            html.raw("<a class=\"button primary after-copy appear\" id=\"guide-next\" href=\"/hermes/wait?name=")
+                .text(name)
+                .raw("\">")
+                .t(k("Next step"))
+                .raw("</a><span>")
+                .fill(
+                    k("After copying, paste it into the command channel of the Hermes {name}. Nowhere else."),
+                    &[("name", Arg::Text(name))],
+                )
+                .raw("</span>");
         }
         Screen::Waiting { seconds, .. } => {
-            html.raw("<span>The invite is valid for another ");
-            clock(html, *seconds);
-            html.raw(". This screen refreshes by itself.</span>");
+            html.raw("<span>")
+                .fill(
+                    k("The invite is valid for another {time}. This screen refreshes by itself."),
+                    &[("time", Arg::Clock(*seconds))],
+                )
+                .raw("</span>");
         }
         Screen::Code { seconds, .. } => {
-            html.raw("<button class=\"button primary\" type=\"submit\" form=\"guide-form\">Approve</button><button class=\"button\" type=\"submit\" form=\"guide-deny\">Deny</button><span>Confirm within ");
-            clock(html, *seconds);
-            html.raw(".</span>");
+            html.raw("<button class=\"button primary\" type=\"submit\" form=\"guide-form\">")
+                .t(k("Approve"))
+                .raw("</button><button class=\"button\" type=\"submit\" form=\"guide-deny\">")
+                .t(k("Deny"))
+                .raw("</button><span>")
+                .fill(
+                    k("Confirm within {time}."),
+                    &[("time", Arg::Clock(*seconds))],
+                )
+                .raw("</span>");
         }
         Screen::Ended { name, .. } => {
             html.raw("<form method=\"post\" action=\"/hermes/invite\">");
             named(html, name);
-            html.raw("<button class=\"button primary\" type=\"submit\">Issue another invite</button></form><a class=\"button\" href=\"/\">Close</a>");
+            html.raw("<button class=\"button primary\" type=\"submit\">")
+                .t(k("Issue another invite"))
+                .raw("</button></form><a class=\"button\" href=\"/\">")
+                .t(k("Close"))
+                .raw("</a>");
         }
         Screen::Done { .. } => {
-            html.raw("<a class=\"button primary\" href=\"/accesses\">See accesses</a><a class=\"button\" href=\"/\">Finish</a>");
+            html.raw("<a class=\"button primary\" href=\"/accesses\">")
+                .t(k("See accesses"))
+                .raw("</a><a class=\"button\" href=\"/\">")
+                .t(k("Finish"))
+                .raw("</a>");
         }
         Screen::NoConnector { .. } | Screen::Failed { .. } => {
-            html.raw("<a class=\"button primary\" href=\"/\">Close</a>");
+            html.raw("<a class=\"button primary\" href=\"/\">")
+                .t(k("Close"))
+                .raw("</a>");
         }
     }
     html.raw("</div>");
@@ -476,7 +582,7 @@ fn footer(html: &mut Html, screen: &Screen) {
 /// The page of the Hermes with the guide over it.
 #[must_use]
 pub fn page(frame: &Frame, hermes: &HermesPage, screen: &Screen) -> String {
-    let mut html = Html::new();
+    let mut html = Html::new(frame.lang);
     view::hermes_into(
         &mut html,
         frame,
@@ -485,19 +591,27 @@ pub fn page(frame: &Frame, hermes: &HermesPage, screen: &Screen) -> String {
             refresh: screen.refresh(),
         },
     );
+    // What the script of the panel says when the block is copied comes from here, in the
+    // language of the page: the script has no sentence of its own.
     html.raw(if matches!(screen, Screen::Block { .. }) {
-        "<dialog open class=\"modal guide preparing\" id=\"guide\" aria-labelledby=\"guide-title\">"
+        "<dialog open class=\"modal guide preparing\" id=\"guide\" aria-labelledby=\"guide-title\" data-copied=\""
     } else {
-        "<dialog open class=\"modal guide\" id=\"guide\" aria-labelledby=\"guide-title\">"
+        "<dialog open class=\"modal guide\" id=\"guide\" aria-labelledby=\"guide-title\" data-copied=\""
     })
-    .raw("<div class=\"modal-head\"><h2 id=\"guide-title\">");
+    .t(k("Copied to the clipboard."))
+    .raw("\" data-selected=\"")
+    .t(k("The text is selected. Copy it with Ctrl+C."))
+    .raw("\"><div class=\"modal-head\"><h2 id=\"guide-title\">");
     match screen.subject() {
-        Some((name, true)) => html.raw("Reconnect ").text(name),
-        Some((name, false)) => html.raw("Connect ").text(name),
-        None => html.raw("Connect Hermes"),
+        Some((name, true)) => html.fill(k("Reconnect {name}"), &[("name", Arg::Text(name))]),
+        Some((name, false)) => html.fill(k("Connect {name}"), &[("name", Arg::Text(name))]),
+        None => html.t(k("Connect Hermes")),
     };
-    html.raw("</h2><a class=\"close\" href=\"/\" aria-label=\"Close\"><svg viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 2l10 10M12 2L2 12\"/></svg></a></div>")
-        .raw("<ol class=\"path\" aria-label=\"Steps\">");
+    html.raw("</h2><a class=\"close\" href=\"/\" aria-label=\"")
+        .t(k("Close"))
+        .raw("\"><svg viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 2l10 10M12 2L2 12\"/></svg></a></div><ol class=\"path\" aria-label=\"")
+        .t(k("Steps"))
+        .raw("\">");
     let step = screen.step();
     for (index, label) in STEPS.into_iter().enumerate() {
         html.raw(if index < step {
@@ -509,7 +623,7 @@ pub fn page(frame: &Frame, hermes: &HermesPage, screen: &Screen) -> String {
         })
         .number(index.saturating_add(1))
         .raw("</span><span class=\"label\">")
-        .raw(label)
+        .t(label)
         .raw("</span></li>");
     }
     html.raw("</ol><div class=\"modal-body\">");

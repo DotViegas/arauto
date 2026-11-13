@@ -10,6 +10,7 @@
 //! | `GET /whatsapps` | the numbers |
 //! | `GET /accesses` | the matrix of accesses |
 //! | `GET /assets/{file}` | the sheet, the fonts and the script of the panel |
+//! | `POST /language` | the language the person chose, kept in a cookie ([`text`]) |
 //! | `/hermes/...` | the guide that connects a Hermes ([`connect`]) |
 //! | `/accesses/edit`, `/accesses/save`, `/hermes/revoke` | the editor of an access and the revocation of a Hermes ([`editor`]) |
 //!
@@ -39,6 +40,7 @@ pub mod guide;
 mod html;
 mod http;
 pub mod secret;
+pub mod text;
 pub mod view;
 
 use std::net::SocketAddr;
@@ -66,9 +68,9 @@ use crate::repo::{self, RepoError};
 const ATTEMPTS_PER_MINUTE: u32 = 30;
 
 /// What the page of the entry says when it refuses. One sentence for every reason.
-const REFUSED: &str = "Invalid or expired code. Issue another one on the hub's server.";
+const REFUSED: &str = text::k("Invalid or expired code. Issue another one on the hub's server.");
 
-const TOO_MANY: &str = "Too many attempts right now. Wait a minute and try again.";
+const TOO_MANY: &str = text::k("Too many attempts right now. Wait a minute and try again.");
 
 /// The files of the panel, written by the project and built into the program.
 const ASSETS: &[(&str, &str, &[u8])] = &[
@@ -207,6 +209,43 @@ impl PanelState {
     }
 }
 
+/// The language of a request: the one the person chose in the panel, else the first the
+/// browser prefers that the panel speaks, else English.
+fn lang_of(headers: &HeaderMap) -> text::Lang {
+    text::Lang::negotiate(
+        http::cookie(headers, text::COOKIE),
+        headers
+            .get(header::ACCEPT_LANGUAGE)
+            .and_then(|value| value.to_str().ok()),
+    )
+}
+
+/// Keeps the language a person chose: a cookie with the tag of a language of the list, and
+/// nothing else. It needs no session (the page of the entry has the same form) and changes
+/// nothing in the hub. What is not a language of the list changes nothing at all.
+async fn language(
+    panel: &PanelState,
+    headers: &HeaderMap,
+    body: Incoming,
+) -> Result<Response<Body>, RepoError> {
+    let chosen = match http::form_field(headers, body, "lang").await {
+        Ok(chosen) => chosen,
+        Err(error) => return Ok(http::plain(error.status(), "The form was not read.\n")),
+    };
+    let answer = http::see_other("/");
+    let Some(lang) = chosen.and_then(|tag| text::Lang::from_tag(tag.trim())) else {
+        return Ok(answer);
+    };
+    // A year: it is a preference, and no secret.
+    let cookie = format!(
+        "{}={}; Path=/; SameSite=Lax; Max-Age=31536000{}",
+        text::COOKIE,
+        lang.tag(),
+        if panel.secure { "; Secure" } else { "" }
+    );
+    Ok(http::with_cookie(answer, &cookie))
+}
+
 /// Something of the hub failed while a page was read or a form was handled.
 fn failed(error: &RepoError) -> Response<Body> {
     tracing::error!(%error, "the panel could not answer");
@@ -282,6 +321,7 @@ pub(crate) async fn route(
                 );
         }
         (true, "/sign-in") => sign_in_page(&hub, panel, &parts.headers).await,
+        (false, "/language") => language(panel, &parts.headers, body).await,
         (false, "/sign-in") => sign_in(&hub, panel, peer, &parts.headers, body).await,
         (false, "/sign-out") => sign_out(&hub, panel, peer, &parts.headers).await,
         (true, "/" | "/whatsapps" | "/accesses") => {
@@ -306,7 +346,10 @@ async fn sign_in_page(
     if session_of(hub, panel, headers).await?.is_some() {
         return Ok(http::see_other("/"));
     }
-    Ok(http::page(StatusCode::OK, view::sign_in(None)))
+    Ok(http::page(
+        StatusCode::OK,
+        view::sign_in(lang_of(headers), None),
+    ))
 }
 
 async fn sign_in(
@@ -320,14 +363,19 @@ async fn sign_in(
     if !panel.attempt(now) {
         return Ok(http::page(
             StatusCode::TOO_MANY_REQUESTS,
-            view::sign_in(Some(TOO_MANY)),
+            view::sign_in(lang_of(headers), Some(TOO_MANY)),
         ));
     }
     let typed = match http::form_field(headers, body, "code").await {
         Ok(typed) => typed,
         Err(error) => return Ok(http::plain(error.status(), "The form was not read.\n")),
     };
-    let refused = || http::page(StatusCode::OK, view::sign_in(Some(REFUSED)));
+    let refused = || {
+        http::page(
+            StatusCode::OK,
+            view::sign_in(lang_of(headers), Some(REFUSED)),
+        )
+    };
     let Some(code) = typed.as_deref().and_then(|typed| EntryCode::parse(typed)) else {
         return Ok(refused());
     };
@@ -384,16 +432,17 @@ async fn page(
     let Some((organization, _)) = session_of(hub, panel, headers).await? else {
         return Ok(http::see_other("/sign-in"));
     };
-    let frame = data::frame(hub, organization).await?;
+    let lang = lang_of(headers);
+    let frame = data::frame(hub, organization, lang).await?;
     let html = match path {
-        "/whatsapps" => view::numbers(&frame, &data::numbers(hub, organization).await?),
+        "/whatsapps" => view::numbers(&frame, &data::numbers(hub, organization, lang).await?),
         "/accesses" => {
-            let mut accesses = data::accesses(hub, organization).await?;
+            let mut accesses = data::accesses(hub, organization, lang).await?;
             // After a save, the address names the access: the page says what it is now.
-            accesses.saved = editor::saved_sentence(hub, organization, query).await?;
+            accesses.saved = editor::saved_sentence(hub, organization, lang, query).await?;
             view::accesses(&frame, &accesses)
         }
-        _ => view::hermes(&frame, &data::hermes(hub, organization).await?),
+        _ => view::hermes(&frame, &data::hermes(hub, organization, lang).await?),
     };
     Ok(http::page(StatusCode::OK, html))
 }

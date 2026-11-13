@@ -21,7 +21,8 @@ use axum::http::request::Parts;
 use axum::http::{Method, Response, StatusCode};
 use hyper::body::Incoming;
 
-use super::html::Html;
+use super::html::{Arg, Html};
+use super::text::{self, Lang, k};
 use super::view::{self, AccessPage, Frame, HermesPage, Over};
 use super::{PanelState, data, http, session_of};
 use crate::admin::{self, AdminError};
@@ -33,13 +34,15 @@ use crate::repo::{self, RepoError};
 /// The wait before waking of an access that never had one set, in seconds.
 const DEFAULT_WAIT_S: u32 = 6;
 
-const WAKE_NEEDS_READ: &str = "Being woken requires reading. Nothing was saved.";
+const WAKE_NEEDS_READ: &str = k("Being woken requires reading. Nothing was saved.");
 const START_NEEDS_SEND_AND_ALL: &str =
-    "Starting chats requires sending and the scope \"every chat\". Nothing was saved.";
-const WAIT_RANGE: &str = "The wait before waking goes from 0 to 60 seconds. Nothing was saved.";
+    k("Starting chats requires sending and the scope \"every chat\". Nothing was saved.");
+const WAIT_RANGE: &str = k("The wait before waking goes from 0 to 60 seconds. Nothing was saved.");
 const FAILED: &str =
-    "Something failed in the hub. See the hub's log and check the access in the matrix.";
-const RESTORED: &str = "The database came back from an older backup and the hub has not handled it yet. Nothing was written. Restart the hub.";
+    k("Something failed in the hub. See the hub's log and check the access in the matrix.");
+const RESTORED: &str = k(
+    "The database came back from an older backup and the hub has not handled it yet. Nothing was written. Restart the hub.",
+);
 
 /// An access as the form shows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,86 +63,78 @@ pub struct Editing {
     pub error: Option<&'static str>,
 }
 
-/// "a, b and c".
-fn joined(parts: &[&str]) -> String {
-    match parts {
-        [] => String::new(),
-        [one] => (*one).to_owned(),
-        [first @ .., last] => format!("{} and {last}", first.join(", ")),
-    }
-}
+/// The pieces an access is said with. Each one is a whole statement, so that no language has
+/// to fit one inside another: the sentence is its head followed by the pieces that apply.
+const NO_ACCESS: &str = k("The Hermes {hermes} has no access to the number {number}.");
+const ONLY_CHOSEN: &str = k(
+    "The Hermes {hermes} only reaches the chosen chats of the number {number}. Chats with a line: {lines}.",
+);
+const HEAD: &str = k("The Hermes {hermes} on the number {number}, in every chat:");
+const READS: &str = k("reads");
+const READS_NOT: &str = k("does not read");
+const SENDS: &str = k("sends");
+const SENDS_NOT: &str = k("does not send");
+const MODIFIES: &str = k("modifies");
+const MODIFIES_NOT: &str = k("does not modify");
+const WOKEN: &str = k("is woken after {seconds} s of silence");
+const WOKEN_NOT: &str = k("is not woken");
+const STARTS: &str = k("may start chats");
+const OWN_RULES: &str = k("chats with their own rule: {lines}");
 
 /// What an access means, in one sentence: the same one the editor shows while it is filled.
 #[must_use]
 pub fn sentence(
+    lang: Lang,
     hermes: &str,
     number: &str,
     grant: Option<&Grant>,
     wait_s: u32,
     lines: usize,
 ) -> String {
+    let lines = lines.to_string();
+    let who = [
+        ("hermes", hermes),
+        ("number", number),
+        ("lines", lines.as_str()),
+    ];
     let Some(grant) = grant else {
-        return format!("The Hermes {hermes} has no access to the number {number}.");
+        return text::fill(lang, NO_ACCESS, &who);
     };
     if grant.scope == Scope::List {
-        return format!(
-            "The Hermes {hermes} only reaches the chosen chats of the number {number}: {lines} \
-             today. What it may do in each one is in its line."
-        );
+        return text::fill(lang, ONLY_CHOSEN, &who);
     }
     let verbs = grant.verbs;
     if !(verbs.read || verbs.send || verbs.modify || verbs.wake) {
-        return format!("The Hermes {hermes} has no access to the number {number}.");
+        return text::fill(lang, NO_ACCESS, &who);
     }
-    let mut can = Vec::new();
-    let mut rest = Vec::new();
-    if verbs.read {
-        can.push("read");
-    } else {
-        rest.push("does not read".to_owned());
-    }
-    if verbs.send {
-        can.push("send");
-    } else {
-        rest.push("does not send".to_owned());
-    }
-    if verbs.modify {
-        can.push("modify");
-    } else {
-        rest.push("does not modify".to_owned());
-    }
-    rest.push(if verbs.wake {
-        format!("is woken after {wait_s} s of silence in the chat")
-    } else {
-        "is not woken".to_owned()
-    });
-    let rest: Vec<&str> = rest.iter().map(String::as_str).collect();
-    let rest = joined(&rest);
-    let mut text = if can.is_empty() {
-        format!("The Hermes {hermes} {rest} in every chat of the number {number}.")
-    } else {
-        format!(
-            "The Hermes {hermes} may {} in every chat of the number {number}. It {rest}.",
-            joined(&can)
-        )
-    };
+    let seconds = wait_s.to_string();
+    let mut said = vec![
+        text::tr(lang, if verbs.read { READS } else { READS_NOT }).to_owned(),
+        text::tr(lang, if verbs.send { SENDS } else { SENDS_NOT }).to_owned(),
+        text::tr(lang, if verbs.modify { MODIFIES } else { MODIFIES_NOT }).to_owned(),
+        if verbs.wake {
+            text::fill(lang, WOKEN, &[("seconds", &seconds)])
+        } else {
+            text::tr(lang, WOKEN_NOT).to_owned()
+        },
+    ];
     if grant.can_start_chats {
-        text.push_str(" It may start a chat with someone who never talked to the number.");
+        said.push(text::tr(lang, STARTS).to_owned());
     }
-    match lines {
-        0 => {}
-        1 => text.push_str(" 1 chat has its own rule."),
-        more => text.push_str(&format!(" {more} chats have their own rule.")),
+    if lines != "0" {
+        said.push(text::fill(lang, OWN_RULES, &who));
     }
-    text
+    format!("{} {}.", text::fill(lang, HEAD, &who), said.join(" · "))
 }
 
+/// One choice of the form: a lead in bold, when it has one, and what it means.
 fn option(
     html: &mut Html,
     kind: &'static str,
     name: &'static str,
     value: &'static str,
     on: bool,
+    lead: Option<&'static str>,
     label: &'static str,
 ) {
     html.raw("<label class=\"option\"><input type=\"")
@@ -148,36 +143,76 @@ fn option(
         .raw(name)
         .raw("\" value=\"")
         .raw(value)
-        .raw(if on { "\" checked><span>" } else { "\"><span>" })
-        .raw(label)
-        .raw("</span></label>");
+        .raw(if on { "\" checked><span>" } else { "\"><span>" });
+    if let Some(lead) = lead {
+        html.raw("<b>").t(lead).raw("</b>: ");
+    }
+    html.t(label).raw("</span></label>");
 }
 
 const CLOSE: &str =
     "<svg viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 2l10 10M12 2L2 12\"/></svg>";
 
+/// The pieces of the sentence, for the script of the panel: it puts them together while the
+/// form is filled, in the language of the page, and has no sentence of its own. The names
+/// are already in them; only the seconds are left for the script.
+fn pieces_for_the_script(html: &mut Html, editing: &Editing) {
+    let lines = editing.lines.to_string();
+    let who = [
+        ("hermes", Arg::Text(&editing.hermes)),
+        ("number", Arg::Text(&editing.number)),
+        ("lines", Arg::Text(&lines)),
+    ];
+    for (attribute, key) in [
+        (" data-none=\"", NO_ACCESS),
+        ("\" data-chosen=\"", ONLY_CHOSEN),
+        ("\" data-head=\"", HEAD),
+        ("\" data-own-rules=\"", OWN_RULES),
+    ] {
+        html.raw(attribute).fill(key, &who);
+    }
+    for (attribute, key) in [
+        ("\" data-read=\"", READS),
+        ("\" data-read-not=\"", READS_NOT),
+        ("\" data-send=\"", SENDS),
+        ("\" data-send-not=\"", SENDS_NOT),
+        ("\" data-modify=\"", MODIFIES),
+        ("\" data-modify-not=\"", MODIFIES_NOT),
+        ("\" data-woken=\"", WOKEN),
+        ("\" data-woken-not=\"", WOKEN_NOT),
+        ("\" data-starts=\"", STARTS),
+    ] {
+        html.raw(attribute).t(key);
+    }
+    html.raw("\" data-lines=\"").number(editing.lines).raw("\"");
+}
+
 /// The page of the accesses with the editor of one of them over it.
 #[must_use]
 pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
-    let mut html = Html::new();
+    let mut html = Html::new(frame.lang);
     view::accesses_into(&mut html, frame, accesses, Over::Guide { refresh: None });
     html.raw("<dialog open class=\"modal\" id=\"guide\" aria-labelledby=\"editor-title\"><div class=\"modal-head\"><h2 id=\"editor-title\">")
-        .text(&editing.hermes)
-        .raw(" on the number ")
-        .text(&editing.number)
-        .raw("</h2><a class=\"close\" href=\"/accesses\" aria-label=\"Close\">")
+        .fill(
+            k("{hermes} on the number {number}"),
+            &[
+                ("hermes", Arg::Text(&editing.hermes)),
+                ("number", Arg::Text(&editing.number)),
+            ],
+        )
+        .raw("</h2><a class=\"close\" href=\"/accesses\" aria-label=\"")
+        .t(k("Close"))
+        .raw("\">")
         .raw(CLOSE)
-        .raw("</a></div><div class=\"modal-body\"><form id=\"editor-form\" method=\"post\" action=\"/accesses/save\" autocomplete=\"off\" data-hermes=\"")
-        .text(&editing.hermes)
-        .raw("\" data-number=\"")
-        .text(&editing.number)
-        .raw("\" data-lines=\"")
-        .number(editing.lines)
-        .raw("\"><input type=\"hidden\" name=\"hermes\" value=\"")
+        .raw("</a></div><div class=\"modal-body\"><form id=\"editor-form\" method=\"post\" action=\"/accesses/save\" autocomplete=\"off\"");
+    pieces_for_the_script(&mut html, editing);
+    html.raw("><input type=\"hidden\" name=\"hermes\" value=\"")
         .text(&editing.hermes)
         .raw("\"><input type=\"hidden\" name=\"number\" value=\"")
         .text(&editing.number)
-        .raw("\"><div class=\"fields\"><fieldset><legend>Where it applies</legend>");
+        .raw("\"><div class=\"fields\"><fieldset><legend>")
+        .t(k("Where it applies"))
+        .raw("</legend>");
     let all = editing.grant.scope == Scope::All;
     option(
         &mut html,
@@ -185,7 +220,8 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
         "scope",
         "all",
         all,
-        "Every chat, including the ones that come later",
+        None,
+        k("Every chat, including the ones that come later"),
     );
     option(
         &mut html,
@@ -193,11 +229,20 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
         "scope",
         "list",
         !all,
-        "Only chosen chats",
+        None,
+        k("Only chosen chats"),
     );
-    html.raw("<p class=\"hint\">With \"only chosen chats\", only the chats that have a line of their own exist for the Hermes, and what it may do in each one comes from the line. The lines are still created with the <code>arauto-hub admin access chat</code> command. Today: ")
-        .number(editing.lines)
-        .raw(".</p></fieldset><fieldset><legend>What it may do</legend>");
+    html.raw("<p class=\"hint\">")
+        .fill(
+            k("With \"only chosen chats\", only the chats that have a line of their own exist for the Hermes, and what it may do in each one comes from the line. The lines are still created with the {command} command. Today: {lines}."),
+            &[
+                ("command", Arg::Code("arauto-hub admin access chat")),
+                ("lines", Arg::Number(editing.lines)),
+            ],
+        )
+        .raw("</p></fieldset><fieldset><legend>")
+        .t(k("What it may do"))
+        .raw("</legend>");
     let verbs = editing.grant.verbs;
     option(
         &mut html,
@@ -205,7 +250,8 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
         "read",
         "on",
         verbs.read,
-        "<b>Read</b>: see chats and messages, search, download files",
+        Some(k("Read")),
+        k("see chats and messages, search, download files"),
     );
     option(
         &mut html,
@@ -213,7 +259,8 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
         "send",
         "on",
         verbs.send,
-        "<b>Send</b>: write, react, mark as read",
+        Some(k("Send")),
+        k("write, react, mark as read"),
     );
     option(
         &mut html,
@@ -221,7 +268,8 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
         "modify",
         "on",
         verbs.modify,
-        "<b>Modify</b>: edit and delete what already exists",
+        Some(k("Modify")),
+        k("edit and delete what already exists"),
     );
     option(
         &mut html,
@@ -229,28 +277,44 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
         "wake",
         "on",
         verbs.wake,
-        "<b>Be woken</b>: the hub gives notice when a message arrives (requires reading)",
+        Some(k("Be woken")),
+        k("the hub gives notice when a message arrives (requires reading)"),
     );
-    html.raw("<div class=\"wait-row\"><label for=\"editor-wait\">Wait</label><input id=\"editor-wait\" name=\"wait\" type=\"number\" min=\"0\" max=\"60\" value=\"")
+    html.raw("<div class=\"wait-row\"><label for=\"editor-wait\">")
+        .t(k("Wait"))
+        .raw("</label><input id=\"editor-wait\" name=\"wait\" type=\"number\" min=\"0\" max=\"60\" value=\"")
         .number(usize::try_from(editing.wait_s).unwrap_or(0))
-        .raw("\"><span>seconds of silence before waking</span></div>");
+        .raw("\"><span>")
+        .t(k("seconds of silence before waking"))
+        .raw("</span></div>");
     option(
         &mut html,
         "checkbox",
         "start",
         "on",
         editing.grant.can_start_chats,
-        "May start a chat with someone who never talked to the number (requires sending and every chat)",
+        None,
+        k(
+            "May start a chat with someone who never talked to the number (requires sending and every chat)",
+        ),
     );
-    html.raw("</fieldset></div></form><p class=\"sentence\" id=\"editor-sentence\"><span class=\"no-script\">Today: </span>")
+    html.raw("</fieldset></div></form><p class=\"sentence\" id=\"editor-sentence\"><span class=\"no-script\">")
+        .t(k("Today:"))
+        .raw(" </span>")
         .text(&editing.today)
         .raw("</p>");
     if let Some(error) = editing.error {
         html.raw("<p class=\"error\" role=\"alert\">")
-            .raw(error)
+            .t(error)
             .raw("</p>");
     }
-    html.raw("</div><div class=\"modal-foot\"><button class=\"button primary\" type=\"submit\" form=\"editor-form\">Save</button><a class=\"button\" href=\"/accesses\">Cancel</a><span>It applies from the next call, with nothing to restart. With no verb marked, the access is removed.</span></div></dialog>")
+    html.raw("</div><div class=\"modal-foot\"><button class=\"button primary\" type=\"submit\" form=\"editor-form\">")
+        .t(k("Save"))
+        .raw("</button><a class=\"button\" href=\"/accesses\">")
+        .t(k("Cancel"))
+        .raw("</a><span>")
+        .t(k("It applies from the next call, with nothing to restart. With no verb marked, the access is removed."))
+        .raw("</span></div></dialog>")
         .raw(view::TAIL);
     html.finish()
 }
@@ -263,21 +327,31 @@ pub fn revoke_page(
     name: &str,
     error: Option<&'static str>,
 ) -> String {
-    let mut html = Html::new();
+    let mut html = Html::new(frame.lang);
     view::hermes_into(&mut html, frame, hermes, Over::Guide { refresh: None });
-    html.raw("<dialog open class=\"modal\" id=\"guide\" aria-labelledby=\"revoke-title\"><div class=\"modal-head\"><h2 id=\"revoke-title\">Revoke ")
-        .text(name)
-        .raw("</h2><a class=\"close\" href=\"/\" aria-label=\"Close\">")
+    html.raw("<dialog open class=\"modal\" id=\"guide\" aria-labelledby=\"revoke-title\"><div class=\"modal-head\"><h2 id=\"revoke-title\">")
+        .fill(k("Revoke {name}"), &[("name", Arg::Text(name))])
+        .raw("</h2><a class=\"close\" href=\"/\" aria-label=\"")
+        .t(k("Close"))
+        .raw("\">")
         .raw(CLOSE)
-        .raw("</a></div><div class=\"modal-body short\"><p>Revoking closes the Hermes in the hub: the device in use, the request in progress and the issued invite. The channel drops within seconds.</p><p>The accesses are kept and apply again when a new device is connected. The only way back is a new invite.</p>");
+        .raw("</a></div><div class=\"modal-body short\"><p>")
+        .t(k("Revoking closes the Hermes in the hub: the device in use, the request in progress and the issued invite. The channel drops within seconds."))
+        .raw("</p><p>")
+        .t(k("The accesses are kept and apply again when a new device is connected. The only way back is a new invite."))
+        .raw("</p>");
     if let Some(error) = error {
         html.raw("<p class=\"error\" role=\"alert\">")
-            .raw(error)
+            .t(error)
             .raw("</p>");
     }
     html.raw("</div><div class=\"modal-foot\"><form method=\"post\" action=\"/hermes/revoke\"><input type=\"hidden\" name=\"name\" value=\"")
         .text(name)
-        .raw("\"><button class=\"button danger\" type=\"submit\">Revoke</button></form><a class=\"button\" href=\"/\">Cancel</a></div></dialog>")
+        .raw("\"><button class=\"button danger\" type=\"submit\">")
+        .t(k("Revoke"))
+        .raw("</button></form><a class=\"button\" href=\"/\">")
+        .t(k("Cancel"))
+        .raw("</a></div></dialog>")
         .raw(view::TAIL);
     html.finish()
 }
@@ -287,6 +361,7 @@ pub fn revoke_page(
 async fn saved(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     hermes: &HermesName,
     number: &NumberAlias,
 ) -> Result<Option<Editing>, RepoError> {
@@ -327,6 +402,7 @@ async fn saved(
         wait_s,
         lines,
         today: sentence(
+            lang,
             hermes.as_str(),
             number.as_str(),
             found.map(|access| &access.grant),
@@ -340,23 +416,25 @@ async fn saved(
 async fn editor(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     status: StatusCode,
     editing: &Editing,
 ) -> Result<Response<Body>, RepoError> {
-    let frame = data::frame(hub, organization).await?;
-    let accesses = data::accesses(hub, organization).await?;
+    let frame = data::frame(hub, organization, lang).await?;
+    let accesses = data::accesses(hub, organization, lang).await?;
     Ok(http::page(status, page(&frame, &accesses, editing)))
 }
 
 async fn revoking(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     status: StatusCode,
     name: &HermesName,
     error: Option<&'static str>,
 ) -> Result<Response<Body>, RepoError> {
-    let frame = data::frame(hub, organization).await?;
-    let hermes = data::hermes(hub, organization).await?;
+    let frame = data::frame(hub, organization, lang).await?;
+    let hermes = data::hermes(hub, organization, lang).await?;
     Ok(http::page(
         status,
         revoke_page(&frame, &hermes, name.as_str(), error),
@@ -393,6 +471,7 @@ fn saved_at(hermes: &HermesName, number: &NumberAlias) -> Response<Body> {
 async fn save(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     admin: &admin::Session,
     form: &http::Form,
 ) -> Result<Response<Body>, RepoError> {
@@ -403,7 +482,7 @@ async fn save(
     let Some((hermes, number)) = names else {
         return Ok(http::see_other("/accesses"));
     };
-    let Some(mut editing) = saved(hub, organization, &hermes, &number).await? else {
+    let Some(mut editing) = saved(hub, organization, lang, &hermes, &number).await? else {
         return Ok(http::see_other("/accesses"));
     };
     let on = |name: &str| form.field(name).is_some();
@@ -462,7 +541,7 @@ async fn save(
         Err(error) => {
             let (status, sentence) = refusal(&error);
             editing.error = Some(sentence);
-            editor(hub, organization, status, &editing).await
+            editor(hub, organization, lang, status, &editing).await
         }
     }
 }
@@ -472,6 +551,7 @@ async fn save(
 pub(super) async fn saved_sentence(
     hub: &Hub,
     organization: ResolvedOrg,
+    lang: Lang,
     query: Option<&str>,
 ) -> Result<Option<String>, RepoError> {
     let names = http::query_field(query, "hermes")
@@ -483,7 +563,7 @@ pub(super) async fn saved_sentence(
     let Some((hermes, number)) = names else {
         return Ok(None);
     };
-    Ok(saved(hub, organization, &hermes, &number)
+    Ok(saved(hub, organization, lang, &hermes, &number)
         .await?
         .map(|editing| editing.today))
 }
@@ -499,6 +579,7 @@ pub(super) async fn answer(
     let Some((organization, session)) = session_of(hub, panel, &parts.headers).await? else {
         return Ok(http::see_other("/sign-in"));
     };
+    let lang = super::lang_of(&parts.headers);
     let reads = parts.method == Method::GET;
     let path = parts.uri.path();
     let query = parts.uri.query();
@@ -513,8 +594,8 @@ pub(super) async fn answer(
             let Some((hermes, number)) = names else {
                 return Ok(http::see_other("/accesses"));
             };
-            return match saved(hub, organization, &hermes, &number).await? {
-                Some(editing) => editor(hub, organization, StatusCode::OK, &editing).await,
+            return match saved(hub, organization, lang, &hermes, &number).await? {
+                Some(editing) => editor(hub, organization, lang, StatusCode::OK, &editing).await,
                 None => Ok(http::see_other("/accesses")),
             };
         }
@@ -528,7 +609,7 @@ pub(super) async fn answer(
             if !lines.iter().any(|line| line.hermes.name == name) {
                 return Ok(http::see_other("/"));
             }
-            return revoking(hub, organization, StatusCode::OK, &name, None).await;
+            return revoking(hub, organization, lang, StatusCode::OK, &name, None).await;
         }
         (false, "/accesses/save" | "/hermes/revoke") => {}
         _ => return Ok(http::plain(StatusCode::NOT_FOUND, "not found\n")),
@@ -544,7 +625,7 @@ pub(super) async fn answer(
         session.admin,
     );
     if path == "/accesses/save" {
-        return save(hub, organization, &admin, &form).await;
+        return save(hub, organization, lang, &admin, &form).await;
     }
     let name = form
         .field("name")
@@ -556,7 +637,7 @@ pub(super) async fn answer(
         Ok(_) | Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
         Err(error) => {
             let (status, sentence) = refusal(&error);
-            revoking(hub, organization, status, &name, Some(sentence)).await
+            revoking(hub, organization, lang, status, &name, Some(sentence)).await
         }
     }
 }
@@ -585,75 +666,43 @@ mod tests {
         }
     }
 
+    fn said(grant: Option<&Grant>, wait_s: u32, lines: usize) -> String {
+        sentence(Lang::En, "ana", "balcao", grant, wait_s, lines)
+    }
+
     #[test]
     fn an_access_is_said_in_one_sentence() {
         let all =
             |read, send, modify, wake, start| grant(Scope::All, read, send, modify, wake, start);
         assert_eq!(
-            sentence("ana", "balcao", None, 6, 0),
+            said(None, 6, 0),
             "The Hermes ana has no access to the number balcao."
         );
         assert_eq!(
-            sentence(
-                "ana",
-                "balcao",
-                Some(&all(true, true, false, true, false)),
-                6,
-                0
-            ),
-            "The Hermes ana may read and send in every chat of the number balcao. It does not modify and is woken after 6 s of silence in the chat."
+            said(Some(&all(true, true, false, true, false)), 6, 0),
+            "The Hermes ana on the number balcao, in every chat: reads · sends · does not modify · is woken after 6 s of silence."
         );
         assert_eq!(
-            sentence(
-                "ana",
-                "balcao",
-                Some(&all(true, true, true, false, true)),
-                6,
-                2
-            ),
-            "The Hermes ana may read, send and modify in every chat of the number balcao. It is not woken. It may start a chat with someone who never talked to the number. 2 chats have their own rule."
+            said(Some(&all(true, true, true, false, true)), 6, 2),
+            "The Hermes ana on the number balcao, in every chat: reads · sends · modifies · is not woken · may start chats · chats with their own rule: 2."
         );
         assert_eq!(
-            sentence(
-                "ana",
-                "balcao",
-                Some(&all(true, false, false, false, false)),
-                0,
-                1
-            ),
-            "The Hermes ana may read in every chat of the number balcao. It does not send, does not modify and is not woken. 1 chat has its own rule."
-        );
-        assert_eq!(
-            sentence(
-                "ana",
-                "balcao",
-                Some(&all(true, true, true, true, false)),
-                12,
-                0
-            ),
-            "The Hermes ana may read, send and modify in every chat of the number balcao. It is woken after 12 s of silence in the chat."
+            said(Some(&all(true, false, false, false, false)), 0, 0),
+            "The Hermes ana on the number balcao, in every chat: reads · does not send · does not modify · is not woken."
         );
         // No verb on every chat is no access.
         assert_eq!(
-            sentence(
-                "ana",
-                "balcao",
-                Some(&all(false, false, false, false, false)),
-                6,
-                0
-            ),
+            said(Some(&all(false, false, false, false, false)), 6, 0),
             "The Hermes ana has no access to the number balcao."
         );
         // With chosen chats, the verbs are the ones of each line.
         assert_eq!(
-            sentence(
-                "ana",
-                "balcao",
+            said(
                 Some(&grant(Scope::List, true, true, false, false, false)),
                 6,
                 3
             ),
-            "The Hermes ana only reaches the chosen chats of the number balcao: 3 today. What it may do in each one is in its line."
+            "The Hermes ana only reaches the chosen chats of the number balcao. Chats with a line: 3."
         );
     }
 
@@ -685,6 +734,9 @@ mod tests {
         assert!(!shown.contains("name=\"send\" value=\"on\" checked>"));
         assert!(shown.contains("name=\"wait\" type=\"number\" min=\"0\" max=\"60\" value=\"7\""));
         assert!(shown.contains("Being woken requires reading."));
+        // The pieces the script puts together are in the page, with the names escaped.
+        assert!(shown.contains("data-woken=\"is woken after {seconds} s of silence\""));
+        assert!(shown.contains("data-lines=\"2\""));
 
         let asks = revoke_page(&Frame::default(), &HermesPage::default(), HOSTILE, None);
         assert!(

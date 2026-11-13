@@ -112,7 +112,7 @@ h1 b { font-weight: 800; color: var(--purple-text); }
 .counters { margin-top: 2px; }
 
 /* a table, inside a frame with its own ground and room at the edges */
-.frame { background: var(--frame); border-radius: 14px; padding: 12px 24px 16px; }
+.frame { background: var(--frame); border-radius: 14px; padding: 12px 24px 16px; overflow-x: auto; }
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-family: var(--f-list); }
 th, td { text-align: left; vertical-align: middle; padding: 14px 12px; }
@@ -123,6 +123,10 @@ thead th {
   font-size: var(--t-label); font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
   color: var(--text); border-bottom: 1px solid var(--strong); white-space: nowrap;
 }
+/* a heading that is long in some language breaks into lines before the table leaves its frame */
+.list thead th { white-space: normal; vertical-align: bottom; }
+/* spacing between letters tears apart a script that joins them */
+:lang(hi) thead th, :lang(hi) .field label, :lang(hi) .modal legend, :lang(hi) h1 { letter-spacing: 0; }
 tbody tr { border-bottom: 1px solid var(--frame-rule); }
 tbody tr:last-child { border-bottom: 0; }
 td { color: var(--strong); }
@@ -156,6 +160,14 @@ a.cell:hover { background: var(--frame-raised); }
 
 .note { margin-top: 16px; font-size: var(--t-label); max-width: 78ch; }
 .footer { margin-top: 48px; font-size: var(--t-label); max-width: 78ch; }
+
+/* the language of the panel: every language by its own name */
+.language { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; font-size: var(--t-label); color: var(--text); }
+.language select {
+  min-height: 34px; padding: 0 8px; font: inherit;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--ground); color: var(--strong);
+}
+.entry .language { margin-top: 0; }
 code { font-family: var(--f-mono); }
 
 /* the entry */
