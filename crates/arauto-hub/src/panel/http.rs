@@ -25,6 +25,11 @@ const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; st
      font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; \
      frame-ancestors 'none'; base-uri 'none'";
 
+/// What a browser tells about the page a request came from: only to the panel itself. It is
+/// also what makes a browser send the `Origin` of the panel with a form (Fetch, "append a
+/// request `Origin` header"); every policy that sends no referrer makes it `null`.
+const REFERRER_POLICY: &str = "same-origin";
+
 /// The headers every answer of the panel carries.
 fn guarded(mut response: Response<Body>, cache: &'static str) -> Response<Body> {
     let headers = response.headers_mut();
@@ -37,9 +42,12 @@ fn guarded(mut response: Response<Body>, cache: &'static str) -> Response<Body> 
         HeaderValue::from_static("nosniff"),
     );
     headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    // `same-origin`, never `no-referrer`: under `no-referrer` a browser sends `Origin: null`
+    // with every form and every request of the script, and the panel, which takes a form
+    // only with its own `Origin`, would refuse them all. Nothing goes to another site.
     headers.insert(
         header::REFERRER_POLICY,
-        HeaderValue::from_static("no-referrer"),
+        HeaderValue::from_static(REFERRER_POLICY),
     );
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
     response
@@ -340,7 +348,10 @@ mod tests {
             assert_eq!(policy.matches("script-src").count(), 1, "{policy}");
             assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
             assert_eq!(headers[header::X_FRAME_OPTIONS], "DENY");
-            assert_eq!(headers[header::REFERRER_POLICY], "no-referrer");
+            // A browser keeps the `Origin` of a form the panel requires only under a policy
+            // that sends the origin to the same site: `no-referrer` makes it `null`, and
+            // every form of the panel was refused in a real browser.
+            assert_eq!(headers[header::REFERRER_POLICY], "same-origin");
             assert!(headers.contains_key(header::CACHE_CONTROL));
         }
         // A page, a refusal and a redirect are never stored.

@@ -120,7 +120,8 @@ async fn every_answer_tells_the_browser_to_do_no_more_than_show_it() {
         assert!(policy.contains("script-src 'self';"), "{policy}");
         assert_eq!(answer.header("x-content-type-options"), Some("nosniff"));
         assert_eq!(answer.header("x-frame-options"), Some("DENY"));
-        assert_eq!(answer.header("referrer-policy"), Some("no-referrer"));
+        // `no-referrer` would make a browser send `Origin: null` with the forms of the panel.
+        assert_eq!(answer.header("referrer-policy"), Some("same-origin"));
         let cache = answer.header("cache-control").unwrap();
         let is_file = answer.header("content-type") == Some("text/css; charset=utf-8");
         assert_eq!(
