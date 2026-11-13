@@ -11,6 +11,7 @@
 //! | `GET /accesses` | the matrix of accesses |
 //! | `GET /assets/{file}` | the sheet, the fonts and the script of the panel |
 //! | `/hermes/...` | the guide that connects a Hermes ([`connect`]) |
+//! | `/accesses/edit`, `/accesses/save`, `/hermes/revoke` | the editor of an access and the revocation of a Hermes ([`editor`]) |
 //!
 //! What holds for every request:
 //!
@@ -33,6 +34,7 @@
 pub mod block;
 mod connect;
 mod data;
+pub mod editor;
 pub mod guide;
 mod html;
 mod http;
@@ -282,7 +284,12 @@ pub(crate) async fn route(
         (true, "/sign-in") => sign_in_page(&hub, panel, &parts.headers).await,
         (false, "/sign-in") => sign_in(&hub, panel, peer, &parts.headers, body).await,
         (false, "/sign-out") => sign_out(&hub, panel, peer, &parts.headers).await,
-        (true, "/" | "/whatsapps" | "/accesses") => page(&hub, panel, &parts.headers, path).await,
+        (true, "/" | "/whatsapps" | "/accesses") => {
+            page(&hub, panel, &parts.headers, path, parts.uri.query()).await
+        }
+        (_, path) if path == "/hermes/revoke" || path.starts_with("/accesses/") => {
+            editor::answer(&hub, panel, &parts, body).await
+        }
         (_, path) if path.starts_with("/hermes/") => {
             connect::answer(&hub, panel, &parts, body).await
         }
@@ -372,6 +379,7 @@ async fn page(
     panel: &PanelState,
     headers: &HeaderMap,
     path: &str,
+    query: Option<&str>,
 ) -> Result<Response<Body>, RepoError> {
     let Some((organization, _)) = session_of(hub, panel, headers).await? else {
         return Ok(http::see_other("/sign-in"));
@@ -379,7 +387,12 @@ async fn page(
     let frame = data::frame(hub, organization).await?;
     let html = match path {
         "/whatsapps" => view::numbers(&frame, &data::numbers(hub, organization).await?),
-        "/accesses" => view::accesses(&frame, &data::accesses(hub, organization).await?),
+        "/accesses" => {
+            let mut accesses = data::accesses(hub, organization).await?;
+            // After a save, the address names the access: the page says what it is now.
+            accesses.saved = editor::saved_sentence(hub, organization, query).await?;
+            view::accesses(&frame, &accesses)
+        }
         _ => view::hermes(&frame, &data::hermes(hub, organization).await?),
     };
     Ok(http::page(StatusCode::OK, html))

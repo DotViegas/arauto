@@ -17,6 +17,66 @@
     else run();
   }
 
+  function joined(parts) {
+    if (parts.length <= 1) return parts.join('');
+    return parts.slice(0, -1).join(', ') + ' e ' + parts[parts.length - 1];
+  }
+
+  // The editor of an access: what cannot be marked is greyed out, and the sentence under the
+  // form says what the form means while it is filled. The hub checks it all again on saving.
+  function editor() {
+    var form = document.getElementById('ed-form');
+    var said = document.getElementById('ed-frase');
+    if (!form || !said) return;
+    var hermes = form.getAttribute('data-hermes');
+    var number = form.getAttribute('data-number');
+    var lines = parseInt(form.getAttribute('data-lines'), 10) || 0;
+    function field(name) { return form.querySelector('input[name="' + name + '"]'); }
+    var all = form.querySelector('input[name="scope"][value="all"]');
+    var read = field('read'), send = field('send'), modify = field('modify');
+    var wake = field('wake'), start = field('start'), wait = field('wait');
+
+    function update() {
+      wake.disabled = !read.checked;
+      if (wake.disabled) wake.checked = false;
+      start.disabled = !(send.checked && all.checked);
+      if (start.disabled) start.checked = false;
+      wait.disabled = !wake.checked;
+
+      var text;
+      var none = !(read.checked || send.checked || modify.checked || wake.checked);
+      if (!all.checked) {
+        text = 'O Hermes ' + hermes + ' só alcança as conversas escolhidas do número ' + number + ': ' +
+          lines + ' hoje. O que ele pode em cada uma está na linha dela.';
+      } else if (none) {
+        text = 'O Hermes ' + hermes + ' não tem acesso ao número ' + number + '.';
+      } else {
+        var can = [], rest = [];
+        if (read.checked) can.push('ler'); else rest.push('não lê');
+        if (send.checked) can.push('enviar'); else rest.push('não envia');
+        if (modify.checked) can.push('modificar'); else rest.push('não modifica');
+        var seconds = parseInt(wait.value, 10);
+        if (isNaN(seconds)) seconds = 0;
+        rest.push(wake.checked ? 'é acordado depois de ' + seconds + ' s de silêncio na conversa' : 'não é acordado');
+        var second = joined(rest);
+        if (can.length) {
+          text = 'O Hermes ' + hermes + ' pode ' + joined(can) + ' em todas as conversas do número ' + number + '. ' +
+            second.charAt(0).toUpperCase() + second.slice(1) + '.';
+        } else {
+          text = 'O Hermes ' + hermes + ' ' + second + ' em todas as conversas do número ' + number + '.';
+        }
+        if (start.checked) text += ' Pode iniciar conversa com quem nunca falou com o número.';
+        if (lines === 1) text += ' 1 conversa tem regra própria.';
+        if (lines > 1) text += ' ' + lines + ' conversas têm regra própria.';
+      }
+      said.textContent = text;
+    }
+
+    form.addEventListener('change', update);
+    form.addEventListener('input', update);
+    update();
+  }
+
   ready(function () {
     var guide = document.getElementById('guia');
     if (!guide) return;
@@ -32,6 +92,8 @@
         node.textContent = clock(left);
       }, 1000);
     });
+
+    editor();
 
     var block = document.getElementById('guia-bloco');
     if (guide.classList.contains('prepara')) {

@@ -137,6 +137,14 @@ pub enum RowAction {
     Reconnect,
 }
 
+impl RowAction {
+    /// Whether the Hermes has something a revocation would close: a device, a request or an
+    /// invite.
+    const fn has_something(self) -> bool {
+        !matches!(self, RowAction::Connect)
+    }
+}
+
 /// The page of the Hermes.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct HermesPage {
@@ -217,6 +225,8 @@ pub struct AccessPage {
     pub rows: Vec<AccessRow>,
     /// What the admin is told and nothing prevents.
     pub warnings: Vec<String>,
+    /// The access that was just saved, in one sentence.
+    pub saved: Option<String>,
 }
 
 /// The page where the entry code is typed.
@@ -302,7 +312,7 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
 
 /// Ends the page, up to where a window over it would go.
 fn close(html: &mut Html) {
-    html.raw("</main><p class=\"rodape\">Nesta versão o painel conecta Hermes. Parear números e dar acesso continuam pelo comando <code>arauto-hub admin</code>, no servidor do hub.</p></div>");
+    html.raw("</main><p class=\"rodape\">Nesta versão o painel conecta e revoga Hermes e muda os acessos de cada número. Parear números e escolher conversas continuam pelo comando <code>arauto-hub admin</code>, no servidor do hub.</p></div>");
 }
 
 fn state(html: &mut Html, tone: Tone, label: &'static str) {
@@ -386,6 +396,11 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
                     });
             }
         }
+        if row.action.has_something() {
+            html.raw("<a class=\"botao perigo\" href=\"/hermes/revoke?name=")
+                .text(&row.name)
+                .raw("\">Revogar</a>");
+        }
         html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
             html.raw("<tr class=\"explica\"><td colspan=\"7\">")
@@ -446,12 +461,19 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     html.finish()
 }
 
-/// The page of the accesses: the matrix, to read.
+/// The page of the accesses: the matrix. Each cell leads to the editor of that access.
 #[must_use]
 pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
     let mut html = Html::new();
-    open(&mut html, frame, Tab::Accesses, Over::Nothing);
-    html.raw("<div class=\"cabeca\"><h1>Acessos</h1><p class=\"contadores\">Nas linhas, os Hermes. Nas colunas, os números.</p></div>");
+    accesses_into(&mut html, frame, page, Over::Nothing);
+    html.raw(TAIL);
+    html.finish()
+}
+
+/// Writes the page of the accesses up to where a window over it would go.
+pub(super) fn accesses_into(html: &mut Html, frame: &Frame, page: &AccessPage, over: Over) {
+    open(html, frame, Tab::Accesses, over);
+    html.raw("<div class=\"cabeca\"><div><h1>Acessos</h1><p class=\"contadores\">Nas linhas, os Hermes. Nas colunas, os números. Clique numa célula para mudar.</p></div></div>");
     if page.rows.is_empty() || page.numbers.is_empty() {
         html.raw("<div class=\"quadro\"><table class=\"lista\"><tbody><tr class=\"vazio\"><td>")
             .raw(if page.rows.is_empty() {
@@ -460,9 +482,8 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
                 "Adicione um WhatsApp primeiro."
             })
             .raw("</td></tr></tbody></table></div>");
-        close(&mut html);
-        html.raw(TAIL);
-        return html.finish();
+        close(html);
+        return;
     }
     html.raw("<div class=\"quadro\"><div class=\"rola\"><table class=\"matriz\"><thead><tr><th scope=\"col\">Hermes</th>");
     for (alias, phone) in &page.numbers {
@@ -485,8 +506,12 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
                 .raw("</span><span class=\"guardado\"> (acessos preservados)</span></td></tr>");
             continue;
         }
-        for cell in &row.cells {
-            html.raw("<td><span class=\"celula\"><span class=\"verbos\">");
+        for (cell, (alias, _)) in row.cells.iter().zip(&page.numbers) {
+            html.raw("<td><a class=\"celula\" href=\"/accesses/edit?hermes=")
+                .text(&row.hermes)
+                .raw("&amp;number=")
+                .text(alias)
+                .raw("\"><span class=\"verbos\">");
             let verbs = cell.as_ref().map_or([false; 4], |cell| cell.verbs);
             for (granted, letter) in verbs.iter().zip(["L", "E", "M", "A"]) {
                 html.raw(if *granted {
@@ -502,11 +527,16 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
                 Some(cell) => html.text(&cell.scope),
                 None => html.raw("sem acesso"),
             };
-            html.raw("</span></span></td>");
+            html.raw("</span></a></td>");
         }
         html.raw("</tr>");
     }
     html.raw("</tbody></table></div></div><p class=\"nota\"><b>L</b> ler · <b>E</b> enviar · <b>M</b> modificar · <b>A</b> ser acordado.</p>");
+    if let Some(saved) = &page.saved {
+        html.raw("<p class=\"situacao\" role=\"status\">Salvo: ")
+            .text(saved)
+            .raw("</p>");
+    }
     if !page.warnings.is_empty() {
         html.raw("<div class=\"avisos\"><b>Avisos que não bloqueiam</b><ul>");
         for warning in &page.warnings {
@@ -514,9 +544,7 @@ pub fn accesses(frame: &Frame, page: &AccessPage) -> String {
         }
         html.raw("</ul></div>");
     }
-    close(&mut html);
-    html.raw(TAIL);
-    html.finish()
+    close(html);
 }
 
 #[cfg(test)]
@@ -573,9 +601,9 @@ mod tests {
         };
         let page = hermes(&frame, &hermes_page);
         clean(&page);
-        // The values of the row (its name twice: in the list and in the form of its button),
-        // and the ones of the frame: every one came out escaped.
-        assert_eq!(page.matches("&lt;script&gt;").count(), 9);
+        // The values of the row (its name three times: in the list, in the form of its button
+        // and in the address of its revocation), and the ones of the frame: all escaped.
+        assert_eq!(page.matches("&lt;script&gt;").count(), 10);
 
         let numbers_page = NumbersPage {
             rows: vec![NumberRow {
@@ -605,6 +633,7 @@ mod tests {
                 })],
             }],
             warnings: vec![HOSTILE.to_owned()],
+            saved: Some(HOSTILE.to_owned()),
         };
         clean(&accesses(&frame, &access_page));
     }
@@ -661,8 +690,21 @@ mod tests {
                 },
             ],
             warnings: Vec::new(),
+            saved: None,
         };
         let html = accesses(&Frame::default(), &page);
+        // Each cell leads to the editor of its Hermes and its number.
+        assert!(
+            html.contains(
+                "<a class=\"celula\" href=\"/accesses/edit?hermes=ana&amp;number=balcao\">"
+            )
+        );
+        assert!(html.contains("href=\"/accesses/edit?hermes=ana&amp;number=compras\""));
+        assert!(
+            !html.contains("hermes=antigo"),
+            "a stopped Hermes has no cell to click"
+        );
+        assert!(!html.contains("class=\"situacao\""));
         assert!(
             html.contains("<span>L</span><span>E</span><span class=\"nao\">M</span><span>A</span>")
         );

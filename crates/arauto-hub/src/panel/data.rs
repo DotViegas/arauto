@@ -653,6 +653,7 @@ pub(super) async fn accesses(
             .collect(),
         rows,
         warnings,
+        saved: None,
     })
 }
 

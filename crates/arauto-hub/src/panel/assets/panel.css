@@ -147,6 +147,9 @@ tr.explica td { background: var(--quadro-realce); padding: 14px 16px; border-rad
 }
 .verbos span.nao { border: 1px dashed var(--borda); background: none; color: var(--texto); }
 .escopo { font-size: var(--t-etiqueta); }
+a.celula { padding: 6px 8px; margin: -6px -8px; border-radius: 8px; }
+a.celula:hover { background: var(--quadro-realce); }
+.situacao { margin-top: 16px; color: var(--ok); font-family: var(--f-lista); font-weight: 600; }
 .guardado { color: var(--texto); }
 .avisos { margin-top: 16px; background: var(--atencao-fundo); border-radius: 12px; padding: 12px 16px; color: var(--forte); font-family: var(--f-lista); }
 .avisos ul { margin: 4px 0 0; padding-left: 18px; list-style: disc; }
@@ -183,6 +186,8 @@ code { font-family: var(--f-fixa); }
   font-family: var(--f-marca); font-weight: 600;
 }
 .botao.principal:hover { border-color: var(--roxo); filter: brightness(1.12); }
+.botao.perigo { color: var(--grave); border-color: var(--grave); }
+.botao.perigo:hover { background: var(--grave-fundo); border-color: var(--grave); }
 .acoes { display: flex; gap: 8px; justify-content: flex-end; }
 .acoes form { margin: 0; }
 
@@ -217,6 +222,17 @@ code { font-family: var(--f-fixa); }
 .modal legend { padding: 0; color: var(--forte); }
 .op { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; cursor: pointer; }
 .op input { flex: none; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--roxo-texto); }
+.op input:disabled + span { color: var(--texto); }
+.campos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 32px; }
+.modal legend { margin-bottom: 4px; font-size: var(--t-etiqueta); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--texto); }
+.modal .reconhece legend { margin-bottom: 0; font-size: var(--t-corpo); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--forte); }
+.espera { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 2px 0 6px 26px; color: var(--texto); }
+.espera input {
+  width: 64px; min-height: 34px; padding: 0 8px; font: inherit;
+  border: 1px solid var(--borda); border-radius: 8px; background: var(--fundo); color: var(--forte);
+}
+.frase { background: var(--modal-realce); border-radius: 10px; padding: 14px 16px; font-weight: 600; }
+.modal-corpo.curto { min-height: 0; }
 
 /* the path at the top of a guide: a line and circles; the line up to the current step, and
    the circle of that step, are purple */
@@ -322,6 +338,8 @@ code { font-family: var(--f-fixa); }
   .percurso { padding: 4px 8px 12px; }
   .fatos { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .fatos dd { margin-bottom: 8px; }
+  .campos { grid-template-columns: minmax(0, 1fr); }
+  .op { padding: 10px 0; }
   .modal-topo { padding-left: 16px; }
   .modal-corpo { padding: 8px 16px 20px; }
   .modal-pe { padding: 12px 16px; }

@@ -359,6 +359,8 @@ pub struct Listed {
     pub grant: Grant,
     /// The lines of its chats, by when they were set.
     pub lines: Vec<(Uuid, Verbs)>,
+    /// How long a notice of a chat waits, after its last message, before it wakes the Hermes.
+    pub wake_wait_ms: i32,
     /// When it changed last.
     pub changed_at: i64,
 }
@@ -383,11 +385,12 @@ pub async fn list(
         bool,
         bool,
         bool,
+        i32,
         i64,
     );
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT a.id, h.name, n.alias, n.state, a.scope, a.can_read, a.can_send, a.can_modify, \
-                a.can_wake, a.can_start_chats, a.changed_at \
+                a.can_wake, a.can_start_chats, a.wake_wait_ms, a.changed_at \
          FROM access a \
          JOIN hermes h ON h.organization_id = a.organization_id AND h.id = a.hermes_id \
          JOIN number n ON n.organization_id = a.organization_id AND n.id = a.number_id \
@@ -400,7 +403,21 @@ pub async fn list(
     .fetch_all(pool)
     .await?;
     let mut listed = Vec::with_capacity(rows.len());
-    for (id, name, alias, state, scope, read, send, modify, wake, start, changed_at) in rows {
+    for (
+        id,
+        name,
+        alias,
+        state,
+        scope,
+        read,
+        send,
+        modify,
+        wake,
+        start,
+        wake_wait_ms,
+        changed_at,
+    ) in rows
+    {
         let lines: Vec<(Uuid, bool, bool, bool, bool)> = sqlx::query_as(
             "SELECT chat_id, can_read, can_send, can_modify, can_wake FROM access_chat \
              WHERE organization_id = $1 AND access_id = $2 ORDER BY created_at, chat_id",
@@ -422,6 +439,7 @@ pub async fn list(
                 .into_iter()
                 .map(|(chat, read, send, modify, wake)| (chat, verbs_of(read, send, modify, wake)))
                 .collect(),
+            wake_wait_ms,
             changed_at,
         });
     }
