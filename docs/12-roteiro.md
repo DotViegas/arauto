@@ -150,9 +150,9 @@ Até esta fase, toda leitura depende do motor estar no ar.
 
 Licença no repositório (Apache-2.0), com o titular dos direitos definido, registro de marca do nome
 conferido, histórico do repositório
-limpo, README em inglês e português, versões assinadas com o resumo publicado, guia de instalação
-(com o painel fechado por padrão), relato privado de falha ligado no GitHub e a página de quem
-mantém.
+limpo, README em inglês com as traduções ([decisão 0016](decisoes/0016-idioma.md)), versões
+assinadas com o resumo publicado, guia de instalação (com o painel fechado por padrão), relato
+privado de falha ligado no GitHub e a página de quem mantém.
 
 **Pronto quando:** alguém de fora instala o hub, conecta um Hermes e pareia um número seguindo só o
 guia.

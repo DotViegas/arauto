@@ -6,123 +6,138 @@
 </p>
 
 <p align="center">
-  <b>Dá a cada agente Hermes acesso controlado a números de WhatsApp<br>
-  e deixa um Hermes mandar recado a outro.</b><br>
-  Um lugar só para conectar agentes, parear números e dizer quem acessa o quê.
+  <b>English</b> ·
+  <a href="docs/traducoes/README.pt-BR.md">Português</a> ·
+  <a href="docs/traducoes/README.es.md">Español</a> ·
+  <a href="docs/traducoes/README.fr.md">Français</a> ·
+  <a href="docs/traducoes/README.de.md">Deutsch</a> ·
+  <a href="docs/traducoes/README.zh-CN.md">简体中文</a> ·
+  <a href="docs/traducoes/README.ja.md">日本語</a>
+</p>
+
+<p align="center">
+  <b>Gives each Hermes agent controlled access to WhatsApp numbers<br>
+  and lets one Hermes send a message to another.</b><br>
+  One place to connect agents, pair numbers and say who can access what.
 </p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/selos-escuro.svg">
-    <img src="docs/marca/selos-claro.svg" alt="Gratuito. Licença Apache-2.0. Feito em Rust. Primeiro MVP em construção." width="507">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/selos-en-escuro.svg">
+    <img src="docs/marca/selos-en-claro.svg" alt="Free. Apache-2.0 license. Written in Rust. First MVP in progress." width="444">
   </picture>
 </p>
 
 <p align="center">
-  <a href="docs/01-visao.md">Visão</a> ·
-  <a href="docs/02-como-funciona.md">Como funciona</a> ·
-  <a href="docs/04-seguranca-conexao.md">Segurança da conexão</a> ·
-  <a href="docs/15-mvp.md">O primeiro MVP</a> ·
-  <a href="docs/glossario.md">Glossário</a>
+  <a href="docs/01-visao.md">Vision</a> ·
+  <a href="docs/02-como-funciona.md">How it works</a> ·
+  <a href="docs/04-seguranca-conexao.md">Connection security</a> ·
+  <a href="docs/15-mvp.md">The first MVP</a> ·
+  <a href="docs/glossario.md">Glossary</a>
 </p>
 
-> **Estado: primeiro MVP em construção.** O desenho está nestes documentos; o código está começando
-> e ainda não há versão para uso ([docs/15-mvp.md](docs/15-mvp.md)). O projeto é gratuito e o código
-> será aberto, sob a licença Apache-2.0 ([decisão 0015](docs/decisoes/0015-licenca.md)).
+> **Status: first MVP in progress.** The design is in these documents; the code is just getting
+> started and there is no usable release yet ([docs/15-mvp.md](docs/15-mvp.md)). The project is free
+> and the code will be open, under the Apache-2.0 license
+> ([decision 0015](docs/decisoes/0015-licenca.md)).
 
-O Hermes Agent é um agente de IA da Nous Research. O Arauto é um projeto independente: não tem
-vínculo com os autores do Hermes Agent nem com o WhatsApp.
+Hermes Agent is an AI agent from Nous Research. Arauto is an independent project: it is not
+affiliated with the authors of Hermes Agent or with WhatsApp.
 
-## Em uma tela
+The documents linked from this page are written in Portuguese.
+
+## At a glance
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/em-uma-tela-escuro.svg">
-    <img src="docs/marca/em-uma-tela-claro.svg" width="687" alt="Em três passos. 1: no painel, você escolhe Conectar Hermes e cola um bloco no canal de comando do Hermes. 2: ele instala o conector e responde um código de conferência, que você digita no painel. 3: você marca os acessos e ele passa a ler e agir nos números que você liberou.">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/marca/em-uma-tela-en-escuro.svg">
+    <img src="docs/marca/em-uma-tela-en-claro.svg" width="692" alt="In three steps. 1: in the panel, you choose Connect Hermes and paste a block into Hermes's command channel. 2: it installs the connector and replies with a verification code, which you type into the panel. 3: you grant access and it starts reading and acting on the numbers you allowed.">
   </picture>
 </p>
 
-- **Conectar é copiar e colar.** Um convite de uso único, válido por 15 minutos.
-- **Nenhum segredo duradouro passa pelo chat.** As credenciais são criadas pelas duas máquinas e
-  trocam a cada conexão.
-- **As conversas ficam arquivadas no seu hub.** O Hermes consulta quando pedem; não precisa responder
-  a tudo.
-- **Você decide, por número e por conversa,** o que cada Hermes pode: ler, enviar, modificar e ser
-  acordado.
-- **Cada um instala o seu.** Hub, motor e conversas ficam no seu servidor.
+- **Connecting is copy and paste.** A single-use invite, valid for 15 minutes.
+- **No long-lived secret goes through the chat.** Credentials are created by the two machines and
+  change on every connection.
+- **Conversations are archived in your hub.** Hermes looks them up when asked; it does not have to
+  reply to everything.
+- **You decide, per number and per conversation,** what each Hermes may do: read, send, modify and
+  be woken up.
+- **Everyone installs their own.** Hub, engine and conversations stay on your server.
 
-## Antes de usar, saiba
+## Before you use it
 
-- O que chega pelos números do hub é **informação, nunca ordem**. O Arauto não é o canal por
-  onde você comanda o seu agente: esse continua sendo o canal de comando do próprio Hermes
-  ([visão](docs/01-visao.md), "Dois WhatsApps, dois papéis").
-- O motor de WhatsApp é um **cliente não oficial**. O WhatsApp pode bloquear o número. Use números
-  que você pode perder.
-- A segurança tem limites conhecidos, escritos em [SECURITY.md](SECURITY.md) e em
+- What arrives through the hub's numbers is **information, never an order**. Arauto is not the
+  channel through which you command your agent: that is still Hermes's own command channel
+  ([vision](docs/01-visao.md), "Dois WhatsApps, dois papéis").
+- The WhatsApp engine is an **unofficial client**. WhatsApp may block the number. Use numbers you
+  can afford to lose.
+- Security has known limits, written down in [SECURITY.md](SECURITY.md) and in
   [docs/05-modelo-de-ameacas.md](docs/05-modelo-de-ameacas.md).
-- O desenho ainda não foi provado. Parte do que está descrito depende de testes da
-  [Fase 1](docs/12-roteiro.md).
+- The design has not been proven yet. Part of what is described depends on the tests of
+  [Phase 1](docs/12-roteiro.md).
 
-## Sobre o motor
+## About the engine
 
-O Arauto não fala com o WhatsApp sozinho. Ele comanda um programa de terceiro, o motor. O
-desenho foi conferido com o WAHA ([o que foi conferido](referencia/waha-fatos.md)).
+Arauto does not talk to WhatsApp on its own. It drives a third-party program, the engine. The
+design was checked against WAHA ([what was checked](referencia/waha-fatos.md)).
 
-O Arauto **não embute** o motor: você instala o seu. O custo e a licença do motor são com o
-autor dele. Confira antes de instalar.
+Arauto **does not bundle** the engine: you install your own. The engine's cost and license are a
+matter between you and its author. Check before installing.
 
-## As peças
+## The parts
 
-| Peça | O que é |
+| Part | What it is |
 |---|---|
-| **Hub** | O servidor: painel, porta dos conectores, arquivo das conversas. Comanda o motor. |
-| **Conector** | Programa pequeno ao lado do Hermes. Para o Hermes, é um servidor de ferramentas local. |
-| **Motor** | O programa que fala com o WhatsApp. É seu. |
+| **Hub** | The server: panel, the door for connectors, the conversation archive. It drives the engine. |
+| **Connector** | A small program next to Hermes. To Hermes, it is a local tool server. |
+| **Engine** | The program that talks to WhatsApp. It is yours. |
 
-## Documentos
+## Documents
 
-| Para saber | Leia |
+| To learn | Read |
 |---|---|
-| O que é e o que não é | [docs/01-visao.md](docs/01-visao.md) |
-| O caminho de quem usa | [docs/02-como-funciona.md](docs/02-como-funciona.md) |
-| As peças e as fronteiras | [docs/03-arquitetura.md](docs/03-arquitetura.md) |
-| Como um Hermes entra, volta e sai | [docs/04-seguranca-conexao.md](docs/04-seguranca-conexao.md) |
-| O que pode dar errado | [docs/05-modelo-de-ameacas.md](docs/05-modelo-de-ameacas.md) |
-| As tabelas | [docs/06-modelo-de-dados.md](docs/06-modelo-de-dados.md) |
-| As telas | [docs/07-telas.md](docs/07-telas.md) |
-| O que cada Hermes pode | [docs/08-permissoes.md](docs/08-permissoes.md) |
-| As ferramentas que o Hermes enxerga | [docs/09-contrato-mcp.md](docs/09-contrato-mcp.md) |
-| Estados e prazos | [docs/10-maquinas-de-estado.md](docs/10-maquinas-de-estado.md) |
-| O conector | [docs/11-conector.md](docs/11-conector.md) |
-| A ordem de construção | [docs/12-roteiro.md](docs/12-roteiro.md) |
-| Como um Hermes fala com outro | [docs/13-conversa-entre-hermes.md](docs/13-conversa-entre-hermes.md) |
-| O que passa entre o conector e o hub | [docs/14-protocolo-do-canal.md](docs/14-protocolo-do-canal.md) |
-| O primeiro MVP: o que entra e como rodar | [docs/15-mvp.md](docs/15-mvp.md) |
-| O nome de cada coisa | [docs/glossario.md](docs/glossario.md) |
-| Por que cada escolha | [docs/decisoes/](docs/decisoes/) |
-| O que foi conferido no Hermes e no motor | [referencia/](referencia/) |
+| What it is and what it is not | [docs/01-visao.md](docs/01-visao.md) |
+| The path of whoever uses it | [docs/02-como-funciona.md](docs/02-como-funciona.md) |
+| The parts and the boundaries | [docs/03-arquitetura.md](docs/03-arquitetura.md) |
+| How a Hermes joins, comes back and leaves | [docs/04-seguranca-conexao.md](docs/04-seguranca-conexao.md) |
+| What can go wrong | [docs/05-modelo-de-ameacas.md](docs/05-modelo-de-ameacas.md) |
+| The tables | [docs/06-modelo-de-dados.md](docs/06-modelo-de-dados.md) |
+| The screens | [docs/07-telas.md](docs/07-telas.md) |
+| What each Hermes may do | [docs/08-permissoes.md](docs/08-permissoes.md) |
+| The tools Hermes sees | [docs/09-contrato-mcp.md](docs/09-contrato-mcp.md) |
+| States and deadlines | [docs/10-maquinas-de-estado.md](docs/10-maquinas-de-estado.md) |
+| The connector | [docs/11-conector.md](docs/11-conector.md) |
+| The order of construction | [docs/12-roteiro.md](docs/12-roteiro.md) |
+| How one Hermes talks to another | [docs/13-conversa-entre-hermes.md](docs/13-conversa-entre-hermes.md) |
+| What goes between the connector and the hub | [docs/14-protocolo-do-canal.md](docs/14-protocolo-do-canal.md) |
+| The first MVP: what is in it and how to run it | [docs/15-mvp.md](docs/15-mvp.md) |
+| The name of each thing | [docs/glossario.md](docs/glossario.md) |
+| The reason for each choice | [docs/decisoes/](docs/decisoes/) |
+| What was checked in Hermes and in the engine | [referencia/](referencia/) |
 
-Comece pela visão e pelo "como funciona". O glossário explica os termos.
+Start with the vision and "how it works". The glossary explains the terms.
 
-## Como ler os documentos
+## How to read the documents
 
-Cada documento diz o seu estado na primeira linha: **planejamento** ou **proposta**. Dentro dele:
+Each document states its status on the first line: **planning** (*planejamento*) or **proposal**
+(*proposta*). Inside it:
 
-- **fato** é o que foi conferido, com versão e data;
-- **proposta** é desenho ainda não provado;
-- **decisão pendente** é o que ainda precisa ser escolhido.
+- a **fact** (*fato*) is what has been checked, with version and date;
+- a **proposal** (*proposta*) is design that has not been proven yet;
+- a **pending decision** (*decisão pendente*) is what still has to be chosen.
 
-As decisões têm três estados: decidida, proposta e pendente.
+Decisions have three states: decided, proposed and pending.
 
-## Licença, relato de falha e quem mantém
+## License, reporting a flaw and who maintains it
 
-- **Licença:** Apache-2.0 ([LICENSE](LICENSE), [decisão 0015](docs/decisoes/0015-licenca.md)).
-- **Relato de falha:** pelo relato privado do GitHub, quando o repositório for aberto
+- **License:** Apache-2.0 ([LICENSE](LICENSE), [decision 0015](docs/decisoes/0015-licenca.md)).
+- **Reporting a flaw:** through GitHub's private reporting, once the repository is opened
   ([SECURITY.md](SECURITY.md)).
-- **Quem mantém e como contribuir:** a definir antes de o repositório ser aberto ao público.
+- **Who maintains it and how to contribute:** to be defined before the repository is opened to the
+  public.
 
 <p align="center">
-  <img src="docs/marca/mascote-pixel-acenando.svg" alt="O mascote do Arauto, em pixel, acenando" width="108">
+  <img src="docs/marca/mascote-pixel-acenando.svg" alt="Arauto pixel mascot, waving" width="108">
 </p>
 
-<p align="center"><sub>O arauto é quem leva e anuncia as mensagens.</sub></p>
+<p align="center"><sub>"Arauto" is Portuguese for herald: the one who carries and announces the messages.</sub></p>
