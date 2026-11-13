@@ -36,6 +36,10 @@
   <a href="../glossario.md">用語集</a>
 </p>
 
+<p align="center">
+  <img src="../marca/capa.webp" alt="丘の上で夕日を眺める Arauto のマスコットの後ろ姿" width="100%">
+</p>
+
 > **状態：最初の MVP を開発中。** 設計はこれらのドキュメントにあります。コードは書き始めたばかりで、まだ利用できるバージョンはありません（[docs/15-mvp.md](../15-mvp.md)）。このプロジェクトは無料で、コードは Apache-2.0 ライセンスで公開される予定です（[決定 0015](../decisoes/0015-licenca.md)）。
 
 Hermes Agent は Nous Research の AI エージェントです。Arauto は独立したプロジェクトであり、Hermes Agent の作者とも WhatsApp とも関係はありません。

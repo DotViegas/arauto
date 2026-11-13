@@ -36,6 +36,10 @@
   <a href="../glossario.md">Glossar</a>
 </p>
 
+<p align="center">
+  <img src="../marca/capa.webp" alt="Das Maskottchen von Arauto, von hinten, auf einem Hügel, beim Blick in den Sonnenuntergang" width="100%">
+</p>
+
 > **Stand: erstes MVP im Aufbau.** Der Entwurf steht in diesen Dokumenten; der Code steht am
 > Anfang, und es gibt noch keine nutzbare Version ([docs/15-mvp.md](../15-mvp.md)). Das Projekt ist
 > kostenlos, und der Code wird unter der Apache-2.0-Lizenz offengelegt

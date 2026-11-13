@@ -36,6 +36,10 @@
   <a href="docs/glossario.md">Glossary</a>
 </p>
 
+<p align="center">
+  <img src="docs/marca/capa.webp" alt="The Arauto mascot seen from behind, on a hill, watching the sunset" width="100%">
+</p>
+
 > **Status: first MVP in progress.** The design is in these documents; the code is just getting
 > started and there is no usable release yet ([docs/15-mvp.md](docs/15-mvp.md)). The project is free
 > and the code will be open, under the Apache-2.0 license

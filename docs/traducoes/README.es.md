@@ -36,6 +36,10 @@
   <a href="../glossario.md">Glosario</a>
 </p>
 
+<p align="center">
+  <img src="../marca/capa.webp" alt="La mascota de Arauto, de espaldas, en lo alto de una colina, mirando la puesta de sol" width="100%">
+</p>
+
 > **Estado: primer MVP en construcción.** El diseño está en estos documentos; el código está
 > empezando y todavía no hay una versión para usar ([docs/15-mvp.md](../15-mvp.md)). El proyecto es
 > gratuito y el código será abierto, bajo la licencia Apache-2.0

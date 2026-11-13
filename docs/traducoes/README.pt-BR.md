@@ -36,6 +36,10 @@
   <a href="../glossario.md">Glossário</a>
 </p>
 
+<p align="center">
+  <img src="../marca/capa.webp" alt="O mascote do Arauto, de costas, no alto de um morro, olhando o pôr do sol" width="100%">
+</p>
+
 > **Estado: primeiro MVP em construção.** O desenho está nestes documentos; o código está começando
 > e ainda não há versão para uso ([docs/15-mvp.md](../15-mvp.md)). O projeto é gratuito e o código
 > será aberto, sob a licença Apache-2.0 ([decisão 0015](../decisoes/0015-licenca.md)).
