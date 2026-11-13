@@ -11,6 +11,8 @@
   <a href="docs/traducoes/README.es.md">Español</a> ·
   <a href="docs/traducoes/README.fr.md">Français</a> ·
   <a href="docs/traducoes/README.de.md">Deutsch</a> ·
+  <a href="docs/traducoes/README.ru.md">Русский</a> ·
+  <a href="docs/traducoes/README.hi.md">हिन्दी</a> ·
   <a href="docs/traducoes/README.zh-CN.md">简体中文</a> ·
   <a href="docs/traducoes/README.ja.md">日本語</a>
 </p>

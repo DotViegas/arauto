@@ -11,6 +11,8 @@
   <b>Español</b> ·
   <a href="README.fr.md">Français</a> ·
   <a href="README.de.md">Deutsch</a> ·
+  <a href="README.ru.md">Русский</a> ·
+  <a href="README.hi.md">हिन्दी</a> ·
   <a href="README.zh-CN.md">简体中文</a> ·
   <a href="README.ja.md">日本語</a>
 </p>
