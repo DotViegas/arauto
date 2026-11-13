@@ -186,6 +186,12 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
     ),
     (
         "db.rs",
+        "organization_of_panel_passkey",
+        "entry: finds the organization by the credential of an active passkey of the panel; \
+         nothing is opened until the signature made with that passkey is checked",
+    ),
+    (
+        "db.rs",
         "organizations_for_system_task",
         "entry: every organization, for a named task of the hub itself",
     ),
@@ -274,6 +280,11 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
         "admin/mod.rs",
         "has_data",
         "task of the installation: whether anything was ever installed",
+    ),
+    (
+        "admin/mod.rs",
+        "install_if_new",
+        "task of the installation: `init`, when the hub starts on an empty database",
     ),
     (
         "admin/mod.rs",

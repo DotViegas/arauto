@@ -69,11 +69,13 @@ that the command `admin invite` shows ([docs/02-como-funciona.md](../docs/02-com
 
 ```
 arauto-hub init                 creates the master key, the mark, the organization and the hub key
+                                (`serve` does the same by itself on an empty database)
 arauto-hub serve                runs the hub
 arauto-hub health               asks the hub of this machine whether it is up (0 = it is)
 arauto-hub migrate --i-have-a-backup   applies migrations to a database that already has data
 arauto-hub admin ...            the administration, by command
-arauto-hub admin panel code     issues the entry code of the panel (10 minutes, one entry)
+arauto-hub admin panel code     issues an installation code of the panel (10 minutes, one use):
+                                it only opens the registration of a passkey
 ```
 
 The sequence of a first use is in the guide of each folder. The [walkthrough of the first test](primeiro-teste.md) brings, step by step, what to check in a new installation.

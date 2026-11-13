@@ -10,17 +10,20 @@ use http_body_util::{BodyExt, Limited};
 use hyper::body::Incoming;
 use zeroize::Zeroizing;
 
-/// The largest form the panel reads. The entry code is 39 characters.
-const FORM_MAX: usize = 4 * 1024;
+/// The largest form the panel reads. The entry code is 39 characters; what a browser answers
+/// in a passkey ceremony is a few thousand, written as a form field.
+const FORM_MAX: usize = 16 * 1024;
 
 /// How long the body of a form may take to arrive.
 const FORM_READ: Duration = Duration::from_secs(5);
 
 /// What a page of the panel may load: its own sheet, its own fonts, its own script file, and
-/// nothing else. No script written inside a page runs, nothing is framed, and a form only
-/// posts back to the panel.
+/// nothing else. No script written inside a page runs, nothing is framed, a form only posts
+/// back to the panel, and the script only asks the panel itself (for the challenge of a
+/// passkey ceremony).
 const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; \
-     font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+     font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; \
+     frame-ancestors 'none'; base-uri 'none'";
 
 /// The headers every answer of the panel carries.
 fn guarded(mut response: Response<Body>, cache: &'static str) -> Response<Body> {
@@ -61,6 +64,17 @@ pub(super) fn plain(status: StatusCode, line: &'static str) -> Response<Body> {
     response.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    guarded(response, "no-store")
+}
+
+/// What the script of a page asked for: the options of a passkey ceremony, as JSON written
+/// by the library of the ceremonies. Never stored.
+pub(super) fn json(body: String) -> Response<Body> {
+    let mut response = Response::new(Body::from(body));
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
     );
     guarded(response, "no-store")
 }

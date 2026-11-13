@@ -51,9 +51,10 @@ has a step marked with **[PROOF]**.
   the connection. `git status` does not show the `arauto.env`.
 - [ ] **1.2 [PROOF]** `dc build` ends without error. Write down the time. It is the first time the
   image is built, and the first time the connector is compiled with TLS.
-- [ ] **1.3** On purpose, `dc up -d` **before** the `init`. Expected: the hub keeps restarting, and
-  `dc logs hub` says the database is not installed and says to run the `init`. Nothing is created.
-- [ ] **1.4** `dc run --rm hub init`. Expected: "The hub is installed." and the public key of the
+- [ ] **1.3** `dc up -d` on the empty database, with no `init` before. Expected: `dc logs hub`
+  says "the database was empty: the hub installed itself", with the hub key, and the hub goes on
+  to start.
+- [ ] **1.4** `dc run --rm hub init`. Expected: "already installed" and the same public key of the
   hub. Running it again: "already installed", with the same key.
 - [ ] **1.5 [PROOF]** `dc up -d` and `dc ps`. Expected: `hub` as `healthy` within one minute.
   `dc logs hub` shows "the hub is up" with the two addresses.

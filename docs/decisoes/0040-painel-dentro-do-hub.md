@@ -2,7 +2,7 @@
 
 **Status:** proposal · **Date:** 12/11/2026, with the code of the first delivery of the panel in
 the hub (read-only screens); 13/11/2026, with the second (connecting a Hermes), the third
-(accesses and revoking) and the screens in nine languages
+(accesses and revoking), the screens in nine languages and the entry by passkey
 
 ## Context
 
@@ -11,18 +11,15 @@ on the server. The [0019](0019-painel-com-passkey.md) says how it must be when i
 passkey, and, with the panel session alone, one can only see. On 12/11/2026 the maintainer asked
 for the panel and approved the design of the screens.
 
-The passkey has not been built yet. This decision records what the first three deliveries of the
-panel do, what the code chose where the texts are silent and where it moves away from them.
-Everything was tested only by the automatic tests, against a test hub: the panel never ran on a
-server, in a container or behind a proxy, and never connected a real Hermes.
+This decision records what the deliveries of the panel do, what the code chose where the texts
+are silent and where it moves away from them. Everything was tested only by the automatic tests,
+against a test hub, with a passkey authenticator written for the tests: the panel never ran behind
+a proxy, never connected a real Hermes, and **no real browser, phone or password manager has
+registered a passkey in it yet**.
 
-## Decided by the maintainer, on 12/11/2026
+## Asked by the maintainer
 
-- **The entry is by code while the passkey does not exist.**
-- **The panel session opened by that code can act** (connect a Hermes, pair, give access). This
-  changes the 0019, which asked for the passkey on each action, and is noted in it.
-- **In this period the panel stays closed:** its port is only reached on the hub's own machine, by
-  tunnel. The passkey comes back before the panel is opened to the internet.
+- **On 12/11/2026:** the panel, and the design of its screens.
 - **On 13/11/2026: the text of the screens is in English,** like everything else that is versioned
   ([0016](0016-idioma.md)). The prototype that was approved was in Portuguese; the screens kept its
   structure and changed its words.
@@ -30,6 +27,13 @@ server, in a container or behind a proxy, and never connected a real Hermes.
   the other eight are translations of it.
 - **On 13/11/2026: the English wording of the 02 was approved,** and with it the text of the
   block in English.
+- **On 13/11/2026: the panel is entered with a passkey, and only with one.** An installation is
+  to be easy for a person and for an agent: everything that is configured can be done on the
+  screens and by command, and a new hub needs no command before its first start.
+
+The first delivery entered by a code alone, with a session that could act, and kept the panel
+reachable only by tunnel. That was a proposal of that delivery, recorded here as if it had been
+chosen by the maintainer; it was replaced on 13/11/2026 by what is below.
 
 ## Decision
 
@@ -62,17 +66,42 @@ server, in a container or behind a proxy, and never connected a real Hermes.
 
 ### The entry
 
-- **Entry code.** The command `arauto-hub admin panel code`, run on the hub's machine, draws
-  20 bytes from the system generator and shows the code once. The hub keeps only its SHA-256. It is
-  valid for 10 minutes and one entry; issuing another cancels the previous one.
+- **A passkey opens the panel, and nothing else does.** The ceremonies are the ones of WebAuthn,
+  done by a library (`webauthn_rp`, version 0.3.0, pure Rust) and never by code of our own. The
+  person has to be verified by the device (fingerprint, face or PIN) at the registration and at
+  every entry. The address the passkey is bound to is the one of `ARAUTO_PANEL_URL`: its name is
+  the identifier of the party, and its origin (scheme, name and port) is the only one accepted.
+- **The hub keeps what checks a passkey:** its public key and its counters, as the library
+  encodes them. Nothing kept can sign in the place of the person.
+- **The installation code only opens the registration of a passkey.** It has 20 bytes from the
+  system generator and the hub keeps only its SHA-256; it serves once, and issuing another cancels
+  the previous one. It comes from two places:
+  - **the start of the hub,** while no admin has a passkey: the hub writes one in the output of
+    its start, valid for 30 minutes. It is the one secret the hub writes there, on purpose
+    ([07-telas.md](../07-telas.md), T0): whoever reads that output already holds the database and
+    the master key. It goes straight to the output and not through the log lines;
+  - **the command** `arauto-hub admin panel code`, valid for 10 minutes: the way back for who
+    lost the passkey.
+- **How far a panel session reaches.** A session opened by a code reaches one page: the
+  registration of a passkey. Every other page leads to it and no form of the panel is taken from
+  it. With a passkey registered in it, that same session reaches the whole panel; a session opened
+  by a passkey reaches it from the start.
 - **The code is typed, never shown by the panel,** and is only spent by a submitted form (`POST`).
   It does not go in an address: opening a page never spends a code.
-- **One sentence only for every refusal** (wrong code, expired, already used), and a ceiling of
-  30 code lookups per minute, of everyone together. The ceiling does not protect the code, which
-  has 160 bits: it keeps a flood away from the database.
-- **Pieces used:** SHA-256 with a fixed prefix for each use, the system generator, and a cookie
-  `HttpOnly` and `SameSite=Strict` (with `Secure` and the prefix `__Host-` when the address of the
-  panel is `https`). No cipher of our own.
+- **One sentence only for every refusal** of a code and one for every refusal of a passkey, and a
+  ceiling of 30 lookups per minute, of everyone together, shared by the code and by the challenge
+  of an entry. The ceiling does not protect the code, which has 160 bits: it keeps a flood away
+  from the database and from the memory of the ceremonies.
+- **The challenge of a ceremony lives in the memory of the hub,** for 5 minutes and one answer,
+  with at most 256 of each kind at a time. The script of the page asks the panel for it, hands it
+  to the browser and sends back what the browser answers; the content policy lets the script call
+  the panel itself and nothing else.
+- **Pieces used:** the library above, SHA-256 with a fixed prefix for each use, the system
+  generator, and a cookie `HttpOnly` and `SameSite=Strict` (with `Secure` and the prefix `__Host-`
+  when the address of the panel is `https`). No cipher of our own.
+- **A hub that starts on an empty database installs itself:** it does what `arauto-hub init`
+  does, by the same function and with the same refusals. A database that has anything in it is
+  not touched by this, and a migration is never applied by the start.
 
 ### The panel session
 
@@ -86,7 +115,8 @@ server, in a container or behind a proxy, and never connected a real Hermes.
   intermediate memory of what was authorized before.
 - **A form is only accepted with the `Origin` of the panel.** Without it, or with another, the
   answer is 403 before the form is read.
-- **In the audit:** the entry is a security event (`panel.signed_in`); the issued code
+- **In the audit:** the entry (`panel.signed_in`, by code or by passkey) and the registration of
+  a passkey (`panel.passkey_registered`) are security events; the issued code
   (`panel.code_issued`) and the exit (`panel.signed_out`) are common events. The actor is the local
   admin; where the command writes the system user, the panel writes the fixed word `panel`.
 - **Purge:** the rows of the codes and of the panel sessions leave 30 days after the moment they
@@ -97,7 +127,7 @@ server, in a container or behind a proxy, and never connected a real Hermes.
 - **Hermes, WhatsApps and Accesses, with the alert banner at the top.** They show what
   `arauto-hub admin` shows, plus what only the running hub knows: which Hermes are connected
   now.
-- **What the screens never show:** entry code, verification code, address or key of the engine,
+- **What the screens never show:** installation code, verification code, address or key of the engine,
   name of the engine session and message content.
 
 ### Connecting a Hermes
@@ -179,14 +209,29 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
   speakers of each language.** They were seen only in photos of some screens of a test hub. A
   sentence may be wrong or read badly, and the English one is the one that counts.
 - No language written from right to left is in the list, and the screens were never drawn for one.
-- The entry code does not identify a person. Whoever runs the command already has the database and
-  the master key; every panel session belongs to the "local admin".
+- The installation code does not identify a person. Whoever runs the command, or reads the
+  output of the start of the hub, already has the database and the master key; every passkey
+  belongs to the one "local admin".
 - **A stolen panel session acts while it is valid** (12 hours, or 30 minutes without use). With it
   one can see everything the screens show, change any access, revoke a Hermes and reconnect a
-  Hermes on a device of whoever stole it, which then inherits its accesses. It is the risk accepted
-  on 12/11/2026, and the reason the panel stays closed until the passkey exists.
+  Hermes on a device of whoever stole it, which then inherits its accesses. The
+  [0019](0019-painel-com-passkey.md) asks for the passkey again on every action that changes
+  something: that is not built.
+- **The passkey was only exercised by an authenticator written for the tests.** How each browser,
+  phone, security key and password manager answers was not seen. Known limits of the library: it
+  accepts no attestation other than "none" or a self-signed one, it refuses an answer whose backup
+  state changed since the registration, and it refuses a counter that does not grow once it left
+  zero.
+- **The challenges of the ceremonies are drawn by the library,** from a generator seeded by the
+  system generator, not by a direct call to it as the rest of the project does.
+- A passkey is bound to the address of the panel: change `ARAUTO_PANEL_URL` and every passkey
+  stops working, and the way back is an installation code.
+- Whoever reaches the port of the panel can ask for challenges: 256 of them, unanswered, keep
+  anyone from entering for up to 5 minutes. The ceiling of 30 a minute slows that down and does
+  not prevent it.
 - The panel depends on the TLS of whoever installs. Without TLS it is only accepted on
-  `localhost`, for use by tunnel, and then the cookie does not carry `Secure`.
+  `localhost`, for use by tunnel, and then the cookie does not carry `Secure`. A browser only
+  makes a passkey over TLS or on `localhost`.
 - In a container, the port of the panel listens on all interfaces: whoever is on the same network
   as the hub, like the WhatsApp engine, reaches the entry screen. What holds there is the
   single-use code.
@@ -195,23 +240,25 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
 
 ## Pending decisions, for the maintainer
 
-1. **The name "entry code".** It entered the glossary as a proposal. The alternative is to widen
-   the "installation code".
-2. **The text of the block.** The panel uses the one proposed in the 02. The command does not
+1. **The text of the block.** The panel uses the one proposed in the 02. The command does not
    print that text: it prints the address of the hub, its key, the invite and the same command
    lines, with no sentence addressed to the Hermes. It remains to make the command print the
    block of the 02, or to say that they are two on purpose.
-3. **The [04-seguranca-conexao.md](../04-seguranca-conexao.md)** says, in two tables, that the
-   login of the panel is by passkey. It was not changed: it changes only with approval.
+2. **The passkey on every action,** as the 0019 asks, or only at the entry, as it is built.
+3. **More than one admin.** Every passkey belongs to the one local admin; the 0019 foresees a
+   second admin giving a passkey to the first.
 
 ## Consequences
 
 - The 0033 gains the note that the panel started before the end of the MVP, and the 0019 the note
-  that the panel session acts while the passkey does not exist. The
+  of what of it is built. The
   [0028](0028-painel-fechado-por-padrao.md) does not change.
 - The hub now has an administration address on the network, when whoever installs turns it on. The
   installation guide publishes the port of the panel only on `127.0.0.1`.
-- A database that already has data needs the new migration before `serve` starts.
+- A database that already has data needs the new migrations before `serve` starts
+  (`arauto-hub migrate --i-have-a-backup`).
+- The name "entry code", a proposal of the first delivery, left the glossary: the code is the
+  installation code of the 0019.
 - Alternatives considered: a separate program for the panel (another database credential and
   another surface to protect); a template library (automatic escape, but one more dependency);
   keeping the last use of the session in the database (it survives the restart of the hub, but is

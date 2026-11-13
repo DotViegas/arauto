@@ -7,6 +7,7 @@ use arauto_protocol::clock::ManualClock;
 use arauto_testkit::http;
 use arauto_testkit::hub::fixture::{self, Fixture};
 use arauto_testkit::hub::support::{PANEL_HOST, PANEL_ORIGIN};
+use arauto_testkit::passkey::SoftAuthenticator;
 use data_encoding::{BASE32_NOPAD, BASE64URL_NOPAD, HEXLOWER, HEXUPPER};
 
 use crate::{Browser, COOKIE, PATIENCE, REFUSED, audited, code, cookie_of, hub, rows};
@@ -144,7 +145,7 @@ async fn the_code_opens_one_session_and_only_once() {
     for _ in 0..3 {
         let page = browser.get("/sign-in", None).await;
         assert_eq!(page.status, 200);
-        assert!(page.text().contains("Entry code"));
+        assert!(page.text().contains("Installation code"));
         assert!(
             !page.text().contains(&entry),
             "the panel never shows a code"
@@ -153,7 +154,7 @@ async fn the_code_opens_one_session_and_only_once() {
 
     let answer = browser.enter(&entry).await;
     assert_eq!(answer.status, 303);
-    assert_eq!(answer.header("location"), Some("/"));
+    assert_eq!(answer.header("location"), Some("/first-access"));
     let set = answer.header("set-cookie").unwrap();
     assert!(set.starts_with(&format!("{COOKIE}=")), "{set}");
     for attribute in ["Path=/", "HttpOnly", "SameSite=Strict", "Max-Age=43200"] {
@@ -164,7 +165,38 @@ async fn the_code_opens_one_session_and_only_once() {
     }
     let cookie = cookie_of(&answer).unwrap();
 
-    // With the cookie, the panel; with it, the page of the entry leads to the panel.
+    // The session a code opens reaches one page: the registration of a passkey. Every
+    // other page, and the page of the entry, lead to it, and nothing of the panel is shown.
+    let reached = browser.get("/first-access", Some(&cookie)).await;
+    assert_eq!(reached.status, 200);
+    assert!(reached.text().contains("<h1>Register a passkey</h1>"));
+    for path in ["/", "/whatsapps", "/accesses", "/sign-in"] {
+        let sent = browser.get(path, Some(&cookie)).await;
+        assert_eq!(sent.status, 303, "{path}");
+        assert_eq!(sent.header("location"), Some("/first-access"), "{path}");
+        assert!(sent.body.is_empty(), "{path}");
+    }
+    for path in [
+        "/hermes/connect",
+        "/accesses/edit?hermes=a&number=b",
+        "/hermes/revoke?name=a",
+    ] {
+        let sent = browser.get(path, Some(&cookie)).await;
+        assert_eq!(sent.status, 303, "{path}");
+        assert!(sent.body.is_empty(), "{path}");
+    }
+    // A form of the panel is not taken from it either.
+    let refused = browser
+        .post("/hermes/connect", Some(&cookie), "name=atendimento")
+        .await;
+    assert_eq!(refused.status, 303);
+    assert!(rows(&fixture, "hermes").await.is_empty());
+
+    // With a passkey registered in it, the same session reaches the panel.
+    let mut authenticator = SoftAuthenticator::new(PANEL_ORIGIN);
+    let kept = browser.register(&cookie, &mut authenticator).await;
+    assert_eq!(kept.status, 303, "{}", kept.text());
+    assert_eq!(kept.header("location"), Some("/"));
     let home = browser.get("/", Some(&cookie)).await;
     assert_eq!(home.status, 200);
     assert!(
@@ -172,6 +204,10 @@ async fn the_code_opens_one_session_and_only_once() {
             .contains("Your Hermes and their <b>[numbers]</b>")
     );
     assert_eq!(browser.get("/sign-in", Some(&cookie)).await.status, 303);
+    assert_eq!(
+        browser.get("/first-access", Some(&cookie)).await.status,
+        303
+    );
 
     // The code is spent: typed again, by anyone, it opens nothing.
     let again = browser.enter(&entry).await;

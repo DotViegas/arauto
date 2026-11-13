@@ -43,6 +43,7 @@ tower.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid = { workspace = true, features = ["v4"] }
+webauthn_rp.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]

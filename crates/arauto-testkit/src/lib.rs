@@ -12,6 +12,7 @@
 //! | [`http`] | Plain HTTP over TCP, for what the websocket library would not send: slow headers, a raw upgrade, a path as written. |
 //! | [`hub`] | The real hub in the process of the test: test databases from a template, an installation, a hub started with short deadlines, and the admin steps (Hermes, invite, approval). |
 //! | [`hermes`] | A fake Hermes: the program that records the registration of the connector, and the client of MCP that starts copies of the connector with a filtered environment, talks to them, kills and closes them. |
+//! | [`passkey`] | A passkey authenticator in software: what a browser and a device answer in the two ceremonies of the panel, with knobs for the answers the hub must refuse. |
 //! | [`engine`] | A fake WhatsApp engine in the format of the WAHA: sessions, pairing, chats, sending, signed events, and failures on command. |
 #![forbid(unsafe_code)]
 
@@ -23,6 +24,7 @@ pub mod hostile;
 pub mod http;
 pub mod hub;
 pub mod load;
+pub mod passkey;
 
 use std::time::Duration;
 

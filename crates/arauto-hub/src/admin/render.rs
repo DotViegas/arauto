@@ -713,7 +713,8 @@ pub fn audit(rows: &[AuditRow]) -> Report {
     Report::done(text)
 }
 
-/// `admin panel code`: the entry code of the panel. This is the only moment it is shown.
+/// `admin panel code`: the installation code of the panel. This is the only moment it is
+/// shown.
 #[must_use]
 pub fn panel_code(
     issued: &crate::repo::panel::IssuedEntry,
@@ -724,7 +725,8 @@ pub fn panel_code(
     let mut text = String::new();
     let _ = writeln!(
         text,
-        "Entry code of the panel. It is valid for {minutes} minutes and opens one session."
+        "Installation code of the panel. It is valid for {minutes} minutes and opens one session,\n\
+         which only reaches the registration of a passkey."
     );
     let _ = writeln!(
         text,

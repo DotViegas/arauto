@@ -21,6 +21,7 @@ use arauto_testkit::device::{self, Enrolled};
 use arauto_testkit::http::{self, Response};
 use arauto_testkit::hub::fixture::{self, Fixture};
 use arauto_testkit::hub::support::{self, PANEL_HOST, PANEL_ORIGIN};
+use arauto_testkit::passkey::SoftAuthenticator;
 use data_encoding::{BASE32_NOPAD, BASE64, BASE64_NOPAD, BASE64URL_NOPAD, HEXLOWER, HEXUPPER};
 
 const PATIENCE: Duration = Duration::from_secs(15);
@@ -153,7 +154,21 @@ async fn get(fixture: &Fixture, path: &str, cookie: Option<&str>) -> Response {
     http::get(panel, path, &headers, PATIENCE).await.unwrap()
 }
 
-/// Signs in and returns the cookie, with every way its identifier could have been written.
+/// A value as a form field carries it.
+fn form_value(text: &str) -> String {
+    text.bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() {
+                char::from(byte).to_string()
+            } else {
+                format!("%{byte:02X}")
+            }
+        })
+        .collect()
+}
+
+/// Signs in with a code and registers a passkey, so that the session reaches the whole
+/// panel. Returns the cookie, with every way its identifier could have been written.
 async fn sign_in(
     fixture: &Fixture,
     code: &str,
@@ -174,6 +189,19 @@ async fn sign_in(
         secrets.push((what.to_owned(), written));
     }
     secrets.push((format!("{what} (its start)"), identifier[..16].to_owned()));
+    let asked = post(fixture, "/passkey/register/start", Some(&cookie), "").await;
+    assert_eq!(asked.status, 200, "{}", asked.text());
+    let made = SoftAuthenticator::new(PANEL_ORIGIN)
+        .create(&asked.text())
+        .unwrap();
+    let kept = post(
+        fixture,
+        "/passkey/register",
+        Some(&cookie),
+        &format!("credential={}", form_value(&made)),
+    )
+    .await;
+    assert_eq!(kept.status, 303, "{}", kept.text());
     cookie
 }
 

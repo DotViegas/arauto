@@ -479,6 +479,29 @@ pub async fn init(
     }))
 }
 
+/// What `serve` does before it starts: on an **empty** database, the same as [`init`], by the
+/// same function and with the same refusals. Returns what was installed, or `None` when the
+/// database has anything in it: then nothing is installed over it and no migration is applied
+/// here, and the checks of the start say what is wrong with it.
+///
+/// # Errors
+/// What [`init`] returns.
+pub async fn install_if_new(
+    pool: &PgPool,
+    data_dir: &Path,
+    os_user: &DeclaredText,
+    allow_unsafe_db: bool,
+    now: i64,
+) -> Result<Option<Installed>, AdminError> {
+    if db::schema_state(pool, &db::MIGRATOR).await? != db::SchemaState::Empty {
+        return Ok(None);
+    }
+    match init(pool, data_dir, os_user, allow_unsafe_db, now).await? {
+        InitOutcome::Created(installed) => Ok(Some(installed)),
+        InitOutcome::AlreadyInstalled(_) => Ok(None),
+    }
+}
+
 // ---------------------------------------------------------------------------- migrate, status, dev-reset
 
 /// `arauto-hub migrate --i-have-a-backup`: applies the pending migrations to a database that

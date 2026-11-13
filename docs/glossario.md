@@ -109,8 +109,7 @@
 | **System log** | The technical log of the hub. |
 | **Purge** | Deleting what passed its retention period. |
 | **Passkey** | The access key of the phone or the computer, used in place of a password. |
-| **Installation code** | A single-use code the hub shows on its first start, to create the first admin. |
-| **Entry code** | A single-use code, issued by a command on the hub's machine, that opens a panel session while the passkey does not exist. It is a short-lived secret: it appears once, and the hub keeps only its digest. Proposed name ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| **Installation code** | A single-use code that only opens the registration of a passkey in the panel. The hub writes one in the output of its start while no admin has a passkey, and a command on the hub's machine issues one for who lost theirs. It is a short-lived secret: it appears once, and the hub keeps only its digest ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 
 ## Conversation between Hermes
 
@@ -160,7 +159,7 @@ The documents were written in Portuguese until 13/11/2026. The terms above repla
 | Portuguese | English |
 |---|---|
 | convite · bloco · inscrição · pedido de conexão | invite · block · enrollment · connection request |
-| código de conferência · código de entrada · código de instalação | verification code · entry code · installation code |
+| código de conferência · código de instalação | verification code · installation code |
 | aparelho · credencial lacrada · lacre · caixa preta · chave-mestra | device · sealed credential · seal · vault · master key |
 | conectar · parear · reconectar · revogar · acordar | connect · pair · reconnect · revoke · wake |
 | canal · aperto de mãos · batimento · troca · "gravei" | channel · handshake · heartbeat · swap · "saved" |

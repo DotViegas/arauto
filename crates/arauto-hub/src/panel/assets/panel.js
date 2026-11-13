@@ -1,7 +1,8 @@
 // The script of the panel of the Arauto hub. It only helps the screen: every step of a guide
 // is a page of the hub and works without it. It never writes markup, never reads a cookie and
-// never talks to anything but the clipboard of whoever clicks. It has no sentence of its
-// own: what it says comes from the page, in the language of the page.
+// never talks to anything but the clipboard of whoever clicks and, for a passkey, the panel
+// itself and the browser. It has no sentence of its own: what it says comes from the page, in
+// the language of the page.
 (function () {
   'use strict';
   var root = document.documentElement;
@@ -65,6 +66,48 @@
     form.addEventListener('input', update);
     update();
   }
+
+  // A passkey: the script asks the panel for the challenge, hands it to the browser, and
+  // sends what the browser answers in the field of the form. The hub checks all of it; this
+  // only carries it. Nothing of it is kept here.
+  function passkey(form) {
+    var said = form.querySelector('[role="status"]');
+    var field = form.querySelector('input[name="credential"]');
+    var button = form.querySelector('button[type="submit"]');
+    var creates = form.getAttribute('data-passkey') === 'create';
+    var keys = window.PublicKeyCredential;
+    var parse = keys && (creates ? keys.parseCreationOptionsFromJSON : keys.parseRequestOptionsFromJSON);
+    function say(name) { if (said) said.textContent = form.getAttribute('data-' + name) || ''; }
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (!parse || !navigator.credentials || !window.fetch) { say('unsupported'); return; }
+      button.disabled = true;
+      say('waiting');
+      fetch(form.getAttribute('data-start'), { method: 'POST', credentials: 'same-origin' })
+        .then(function (answer) {
+          if (!answer.ok) throw new Error('refused');
+          return answer.json();
+        })
+        .then(function (options) {
+          var asked = { publicKey: parse.call(keys, options.publicKey || options) };
+          return creates ? navigator.credentials.create(asked) : navigator.credentials.get(asked);
+        })
+        .then(function (credential) {
+          field.value = JSON.stringify(credential.toJSON());
+          // Not `requestSubmit`: this handler must not run again.
+          HTMLFormElement.prototype.submit.call(form);
+        })
+        .catch(function () {
+          button.disabled = false;
+          say('failed');
+        });
+    });
+  }
+
+  ready(function () {
+    Array.prototype.forEach.call(document.querySelectorAll('form[data-passkey]'), passkey);
+  });
 
   ready(function () {
     var guide = document.getElementById('guide');

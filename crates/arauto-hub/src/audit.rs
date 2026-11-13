@@ -172,6 +172,8 @@ actions! {
     PanelSignedIn => "panel.signed_in", true;
     /// A session of the panel was closed by whoever held it.
     PanelSignedOut => "panel.signed_out", false;
+    /// A passkey was registered for an admin, in a session of the panel.
+    PanelPasskeyRegistered => "panel.passkey_registered", true;
 }
 
 impl fmt::Display for Action {
@@ -635,6 +637,8 @@ mod tests {
             "access_chat.removed",
             // A session of the panel is someone who can ask for all of the above.
             "panel.signed_in",
+            // A passkey is what opens such a session from then on.
+            "panel.passkey_registered",
         ]
         .into_iter()
         .collect();

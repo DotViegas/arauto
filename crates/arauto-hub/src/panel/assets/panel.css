@@ -161,6 +161,12 @@ a.cell:hover { background: var(--frame-raised); }
 .note { margin-top: 16px; font-size: var(--t-label); max-width: 78ch; }
 .footer { margin-top: 48px; font-size: var(--t-label); max-width: 78ch; }
 
+/* the form that asks the browser for a passkey */
+.passkey { display: grid; gap: 12px; }
+.passkey .status { margin-top: 0; color: var(--text); font-weight: 400; }
+.passkey .status:empty { display: none; }
+.entry > .error { margin: 0; }
+
 /* the language of the panel: every language by its own name */
 .language { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; font-size: var(--t-label); color: var(--text); }
 .language select {

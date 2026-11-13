@@ -248,6 +248,50 @@ async fn init_installs_once_and_does_not_redo_what_exists() {
 }
 
 #[tokio::test]
+async fn a_start_installs_an_empty_database_and_touches_no_other() {
+    let install = |fresh: &Fresh| {
+        let (pool, dir) = (fresh.db.pool.clone(), fresh.data_dir());
+        async move { admin::install_if_new(&pool, &dir, &os_user(), false, NOW).await }
+    };
+
+    // An empty database: the start does what `init` does, once.
+    let fresh = Fresh::new().await;
+    let installed = install(&fresh).await.unwrap().expect("it installs itself");
+    assert!(fresh.data_dir().join(MASTER_KEY_FILE).is_file());
+    assert_eq!(count(&fresh.db.pool, "installation").await, 1);
+    assert_eq!(count(&fresh.db.pool, "audit").await, 4);
+    let vault = Vault::open(&fresh.data_dir()).unwrap();
+    let pair = admin::hub_keypair(&fresh.db.pool, &vault).await.unwrap();
+    assert_eq!(pair.public(), &installed.hub_key);
+    // The next start finds an installation and does nothing.
+    let before = everything(&fresh.db.pool).await;
+    assert_eq!(install(&fresh).await.unwrap(), None);
+    assert_eq!(everything(&fresh.db.pool).await, before);
+
+    // A database with data and no master key is not an empty one: nothing is created over
+    // it, and no new key appears beside it.
+    let key_path = fresh.data_dir().join(MASTER_KEY_FILE);
+    std::fs::remove_file(&key_path).unwrap();
+    assert_eq!(install(&fresh).await.unwrap(), None);
+    assert!(!key_path.exists(), "a start created a master key over data");
+    assert_eq!(everything(&fresh.db.pool).await, before);
+
+    // An empty database beside the mark of another installation is refused, as in `init`.
+    let other = Fresh::new().await;
+    std::fs::create_dir_all(other.data_dir()).unwrap();
+    other.mark().advance(7).await.unwrap();
+    let refused = install(&other).await;
+    assert!(
+        matches!(
+            refused,
+            Err(AdminError::MarkOfAnotherInstallation { mark: 7 })
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(count(&other.db.pool, "installation").await, 0);
+}
+
+#[tokio::test]
 async fn init_refuses_a_database_with_data_whose_master_key_is_gone() {
     let fresh = Fresh::new().await;
     fresh.init().await.unwrap();

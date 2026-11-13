@@ -21,6 +21,7 @@ use arauto_hub::engine::EngineSettings;
 use arauto_hub::mark::Mark;
 use arauto_hub::repo::alert::AlertFilter;
 use arauto_hub::repo::approval::{ApproveOutcome, Recognition, Recognized};
+use arauto_hub::repo::panel::INSTALLATION_VALIDITY_MS;
 use arauto_hub::vault::Vault;
 use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_protocol::message::DeclaredText;
@@ -523,6 +524,7 @@ async fn serve() -> anyhow::Result<Report> {
         .with_writer(std::io::stderr)
         .try_init();
     let config = ServeConfig::read(&ProcessEnv)?;
+    install_if_new(&config.storage).await?;
     let options = channel::Options {
         settings: ChannelSettings::default(),
         downloads: downloads()?.0,
@@ -535,7 +537,10 @@ async fn serve() -> anyhow::Result<Report> {
         "the hub is up"
     );
     match running.panel_addr() {
-        Some(panel) => tracing::info!(%panel, "the panel of the admin is listening"),
+        Some(panel) => {
+            tracing::info!(%panel, "the panel of the admin is listening");
+            first_access(&config).await;
+        }
         None => tracing::info!(
             "the hub has no panel: ARAUTO_LISTEN_PANEL and ARAUTO_PANEL_URL are not set"
         ),
@@ -547,6 +552,83 @@ async fn serve() -> anyhow::Result<Report> {
         text: "The hub stopped.\n".to_owned(),
         done: true,
     })
+}
+
+/// A hub that starts on an empty database installs itself, so that an installation needs no
+/// command before the first start ([`admin::install_if_new`]).
+async fn install_if_new(storage: &StorageConfig) -> anyhow::Result<()> {
+    let options = PoolOptions {
+        size: 2,
+        acquire_timeout: Duration::from_secs(5),
+    };
+    let pool = db::connect(&storage.database_url, options).await?;
+    let installed = admin::install_if_new(
+        &pool,
+        &storage.data_dir,
+        &os_user(),
+        storage.allow_unsafe_db,
+        SystemClock.now_ms(),
+    )
+    .await;
+    pool.close().await;
+    if let Some(installed) = installed? {
+        tracing::info!(
+            hub_key = %installed.hub_key.to_text(),
+            "the database was empty: the hub installed itself"
+        );
+    }
+    Ok(())
+}
+
+/// A hub that starts with a panel and no passkey writes an installation code where whoever
+/// installed it reads: the output of the start. It is the one secret the hub ever writes
+/// there, and it does so on purpose (`docs/07-telas.md`, T0): the code lasts minutes, serves
+/// once, and only opens the registration of a passkey. It goes straight to the output, never
+/// through the log lines, so that no log setting copies or reformats it.
+///
+/// A failure here does not stop the hub: the command `admin panel code` issues one too.
+async fn first_access(config: &ServeConfig) {
+    let issued = async {
+        let options = PoolOptions {
+            size: 2,
+            acquire_timeout: Duration::from_secs(5),
+        };
+        let pool = db::connect(&config.storage.database_url, options).await?;
+        let session =
+            Session::open(pool.clone(), Mark::new(&config.storage.data_dir), os_user()).await;
+        let issued = match session {
+            Ok(session) => session.installation_code(SystemClock.now_ms()).await,
+            Err(error) => Err(error),
+        };
+        pool.close().await;
+        anyhow::Ok(issued?)
+    }
+    .await;
+    match issued {
+        Ok(Some(issued)) => {
+            let address = config
+                .panel
+                .as_ref()
+                .map(|panel| panel.url.origin())
+                .unwrap_or_default();
+            let minutes = INSTALLATION_VALIDITY_MS / 60_000;
+            let mut out = std::io::stderr().lock();
+            let _ = writeln!(out);
+            let _ = writeln!(out, "No admin of this hub has a passkey yet.");
+            let _ = writeln!(out, "INSTALLATION CODE: {}", issued.code.reveal().as_str());
+            let _ = writeln!(
+                out,
+                "Open {address}, type it and register a passkey. It is valid for {minutes} \
+                 minutes and for one use; restart the hub for another."
+            );
+            let _ = writeln!(out);
+        }
+        Ok(None) => {}
+        Err(error) => tracing::warn!(
+            %error,
+            "the installation code was not issued: use `arauto-hub admin panel code`"
+        ),
+    }
 }
 
 /// The files of the folder of downloads, when the environment names one.

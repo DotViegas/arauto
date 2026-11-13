@@ -128,9 +128,15 @@ async fn every_answer_tells_the_browser_to_do_no_more_than_show_it() {
             !is_file,
             "only a file of the panel may be kept"
         );
-        assert!(
-            !answer.text().contains("<script"),
-            "a page without a guide loads no script"
+        // The one script is a file of the panel, loaded by the pages that need it: never
+        // text written inside a page.
+        assert!(!answer.text().contains("<script>"));
+        assert_eq!(
+            answer.text().matches("<script").count(),
+            answer
+                .text()
+                .matches("<script src=\"/assets/panel.js\"></script>")
+                .count()
         );
     }
     assert_eq!(
@@ -292,7 +298,7 @@ async fn a_request_that_reads_writes_nothing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_hub_that_starts_again_serves_no_session_from_before() {
     let mut fixture = hub().await;
-    let cookie = Browser::of(&fixture).signed_in(&fixture).await;
+    let (cookie, mut authenticator) = Browser::of(&fixture).first_access(&fixture).await;
     // A code issued before the stop is still a code: it is in the database, not in memory.
     let waiting = code(&fixture).await;
 
@@ -311,7 +317,11 @@ async fn a_hub_that_starts_again_serves_no_session_from_before() {
 
     let again = browser.enter(&waiting).await;
     assert_eq!(again.status, 303);
-    let cookie = cookie_of(&again).unwrap();
+    assert_eq!(again.header("location"), Some("/first-access"));
+    // And the passkey is in the database too: it signs in on the hub that started again.
+    let passed = browser.pass(&mut authenticator).await;
+    assert_eq!(passed.status, 303, "{}", passed.text());
+    let cookie = cookie_of(&passed).unwrap();
     assert_eq!(browser.get("/", Some(&cookie)).await.status, 200);
 }
 

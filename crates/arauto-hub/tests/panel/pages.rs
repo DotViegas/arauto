@@ -4,7 +4,7 @@ use arauto_hub::core::access::{Grant, Scope, Verbs};
 use arauto_testkit::hub::fixture::Fixture;
 
 use crate::world::{World, phone};
-use crate::{Browser, code, cookie_of, hub};
+use crate::{Browser, hub};
 
 const fn all(read: bool, send: bool, modify: bool, wake: bool) -> Grant {
     Grant {
@@ -235,9 +235,7 @@ async fn a_hub_that_came_back_from_a_copy_says_so_and_still_lets_the_admin_in() 
 
     // The panel is how the admin sees what happened: the entry works in this mode.
     let browser = Browser::of(&fixture);
-    let answer = browser.enter(&code(&fixture).await).await;
-    assert_eq!(answer.status, 303, "{}", answer.text());
-    let cookie = cookie_of(&answer).unwrap();
+    let cookie = browser.signed_in(&fixture).await;
 
     let shown = page(&browser, &cookie, "/").await;
     assert!(shown.contains("class=\"alerts\""));

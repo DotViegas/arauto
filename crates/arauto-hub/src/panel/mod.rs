@@ -39,6 +39,7 @@ pub mod editor;
 pub mod guide;
 mod html;
 mod http;
+pub mod passkey;
 pub mod secret;
 pub mod text;
 pub mod view;
@@ -53,6 +54,7 @@ use dashmap::DashMap;
 use hyper::body::Incoming;
 use uuid::Uuid;
 
+use self::passkey::{RelyingParty, StoredPasskey};
 use self::secret::{EntryCode, SessionSecret};
 use crate::audit::AuditError;
 use crate::channel::client_ip::client_ip;
@@ -60,7 +62,9 @@ use crate::channel::{Downloads, Hub};
 use crate::config::PublicUrl;
 use crate::db::{self, ResolvedOrg};
 use crate::download::Listed;
-use crate::repo::panel::{PanelSession, SESSION_IDLE_MS, SESSION_VALIDITY_MS, SignIn};
+use crate::repo::panel::{
+    NewPasskey, PanelSession, Registered, SESSION_IDLE_MS, SESSION_VALIDITY_MS, SignIn,
+};
 use crate::repo::{self, RepoError};
 
 /// How many times a minute the hub looks an entry code up, from everyone together. A code
@@ -71,6 +75,12 @@ const ATTEMPTS_PER_MINUTE: u32 = 30;
 const REFUSED: &str = text::k("Invalid or expired code. Issue another one on the hub's server.");
 
 const TOO_MANY: &str = text::k("Too many attempts right now. Wait a minute and try again.");
+
+/// What a page says when a passkey ceremony did not end well. One sentence for every reason.
+const PASSKEY_REFUSED: &str = text::k("The passkey was not accepted. Try again.");
+
+/// The name a passkey shows for the admin of the panel, in the list of the authenticator.
+const PASSKEY_USER: &str = "admin";
 
 /// The files of the panel, written by the project and built into the program.
 const ASSETS: &[(&str, &str, &[u8])] = &[
@@ -130,6 +140,9 @@ pub struct PanelState {
     hub_url: PublicUrl,
     /// The connector a block tells a Hermes to download, when the hub serves one.
     connector: Option<Listed>,
+    /// The passkey ceremonies of this panel, for its own address. `None` when a browser
+    /// would refuse a passkey at that address.
+    relying: Option<RelyingParty>,
 }
 
 impl PanelState {
@@ -153,6 +166,7 @@ impl PanelState {
             attempts: Mutex::new((0, 0)),
             hub_url: hub_url.clone(),
             connector: block::connector(&downloads.listed()).cloned(),
+            relying: RelyingParty::new(&url.origin()).ok(),
         }
     }
 
@@ -255,9 +269,22 @@ fn failed(error: &RepoError) -> Response<Body> {
     )
 }
 
-/// The session a request brings, when it is one this hub serves: open, in its hours, and
-/// used not long ago. Only reads the database.
+/// The session a request brings, when it reaches the whole panel: a passkey was shown in
+/// it. Every page and every form of the panel asks this one. Only reads the database.
 async fn session_of(
+    hub: &Hub,
+    panel: &PanelState,
+    headers: &HeaderMap,
+) -> Result<Option<(ResolvedOrg, PanelSession)>, RepoError> {
+    Ok(any_session_of(hub, panel, headers)
+        .await?
+        .filter(|(_, session)| session.full))
+}
+
+/// The session a request brings, when it is one this hub serves: open, in its hours, and
+/// used not long ago. One opened by a code only reaches the registration of a passkey: only
+/// that registration asks this function. Only reads the database.
+async fn any_session_of(
     hub: &Hub,
     panel: &PanelState,
     headers: &HeaderMap,
@@ -324,6 +351,13 @@ pub(crate) async fn route(
         (false, "/language") => language(panel, &parts.headers, body).await,
         (false, "/sign-in") => sign_in(&hub, panel, peer, &parts.headers, body).await,
         (false, "/sign-out") => sign_out(&hub, panel, peer, &parts.headers).await,
+        (true, "/first-access") => first_access_page(&hub, panel, &parts.headers).await,
+        (false, "/passkey/register/start") => register_start(&hub, panel, &parts.headers).await,
+        (false, "/passkey/register") => register(&hub, panel, peer, &parts.headers, body).await,
+        (false, "/passkey/sign-in/start") => Ok(passkey_start(&hub, panel)),
+        (false, "/passkey/sign-in") => {
+            passkey_sign_in(&hub, panel, peer, &parts.headers, body).await
+        }
         (true, "/" | "/whatsapps" | "/accesses") => {
             page(&hub, panel, &parts.headers, path, parts.uri.query()).await
         }
@@ -343,13 +377,219 @@ async fn sign_in_page(
     panel: &PanelState,
     headers: &HeaderMap,
 ) -> Result<Response<Body>, RepoError> {
-    if session_of(hub, panel, headers).await?.is_some() {
-        return Ok(http::see_other("/"));
+    if let Some((_, session)) = any_session_of(hub, panel, headers).await? {
+        return Ok(http::see_other(if session.full {
+            "/"
+        } else {
+            "/first-access"
+        }));
     }
     Ok(http::page(
         StatusCode::OK,
         view::sign_in(lang_of(headers), None),
     ))
+}
+
+/// The page of a session opened by a code: the registration of a passkey.
+async fn first_access_page(
+    hub: &Hub,
+    panel: &PanelState,
+    headers: &HeaderMap,
+) -> Result<Response<Body>, RepoError> {
+    match any_session_of(hub, panel, headers).await? {
+        None => Ok(http::see_other("/sign-in")),
+        Some((_, session)) if session.full => Ok(http::see_other("/")),
+        Some(_) => Ok(http::page(
+            StatusCode::OK,
+            view::first_access(lang_of(headers), None),
+        )),
+    }
+}
+
+/// The challenge of a registration, for the script of the page: any session of the panel
+/// may register a passkey for its admin.
+async fn register_start(
+    hub: &Hub,
+    panel: &PanelState,
+    headers: &HeaderMap,
+) -> Result<Response<Body>, RepoError> {
+    let Some((organization, session)) = any_session_of(hub, panel, headers).await? else {
+        return Ok(http::plain(StatusCode::FORBIDDEN, "There is no session.\n"));
+    };
+    let Some(relying) = &panel.relying else {
+        return Ok(http::plain(StatusCode::NOT_FOUND, "not found\n"));
+    };
+    let existing =
+        repo::panel::passkey_credentials(hub.pool(), organization, session.admin).await?;
+    Ok(
+        match relying.start_registration(session.admin.as_bytes(), PASSKEY_USER, &existing) {
+            Ok(options) => http::json(options),
+            Err(_) => http::plain(StatusCode::SERVICE_UNAVAILABLE, "Try again.\n"),
+        },
+    )
+}
+
+/// Keeps the passkey a browser just made, when the hub asked for it in this session. From
+/// here on the session reaches the whole panel.
+async fn register(
+    hub: &Hub,
+    panel: &PanelState,
+    peer: SocketAddr,
+    headers: &HeaderMap,
+    body: Incoming,
+) -> Result<Response<Body>, RepoError> {
+    let Some((organization, session)) = any_session_of(hub, panel, headers).await? else {
+        return Ok(http::see_other("/sign-in"));
+    };
+    let answered = match http::form_field(headers, body, "credential").await {
+        Ok(answered) => answered,
+        Err(error) => return Ok(http::plain(error.status(), "The form was not read.\n")),
+    };
+    let refused = || {
+        http::page(
+            StatusCode::OK,
+            view::first_access(lang_of(headers), Some(PASSKEY_REFUSED)),
+        )
+    };
+    let (Some(relying), Some(answered)) = (&panel.relying, answered) else {
+        return Ok(refused());
+    };
+    let Ok(made) = relying.finish_registration(session.admin.as_bytes(), answered.as_bytes())
+    else {
+        return Ok(refused());
+    };
+    let new = NewPasskey {
+        credential_id: made.credential_id,
+        user_handle: made.user_handle.to_vec(),
+        static_state: made.static_state,
+        dynamic_state: made.dynamic_state,
+    };
+    let now = hub.now_ms();
+    let address = client_ip(hub.client_ip_source(), peer, headers).ok();
+    let kept = repo::panel::register_passkey(
+        hub.pool(),
+        hub.mark(),
+        organization,
+        session,
+        &new,
+        address,
+        now,
+    )
+    .await;
+    match kept {
+        Ok(Registered::Kept { .. }) => Ok(http::see_other("/")),
+        Ok(Registered::NoSession) => Ok(http::see_other("/sign-in")),
+        Ok(Registered::Repeated) => Ok(refused()),
+        Err(error) => security_failed(hub, organization, error).await,
+    }
+}
+
+/// A security write of the panel failed. When the row is written and the audit mark did not
+/// follow, the hub says so in an alert, as for every security write.
+async fn security_failed(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    error: RepoError,
+) -> Result<Response<Body>, RepoError> {
+    if matches!(error, RepoError::Audit(AuditError::MarkNotAdvanced { .. })) {
+        let shown = failed(&error);
+        hub.security_write_failed(organization, None, error).await;
+        return Ok(shown);
+    }
+    Err(error)
+}
+
+/// The challenge of a sign-in, for the script of the page of the entry. It needs no session,
+/// so it shares the ceiling of the looks at entry codes: a flood does not fill the memory
+/// of the ceremonies.
+fn passkey_start(hub: &Hub, panel: &PanelState) -> Response<Body> {
+    if !panel.attempt(hub.now_ms()) {
+        return http::plain(StatusCode::TOO_MANY_REQUESTS, "Too many attempts.\n");
+    }
+    let Some(relying) = &panel.relying else {
+        return http::plain(StatusCode::NOT_FOUND, "not found\n");
+    };
+    match relying.start_authentication() {
+        Ok(options) => http::json(options),
+        Err(_) => http::plain(StatusCode::SERVICE_UNAVAILABLE, "Try again.\n"),
+    }
+}
+
+/// Checks what a browser answered to the challenge of a sign-in and opens a session that
+/// reaches the whole panel.
+async fn passkey_sign_in(
+    hub: &Hub,
+    panel: &PanelState,
+    peer: SocketAddr,
+    headers: &HeaderMap,
+    body: Incoming,
+) -> Result<Response<Body>, RepoError> {
+    let now = hub.now_ms();
+    if !panel.attempt(now) {
+        return Ok(http::page(
+            StatusCode::TOO_MANY_REQUESTS,
+            view::sign_in(lang_of(headers), Some(TOO_MANY)),
+        ));
+    }
+    let answered = match http::form_field(headers, body, "credential").await {
+        Ok(answered) => answered,
+        Err(error) => return Ok(http::plain(error.status(), "The form was not read.\n")),
+    };
+    let refused = || {
+        http::page(
+            StatusCode::OK,
+            view::sign_in(lang_of(headers), Some(PASSKEY_REFUSED)),
+        )
+    };
+    let (Some(relying), Some(answered)) = (&panel.relying, answered) else {
+        return Ok(refused());
+    };
+    // The challenge is spent here, whatever comes next.
+    let Ok(pending) = relying.claim_authentication(answered.as_bytes()) else {
+        return Ok(refused());
+    };
+    let Some(organization) =
+        db::organization_of_panel_passkey(hub.pool(), pending.credential_id()).await?
+    else {
+        return Ok(refused());
+    };
+    let Some(stored) =
+        repo::panel::passkey(hub.pool(), organization, pending.credential_id()).await?
+    else {
+        return Ok(refused());
+    };
+    let checked = relying.finish_authentication(
+        pending,
+        Some(StoredPasskey {
+            credential_id: &stored.credential_id,
+            user_handle: &stored.user_handle,
+            static_state: &stored.static_state,
+            dynamic_state: &stored.dynamic_state,
+        }),
+    );
+    let Ok(checked) = checked else {
+        return Ok(refused());
+    };
+    let address = client_ip(hub.client_ip_source(), peer, headers).ok();
+    let opened = repo::panel::sign_in_with_passkey(
+        hub.pool(),
+        hub.mark(),
+        organization,
+        &stored,
+        checked.updated_dynamic_state.as_deref(),
+        address,
+        now,
+    )
+    .await;
+    match opened {
+        Ok(Some(opened)) => {
+            panel.opened(opened.id, now);
+            let cookie = panel.set_cookie(&opened.secret.reveal(), SESSION_VALIDITY_MS / 1_000);
+            Ok(http::with_cookie(http::see_other("/"), &cookie))
+        }
+        Ok(None) => Ok(refused()),
+        Err(error) => security_failed(hub, organization, error).await,
+    }
 }
 
 async fn sign_in(
@@ -388,19 +628,12 @@ async fn sign_in(
         Ok(SignIn::Opened(opened)) => {
             panel.opened(opened.id, now);
             let cookie = panel.set_cookie(&opened.secret.reveal(), SESSION_VALIDITY_MS / 1_000);
-            Ok(http::with_cookie(http::see_other("/"), &cookie))
+            // The session a code opens only reaches the registration of a passkey.
+            Ok(http::with_cookie(http::see_other("/first-access"), &cookie))
         }
         Ok(SignIn::Refused) => Ok(refused()),
-        Err(error) => {
-            // The session may be open with the audit mark behind: the hub says so in an
-            // alert, as for every security write, and the admin asks for another code.
-            if matches!(error, RepoError::Audit(AuditError::MarkNotAdvanced { .. })) {
-                let shown = failed(&error);
-                hub.security_write_failed(organization, None, error).await;
-                return Ok(shown);
-            }
-            Err(error)
-        }
+        // The session may be open with the audit mark behind: the admin asks for another code.
+        Err(error) => security_failed(hub, organization, error).await,
     }
 }
 
@@ -410,7 +643,7 @@ async fn sign_out(
     peer: SocketAddr,
     headers: &HeaderMap,
 ) -> Result<Response<Body>, RepoError> {
-    if let Some((organization, session)) = session_of(hub, panel, headers).await? {
+    if let Some((organization, session)) = any_session_of(hub, panel, headers).await? {
         let address = client_ip(hub.client_ip_source(), peer, headers).ok();
         repo::panel::sign_out(hub.pool(), organization, session, address, hub.now_ms()).await?;
         panel.closed(session.id);
@@ -429,8 +662,11 @@ async fn page(
     path: &str,
     query: Option<&str>,
 ) -> Result<Response<Body>, RepoError> {
-    let Some((organization, _)) = session_of(hub, panel, headers).await? else {
-        return Ok(http::see_other("/sign-in"));
+    let organization = match any_session_of(hub, panel, headers).await? {
+        Some((organization, session)) if session.full => organization,
+        // A session opened by a code is sent to the one page it reaches.
+        Some(_) => return Ok(http::see_other("/first-access")),
+        None => return Ok(http::see_other("/sign-in")),
     };
     let lang = lang_of(headers);
     let frame = data::frame(hub, organization, lang).await?;
@@ -568,7 +804,8 @@ mod tests {
         );
         let sheet = std::str::from_utf8(ASSETS[0].2).unwrap();
         // The script helps the screen and nothing else: it writes no markup, runs no text,
-        // reads no cookie and calls no address.
+        // reads no cookie and calls no address but the one the page of the panel names for
+        // the challenge of a passkey.
         let script = std::str::from_utf8(ASSETS[1].2).unwrap();
         assert_eq!(ASSETS[1].1, "text/javascript; charset=utf-8");
         for forbidden in [
@@ -579,7 +816,6 @@ mod tests {
             "eval(",
             "Function(",
             "document.cookie",
-            "fetch(",
             "XMLHttpRequest",
             "WebSocket",
             "sendBeacon",
@@ -593,6 +829,11 @@ mod tests {
                 "the script of the panel has {forbidden}"
             );
         }
+        // One call, to an address written by the hub in the page, with nothing in it.
+        assert_eq!(script.matches("fetch(").count(), 1);
+        assert!(script.contains(
+            "fetch(form.getAttribute('data-start'), { method: 'POST', credentials: 'same-origin' })"
+        ));
         for (name, kind, bytes) in ASSETS.iter().skip(2) {
             assert_eq!(*kind, "font/woff2");
             assert!(bytes.starts_with(b"wOF2"), "{name}");

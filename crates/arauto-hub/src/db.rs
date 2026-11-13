@@ -427,8 +427,8 @@ pub async fn require_current_schema(pool: &PgPool, migrator: &Migrator) -> Resul
 /// Every repository function of business data takes one, so a query cannot be written
 /// without saying whose data it reads. There is no public constructor: the only ways in are
 /// [`organization_of_device`], [`organization_of_invite`], [`organization_of_engine_events`],
-/// the two of the panel ([`organization_of_panel_entry`] and
-/// [`organization_of_panel_session`]) and [`organizations_for_system_task`].
+/// the three of the panel ([`organization_of_panel_entry`], [`organization_of_panel_session`]
+/// and [`organization_of_panel_passkey`]) and [`organizations_for_system_task`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ResolvedOrg {
     id: Uuid,
@@ -505,6 +505,23 @@ pub async fn organization_of_panel_session<'e>(
             .bind(digest.as_bytes().as_slice())
             .fetch_optional(executor)
             .await?;
+    Ok(id.map(|id| ResolvedOrg { id }))
+}
+
+/// The organization of the passkey with this credential, while the passkey is active.
+///
+/// # Errors
+/// [`DbError::Query`] when the database does not answer.
+pub async fn organization_of_panel_passkey<'e>(
+    executor: impl PgExecutor<'e>,
+    credential_id: &[u8],
+) -> Result<Option<ResolvedOrg>, DbError> {
+    let id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT organization_id FROM panel_passkey WHERE credential_id = $1 AND state = 'active'",
+    )
+    .bind(credential_id)
+    .fetch_optional(executor)
+    .await?;
     Ok(id.map(|id| ResolvedOrg { id }))
 }
 

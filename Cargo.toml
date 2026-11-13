@@ -60,7 +60,14 @@ webpki-roots = "0.26.11"
 x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 zeroize = "1.9.1"
 
+# The passkeys of the panel: the WebAuthn ceremonies on the side of the hub, pure Rust.
+# `bin` gives the encoding of what the database keeps; `serde_relaxed` reads the JSON of the
+# browsers, which do not all follow the letter of WebAuthn level 3.
+webauthn_rp = { version = "0.3.0", default-features = false, features = ["bin", "serde_relaxed"] }
+
 # Tests only.
+# The keys of the passkey authenticator in software (the same curve the hub verifies).
+p256 = { version = "0.13.2", default-features = false, features = ["ecdsa"] }
 proptest = "1.12.0"
 tempfile = "3.27.0"
 

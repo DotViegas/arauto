@@ -58,7 +58,8 @@ docker compose --env-file arauto.env ps
 ```
 
 - `init` runs **once**. It creates the master key, the audit mark, the organization and the hub
-  key. Running it again redoes nothing.
+  key. Running it again redoes nothing. It may be skipped: a hub that starts on an empty database
+  does the same by itself, and says so in its log.
 - After the `up`, the service `hub` needs to appear as `healthy`. The health check is the command
   `arauto-hub health`, which asks through the internal port.
 
@@ -79,27 +80,33 @@ The panel shows the Hermes, the numbers and the accesses, connects and revokes a
 the access of a Hermes on a number. Pairing numbers and choosing the chats of an access continue
 through the command. It comes off, and **has not been proven on a server yet**.
 
-There is no passkey yet: whoever has the panel session open can connect, reconnect and revoke
-Hermes and change accesses.
-For that reason, leave the panel closed, as below, and sign out of it when you finish.
+The panel is entered with a passkey. It is asked at the entry, not again on each action: whoever
+has the panel session open can connect, reconnect and revoke Hermes and change accesses. Sign out
+of it when you finish.
 
 1. In the `arauto.env`, uncomment `ARAUTO_LISTEN_PANEL` and `ARAUTO_PANEL_URL`, and run
    `docker compose --env-file arauto.env up -d`.
 2. From your computer, open a tunnel to the server: `ssh -L 8445:127.0.0.1:8445 YOUR-SERVER`.
-3. Issue the entry code: `docker compose --env-file arauto.env exec hub arauto-hub admin panel code`.
-   It appears once, is valid for 10 minutes and one entry. It is a secret: do not paste it in a
-   chat or in a report.
-4. Open `http://localhost:8445` in the browser and type the code.
+3. Get the installation code. While no passkey exists, the hub writes one in the output of its
+   start (`docker compose --env-file arauto.env logs hub`, the line `INSTALLATION CODE:`), valid
+   for 30 minutes; restart the hub for another. At any time,
+   `docker compose --env-file arauto.env exec hub arauto-hub admin panel code` issues one, valid
+   for 10 minutes. It serves once. It is a secret: do not paste it in a chat or in a report.
+4. Open `http://localhost:8445` in the browser, type the code and register a passkey: the
+   fingerprint, the face or the PIN of your device. From then on the panel is entered with the
+   passkey, and the code is only for who lost it.
 
 The address in the browser has to be exactly that of `ARAUTO_PANEL_URL`: with another name, the hub
 answers 421. The panel session lasts 12 hours, or 30 minutes without use, and ends when the hub
 restarts.
 
 The port of the panel is published only on `127.0.0.1` of the server. Inside Docker, whoever is on
-a network of the hub (the WhatsApp engine, for example) reaches the entry screen; without the code,
-they do not get past it. Opening the panel without a tunnel (an address of its own on your proxy,
-with TLS, that is not that of the connectors) is possible, but **is not recommended while the
-passkey does not exist**. The risk of opening it is yours.
+a network of the hub (the WhatsApp engine, for example) reaches the entry screen; without a
+passkey or an installation code, they do not get past it. To open the panel without a tunnel, give
+it an address of its own on your proxy, with TLS, that is not that of the connectors, and put that
+address in `ARAUTO_PANEL_URL`: a passkey is bound to the address it was registered at. A panel
+open to the internet has **not been proven on a server yet**, and its session acts without asking
+for the passkey again ([decision 0040](../../docs/decisoes/0040-painel-dentro-do-hub.md)).
 
 ## 3. Connect the first Hermes
 

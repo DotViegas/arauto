@@ -1,9 +1,10 @@
-//! `arauto-hub admin panel code`: the entry code of the panel.
+//! `arauto-hub admin panel code`: the installation code of the panel.
 //!
-//! The panel has no password. Whoever can run this command on the machine of the hub
-//! already holds the database and the master key, and is who the panel lets in: the command
-//! draws a code of one use, shows it once, and the panel opens one session for whoever
-//! types it within 10 minutes (`docs/decisoes/0040-painel-dentro-do-hub.md`).
+//! The panel has no password: it is entered with a passkey. The code is the way to register
+//! one when there is none yet, or when the only one was lost. Whoever can run this command
+//! on the machine of the hub, or read the log of its start, already holds the database and
+//! the master key: the code is drawn, shown once, and opens one session that only reaches
+//! the registration of a passkey (`docs/decisoes/0040-painel-dentro-do-hub.md`).
 
 use arauto_protocol::message::DeclaredText;
 use sqlx::postgres::PgPool;
@@ -12,7 +13,7 @@ use uuid::Uuid;
 use super::{AdminError, Session};
 use crate::db::ResolvedOrg;
 use crate::mark::Mark;
-use crate::repo::panel::{IssuedEntry, PANEL_ACTOR};
+use crate::repo::panel::{INSTALLATION_VALIDITY_MS, IssuedEntry, PANEL_ACTOR};
 use crate::repo::{self, Admin};
 
 impl Session {
@@ -41,5 +42,27 @@ impl Session {
     /// What the database or the generator of the system return.
     pub async fn panel_code(&self, now: i64) -> Result<IssuedEntry, AdminError> {
         Ok(repo::panel::issue_entry(&self.pool, self.organization, &self.admin, now).await?)
+    }
+
+    /// What the hub does when it starts with a panel: while no admin has a passkey, it
+    /// issues an installation code, for the log of the start. `None` once a passkey exists:
+    /// then a code only comes out of the command, asked for by a person.
+    ///
+    /// # Errors
+    /// What the database or the generator of the system return.
+    pub async fn installation_code(&self, now: i64) -> Result<Option<IssuedEntry>, AdminError> {
+        if repo::panel::has_passkey(&self.pool, self.organization).await? {
+            return Ok(None);
+        }
+        Ok(Some(
+            repo::panel::issue_entry_for(
+                &self.pool,
+                self.organization,
+                &self.admin,
+                INSTALLATION_VALIDITY_MS,
+                now,
+            )
+            .await?,
+        ))
     }
 }
