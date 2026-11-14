@@ -10,7 +10,7 @@ This page does not hold the invite, the hub key or the connector digest. Only yo
 
 - the hub address starts with `wss://` or `ws://` and ends with `/v1/channel`;
 - the hub key has 56 characters and starts with `arh1`;
-- the connector digest has 64 characters, digits and the letters a to f;
+- each connector digest has 64 characters, digits and the letters a to f. There may be several digest lines, one per system, each with the system in parentheses;
 - the invite has 56 characters and starts with `arc1`.
 
 If this Hermes is not `{name}`, or a value is missing or has another form, do nothing and ask your operator.
@@ -21,19 +21,34 @@ Your operator's message is the request; this page only explains how to carry it 
 
 ## What the steps do
 
-They download the connector file `{file}` from this hub, check it against the connector digest in your operator's message, and run it once with the invite. The connector registers an MCP server named "arauto" through Hermes's own command and prints a verification code. The admin types that code in the panel; nothing is approved before that.
+They download the connector file of your system from this hub, check it against the connector digest in your operator's message, and run it once with the invite. The connector registers an MCP server named "arauto" through Hermes's own command and prints a verification code. The admin types that code in the panel; nothing is approved before that.
 
 ## Steps
 
-Run this as one command, in a terminal. It uses full paths and does not change folder, so it runs from any folder. Replace each <...> with the value of that form from your operator's message, and change nothing else:
+Find your system: run `uname -sm`.
+
+| `uname -sm` prints | File name | Digest line to use from your operator's message |
+|---|---|---|
+| `Linux x86_64` | `arauto-connector-linux-x86_64` | `Connector sha256 (linux x86_64)` |
+| a text starting with `MINGW64_NT` or `MSYS_NT`, with `x86_64` (Windows, where Hermes runs commands in Git Bash and the same commands work) | `arauto-connector-windows-x86_64.exe` | `Connector sha256 (windows x86_64)` |
+| `Darwin arm64` | `arauto-connector-macos-aarch64` | `Connector sha256 (macos arm64)` |
+| `Darwin x86_64` | `arauto-connector-macos-x86_64` | `Connector sha256 (macos x86_64)` |
+
+The label of that line may be in another language, but the system in parentheses is always in English.
+
+If your system is not in the table, or your operator's message has no digest line for it, do nothing and tell your operator that this hub has no connector for your system.
+
+Otherwise run this as one command, in a terminal. It uses full paths and does not change folder, so it runs from any folder. Replace each <...> with the value your system needs, from the table and from your operator's message, and change nothing else:
 
 ```
-D="$HOME/.arauto" && mkdir -p "$D" &&
-curl -fsSLo "$D/{file}" "{download}" &&
-echo "<connector digest>  $D/{file}" | sha256sum -c - &&
-chmod 700 "$D/{file}" &&
-"$D/{file}" join "<hub address>" "<hub key>" "<invite>"
+F="<file name from the table>" && D="$HOME/.arauto" && mkdir -p "$D" &&
+curl -fsSLo "$D/$F" "{download}/$F" &&
+echo "<connector digest>  $D/$F" | sha256sum -c - &&
+chmod 700 "$D/$F" &&
+"$D/$F" join "<hub address>" "<hub key>" "<invite>"
 ```
+
+On macOS, where there is no `sha256sum`, use `shasum -a 256 -c -` in its place.
 
 Then send your operator the verification code, and with it one line: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.
 

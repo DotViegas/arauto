@@ -3,8 +3,12 @@
 # Build it from the root of the repository:
 #   docker build -f deploy/docker/Dockerfile -t arauto-hub .
 #
-# It carries the hub and, to be served at /v1/download/, the connector for Linux x86_64. The
-# WhatsApp engine is never in the image: whoever installs brings their own.
+# It carries the hub and, to be served at /v1/download/, the connector for Linux x86_64, Windows
+# x86_64 and macOS (arm64 and x86_64). The WhatsApp engine is never in the image: whoever installs
+# brings their own.
+#
+# Fact stated by the maintainer's assistant on 14/11/2026: the Windows and macOS builds below
+# compile and link in this build image. None of those files was ever run.
 
 # ---------------------------------------------------------------------------- build
 FROM rust:1.98-bookworm AS build
@@ -18,6 +22,24 @@ RUN cargo build --release --locked -p arauto-hub \
  && mkdir -p /out/download \
  && cp target/release/arauto-hub /out/arauto-hub \
  && cp target/release/arauto-connector /out/download/arauto-connector-linux-x86_64
+# The connector for Windows x86_64: the GNU target, linked by mingw-w64.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 \
+ && rm -rf /var/lib/apt/lists/* \
+ && rustup target add x86_64-pc-windows-gnu \
+ && cargo build --release --locked -p arauto-connector --features tls --target x86_64-pc-windows-gnu \
+ && cp target/x86_64-pc-windows-gnu/release/arauto-connector.exe /out/download/arauto-connector-windows-x86_64.exe
+# The connector for macOS (arm64 and x86_64): linked by zig through cargo-zigbuild. The linker
+# warns that no Apple SDK was found and still links.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3-pip \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip3 install --break-system-packages ziglang==0.17.1 cargo-zigbuild==0.24.1 \
+ && rustup target add aarch64-apple-darwin x86_64-apple-darwin \
+ && cargo zigbuild --release --locked -p arauto-connector --features tls --target aarch64-apple-darwin \
+ && cargo zigbuild --release --locked -p arauto-connector --features tls --target x86_64-apple-darwin \
+ && cp target/aarch64-apple-darwin/release/arauto-connector /out/download/arauto-connector-macos-aarch64 \
+ && cp target/x86_64-apple-darwin/release/arauto-connector /out/download/arauto-connector-macos-x86_64
 
 # ---------------------------------------------------------------------------- run
 FROM debian:bookworm-slim

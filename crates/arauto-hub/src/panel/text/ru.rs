@@ -780,7 +780,10 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Hub:", "Хаб:"),
     ("Hub key:", "Ключ хаба:"),
-    ("Connector sha256:", "sha256 коннектора:"),
+    (
+        "Connector sha256 ({system}):",
+        "sha256 коннектора ({system}):",
+    ),
     (
         "Invite (one use, until {deadline} UTC):",
         "Приглашение (одноразовое, до {deadline} UTC):",

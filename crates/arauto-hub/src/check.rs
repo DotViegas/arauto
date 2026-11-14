@@ -189,7 +189,7 @@ pub struct Sources<'a> {
     pub organization: ResolvedOrg,
     /// Where the hub keeps its data, and whether it replaces the password of its database.
     pub storage: &'a StorageConfig,
-    /// The connector the hub serves, as [`crate::panel::block::connector`] picks it from the
+    /// The connector the hub serves, as [`crate::download::connectors`] lists it from the
     /// folder of downloads.
     pub connector: Option<&'a Listed>,
 }

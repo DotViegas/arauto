@@ -135,8 +135,8 @@ pub struct PanelState {
     organization: Option<ResolvedOrg>,
     /// The address of the hub that goes in a block: the one the connectors reach.
     hub_url: PublicUrl,
-    /// The connector a block tells a Hermes to download, when the hub serves one.
-    connector: Option<Listed>,
+    /// The connectors the hub serves that the sentence names, in the order of their systems.
+    connectors: Vec<Listed>,
     /// The passkey ceremonies of this panel, for its own address. `None` when a browser
     /// would refuse a passkey at that address.
     relying: Option<RelyingParty>,
@@ -163,7 +163,10 @@ impl PanelState {
             attempts: Attempts::default(),
             organization: None,
             hub_url: hub_url.clone(),
-            connector: block::connector(&downloads.listed()).cloned(),
+            connectors: crate::download::connectors(&downloads.listed())
+                .into_iter()
+                .map(|(_, file)| file.clone())
+                .collect(),
             relying: RelyingParty::new(&url.origin()).ok(),
         }
     }
@@ -888,7 +891,7 @@ async fn installation(
             pool: hub.pool(),
             organization,
             storage: hub.storage(),
-            connector: panel.connector.as_ref(),
+            connector: panel.connectors.first(),
         },
         Some(panel.origin.clone()),
         Some(panel.hub_url.origin()),
@@ -960,7 +963,7 @@ mod tests {
             &PublicUrl::parse("https://hub.example.com").unwrap(),
             &serves,
         );
-        let connector = panel.connector.unwrap();
+        let connector = panel.connectors.first().unwrap();
         assert_eq!(connector.name, "arauto-connector-linux-x86_64");
         // The SHA-256 of the three bytes the hub serves under that name.
         assert_eq!(
@@ -971,7 +974,7 @@ mod tests {
             panel.hub_url.channel_url(),
             "wss://hub.example.com/v1/channel"
         );
-        // A program for Windows is no connector a block can chain.
+        // A program for Windows is a connector of the sentence, but not one the block can chain.
         let windows_only = Downloads::empty()
             .with_file("arauto-connector-windows-x86_64.exe", bytes::Bytes::new())
             .unwrap();
@@ -980,7 +983,8 @@ mod tests {
             &PublicUrl::parse("https://hub.example.com").unwrap(),
             &windows_only,
         );
-        assert!(panel.connector.is_none());
+        assert_eq!(panel.connectors.len(), 1);
+        assert!(crate::download::linux(&panel.connectors).is_none());
     }
 
     #[test]

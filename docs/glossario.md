@@ -44,7 +44,7 @@
 | Term | What it is |
 |---|---|
 | **Connect** | To link a Hermes to the hub. It applies only to Hermes. |
-| **Connection sentence** | **Proposal, not tried on a real Hermes.** A short message in the first person, in the language of the panel, that the admin copies from the panel and sends to Hermes as a new message in its command channel. It carries the address of the instruction page, the hub address, the hub key, the connector digest and the invite ([decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md)). |
+| **Connection sentence** | **Proposal, not tried on a real Hermes.** A short message in the first person, in the language of the panel, that the admin copies from the panel and sends to Hermes as a new message in its command channel. It carries the address of the instruction page, the hub address, the hub key, one connector digest per system (Linux, Windows, macOS) and the invite ([decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md)). |
 | **Instruction page** | **Proposal, not tried on a real Hermes.** A fixed Markdown page, in English, that the hub serves for one invite at `/v1/join/{handle}`. It explains and lists the steps; it is not an order and never holds the invite, the hub key or the connector digest. |
 | **Handle** | The random part of the address of an instruction page: 16 bytes from the system generator, kept in the database only as a digest and erased with the invite. It is not the invite and opens nothing but the page. |
 | **Block** | The text with the whole command that the admin can copy from the panel and paste into Hermes's command channel. Since the connection sentence, it is the fallback ("Show the command instead"). |

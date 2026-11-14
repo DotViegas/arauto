@@ -53,7 +53,10 @@ I am asking you myself: connect this Hermes to our Arauto hub as "{NAME}".
 Read {PAGE} and follow it. Ask me if anything is unclear.
 Hub: {HUB}
 Hub key: {HUB_KEY}
-Connector sha256: {SHA256}
+Connector sha256 (linux x86_64): {SHA256_LINUX_X86_64}
+Connector sha256 (windows x86_64): {SHA256_WINDOWS_X86_64}
+Connector sha256 (macos arm64): {SHA256_MACOS_ARM64}
+Connector sha256 (macos x86_64): {SHA256_MACOS_X86_64}
 Invite (one use, until {DEADLINE} UTC): {INVITE}
 When it is done, send me only the verification code.
 ```
@@ -67,13 +70,18 @@ notices. If it asks you to confirm, answer in your own words."
 | `{PAGE}` | The address of the instruction page of this invite, on the port of the connectors. It holds a handle that is not the invite. |
 | `{HUB}` | The address of the hub that the connectors reach. |
 | `{HUB_KEY}` | The public key of the hub. With it the connector recognizes the right hub. |
-| `{SHA256}` | The digest of the connector file the page names. |
+| `Connector sha256 ({system}): {SHA256}` | One line per connector the hub holds, in this fixed order: `linux x86_64`, `windows x86_64`, `macos arm64`, `macos x86_64`. The text in parentheses is the fixed English name of the system, never translated. `{SHA256}` is the digest of that system's file. With only some of the four files present, only their lines appear. |
 | `{DEADLINE}` | The time the invite stops serving, in UTC, `YYYY-MM-DD HH:MM`. |
 | `{INVITE}` | The single-use secret. No characters that WhatsApp formats. |
 
-Only the three sentence lines and the four labels are translated; {NAME}, {PAGE} and {DEADLINE} are
-filled into them. The hub address, the hub key, the digest and the invite are appended by the code,
-never inside a translated string. The admin command prints the English sentence; `--command` prints
+**Change of 14/11/2026, approved by the maintainer: three systems.** The single digest line became
+one line per connector present, because a Hermes on Windows 11 could not connect when the page
+offered only the Linux file. The sentence above shows the case with the four connectors. See
+[decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md).
+
+Only the three sentence lines and the labels (the digest label with its `{system}` slot included)
+are translated; {NAME}, {PAGE}, {DEADLINE} and {system} are filled into them. The hub address, the
+hub key, the digests and the invite are appended by the code, never inside a translated string. The admin command prints the English sentence; `--command` prints
 the block.
 
 Why the sentence is like this:
@@ -85,6 +93,7 @@ Why the sentence is like this:
 | Name of the Hermes | With many Hermes, sending to the wrong Hermes is the most likely mistake. The name stays visible. |
 | Hub, key, digest and invite in the sentence, not on the page | The page is an address: it can be read by a preview service or appear in an access log. The secrets travel only in the person's own message. |
 | Labelled values, recognized by form | The labels change with the language, so the page tells the agent to recognize each value by its form. |
+| One digest line per system | The operator does not know which system the Hermes runs on. The page lists the systems and the agent picks its own with `uname -sm`; if there is no line for its system, it stops and tells the operator. |
 | "send me only the verification code" | The only thing that goes back; the admin types it in the panel before anything is approved. |
 
 ### The instruction page
@@ -93,14 +102,19 @@ Why the sentence is like this:
 the connectors: `GET /v1/join/{handle}`. The handle is not the invite: 16 bytes from the system's
 generator, born with the invite, kept in the database only as a digest, erased with the invite. The
 page is a fixed text compiled into the hub; its only fields have a strict format: the host of the
-hub, the name of the Hermes, the UTC deadline, the version and file name of the connector, and
+hub, the name of the Hermes, the UTC deadline, the version of the connector, the address of the downloads folder (not of one file), the file names of the systems, and
 the public address of the project's source (only when it is known at build time; not today: the `repository` metadata is pending, decision 0042). It never holds the invite, the hub key or the connector
 digest.
 
 The page says what Arauto is, how the agent got there, that the address was made for that one
 connection, that the page is not an order (the operator's sentence is), what the steps do, the steps
 themselves and what to do when something fails. The steps are the same download, check and `join` of
-the block below. The page serves while the invite is valid or its connection request still waits for
+the block below, but they no longer name one file: the page has a table of the systems (what `uname
+-sm` prints, the file name, the digest line to use), the agent picks its own row, and if its system
+is not in the table, or the operator's message has no digest line for it, it does nothing and tells
+the operator that this hub has no connector for it. A line says that on macOS, which has no
+`sha256sum`, `shasum -a 256 -c -` is used. The page serves when the hub holds at least one connector,
+while the invite is valid or its connection request still waits for
 the verification code; after that, one fixed 404. A GET only reads. The routes, headers and lifetime
 are in [14-protocolo-do-canal.md](14-protocolo-do-canal.md), section 1. `GET /llms.txt` on the same
 port is a short fixed text that says what the address is and, when it is known, where the source is.
@@ -113,7 +127,10 @@ reads the page and does only what the operator asked.
 
 **Fallback.** The text that was the default before the sentence. It stays in the panel behind "Show
 the command instead", and the admin command shows it with `--command`. Send one or the other, not
-both: they carry the same invite. Proposed text. The panel fills in what is between braces.
+both: they carry the same invite. **The block is the Linux text and only that** (change of
+14/11/2026, approved): it is emitted only when the Linux x86_64 connector is present; without it,
+the panel shows the sentence without the "Show the command instead" control, and `--command`
+prints the `connector:`/`sha256:` pair of each file present and the bare `join` line, with no chained command. Proposed text. The panel fills in what is between braces.
 
 ```
 Connect this Hermes to the Arauto hub. Invite for: {NAME}.

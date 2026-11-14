@@ -422,7 +422,12 @@ async fn the_host_of_the_page_comes_from_the_configuration() {
     let text = answer.text();
     assert!(!text.contains("evil.example.org"));
     assert!(text.contains("`127.0.0.1:1`"), "the configured host");
-    assert!(text.contains(&format!("http://127.0.0.1:1/v1/download/{CONNECTOR}")));
+    // The address of the folder of downloads, never of one file.
+    assert!(text.contains("\"http://127.0.0.1:1/v1/download/$F\""));
+    assert!(!text.contains(&format!("/v1/download/{CONNECTOR}")));
+    for (file, _) in arauto_hub::download::SYSTEMS {
+        assert!(text.contains(file), "{file}");
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

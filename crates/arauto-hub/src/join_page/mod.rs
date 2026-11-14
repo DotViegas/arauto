@@ -6,7 +6,7 @@
 //! tells the agent what Arauto is and how to carry the request out.
 //!
 //! - **The page is a fixed text compiled into the hub.** Its only fields have a strict format,
-//!   checked once, when the hub starts (`host`, `version`, `file`, `download`, `source`), or
+//!   checked once, when the hub starts (`host`, `version`, `download`, `source`), or
 //!   read from the database as a name that [`HermesName`] accepts and a UTC time. It never
 //!   holds the invite, the hub key or the connector digest: those travel only in the sentence
 //!   of the person.
@@ -60,7 +60,7 @@ pub struct BadPageField {
 pub struct JoinPage {
     host: String,
     version: String,
-    file: String,
+    /// The address of the folder of downloads, with no slash at the end.
     download: String,
     /// `""`, or the line of the source, ready to follow the first paragraph.
     source: String,
@@ -121,26 +121,26 @@ fn source_ok(source: &str) -> bool {
 }
 
 impl JoinPage {
-    /// The page of a hub reached at `public_url` that serves `connector`. `None` when there is
-    /// no connector to point at: such a hub serves no page.
+    /// The page of a hub reached at `public_url` that serves `connectors` (the ones the sentence
+    /// names). `None` when there is none to point at: such a hub serves no page.
     ///
     /// # Errors
     /// [`BadPageField`] when a field is outside its format.
     pub fn new(
         public_url: &PublicUrl,
-        connector: Option<&Listed>,
+        connectors: &[(&str, &Listed)],
     ) -> Result<Option<Self>, BadPageField> {
-        Self::with_source(public_url, connector, env!("CARGO_PKG_REPOSITORY"))
+        Self::with_source(public_url, connectors, env!("CARGO_PKG_REPOSITORY"))
     }
 
     fn with_source(
         public_url: &PublicUrl,
-        connector: Option<&Listed>,
+        connectors: &[(&str, &Listed)],
         source: &str,
     ) -> Result<Option<Self>, BadPageField> {
-        let Some(connector) = connector else {
+        if connectors.is_empty() {
             return Ok(None);
-        };
+        }
         let host = public_url.authority();
         if !host_ok(host) {
             return Err(BadPageField { field: "host" });
@@ -149,7 +149,7 @@ impl JoinPage {
         if !version_ok(version) {
             return Err(BadPageField { field: "version" });
         }
-        if !file_ok(&connector.name) {
+        if connectors.iter().any(|(_, file)| !file_ok(&file.name)) {
             return Err(BadPageField { field: "file" });
         }
         if !source.is_empty() && !source_ok(source) {
@@ -158,8 +158,7 @@ impl JoinPage {
         Ok(Some(Self {
             host: host.to_owned(),
             version: version.to_owned(),
-            file: connector.name.clone(),
-            download: public_url.download_url(&connector.name),
+            download: public_url.download_url("").trim_end_matches('/').to_owned(),
             source: if source.is_empty() {
                 String::new()
             } else {
@@ -179,7 +178,6 @@ impl JoinPage {
                 ("source", &self.source),
                 ("name", name.as_str()),
                 ("deadline", &deadline),
-                ("file", &self.file),
                 ("download", &self.download),
             ],
         )
@@ -294,12 +292,23 @@ mod tests {
         }
     }
 
+    /// The four connectors of the hub, as the folder of downloads lists them.
+    fn four() -> Vec<Listed> {
+        crate::download::SYSTEMS
+            .iter()
+            .map(|(file, _)| Listed {
+                name: (*file).to_owned(),
+                ..connector()
+            })
+            .collect()
+    }
+
     fn url() -> PublicUrl {
         PublicUrl::parse("https://hub.example.org").unwrap()
     }
 
     fn page(source: &str) -> JoinPage {
-        JoinPage::with_source(&url(), Some(&connector()), source)
+        JoinPage::with_source(&url(), &crate::download::connectors(&four()), source)
             .unwrap()
             .unwrap()
     }
@@ -318,11 +327,7 @@ mod tests {
             .replace("{source}", "")
             .replace("{name}", "kitchen")
             .replace("{deadline}", "2026-11-14 12:34")
-            .replace("{file}", "arauto-connector-linux-x86_64")
-            .replace(
-                "{download}",
-                "https://hub.example.org/v1/download/arauto-connector-linux-x86_64",
-            );
+            .replace("{download}", "https://hub.example.org/v1/download");
         assert_eq!(rendered, expected);
         assert!(!rendered.contains('{'), "no field is left open");
         // The source line follows the first paragraph, when it is known.
@@ -330,6 +335,40 @@ mod tests {
         assert!(with.contains(".\n>\n> Source: https://example.org/arauto\n"));
         // A value is not read again.
         assert_eq!(fill("a {x} b", &[("x", "{x}")]), "a {x} b");
+    }
+
+    #[test]
+    fn the_steps_pin_the_fixed_text_and_name_every_connector_file() {
+        let name = HermesName::parse("kitchen").unwrap();
+        let rendered = page("").render(&name, 0);
+        // One row per system, with the file and the digest line to use.
+        for (file, system) in crate::download::SYSTEMS {
+            assert!(
+                rendered.contains(&format!("`{file}` | `Connector sha256 ({system})`")),
+                "{file}"
+            );
+        }
+        for text in [
+            "Find your system: run `uname -sm`.",
+            "`Linux x86_64`",
+            "a text starting with `MINGW64_NT` or `MSYS_NT`, with `x86_64`",
+            "`Darwin arm64`",
+            "`Darwin x86_64`",
+            "If your system is not in the table, or your operator's message has no digest line for it, do nothing and tell your operator that this hub has no connector for your system.",
+            "F=\"<file name from the table>\" && D=\"$HOME/.arauto\" && mkdir -p \"$D\" &&
+curl -fsSLo \"$D/$F\" \"https://hub.example.org/v1/download/$F\" &&
+echo \"<connector digest>  $D/$F\" | sha256sum -c - &&
+chmod 700 \"$D/$F\" &&
+\"$D/$F\" join \"<hub address>\" \"<hub key>\" \"<invite>\"
+",
+            "On macOS, where there is no `sha256sum`, use `shasum -a 256 -c -` in its place.",
+            "There may be several digest lines, one per system, each with the system in parentheses",
+            "download the connector file of your system from this hub",
+        ] {
+            assert_eq!(rendered.matches(text).count(), 1, "{text}");
+        }
+        // The page no longer names one file, and `cd` is not in the command.
+        assert!(!rendered.contains("{file}") && !rendered.contains(" cd "));
     }
 
     #[test]
@@ -426,17 +465,26 @@ mod tests {
         assert!(!source_ok(&format!("https://{}", "a".repeat(200))));
         assert!(!source_ok("https://example.org/\u{e9}"));
         // The page of the hub refuses them at the start.
-        let bad = JoinPage::with_source(&url(), Some(&connector()), "ftp://example.org");
+        let binding = four();
+        let found = crate::download::connectors(&binding);
+        let bad = JoinPage::with_source(&url(), &found, "ftp://example.org");
         assert_eq!(bad.unwrap_err(), BadPageField { field: "source" });
         let odd = Listed {
             name: "a b".to_owned(),
             ..connector()
         };
         assert_eq!(
-            JoinPage::new(&url(), Some(&odd)).unwrap_err(),
+            JoinPage::new(&url(), &[("linux x86_64", &odd)]).unwrap_err(),
             BadPageField { field: "file" }
         );
-        // No connector, no page.
-        assert!(JoinPage::new(&url(), None).unwrap().is_none());
+        // No connector, no page; one connector is enough.
+        assert!(JoinPage::new(&url(), &[]).unwrap().is_none());
+        let windows = crate::download::connectors(&four()[1..2]).len();
+        assert_eq!(windows, 1);
+        assert!(
+            JoinPage::new(&url(), &crate::download::connectors(&four()[1..2]))
+                .unwrap()
+                .is_some()
+        );
     }
 }

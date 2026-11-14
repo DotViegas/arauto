@@ -744,7 +744,7 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Hub:", "हब:"),
     ("Hub key:", "हब की कुंजी:"),
-    ("Connector sha256:", "कनेक्टर sha256:"),
+    ("Connector sha256 ({system}):", "कनेक्टर sha256 ({system}):"),
     (
         "Invite (one use, until {deadline} UTC):",
         "आमंत्रण (एक बार के लिए, {deadline} UTC तक):",

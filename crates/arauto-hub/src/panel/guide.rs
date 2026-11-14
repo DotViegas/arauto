@@ -99,8 +99,9 @@ pub enum Screen {
         name: String,
         /// The connection sentence, in the language of the page. **It holds the invite.**
         sentence: Zeroizing<String>,
-        /// The block of the command, the fallback. **It holds the invite.**
-        command: Zeroizing<String>,
+        /// The block of the command, the fallback. **It holds the invite.** `None` when the hub
+        /// holds no Linux connector, the only one the approved block downloads.
+        command: Option<Zeroizing<String>>,
         /// For how many seconds the invite is still accepted.
         seconds: i64,
         /// The Hermes has a device in use.
@@ -210,6 +211,11 @@ impl Screen {
     const fn refresh(&self) -> Option<u32> {
         match self {
             Screen::Waiting { .. } => Some(WAITING_REFRESH_S),
+            // Approved and not connected yet: the connector confirms when Hermes starts it,
+            // and only another reading of the page shows it.
+            Screen::Done {
+                connected: false, ..
+            } => Some(WAITING_REFRESH_S),
             _ => None,
         }
     }
@@ -331,19 +337,21 @@ fn body(html: &mut Html, screen: &Screen) {
             hint(html, SEND_HINT);
             // The block of the command stays behind a control: the same invite, the way it
             // always was, for a Hermes the sentence does not move.
-            html.raw("<details class=\"fallback\"><summary>")
-                .t(k("Show the command instead"))
-                .raw("</summary><div class=\"block\" id=\"guide-command-block\" aria-describedby=\"guide-command-how\"><pre id=\"guide-command\">")
-                .text(command)
-                .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>")
-                .t(k("Copied"))
-                .raw("</span></span></div><p class=\"hint\" id=\"guide-command-how\"><span class=\"with-script\">")
-                .t(k("Click the block to copy it."))
-                .raw(" </span><span class=\"no-script\">")
-                .t(k("Select the whole text and copy it."))
-                .raw(" </span></p>");
-            hint(html, ONE_OR_OTHER);
-            html.raw("</details>");
+            if let Some(command) = command {
+                html.raw("<details class=\"fallback\"><summary>")
+                    .t(k("Show the command instead"))
+                    .raw("</summary><div class=\"block\" id=\"guide-command-block\" aria-describedby=\"guide-command-how\"><pre id=\"guide-command\">")
+                    .text(command)
+                    .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>")
+                    .t(k("Copied"))
+                    .raw("</span></span></div><p class=\"hint\" id=\"guide-command-how\"><span class=\"with-script\">")
+                    .t(k("Click the block to copy it."))
+                    .raw(" </span><span class=\"no-script\">")
+                    .t(k("Select the whole text and copy it."))
+                    .raw(" </span></p>");
+                hint(html, ONE_OR_OTHER);
+                html.raw("</details>");
+            }
             if *cancelled {
                 hint(html, k("The invite issued before was cancelled."));
             }
@@ -726,7 +734,7 @@ mod tests {
             Screen::Block {
                 name: hostile(),
                 sentence: Zeroizing::new(hostile()),
-                command: Zeroizing::new(hostile()),
+                command: Some(Zeroizing::new(hostile())),
                 seconds: 900,
                 reconnect: true,
                 cancelled: true,
@@ -846,6 +854,15 @@ mod tests {
         });
         assert_eq!(done.matches("<li class=\"done\">").count(), 3);
         assert_eq!(done.matches("<li class=\"ok\">").count(), 4);
+        // Connected is the end: the page stops asking.
+        assert!(!done.contains("http-equiv=\"refresh\""));
+        // Approved and not connected yet: only another reading shows the connector arriving.
+        let approved = shown(&Screen::Done {
+            name: "ana".to_owned(),
+            connected: false,
+            reconnect: false,
+        });
+        assert!(approved.contains("<meta http-equiv=\"refresh\" content=\"3\">"));
     }
 
     #[test]
@@ -853,7 +870,7 @@ mod tests {
         let block = shown(&Screen::Block {
             name: "ana".to_owned(),
             sentence: Zeroizing::new("the sentence".to_owned()),
-            command: Zeroizing::new("the command".to_owned()),
+            command: Some(Zeroizing::new("the command".to_owned())),
             seconds: 900,
             reconnect: false,
             cancelled: false,
@@ -880,5 +897,17 @@ mod tests {
             !block.contains("http-equiv"),
             "the block is never asked for again"
         );
+        // Without a command (no Linux connector) the control is not there.
+        let bare = shown(&Screen::Block {
+            name: "ana".to_owned(),
+            sentence: Zeroizing::new("the sentence".to_owned()),
+            command: None,
+            seconds: 900,
+            reconnect: false,
+            cancelled: false,
+            closed_request: false,
+        });
+        assert!(bare.contains("the sentence"));
+        assert!(!bare.contains("Show the command instead") && !bare.contains("guide-command"));
     }
 }

@@ -109,11 +109,38 @@ pub fn address(channel_url: &str, name: &str) -> Option<String> {
     ))
 }
 
-/// The connector a block tells a Hermes to download: the first of the list a Unix shell
-/// runs. A program for Windows is downloaded and checked by hand, never by this chain.
+/// The connectors the hub recognises, by their exact file names and in this order: the file
+/// and the text of the system, as the sentence and the page write it (`docs/02`). The text is
+/// fixed English and is never translated.
+pub const SYSTEMS: [(&str, &str); 4] = [
+    ("arauto-connector-linux-x86_64", "linux x86_64"),
+    ("arauto-connector-windows-x86_64.exe", "windows x86_64"),
+    ("arauto-connector-macos-aarch64", "macos arm64"),
+    ("arauto-connector-macos-x86_64", "macos x86_64"),
+];
+
+/// The file the approved fallback block downloads.
+pub const LINUX_FILE: &str = SYSTEMS[0].0;
+
+/// The connectors of the list, in the order of [`SYSTEMS`], each with the text of its system.
+/// A file with the prefix and another name is served but is not a connector of the sentence.
 #[must_use]
-pub fn connector(listed: &[Listed]) -> Option<&Listed> {
-    listed.iter().find(|file| !file.name.ends_with(".exe"))
+pub fn connectors(listed: &[Listed]) -> Vec<(&'static str, &Listed)> {
+    SYSTEMS
+        .iter()
+        .filter_map(|(file, system)| {
+            listed
+                .iter()
+                .find(|found| found.name == *file)
+                .map(|found| (*system, found))
+        })
+        .collect()
+}
+
+/// The Linux connector, the only one the approved fallback block tells a Hermes to download.
+#[must_use]
+pub fn linux(listed: &[Listed]) -> Option<&Listed> {
+    listed.iter().find(|file| file.name == LINUX_FILE)
 }
 
 /// The address of the instruction page of the handle `handle`, from the address of the
@@ -163,6 +190,45 @@ mod tests {
                     .to_owned(),
             }]
         );
+    }
+
+    fn listed(name: &str) -> Listed {
+        Listed {
+            name: name.to_owned(),
+            size: 1,
+            sha256: "ab".repeat(32),
+        }
+    }
+
+    #[test]
+    fn the_four_names_are_the_connectors_in_their_order_and_no_other_is() {
+        let all = [
+            listed("arauto-connector-macos-x86_64"),
+            listed("arauto-connector-linux-aarch64"),
+            listed("arauto-connector-windows-x86_64.exe"),
+            listed("arauto-connector-macos-aarch64"),
+            listed("arauto-connector-linux-x86_64"),
+            listed("arauto-connector-windows-x86_64"),
+        ];
+        let found: Vec<(&str, &str)> = connectors(&all)
+            .into_iter()
+            .map(|(system, file)| (system, file.name.as_str()))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("linux x86_64", "arauto-connector-linux-x86_64"),
+                ("windows x86_64", "arauto-connector-windows-x86_64.exe"),
+                ("macos arm64", "arauto-connector-macos-aarch64"),
+                ("macos x86_64", "arauto-connector-macos-x86_64"),
+            ]
+        );
+        // A name with the prefix and another spelling is not a connector.
+        assert!(connectors(&all[1..2]).is_empty());
+        assert!(connectors(&all[5..]).is_empty());
+        assert!(connectors(&[]).is_empty());
+        assert_eq!(linux(&all).map(|f| f.name.as_str()), Some(LINUX_FILE));
+        assert!(linux(&all[..4]).is_none());
     }
 
     #[test]

@@ -44,7 +44,7 @@ All on the port of the connectors.
 | Address | What for |
 |---|---|
 | `GET /v1/channel` | The websocket. It serves the enrollment, the channel and the closing request. |
-| `GET /v1/download/{file}` | The connector, in an exact version. Public and with no secret. It only serves names from a fixed list, built at startup. |
+| `GET /v1/download/{file}` | The connector, in an exact version. Public and with no secret. It only serves names from a fixed list, built at startup. The hub recognises as a connector of the sentence only four exact names, in this order: `arauto-connector-linux-x86_64`, `arauto-connector-windows-x86_64.exe`, `arauto-connector-macos-aarch64`, `arauto-connector-macos-x86_64`. Any subset may be present. A file with the prefix and another name is still served here but is not a connector of the sentence. |
 | `GET /v1/join/{handle}` | **Proposal, built, not tried on a real Hermes.** The instruction page of one invite: English only, Markdown text. See "The instruction page" below. |
 | `GET /llms.txt` | **Proposal, built, not tried on a real Hermes.** A short fixed text: what this address is (not the panel), that connection pages are made one per invite in the panel, and, when it is known, where the source is. |
 
@@ -76,13 +76,17 @@ All on the port of the connectors.
     logged: the router logs no path.
   - **The page is a fixed text compiled into the hub.** Its only fields have a strict format: the
     host of the hub (from `ARAUTO_PUBLIC_URL`, never from the request), the name of the Hermes, the
-    UTC deadline, the version and file name of the connector, and, when it is known at build time (not today: the
+    UTC deadline, the version of the connector, the address of the downloads folder (derived only from the configured public address; not of one file), the file names of the systems, and, when it is known at build time (not today: the
     `repository` metadata is pending, decision 0042), the public address of the project's source. It never holds the invite, the hub key or the connector digest: those travel
     only in the person's sentence, and the page tells the agent to recognize each by its form.
   - **When it serves.** While the invite is `issued` and not expired, or `used` with its device
     `pending` and the verification deadline not passed. The hub erases the digest when the invite
     is cancelled, expires or is superseded, and when the request is approved, denied, expires or is
     closed. A new invite for the same Hermes kills the old page.
+  - **Systems (change of 14/11/2026, approved).** The page no longer names one file: a table lists
+    the systems (what `uname -sm` prints, the file name, the digest line to use from the
+    operator's message). The page is served when at least one connector is present. The digests
+    still travel only in the sentence, one line per system.
   - **What a GET does.** It only reads: one query, no lock; it never spends or changes the invite.
     Unknown, malformed, expired, cancelled or decided handles get one 404 with a fixed text,
     byte-identical in every case. Other methods on these addresses get today's empty 404.

@@ -115,23 +115,29 @@ async fn issue(
     admin: &admin::Session,
     name: &HermesName,
 ) -> Result<Response<Body>, RepoError> {
-    let Some(connector) = panel.connector.as_ref() else {
+    let found = crate::download::connectors(&panel.connectors);
+    if found.is_empty() {
         let screen = Screen::NoConnector {
             name: name.as_str().to_owned(),
         };
         return shown(hub, organization, lang, StatusCode::OK, &screen).await;
-    };
+    }
     let now = hub.now_ms();
     let issued = match admin.invite(name.as_str(), &panel.hub_url, now).await {
         Ok(issued) => issued,
         Err(AdminError::NoSuchHermes) => return Ok(http::see_other("/")),
         Err(error) => return failed(hub, organization, lang, error).await,
     };
-    let (Some(sentence), Some(command)) = (
-        block::sentence(&issued, connector, lang),
-        block::text(&issued, connector),
-    ) else {
+    let Some(sentence) = block::sentence(&issued, &found, lang) else {
         return failed(hub, organization, lang, AdminError::Task).await;
+    };
+    // The fallback block is the approved Linux text: only a hub that holds that file has it.
+    let command = match crate::download::linux(&panel.connectors) {
+        Some(linux) => match block::text(&issued, linux) {
+            Some(command) => Some(command),
+            None => return failed(hub, organization, lang, AdminError::Task).await,
+        },
+        None => None,
     };
     let screen = Screen::Block {
         name: name.as_str().to_owned(),
@@ -362,7 +368,7 @@ pub(super) async fn answer(
             }
         };
         // Without a connector to serve there is no block: the line is not created either.
-        if panel.connector.is_none() {
+        if panel.connectors.is_empty() {
             return issue(hub, panel, organization, lang, &admin, &name).await;
         }
         return match admin.hermes_add(name.as_str(), now).await {

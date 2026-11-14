@@ -412,7 +412,9 @@ pub enum Shown {
 /// `admin invite`: the sentence or the block. **This shows the invite**, the one secret this
 /// command ever prints, and it is the only time it appears.
 ///
-/// The sentence needs a connector to point at; without one, the text is the block's.
+/// The sentence needs a connector to point at; without one, the text is the block's. The block
+/// (`--command`) chains only the Linux file; another connector is listed with its address and its
+/// digest, and a hub with no Linux file shows the `join` line alone.
 #[must_use]
 pub fn block(
     block: &Block,
@@ -449,10 +451,11 @@ pub fn block(
             "The device in use goes on until the new one confirms its first credential."
         );
     }
+    let found = crate::download::connectors(downloads);
     if shown == Shown::Sentence
-        && let Some(connector) = crate::download::connector(downloads)
+        && !found.is_empty()
         && let Some(sentence) =
-            crate::panel::block::sentence(block, connector, crate::panel::text::Lang::En)
+            crate::panel::block::sentence(block, &found, crate::panel::text::Lang::En)
     {
         let _ = writeln!(text);
         let _ = writeln!(
@@ -484,8 +487,8 @@ pub fn block(
         };
         let _ = writeln!(text, "connector: {address}");
         let _ = writeln!(text, "sha256:    {}", file.sha256);
-        // The chain is for a Unix shell; a program for Windows is downloaded and checked by hand.
-        if file.name.ends_with(".exe") {
+        // The chain is the approved Linux block; another system is downloaded and checked by hand.
+        if file.name != crate::download::LINUX_FILE {
             continue;
         }
         chained = true;

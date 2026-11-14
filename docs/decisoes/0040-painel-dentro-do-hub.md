@@ -237,8 +237,9 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
   and fails when one changes without the other. Where the 02 writes `arauto-connector-{VERSION}`, the name of the file the hub serves
   goes, with the SHA-256 calculated from the bytes served.
 - **Without a connector to serve, the panel makes no block** and issues nothing: it says to use
-  the command. With more than one connector for Linux in the folder, the block uses the first by
-  name.
+  the command. Since 14/11/2026 the block is made only from the file with the exact name
+  `arauto-connector-linux-x86_64`; another file for Linux in the folder is served, and is not the
+  one of the block (decision 0042, "Change of 14/11/2026: three systems").
 - **The verification code is typed and never shown,** not even back to whoever got it wrong.
 - **Each stage lights up when the hub observes it:** invite issued, device used the invite,
   request approved, connector confirmed the first credential. The page that waits asks again by

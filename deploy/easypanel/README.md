@@ -33,7 +33,9 @@ The first use is the test.
 
 The hub answers on two addresses, and they have to be two different names:
 
-- **The connectors' name** (`ARAUTO_PUBLIC_URL`): where the connectors arrive.
+- **The connectors' name** (`ARAUTO_PUBLIC_URL`): where the connectors arrive. The image behind it
+  serves the connector for Linux x86_64, Windows x86_64 and macOS (arm64 and x86_64); the Windows
+  and macOS files were compiled and linked and never run (14/11/2026).
 - **The panel's name** (`ARAUTO_PANEL_URL`): where you open the panel in a browser.
 
 **For real use, give the panel a name of your own,** such as `https://arauto-panel.example.org`.

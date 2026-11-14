@@ -469,7 +469,10 @@ async fn the_admin_command_from_init_to_revoke() {
         "{sentence}"
     );
     assert!(
-        sentence.contains(&format!("Connector sha256: {}", connector.sha256)),
+        sentence.contains(&format!(
+            "Connector sha256 (linux x86_64): {}",
+            connector.sha256
+        )),
         "{sentence}"
     );
     assert!(
@@ -533,6 +536,43 @@ async fn the_admin_command_from_init_to_revoke() {
     assert!(
         !with_download.contains("\narauto-connector join"),
         "{with_download}"
+    );
+    // A hub with only the Windows file: the sentence has that one digest line and the block is
+    // not chained (the approved block is the Linux one).
+    let windows = arauto_hub::download::Listed {
+        name: "arauto-connector-windows-x86_64.exe".to_owned(),
+        size: 3,
+        sha256: "cd".repeat(32),
+    };
+    let windows_only = render::block(
+        &block,
+        std::slice::from_ref(&windows),
+        NOW,
+        render::Shown::Sentence,
+    )
+    .text;
+    assert!(
+        windows_only.contains(&format!(
+            "Connector sha256 (windows x86_64): {}",
+            windows.sha256
+        )),
+        "{windows_only}"
+    );
+    assert_eq!(windows_only.matches("Connector sha256").count(), 1);
+    let windows_command = render::block(
+        &block,
+        std::slice::from_ref(&windows),
+        NOW,
+        render::Shown::Command,
+    )
+    .text;
+    assert!(!windows_command.contains("sha256sum"), "{windows_command}");
+    assert!(
+        windows_command.contains(
+            "
+arauto-connector join"
+        ),
+        "{windows_command}"
     );
     assert!(!shown.contains("sha256"), "{shown}");
     let invite = invite_in(&shown);

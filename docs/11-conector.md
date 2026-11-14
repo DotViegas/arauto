@@ -144,7 +144,13 @@ Hermes below was checked on v0.22.5 on 14/11/2026, in
 1. **Finds the program.** `ARAUTO_HERMES_BIN`, when set, is used exactly. Otherwise it tries
    `hermes` through the `PATH` and, only if the system says that program does not exist, on
    Unix, these fixed absolute places in order: `/opt/hermes/bin/hermes`,
-   `/opt/hermes/.venv/bin/hermes` and `.local/bin/hermes` in the folder of the user. The first
+   `/opt/hermes/.venv/bin/hermes` and `.local/bin/hermes` in the folder of the user (the last one
+   also covers macOS). On Windows (change of 14/11/2026, approved) the list gains
+   `<LOCALAPPDATA>\hermes\bin\hermes.exe`, with `LOCALAPPDATA` read from the environment of this
+   machine and skipped when unset or not absolute. The refusal of a batch (`.cmd`) file stays: a
+   Hermes whose launcher is only a `.cmd` is not found by this search and needs
+   `ARAUTO_HERMES_BIN` set to a real program. The Windows place comes from the documentation of
+   Hermes, read and not run ([hermes-fatos.md](../referencia/hermes-fatos.md)). The first
    that starts wins. Nothing from the hub or from the command line of `join` enters that list.
    If none exists, the failure says the program was not found and that `ARAUTO_HERMES_BIN` names
    it (AR-601).
@@ -288,5 +294,14 @@ protection: the LLM reaches the credential file" or "Shielded protection".
 |---|---|
 | Linux x86_64 | First. |
 | Linux arm64 | Later. |
-| Windows | Only for development ([decision 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). |
-| macOS | Later. |
+| Windows | Development ([decision 0036](decisoes/0036-windows-so-para-desenvolvimento.md)). Since 14/11/2026 the image also builds a Windows x86_64 file (see below); it is served, not a supported platform, and the limits of 0036 still hold. |
+| macOS | Later for use. Since 14/11/2026 the image also builds macOS arm64 and x86_64 files (see below). |
+
+**Compiled, never run (change of 14/11/2026, facts stated by the maintainer's assistant).** In the
+build image (`rust:1.98-bookworm`) the connector, with its `tls` feature, compiles and links for
+`x86_64-pc-windows-gnu` (with `gcc-mingw-w64-x86-64`, about 13 MB) and for `aarch64-apple-darwin`
+and `x86_64-apple-darwin` (with `cargo-zigbuild` and `ziglang`, about 7.5 MB each; the linker warns
+that no Apple SDK was found and still links; the arm64 file carries an ad hoc code signature
+command). **None of these three files was ever executed.** The code of the connector runs on a
+Windows machine in the test suite, but with the MSVC toolchain, not this GNU build. There is no Mac
+available. Nothing here says the Windows or macOS connector works.

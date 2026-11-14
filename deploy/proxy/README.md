@@ -16,7 +16,8 @@ And a fourth, of security: the proxy **writes** the header `X-Forwarded-For` wit
 whoever arrived, **replacing** what came from outside. The hub only believes this header when the
 connection comes from an address of `ARAUTO_TRUSTED_PROXIES`.
 
-Four paths need to reach the hub: `/v1/channel`, `/v1/download/`, and, for the connection sentence
+Four paths need to reach the hub: `/v1/channel`, `/v1/download/` (it serves up to four connector
+files, one per system, and the Windows one ends in `.exe`: do not filter by extension), and, for the connection sentence
 of the panel, `/v1/join/` (the instruction page of an invite) and `/llms.txt`. The two last ones are
 a proposal, built and not tried on a real Hermes. Without them the address in the sentence answers
 404 at the proxy. The rest can answer 404 at the proxy itself.

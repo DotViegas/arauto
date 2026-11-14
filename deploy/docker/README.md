@@ -5,7 +5,7 @@ outside it.
 
 | File | What it is |
 |---|---|
-| [`Dockerfile`](Dockerfile) | The image of the hub. It also brings the connector for Linux x86_64, served for download. |
+| [`Dockerfile`](Dockerfile) | The image of the hub. It also builds the connector for four systems (Linux x86_64, Windows x86_64, macOS arm64 and macOS x86_64), served for download. Building the three extra files needs tools fetched at build time (`gcc-mingw-w64-x86-64`, and `ziglang` 0.17.1 and `cargo-zigbuild` 0.24.1 through `pip`): the two Python versions are pinned and their origin is not otherwise verified. The Windows and macOS files were compiled and linked, and **never run** (14/11/2026). |
 | [`compose.yaml`](compose.yaml) | The hub and PostgreSQL 16, with the volumes and the networks. |
 | [`arauto.env.example`](arauto.env.example) | The variables you fill in. |
 
@@ -121,9 +121,10 @@ docker compose --env-file arauto.env exec hub arauto-hub admin invite atendiment
 ```
 
 The `invite` shows the connection sentence, to send to Hermes as a new message in its command channel
-(proposal, not tried on a real Hermes yet), and with `--command`, the block. The block holds: the address of the hub, the hub key, the invite (valid for
-15 minutes and one use), the address of the connector, the SHA-256 of the file and **one command
-only**, chained: it downloads the connector to `~/.arauto`, checks the SHA-256 written in the block
+(proposal, not tried on a real Hermes yet), with one SHA-256 line per connector present in the image,
+and with `--command`, the block, which is the Linux text only (without the Linux connector, `--command` prints no chained command, only the bare `join` line). It holds: the address of the hub, the hub key, the invite (valid for
+15 minutes and one use), the address and the SHA-256 of **each** connector present, and **one chained command
+only**, for the Linux file: it downloads the connector to `~/.arauto`, checks the SHA-256 written in the block
 and only then runs the `join`. If the file does not match, nothing runs.
 
 This command runs **on Hermes's machine, with the same user as Hermes** (preferably by Hermes
@@ -246,6 +247,6 @@ not supported ([decision 0040](../../docs/decisoes/0040-painel-dentro-do-hub.md)
 | The internal port is not published | From outside the server, port 8444 does not answer. |
 | The port of the panel is not published | From outside the server, port 8445 does not answer, with the panel on or off. |
 | The panel does not exist on the address of the connectors | `curl -I https://YOUR-ADDRESS/sign-in` answers 404. |
-| The download works | `curl -O https://YOUR-ADDRESS/v1/download/arauto-connector-linux-x86_64` and the `sha256sum` matches that of the block. |
+| The download works | `curl -O https://YOUR-ADDRESS/v1/download/arauto-connector-linux-x86_64` and the `sha256sum` matches the Linux line of the sentence (or that of the block). The other names (`arauto-connector-windows-x86_64.exe`, `arauto-connector-macos-aarch64`, `arauto-connector-macos-x86_64`) download the same way and match their own lines; they were never run. |
 | The address of the connectors | In `admin audit`, the connection of a Hermes shows its address, not that of the proxy. |
 | The orderly stop | `docker compose stop hub` ends in less than 20 seconds, without being forced. |

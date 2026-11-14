@@ -965,7 +965,9 @@ impl Session {
                 pool: &self.pool,
                 organization: self.organization,
                 storage,
-                connector: crate::panel::block::connector(listed),
+                connector: crate::download::connectors(listed)
+                    .first()
+                    .map(|(_, file)| *file),
             },
             origin_of(crate::config::names::PANEL_URL),
             origin_of(crate::config::names::PUBLIC_URL),

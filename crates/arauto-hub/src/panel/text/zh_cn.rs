@@ -720,7 +720,7 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Hub:", "hub："),
     ("Hub key:", "hub 密钥："),
-    ("Connector sha256:", "连接器 sha256："),
+    ("Connector sha256 ({system}):", "连接器 sha256 ({system})："),
     (
         "Invite (one use, until {deadline} UTC):",
         "邀请（仅限一次，有效期至 {deadline} UTC）：",

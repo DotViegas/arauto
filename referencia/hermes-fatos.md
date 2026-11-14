@@ -143,3 +143,38 @@ program came without color codes.
 
 Not checked: a native install (outside a container); whether a running Hermes picks the new
 entry up by itself or needs a new session; the tools of WhatsApp after an access is granted.
+
+## Windows and macOS (14/11/2026)
+
+Stated by the maintainer's assistant on 14/11/2026. **None of this was run on a real Windows
+Hermes or on a Mac. Do not read any row as proved.** The version read is the main branch, not the
+installed one. Used by [decision 0042](../docs/decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md)
+and [11-conector.md](../docs/11-conector.md).
+
+| | Fact |
+|---|---|
+| W1 | [observed] In the build image (`rust:1.98-bookworm`) the connector, with its `tls` feature, compiles and links for `x86_64-pc-windows-gnu` (after `gcc-mingw-w64-x86-64` and `rustup target add`; `arauto-connector.exe`, about 13 MB) and for `aarch64-apple-darwin` and `x86_64-apple-darwin` (with `ziglang` 0.17.1 and `cargo-zigbuild` 0.24.1 from `pip`; about 7.5 MB each). The linker warns that no Apple SDK was found and still links. The arm64 file carries an ad hoc code signature command; the x86_64 one does not need one. |
+| W2 | [observed] None of the Windows or macOS files was ever executed. The code of the connector runs on Windows in the test suite, but with the MSVC toolchain, not this GNU build. |
+| W3a | [code read, main branch, not run] On native Windows the terminal of the Hermes agent runs commands through Git Bash, so POSIX commands (`mkdir -p`, `curl`, `chmod`) are the ones to give it. |
+| W3b | [documentation] `sha256sum` and `curl` come with Git for Windows. Not verified on a machine. |
+| W3c | [code read, main branch, not run] The launcher is a real `hermes.exe` in `<HERMES_HOME>\bin`, and `HERMES_HOME` defaults to `%LOCALAPPDATA%\hermes`; it falls back to a `.cmd` only when its tool to make launchers is missing. |
+| W3d | [code read, main branch, not run] Outside a container the terminal keeps the real `HOME`. |
+| W3e | [documentation] In Git Bash, `uname -s` starts with `MINGW64_NT` or `MSYS_NT`. |
+| W4a | [documentation] macOS has no `sha256sum` by default; it has `shasum -a 256`. |
+| W4b | [documentation] `uname -sm` prints `Darwin arm64` or `Darwin x86_64`. |
+| W4c | [documentation] The Hermes install script puts the launcher in `~/.local/bin` (read, not run). |
+
+Not checked: a Windows or macOS Hermes running the page's command; whether the Windows or macOS
+connector starts, registers itself in Hermes or holds a channel.
+
+**Checked on 14/11/2026, on a Windows 11 machine with Git for Windows and no Hermes, with the
+Windows file taken from the image built from the working tree.**
+
+| | Fact |
+|---|---|
+| W5 | [observed] The whole image builds with the four files in its downloads folder. |
+| W6 | [observed] In Git Bash, `uname -sm` printed `MINGW64_NT-10.0-26300 x86_64`, and `curl` and `sha256sum` were on the `PATH`. |
+| W7 | [observed] The steps of the page, run in Git Bash with the Windows file: the digest checked, the file ran, `join` reached the hub over `wss://` and left a request waiting for the code. With no Hermes on the machine it ended in AR-601 with the sentence that the program of Hermes was not found, and installed itself as `arauto-connector.exe`. |
+
+Still not checked: the same steps inside the terminal of a Hermes on Windows, the registration in
+a Hermes on Windows, and anything at all on a Mac.

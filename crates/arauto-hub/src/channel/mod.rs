@@ -651,7 +651,7 @@ pub async fn start<P: Purposes>(
     let settings = options.settings;
     let join_page = JoinPage::new(
         &config.public_url,
-        crate::download::connector(&options.downloads.listed()),
+        &crate::download::connectors(&options.downloads.listed()),
     )?;
     let pool = db::open(&config.storage, settings.pool).await?;
     let sweep_pool = db::open(

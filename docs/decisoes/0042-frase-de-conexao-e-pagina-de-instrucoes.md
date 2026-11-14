@@ -72,3 +72,61 @@ done immediately and in production.
 - A proxy in front of the hub must pass `/v1/join/` and `/llms.txt`
   ([deploy/proxy](../../deploy/proxy/README.md)).
 - The test on a real Hermes goes to step 3.0 of [primeiro-teste](../../deploy/primeiro-teste.md).
+
+## Change of 14/11/2026: three systems
+
+**Status of this change: proposal.** Compiled facts below are stated by the maintainer's assistant
+and recorded in [referencia/hermes-fatos.md](../../referencia/hermes-fatos.md).
+
+### What was asked and approved
+
+A Hermes on Windows 11 could not connect: the page only offered the Linux file. The maintainer
+approved, on 14/11/2026, that the connector is served for Linux, Windows and macOS, and that the
+connection sentence carries one digest line per system in place of the single line.
+
+### The design
+
+- **Four files, fixed names.** `arauto-connector-linux-x86_64` (`linux x86_64`),
+  `arauto-connector-windows-x86_64.exe` (`windows x86_64`), `arauto-connector-macos-aarch64`
+  (`macos arm64`) and `arauto-connector-macos-x86_64` (`macos x86_64`). The hub recognises a
+  connector only by these exact names in its downloads folder, in this order. Another name with the
+  prefix is still served by `/v1/download` but is not a connector of the sentence. Any subset may
+  be present; with none, nothing is issued.
+- **The image builds the four files** in the same build image, keeping the Linux build as it was.
+  Windows through `x86_64-pc-windows-gnu` with `gcc-mingw-w64-x86-64`; macOS through
+  `cargo-zigbuild` and `ziglang`. The two Python tools are fetched at build time, their versions are
+  pinned and their origin is not otherwise verified.
+- **The sentence** has one line per connector present, `Connector sha256 ({system}): <digest>`, in
+  the order above. `{system}` is the fixed English text, never translated; the label is translated
+  in the nine languages with `({system})` before its final colon.
+- **The page** no longer names one file. Its steps: find your system with `uname -sm`, a table (what
+  `uname` prints, file name, digest line to use), "if your system is not in the table, or the
+  message has no digest line for it, do nothing and tell your operator that this hub has no
+  connector for your system", one chained command with full paths and no `cd`, and a line for
+  macOS (`shasum -a 256 -c -`). The page never holds the invite, the hub key or a digest.
+- **The block stays the approved Linux text.** It is emitted only when the Linux connector is
+  present; without it the panel hides "Show the command instead", and `invite --command` prints
+  the `connector:`/`sha256:` pair of each file present and the bare `join` line, with no chained
+  command (what the code does, not a "no connector" sentence).
+- **The connector** looks, on Windows, for `<LOCALAPPDATA>\hermes\bin\hermes.exe` when
+  `ARAUTO_HERMES_BIN` is unset and `hermes` is not found. Unix is unchanged.
+
+### Relation to decision 0036
+
+The files are served, but this does not make Windows or macOS a supported platform. Decision 0036 (a proposal) is not reopened, and its Windows limits (durable write, named pipe) still hold.
+
+### What is not guaranteed
+
+- **That the Windows or macOS connector works.** The three files were compiled and linked and
+  **never run**. The code is exercised on Windows by the suite, but with the MSVC toolchain, not the
+  GNU build. There is no Mac available.
+- **That Hermes on Windows behaves as read.** Git Bash, the launcher path and `uname` output come
+  from documentation and from reading the main branch, not from a run, and not of the installed
+  version.
+- **That the Git for Windows tools are there.** `curl` and `sha256sum` were not verified on a
+  machine.
+- **A `.cmd` launcher of Hermes.** The refusal of a batch file stays: such a Hermes needs
+  `ARAUTO_HERMES_BIN` set to a real program.
+- **The fallback block outside Linux.** It is the Linux text only.
+- **The build tools.** `ziglang` and `cargo-zigbuild` are pinned, but their origin is not
+  otherwise verified.

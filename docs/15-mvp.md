@@ -357,7 +357,8 @@ Modules of the hub ([03-arquitetura.md](03-arquitetura.md), section 3): `enrollm
 | Command line and logging | `clap`, `tracing` |
 
 The minimum Rust version is the one pinned in the repository. In production the connector is a
-static binary for Linux x86_64.
+static binary for Linux x86_64. Since 14/11/2026 the image also builds Windows x86_64 and macOS
+(arm64 and x86_64) files, compiled and linked and **never run** (see [11](11-conector.md), section 10).
 
 **Configuration**, by environment variables:
 
@@ -469,8 +470,9 @@ In a container ([decision 0006](decisoes/0006-instalado-no-servidor-de-cada-um.m
   reaches the hub through a shared network of the composition, and each event brings the event
   secret.
 - The composition declares the hub's limit of open files and the stop deadline.
-- The image brings the connector for Linux x86_64, served at the download address, with the SHA-256
-  digest computed at build time.
+- The image brings the connector for four systems (Linux x86_64, Windows x86_64, macOS arm64 and
+  macOS x86_64), served at the download address, with one SHA-256 digest per file computed at build
+  time. Only the Linux file is the one the MVP verifies; the other three were never run (14/11/2026).
 
 ## 7. Milestones and how each one is verified
 

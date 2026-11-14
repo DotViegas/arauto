@@ -11,7 +11,9 @@
 //!   tried through the `PATH` and, only if the system says it does not exist, these fixed
 //!   absolute places, in this order, on Unix: `/opt/hermes/bin/hermes`,
 //!   `/opt/hermes/.venv/bin/hermes` and `.local/bin/hermes` in the folder of the user (the
-//!   terminal of a Hermes may not have it on its `PATH`). The first that starts wins. Nothing
+//!   terminal of a Hermes may not have it on its `PATH`; this also covers macOS). On Windows the
+//!   one place is `hermes\bin\hermes.exe` inside `LOCALAPPDATA`, read from the environment of
+//!   this machine and left out when it is unset or not absolute. The first that starts wins. Nothing
 //!   from the hub or from the command line of `join` enters that list. The program is run
 //!   directly: no interpreter of commands, on any system. A batch file of Windows would be one,
 //!   so it is refused.
@@ -197,16 +199,28 @@ impl Hermes {
         }
     }
 
-    /// The fixed places tried after `hermes` is not found: none when the program was named, and
-    /// none off Unix.
+    /// The fixed places tried after `hermes` is not found: none when the program was named. On
+    /// Unix the three of [`fallback_candidates`]; on Windows the launcher in `LOCALAPPDATA`.
     fn fallbacks(&self) -> Vec<PathBuf> {
-        if self.explicit || !cfg!(unix) {
+        if self.explicit {
             return Vec::new();
         }
-        let user = arauto_platform::default_home()
-            .ok()
-            .and_then(|home| home.parent().map(Path::to_path_buf));
-        fallback_candidates(user.as_deref())
+        #[cfg(unix)]
+        {
+            let user = arauto_platform::default_home()
+                .ok()
+                .and_then(|home| home.parent().map(Path::to_path_buf));
+            fallback_candidates(user.as_deref())
+        }
+        #[cfg(windows)]
+        {
+            let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+            windows_candidate(local.as_deref()).into_iter().collect()
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            Vec::new()
+        }
     }
 
     async fn run(
@@ -237,6 +251,7 @@ impl Hermes {
 /// the Docker install, the launcher inside its virtual environment, and the launcher of the
 /// install script of the user. The last one is left out when the folder of the user is unknown
 /// or is not absolute.
+#[cfg_attr(not(unix), allow(dead_code))]
 fn fallback_candidates(user_home: Option<&Path>) -> Vec<PathBuf> {
     let mut candidates = vec![
         PathBuf::from("/opt/hermes/bin/hermes"),
@@ -246,6 +261,16 @@ fn fallback_candidates(user_home: Option<&Path>) -> Vec<PathBuf> {
         candidates.push(home.join(".local").join("bin").join("hermes"));
     }
     candidates
+}
+
+/// The launcher of Hermes on native Windows: `hermes\bin\hermes.exe` inside `LOCALAPPDATA`
+/// (the default of `HERMES_HOME`; read in its documentation, never run). `None` when the
+/// variable is unset or its value is not an absolute path.
+#[cfg(windows)]
+fn windows_candidate(local_app_data: Option<&Path>) -> Option<PathBuf> {
+    local_app_data
+        .filter(|folder| folder.is_absolute())
+        .map(|folder| folder.join("hermes").join("bin").join("hermes.exe"))
 }
 
 /// Starts the first of `programs` that exists and runs it to its end, within the time limit:
@@ -568,8 +593,48 @@ mod tests {
                 .fallbacks()
                 .is_empty()
         );
-        #[cfg(not(unix))]
+        #[cfg(not(any(unix, windows)))]
         assert!(Hermes::default().fallbacks().is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_windows_launcher_is_one_absolute_place_in_the_local_app_data_folder() {
+        let local = std::env::temp_dir();
+        assert_eq!(
+            windows_candidate(Some(&local)),
+            Some(local.join("hermes").join("bin").join("hermes.exe"))
+        );
+        // Unset, or not absolute: left out.
+        assert_eq!(windows_candidate(None), None);
+        assert_eq!(windows_candidate(Some(Path::new("relative"))), None);
+        // The program of the machine is read from the environment of the machine, and only this
+        // one place is tried; the Unix places never appear.
+        let found = Hermes::default().fallbacks();
+        let here = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+        let expected: Vec<PathBuf> = windows_candidate(here.as_deref()).into_iter().collect();
+        assert_eq!(found, expected);
+        // This machine has the folder: the place is really in the list.
+        assert_eq!(
+            here.is_some_and(|folder| folder.is_absolute()),
+            found.len() == 1
+        );
+        assert!(
+            Hermes::new(Some(OsString::from("C:\\x\\hermes.exe")))
+                .fallbacks()
+                .is_empty()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_windows_launcher_never_appears_on_unix() {
+        let found = Hermes::default().fallbacks();
+        assert!(
+            found.iter().all(|path| path.extension().is_none()),
+            "{found:?}"
+        );
+        assert!(found.iter().all(|path| !path.ends_with("hermes.exe")));
     }
 
     /// The first program that exists wins; the ones the system says are missing are skipped.

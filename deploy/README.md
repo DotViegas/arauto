@@ -13,6 +13,10 @@ to all of them is on this page.
 The connector is not installed from here: it is downloaded from the hub itself, through the
 connection sentence (or, as a fallback, the block) that the command `admin invite` shows
 ([docs/02-como-funciona.md](../docs/02-como-funciona.md)) (proposal, not tried on a real Hermes yet).
+The image builds the connector for Linux x86_64, Windows x86_64 and macOS (arm64 and x86_64); the
+Windows and macOS files were compiled and never run (14/11/2026). The build fetches extra tools
+(`gcc-mingw-w64-x86-64`, and `ziglang` and `cargo-zigbuild` at pinned versions); the origin of those
+is not otherwise verified.
 
 ## The parts
 

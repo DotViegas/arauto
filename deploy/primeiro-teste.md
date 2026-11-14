@@ -59,7 +59,7 @@ has a step marked with **[PROOF]**.
 - [ ] **1.5 [PROOF]** `dc up -d` and `dc ps`. Expected: `hub` as `healthy` within one minute.
   `dc logs hub` shows "the hub is up" with the two addresses.
 - [ ] **1.6** `adm status`. Expected: database current, mark consistent, restored mode off.
-- [ ] **1.7** `dc exec hub ls /usr/share/arauto/download`. Expected: only `arauto-connector-linux-x86_64`.
+- [ ] **1.7** `dc exec hub ls /usr/share/arauto/download`. Expected: the four names `arauto-connector-linux-x86_64`, `arauto-connector-windows-x86_64.exe`, `arauto-connector-macos-aarch64` and `arauto-connector-macos-x86_64` (the Windows and macOS files were compiled and never run).
 
 ## Phase 2: the proxy
 
@@ -85,8 +85,8 @@ has a step marked with **[PROOF]**.
 
 - [ ] **3.0 [PROOF]** The connection sentence and the instruction page were never tried on a real Hermes. Send the sentence that `adm invite atendimento` prints (or the one in the panel) as a new message in the command channel, and write down what the Hermes did: whether it read the page, asked, refused or ran the steps, and why. The first real attempt with the block alone was refused by a production Hermes on 14/11/2026, cause unknown. Use `--command` only as the fallback.
 - [ ] **3.1** `adm hermes add atendimento` and `adm invite atendimento --command`. Expected: the block with
-  the address of the hub (`wss://...`), the hub key, the invite, **one** line `connector:`, the
-  `sha256:` equal to that of step 2.3, and one command only, chained. The invite is a secret: do
+  the address of the hub (`wss://...`), the hub key, the invite, one `connector:`/`sha256:` pair per file (four), the
+  Linux `sha256:` equal to that of step 2.3, and one command only, chained, for the Linux file. The invite is a secret: do
   not paste it in a report.
 - [ ] **3.2 [PROOF]** On Hermes's machine, as Hermes's user, before pasting the block: download
   the file by hand and run `./arauto-connector-linux-x86_64 --version`. Expected: the version.

@@ -348,7 +348,8 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     assert!(done.contains("<h3>atendimento was approved</h3>"));
     assert!(done.contains("It has no access to any number yet."));
     assert!(done.contains("class=\"mascot waving\""));
-    assert!(!done.contains("http-equiv"));
+    // Approved and not connected yet: the page reads itself again until the connector arrives.
+    assert!(done.contains("http-equiv=\"refresh\""));
 
     // The connector confirms its first credential: connected, in the guide and in the list.
     let session = device
@@ -360,6 +361,7 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
     let done = wait_page(&browser, &cookie, "atendimento").await;
     assert!(done.contains("<h3>atendimento is connected</h3>"), "{done}");
     assert_eq!(done.matches("<li class=\"ok\">").count(), 4);
+    assert!(!done.contains("http-equiv"), "connected is the end");
     let list = browser.get("/", Some(&cookie)).await.text();
     assert!(list.contains("<span class=\"state\">Connected</span>"));
     assert!(list.contains("Connected: 1 · Waiting: 0 · On alert: 0"));
@@ -852,7 +854,7 @@ async fn the_sentence_follows_the_language_of_the_panel() {
     );
     for label in [
         "Chave do hub: arh1",
-        "sha256 do conector: ",
+        "sha256 do conector (linux x86_64): ",
         "Convite (uso único, até ",
         "Quando terminar, me envie só o código de verificação.",
     ] {
@@ -872,4 +874,46 @@ async fn the_sentence_follows_the_language_of_the_panel() {
             .text()
             .starts_with("# Connect a Hermes to an Arauto hub")
     );
+}
+
+/// A hub that holds only the Windows file: the sentence has that one digest line, and there is no
+/// fallback block, because the approved block is the Linux one.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_hub_with_only_the_windows_file_issues_its_line_and_no_fallback() {
+    let mut fixture = Fixture::stopped(
+        support::install().await,
+        fixture::settings(),
+        Arc::new(SystemClock),
+    )
+    .await;
+    fixture.downloads = Downloads::empty()
+        .with_file(
+            "arauto-connector-windows-x86_64.exe",
+            Bytes::from_static(b"abc"),
+        )
+        .unwrap();
+    fixture.start().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    let issued = browser
+        .post("/hermes/connect", Some(&cookie), "name=atendimento")
+        .await;
+    assert_eq!(issued.status, 200, "{}", issued.text());
+    let page = issued.text();
+    let sentence = sentence_of(&page);
+    assert_eq!(sentence.lines().count(), 7, "{sentence}");
+    assert!(
+        sentence.contains(&format!(
+            "Connector sha256 (windows x86_64): {CONNECTOR_SHA256}"
+        )),
+        "{sentence}"
+    );
+    assert_eq!(sentence.matches("Connector sha256").count(), 1);
+    assert!(!page.contains("Show the command instead"));
+    assert!(!page.contains("guide-command"));
+    // The page of instructions serves, with a table of every system.
+    let served = http::get(fixture.addr(), &page_path_of(&sentence), &[], PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(served.status, 200);
 }
