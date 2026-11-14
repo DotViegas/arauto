@@ -178,3 +178,19 @@ Windows file taken from the image built from the working tree.**
 
 Still not checked: the same steps inside the terminal of a Hermes on Windows, the registration in
 a Hermes on Windows, and anything at all on a Mac.
+
+**Checked on 14/11/2026, on a Windows 11 machine with Hermes Agent v0.22.2 installed natively,
+by running the terminal tool of that Hermes with its own Python, in a separate data folder and a
+separate user folder (the configuration in use was not touched).**
+
+| | Fact |
+|---|---|
+| W8 | [observed] The terminal of the agent is Git Bash: `uname -sm` printed `MSYS_NT-10.0-26300 x86_64`; `curl` (the one of Git, a native Windows program) and `sha256sum` were on the `PATH`, and so was `hermes`; `MSYS_NO_PATHCONV` was `1`. |
+| W9 | [observed] With that setting, `curl -o` given a path in the form `/c/Users/...` fails with `curl: (23) client returned ERROR on write`: the program does not understand the path and Git Bash does not convert it. This stopped a real connection attempt. With the download written by the shell (`curl ... > "$D/$F"`) it works. |
+| W10 | [observed] The launcher is `hermes.exe` in `%LOCALAPPDATA%\hermesin`, beside a `hermes.cmd`. |
+| W11 | [observed] The registration with answers on the input and the output discarded saves the entry enabled, and `hermes mcp list` read by a program shows the row; the lines end in CR LF. |
+| W12 | [observed] The first command of Hermes in a data folder it never used took 47 s; the next ones about 2 s. With a limit of 30 s the registration of the trial failed the first time and passed when the same command was repeated. The limit of the connector is 90 s since then. |
+| W13 | [observed] The whole command of the page, then the approval, then the connector started with the arguments of the saved entry: the hub showed the Hermes of the trial as active and `arauto_status` answered connected. |
+
+Still not checked: a real agent on Windows following the page by itself; whether that Hermes
+loads the new entry without `/reload-mcp`; anything at all on a Mac.

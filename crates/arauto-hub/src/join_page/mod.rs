@@ -356,7 +356,7 @@ mod tests {
             "`Darwin x86_64`",
             "If your system is not in the table, or your operator's message has no digest line for it, do nothing and tell your operator that this hub has no connector for your system.",
             "F=\"<file name from the table>\" && D=\"$HOME/.arauto\" && mkdir -p \"$D\" &&
-curl -fsSLo \"$D/$F\" \"https://hub.example.org/v1/download/$F\" &&
+curl -fsSL \"https://hub.example.org/v1/download/$F\" > \"$D/$F\" &&
 echo \"<connector digest>  $D/$F\" | sha256sum -c - &&
 chmod 700 \"$D/$F\" &&
 \"$D/$F\" join \"<hub address>\" \"<hub key>\" \"<invite>\"

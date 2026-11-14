@@ -42,7 +42,7 @@ Otherwise run this as one command, in a terminal. It uses full paths and does no
 
 ```
 F="<file name from the table>" && D="$HOME/.arauto" && mkdir -p "$D" &&
-curl -fsSLo "$D/$F" "{download}/$F" &&
+curl -fsSL "{download}/$F" > "$D/$F" &&
 echo "<connector digest>  $D/$F" | sha256sum -c - &&
 chmod 700 "$D/$F" &&
 "$D/$F" join "<hub address>" "<hub key>" "<invite>"

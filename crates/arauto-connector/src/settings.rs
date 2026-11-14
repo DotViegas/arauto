@@ -56,7 +56,9 @@ impl Default for Settings {
             relay_retry_ms: 200,
             devices_lock_ms: 30 * SECOND_MS,
             command_lock_ms: 3 * SECOND_MS,
-            hermes_ms: 30 * SECOND_MS,
+            // The first command of Hermes in a data folder it never used took 47 s on a
+            // Windows machine (14/11/2026); in a folder in use it takes 2 to 4 s.
+            hermes_ms: 90 * SECOND_MS,
             shutdown_ms: 1_500,
             waker: std::sync::Arc::default(),
             #[cfg(feature = "testing")]
