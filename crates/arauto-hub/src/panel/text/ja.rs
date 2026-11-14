@@ -10,35 +10,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("M", "変"),
     ("W", "起"),
     ("Waiting for the device…", "デバイスを待っています…"),
-    (
-        "The passkey was not accepted. Try again.",
-        "パスキーは受け付けられませんでした。もう一度お試しください。",
-    ),
-    (
-        "This browser cannot use a passkey here. Use a current browser, at the address of the panel.",
-        "このブラウザーでは、ここでパスキーを使えません。パネルのアドレスで、新しいブラウザーをお使いください。",
-    ),
-    ("Sign in to the panel", "パネルにログイン"),
-    (
-        "Use the passkey you registered: on this device, or in your password manager.",
-        "登録済みのパスキーを使ってください。このデバイス、またはパスワードマネージャーにあります。",
-    ),
     ("Sign in with a passkey", "パスキーでログイン"),
     ("Installation code", "インストールコード"),
-    (
-        "First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey.",
-        "初回アクセス、またはパスキーを紛失した場合: ハブが起動時にログに書き出したコードを入力するか、ハブのサーバーで {command} を実行して発行してください。このコードで開けるのはパスキーの登録だけです。",
-    ),
     ("Continue", "続行"),
-    ("Register a passkey", "パスキーを登録"),
-    (
-        "A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak.",
-        "パスキーはこのデバイスまたはパスワードマネージャーに保存され、デバイスの指紋、顔、または PIN で開きます。ハブが保持するのはパスキーを検証するための情報だけで、漏えいするパスワードはありません。",
-    ),
-    (
-        "This session only reaches the registration of a passkey. The rest of the panel opens after it.",
-        "このセッションで行えるのはパスキーの登録だけです。パネルの残りは登録後に開きます。",
-    ),
     ("Sign out", "ログアウト"),
     ("Alerts", "アラート"),
     ("Unknown devices", "不明なデバイス"),
@@ -119,6 +93,96 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Saved: {what}", "保存しました: {what}"),
     ("Warnings that block nothing", "動作を妨げない警告"),
+    (
+        "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+        "そのコードは使えませんでした。最新のコードを使ってください。ログの最後のブロックにあるコード、またはハブのサーバーで発行したコードです。",
+    ),
+    (
+        "The hub did not accept this passkey. Try again.",
+        "ハブはこのパスキーを受け付けませんでした。もう一度お試しください。",
+    ),
+    (
+        "Your panel session ended. Type the latest code to pick up where you left off.",
+        "パネルのセッションが終了しました。最新のコードを入力すると、続きから再開できます。",
+    ),
+    (
+        "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+        "このブラウザーでは、ここでパスキーを使えません。最新のブラウザーで、パネルのアドレスを直接開いてください（ほかのアプリの中ではなく）。",
+    ),
+    (
+        "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        "パスキーを作成できませんでした。操作がキャンセルされたか、時間がかかりすぎました。もう一度お試しください。",
+    ),
+    (
+        "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        "パスキーが使われませんでした。このデバイスにない場合は、作成したデバイスまたはパスワードマネージャーを使うか、「パスキーを紛失しましたか？」を開いてください。",
+    ),
+    ("Passkey", "パスキー"),
+    ("Check", "チェック"),
+    ("Welcome to your Arauto hub", "Arauto ハブへようこそ"),
+    (
+        "Let's set up your first access. It takes three quick steps, and you only do it once.",
+        "最初のアクセスを設定しましょう。手順は3つだけで、設定は一度きりです。",
+    ),
+    (
+        "Step 1 · Confirm it is you",
+        "ステップ 1 · ご本人であることを確認",
+    ),
+    (
+        "When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you.",
+        "ハブは起動時に、自分のログにインストールコードを書き出しました。このログを見られるのはサーバーを管理している人だけです。それでハブはご本人だとわかります。",
+    ),
+    ("Where to find the code:", "コードの見つけ方:"),
+    (
+        "In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})",
+        "Easypanel では、ハブのサービスを開いて Logs に進みます。(Docker の場合: {command})",
+    ),
+    (
+        "Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code.",
+        "ARAUTO FIRST ACCESS のブロックを探します。いちばん新しいブロックは最後、ログのいちばん下にあります。そのコードをコピーします。",
+    ),
+    ("Paste the code here:", "ここにコードを貼り付けてください:"),
+    (
+        "The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest.",
+        "コードに有効期限はなく、使えるのは一度だけです。ハブが再起動すると新しいコードが書き出されます。必ず最新のものを使ってください。",
+    ),
+    (
+        "Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log.",
+        "ログを開けませんか？ハブのサーバーで {command} を実行してください。ご注意: その新しいコードを発行すると、ログにあるコードは無効になります。",
+    ),
+    ("Good to have you back", "おかえりなさい"),
+    (
+        "Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager.",
+        "パスキーでログインしてください。このデバイスの指紋、顔、PIN、またはパスワードマネージャーを使います。",
+    ),
+    ("Lost your passkey?", "パスキーを紛失しましたか？"),
+    (
+        "No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey.",
+        "ご心配なく。ハブのサーバーで {command} を実行してください。10分間有効なコードが表示されるので、ここに入力して新しいパスキーを作成してください。",
+    ),
+    (
+        "Code accepted! Now, create your passkey",
+        "コードを受け付けました！次はパスキーを作成します",
+    ),
+    (
+        "It is how you will enter the panel from now on, with no password to remember.",
+        "今後はこれでパネルにログインします。覚えておくパスワードはありません。",
+    ),
+    (
+        "The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak.",
+        "パスキーはこのデバイスまたはパスワードマネージャーに保存され、指紋、顔、またはデバイスの PIN で開きます。ハブが保持するのはパスキーを検証するための情報だけで、漏えいするパスワードはありません。",
+    ),
+    ("It will work at this address:", "このアドレスで使えます:"),
+    ("Create my passkey", "パスキーを作成"),
+    (
+        "If you use a password manager, the passkey can go along to your other devices.",
+        "パスワードマネージャーをお使いなら、パスキーはほかのデバイスにも引き継げます。",
+    ),
+    (
+        "Left this page by accident? Type the same code again: it is only spent when the passkey is created.",
+        "うっかりこのページを離れましたか？同じコードをもう一度入力してください。コードが使われるのは、パスキーを作成したときだけです。",
+    ),
+    ("Check the installation", "インストールの確認"),
     // guide.rs
     ("Name", "名前"),
     ("Block", "ブロック"),
@@ -311,6 +375,27 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Reconnect {name}", "{name} を再接続"),
     ("Connect {name}", "{name} を接続"),
     ("Steps", "ステップ"),
+    ("How it works:", "しくみ:"),
+    (
+        "You give the Hermes a name here.",
+        "ここで Hermes に名前を付けます。",
+    ),
+    (
+        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
+        "ハブが招待を生成します。これはテキストのブロックで、その Hermes のコマンドチャネルにだけ貼り付けます。ほかの場所には貼り付けません。",
+    ),
+    (
+        "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
+        "Hermes がこのハブからコネクターをダウンロードし、6桁の確認コードを返します。",
+    ),
+    (
+        "You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms.",
+        "ここでコードを入力して承認します。これで完了です。コネクターが確認した時点で、Hermes は接続済みと表示されます。",
+    ),
+    (
+        "Let's connect your first Hermes",
+        "最初の Hermes を接続しましょう",
+    ),
     // editor.rs
     (
         "Being woken requires reading. Nothing was saved.",
@@ -609,11 +694,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     // mod.rs
     (
-        "Invalid or expired code. Issue another one on the hub's server.",
-        "コードが無効か、期限切れです。ハブのサーバーで別のコードを発行してください。",
-    ),
-    (
         "Too many attempts right now. Wait a minute and try again.",
         "試行回数が多すぎます。1 分待ってから、もう一度お試しください。",
     ),
+    // check.rs
+    ("ok", "問題なし"),
+    ("check", "要確認"),
+    ("attention", "注意"),
+    ("later", "あとで"),
+    ("failed", "失敗"),
+    ("Panel address", "パネルのアドレス"),
+    ("Connectors address", "コネクターのアドレス"),
+    ("Your address", "お使いのアドレス"),
+    ("Database password", "データベースのパスワード"),
+    ("Data folder", "データフォルダー"),
+    ("WhatsApp engine", "WhatsApp エンジン"),
+    ("Your passkey works here.", "パスキーはここで使えます。"),
+    (
+        "Open it: it should say it is the address of the connectors.",
+        "開いてみてください。コネクター用のアドレスだと表示されるはずです。",
+    ),
+    (
+        "The hub sees you at {address}. Is it yours? If not, the proxy is not passing the real address.",
+        "ハブにはあなたのアドレスが {address} と見えています。合っていますか？違う場合は、プロキシが実際のアドレスを渡していません。",
+    ),
+    (
+        "A connection from {address}, which is not in ARAUTO_TRUSTED_PROXIES, brought a forwarded address. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "ARAUTO_TRUSTED_PROXIES に含まれていない {address} からの接続に、転送されたアドレスが含まれていました。この接続元のアドレスを ARAUTO_TRUSTED_PROXIES に追加して、もう一度デプロイしてください。",
+    ),
+    (
+        "The hub sees you at {address}, an address of an internal network: the proxy is not trusted yet. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "ハブにはあなたのアドレスが {address} と見えています。これは内部ネットワークのアドレスで、プロキシはまだ信頼されていません。プロキシのアドレスを ARAUTO_TRUSTED_PROXIES に追加して、もう一度デプロイしてください。",
+    ),
+    (
+        "Replaced by one nobody saw.",
+        "誰も見ていないパスワードに置き換えました。",
+    ),
+    (
+        "Not replaced by the hub: this installation sets the password of the database itself.",
+        "ハブは置き換えていません。この環境では、データベースのパスワードを環境側で設定しています。",
+    ),
+    (
+        "The replacement failed. See the log of the hub, then run {command}.",
+        "置き換えに失敗しました。ハブのログを確認してから、{command} を実行してください。",
+    ),
+    (
+        "Ready for your Hermes.",
+        "Hermes を迎える準備ができています。",
+    ),
+    (
+        "The downloads folder is empty: a Hermes cannot be connected through the panel. Rebuild the image of the hub.",
+        "ダウンロード用のフォルダーが空です。パネルから Hermes を接続できません。ハブのイメージをビルドし直してください。",
+    ),
+    (
+        "It holds the master key and the password of the database. Back it up: without it, the hub cannot open what it kept encrypted.",
+        "マスターキーとデータベースのパスワードが入っています。バックアップを取ってください。これがないと、ハブは暗号化して保存したデータを開けません。",
+    ),
+    ("Configured.", "設定済みです。"),
+    (
+        "A Hermes can be connected without it; WhatsApp numbers need it.",
+        "これがなくても Hermes は接続できます。WhatsApp の番号には必要です。",
+    ),
+    (
+        "The hub checked a few things by itself. Nothing here changes anything: it is only so you know how it turned out.",
+        "ハブがいくつかの項目を自動で確認しました。ここでは何も変更されません。結果をお知らせするだけです。",
+    ),
+    // installation.rs
+    (
+        "Step 3 · Let's check the installation",
+        "ステップ 3 · インストールを確認しましょう",
+    ),
+    (
+        "All set: your passkey was created!",
+        "準備完了です。パスキーを作成しました！",
+    ),
+    (
+        "The same by command: {command}",
+        "コマンドでも同じ確認ができます: {command}",
+    ),
+    ("Connect my first Hermes", "最初の Hermes を接続する"),
+    ("Do it later", "あとで行う"),
 ];

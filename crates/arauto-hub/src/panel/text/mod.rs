@@ -345,13 +345,15 @@ mod tests {
     }
 
     /// The code of the panel that writes sentences, as text: this test reads it.
-    const SOURCES: [(&str, &str); 6] = [
+    const SOURCES: [(&str, &str); 8] = [
         ("view.rs", include_str!("../view.rs")),
         ("guide.rs", include_str!("../guide.rs")),
         ("editor.rs", include_str!("../editor.rs")),
         ("data.rs", include_str!("../data.rs")),
         ("connect.rs", include_str!("../connect.rs")),
         ("mod.rs", include_str!("../mod.rs")),
+        ("check.rs", include_str!("../../check.rs")),
+        ("installation.rs", include_str!("../installation.rs")),
     ];
 
     /// Every sentence the code marks with `k("...")`, outside the tests of each file.
@@ -411,7 +413,7 @@ mod tests {
             "the code was read: {}",
             sentences.len()
         );
-        assert!(sentences.iter().any(|s| s == "Sign in to the panel"));
+        assert!(sentences.iter().any(|s| s == "Welcome to your Arauto hub"));
         assert!(
             sentences.iter().any(|s| s.contains("\"Connect Hermes\"")),
             "escapes are read"

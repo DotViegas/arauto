@@ -12,16 +12,17 @@ use arauto_hub::admin::render::{self, Report, access, link, whatsapp};
 use arauto_hub::admin::whatsapp::{PairMethod, Removal};
 use arauto_hub::admin::{self, Session};
 use arauto_hub::channel::{self, ChannelSettings};
+use arauto_hub::check;
 use arauto_hub::config::{ProcessEnv, PublicUrl, ServeConfig, StorageConfig};
 use arauto_hub::core::access::{Grant, Scope, Verbs};
 use arauto_hub::core::model::DeviceState;
 use arauto_hub::db::{self, PoolOptions};
 use arauto_hub::download;
 use arauto_hub::engine::EngineSettings;
+use arauto_hub::first_access;
 use arauto_hub::mark::Mark;
 use arauto_hub::repo::alert::AlertFilter;
 use arauto_hub::repo::approval::{ApproveOutcome, Recognition, Recognized};
-use arauto_hub::repo::panel::INSTALLATION_VALIDITY_MS;
 use arauto_hub::vault::Vault;
 use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_protocol::message::DeclaredText;
@@ -168,6 +169,9 @@ enum InstalledCommand {
         #[command(subcommand)]
         command: DatabaseCommand,
     },
+    /// Checks the installation, like the window of the panel does: the addresses, the password
+    /// of the database, the connector, the data folder and the engine. It changes nothing.
+    Check,
 }
 
 #[derive(Debug, Subcommand)]
@@ -526,15 +530,7 @@ async fn run(command: Command) -> anyhow::Result<Report> {
 async fn serve() -> anyhow::Result<Report> {
     // Listening starts here, so a request to stop during the start is not lost.
     let shutdown = arauto_platform::shutdown_signal()?;
-    let _ = tracing_subscriber::fmt()
-        // Without RUST_LOG the hub says what an operator needs: its start, the warnings of
-        // the engine, the restored mode. With only the errors, a first installation is blind.
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .with_writer(std::io::stderr)
-        .try_init();
+    arauto_hub::logging::init_stderr();
     let config = ServeConfig::read(&ProcessEnv)?;
     install_if_new(&config.storage).await?;
     let options = channel::Options {
@@ -551,14 +547,18 @@ async fn serve() -> anyhow::Result<Report> {
     match running.panel_addr() {
         Some(panel) => {
             tracing::info!(%panel, "the panel of the admin is listening");
-            first_access(&config).await;
         }
         None => tracing::info!(
             "the hub has no panel: ARAUTO_LISTEN_PANEL and ARAUTO_PANEL_URL are not set"
         ),
     }
+    // The block with the start code, and the task that repeats it while the code is unspent.
+    // The first thing a hub with no panel says is that, in the same place.
+    let first_access =
+        first_access::start(running.hub(), Arc::new(first_access::Stderr), os_user()).await;
     shutdown.await;
     tracing::info!("the hub is stopping");
+    first_access.stop().await;
     running.stop().await;
     Ok(Report {
         text: "The hub stopped.\n".to_owned(),
@@ -590,57 +590,6 @@ async fn install_if_new(storage: &StorageConfig) -> anyhow::Result<()> {
         );
     }
     Ok(())
-}
-
-/// A hub that starts with a panel and no passkey writes an installation code where whoever
-/// installed it reads: the output of the start. It is the one secret the hub ever writes
-/// there, and it does so on purpose (`docs/07-telas.md`, T0): the code lasts minutes, serves
-/// once, and only opens the registration of a passkey. It goes straight to the output, never
-/// through the log lines, so that no log setting copies or reformats it.
-///
-/// A failure here does not stop the hub: the command `admin panel code` issues one too.
-async fn first_access(config: &ServeConfig) {
-    let issued = async {
-        let options = PoolOptions {
-            size: 2,
-            acquire_timeout: Duration::from_secs(5),
-        };
-        let pool = db::open(&config.storage, options).await?;
-        let session =
-            Session::open(pool.clone(), Mark::new(&config.storage.data_dir), os_user()).await;
-        let issued = match session {
-            Ok(session) => session.installation_code(SystemClock.now_ms()).await,
-            Err(error) => Err(error),
-        };
-        pool.close().await;
-        anyhow::Ok(issued?)
-    }
-    .await;
-    match issued {
-        Ok(Some(issued)) => {
-            let address = config
-                .panel
-                .as_ref()
-                .map(|panel| panel.url.origin())
-                .unwrap_or_default();
-            let minutes = INSTALLATION_VALIDITY_MS / 60_000;
-            let mut out = std::io::stderr().lock();
-            let _ = writeln!(out);
-            let _ = writeln!(out, "No admin of this hub has a passkey yet.");
-            let _ = writeln!(out, "INSTALLATION CODE: {}", issued.code.reveal().as_str());
-            let _ = writeln!(
-                out,
-                "Open {address}, type it and register a passkey. It is valid for {minutes} \
-                 minutes and for one use; restart the hub for another."
-            );
-            let _ = writeln!(out);
-        }
-        Ok(None) => {}
-        Err(error) => tracing::warn!(
-            %error,
-            "the installation code was not issued: use `arauto-hub admin panel code`"
-        ),
-    }
 }
 
 /// The files of the folder of downloads, when the environment names one.
@@ -1004,6 +953,15 @@ async fn run_installed(
         InstalledCommand::Database {
             command: DatabaseCommand::RotatePassword,
         } => render::database_password(&session.rotate_database_password(storage, now).await?),
+        InstalledCommand::Check => {
+            // The addresses are the ones this environment names; what only the running hub sees
+            // (the address of whoever reads the window) the window says and this does not.
+            let rows = session.check(storage, &downloads()?.1, &ProcessEnv).await?;
+            Report {
+                text: check::print(&rows),
+                done: true,
+            }
+        }
     })
 }
 
@@ -1151,6 +1109,7 @@ mod tests {
             "arauto-hub admin link list",
             "arauto-hub admin panel code",
             "arauto-hub admin database rotate-password",
+            "arauto-hub admin check",
             "arauto-hub dev-reset --yes-erase-everything",
         ] {
             let parsed = Cli::try_parse_from(line.split(' '));
@@ -1178,6 +1137,7 @@ mod tests {
             "arauto-hub admin panel code abcd-efgh",
             "arauto-hub admin database",
             "arauto-hub admin database rotate-password 0123456789abcdef",
+            "arauto-hub admin check now",
         ] {
             assert!(Cli::try_parse_from(line.split(' ')).is_err(), "{line}");
         }

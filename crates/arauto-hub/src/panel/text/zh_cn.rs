@@ -10,35 +10,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("M", "改"),
     ("W", "醒"),
     ("Waiting for the device…", "正在等待设备…"),
-    (
-        "The passkey was not accepted. Try again.",
-        "通行密钥未被接受。请重试。",
-    ),
-    (
-        "This browser cannot use a passkey here. Use a current browser, at the address of the panel.",
-        "此浏览器无法在这里使用通行密钥。请在面板地址使用较新的浏览器。",
-    ),
-    ("Sign in to the panel", "登录面板"),
-    (
-        "Use the passkey you registered: on this device, or in your password manager.",
-        "请使用您已注册的通行密钥：在此设备上，或在您的密码管理器中。",
-    ),
     ("Sign in with a passkey", "使用通行密钥登录"),
     ("Installation code", "安装码"),
-    (
-        "First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey.",
-        "首次访问或通行密钥丢失：请输入 hub 启动时写入日志的安装码，或在 hub 的服务器上用 {command} 签发一个。安装码只能打开通行密钥的注册。",
-    ),
     ("Continue", "继续"),
-    ("Register a passkey", "注册通行密钥"),
-    (
-        "A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak.",
-        "通行密钥保存在此设备或您的密码管理器中，用设备的指纹、面容或 PIN 打开。hub 只保存用来验证它的内容：没有可泄露的密码。",
-    ),
-    (
-        "This session only reaches the registration of a passkey. The rest of the panel opens after it.",
-        "此会话只能进行通行密钥的注册。注册后才会打开面板的其余部分。",
-    ),
     ("Sign out", "退出登录"),
     ("Alerts", "告警"),
     ("Unknown devices", "未知设备"),
@@ -113,6 +87,93 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Saved: {what}", "已保存：{what}"),
     ("Warnings that block nothing", "不阻止任何操作的警告"),
+    (
+        "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+        "这个安装码无效。请使用最新的：日志最后一个块中的安装码，或在 hub 的服务器上签发的安装码。",
+    ),
+    (
+        "The hub did not accept this passkey. Try again.",
+        "hub 没有接受这个通行密钥。请重试。",
+    ),
+    (
+        "Your panel session ended. Type the latest code to pick up where you left off.",
+        "您的面板会话已结束。输入最新的安装码，即可从中断的地方继续。",
+    ),
+    (
+        "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+        "此浏览器无法在这里使用通行密钥。请用最新的浏览器，直接在面板地址打开面板（不要在其他应用内打开）。",
+    ),
+    (
+        "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        "通行密钥没有创建成功：请求被取消，或等待时间太长。再试一次即可。",
+    ),
+    (
+        "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        "没有使用任何通行密钥。如果它不在此设备上，请使用您创建它的那台设备或密码管理器，或者打开“丢了通行密钥？”。",
+    ),
+    ("Passkey", "通行密钥"),
+    ("Check", "检查"),
+    ("Welcome to your Arauto hub", "欢迎使用您的 Arauto hub"),
+    (
+        "Let's set up your first access. It takes three quick steps, and you only do it once.",
+        "我们来设置您的首次访问。只需三个简单的步骤，而且只需做一次。",
+    ),
+    ("Step 1 · Confirm it is you", "第 1 步 · 确认是您本人"),
+    (
+        "When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you.",
+        "hub 启动时，在自己的日志中写入了一个安装码。只有管理服务器的人才能看到这份日志：hub 就是这样确认是您本人的。",
+    ),
+    ("Where to find the code:", "在哪里找到安装码："),
+    (
+        "In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})",
+        "在 Easypanel 中，打开 hub 的服务，进入 Logs。（使用 Docker 时：{command}）",
+    ),
+    (
+        "Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code.",
+        "找到 ARAUTO FIRST ACCESS 块：最新的是最后一个，在日志的最底部。复制其中的安装码。",
+    ),
+    ("Paste the code here:", "请在这里粘贴安装码："),
+    (
+        "The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest.",
+        "安装码不会过期，只能使用一次。hub 重启后会写入新的安装码：请始终使用最新的那个。",
+    ),
+    (
+        "Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log.",
+        "打不开日志？请在 hub 的服务器上运行 {command}。注意：这个新安装码会让日志中的安装码失效。",
+    ),
+    ("Good to have you back", "欢迎回来"),
+    (
+        "Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager.",
+        "请用您的通行密钥登录：使用此设备的指纹、面容或 PIN，或者您的密码管理器。",
+    ),
+    ("Lost your passkey?", "丢了通行密钥？"),
+    (
+        "No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey.",
+        "没关系。请在 hub 的服务器上运行 {command}。它会显示一个 10 分钟内有效的安装码：在这里输入它，然后创建新的通行密钥。",
+    ),
+    (
+        "Code accepted! Now, create your passkey",
+        "安装码已接受！现在来创建您的通行密钥",
+    ),
+    (
+        "It is how you will enter the panel from now on, with no password to remember.",
+        "今后您就用它登录面板，不需要记任何密码。",
+    ),
+    (
+        "The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak.",
+        "通行密钥保存在此设备或您的密码管理器中，用您的指纹、面容或设备的 PIN 打开。hub 只保存用来验证通行密钥的内容：没有可泄露的密码。",
+    ),
+    ("It will work at this address:", "它将在此地址生效："),
+    ("Create my passkey", "创建我的通行密钥"),
+    (
+        "If you use a password manager, the passkey can go along to your other devices.",
+        "如果您使用密码管理器，通行密钥可以同步到您的其他设备。",
+    ),
+    (
+        "Left this page by accident? Type the same code again: it is only spent when the passkey is created.",
+        "不小心离开了这个页面？再输入同一个安装码即可：只有在创建通行密钥时它才会被用掉。",
+    ),
+    ("Check the installation", "检查安装情况"),
     // guide.rs
     ("Name", "名称"),
     ("Block", "文本块"),
@@ -281,6 +342,27 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Reconnect {name}", "重新连接 {name}"),
     ("Connect {name}", "连接 {name}"),
     ("Steps", "步骤"),
+    ("How it works:", "工作方式："),
+    (
+        "You give the Hermes a name here.",
+        "您在这里给 Hermes 起个名字。",
+    ),
+    (
+        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
+        "hub 会生成一个邀请：一段文本，您只需把它粘贴到该 Hermes 的指令通道中，不要粘贴到别处。",
+    ),
+    (
+        "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
+        "Hermes 会从这个 hub 下载连接器，并回复一个 6 位数的验证码。",
+    ),
+    (
+        "You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms.",
+        "您在这里输入验证码并批准。完成：该 Hermes 的连接器一确认，它就会显示为已连接。",
+    ),
+    (
+        "Let's connect your first Hermes",
+        "我们来连接您的第一个 Hermes",
+    ),
     // editor.rs
     (
         "Being woken requires reading. Nothing was saved.",
@@ -564,11 +646,81 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     // mod.rs
     (
-        "Invalid or expired code. Issue another one on the hub's server.",
-        "登录码无效或已过期。请在 hub 的服务器上签发新的登录码。",
-    ),
-    (
         "Too many attempts right now. Wait a minute and try again.",
         "当前尝试次数过多。请等待一分钟后重试。",
     ),
+    // check.rs
+    ("ok", "正常"),
+    ("check", "请核对"),
+    ("attention", "注意"),
+    ("later", "稍后"),
+    ("failed", "失败"),
+    ("Panel address", "面板地址"),
+    ("Connectors address", "连接器地址"),
+    ("Your address", "您的地址"),
+    ("Database password", "数据库密码"),
+    ("Data folder", "数据文件夹"),
+    ("WhatsApp engine", "WhatsApp 引擎"),
+    ("Your passkey works here.", "您的通行密钥在这里可以使用。"),
+    (
+        "Open it: it should say it is the address of the connectors.",
+        "请打开它：页面应当说明这是连接器的地址。",
+    ),
+    (
+        "The hub sees you at {address}. Is it yours? If not, the proxy is not passing the real address.",
+        "hub 看到您的地址是 {address}。这是您的地址吗？如果不是，说明代理没有传递真实地址。",
+    ),
+    (
+        "A connection from {address}, which is not in ARAUTO_TRUSTED_PROXIES, brought a forwarded address. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "{address} 不在 ARAUTO_TRUSTED_PROXIES 中，但来自它的一个连接带来了转发的地址。请把这个连接的来源地址加入 ARAUTO_TRUSTED_PROXIES，然后重新部署。",
+    ),
+    (
+        "The hub sees you at {address}, an address of an internal network: the proxy is not trusted yet. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "hub 看到您的地址是 {address}，这是内部网络的地址：代理尚未被信任。请把代理的地址加入 ARAUTO_TRUSTED_PROXIES，然后重新部署。",
+    ),
+    (
+        "Replaced by one nobody saw.",
+        "已换成一个无人见过的新密码。",
+    ),
+    (
+        "Not replaced by the hub: this installation sets the password of the database itself.",
+        "hub 没有替换：此安装环境自行设置数据库密码。",
+    ),
+    (
+        "The replacement failed. See the log of the hub, then run {command}.",
+        "替换失败。请查看 hub 的日志，然后运行 {command}。",
+    ),
+    ("Ready for your Hermes.", "已为您的 Hermes 准备就绪。"),
+    (
+        "The downloads folder is empty: a Hermes cannot be connected through the panel. Rebuild the image of the hub.",
+        "下载文件夹是空的：无法通过面板连接 Hermes。请重新构建 hub 的镜像。",
+    ),
+    (
+        "It holds the master key and the password of the database. Back it up: without it, the hub cannot open what it kept encrypted.",
+        "里面存放着主密钥和数据库密码。请备份：没有它，hub 就无法打开它加密保存的内容。",
+    ),
+    ("Configured.", "已配置。"),
+    (
+        "A Hermes can be connected without it; WhatsApp numbers need it.",
+        "没有它也可以连接 Hermes；WhatsApp 号码则需要它。",
+    ),
+    (
+        "The hub checked a few things by itself. Nothing here changes anything: it is only so you know how it turned out.",
+        "hub 自己检查了几项内容。这里不会更改任何东西：只是让您了解检查结果。",
+    ),
+    // installation.rs
+    (
+        "Step 3 · Let's check the installation",
+        "第 3 步 · 来检查一下安装情况",
+    ),
+    (
+        "All set: your passkey was created!",
+        "一切就绪：您的通行密钥已创建！",
+    ),
+    (
+        "The same by command: {command}",
+        "用命令也能得到同样的结果：{command}",
+    ),
+    ("Connect my first Hermes", "连接我的第一个 Hermes"),
+    ("Do it later", "以后再说"),
 ];

@@ -160,6 +160,9 @@ a.cell:hover { background: var(--frame-raised); }
 
 .note { margin-top: 16px; font-size: var(--t-label); max-width: 78ch; }
 .footer { margin-top: 48px; font-size: var(--t-label); max-width: 78ch; }
+.footer.next { margin-top: 8px; }
+.footer-link { color: var(--strong); text-decoration: underline; text-underline-offset: 3px; }
+.footer-link:hover { color: var(--purple-text); }
 
 /* the form that asks the browser for a passkey */
 .passkey { display: grid; gap: 12px; }
@@ -189,6 +192,65 @@ code { font-family: var(--f-mono); }
 }
 .hint { color: var(--text); font-size: var(--t-label); }
 .error { color: var(--bad); font-weight: 600; }
+
+/* the first access: the three steps at the top, the instructions in numbers, and the way back
+   from a lost passkey in a details element that shows whether it is open */
+.stepper { display: flex; list-style: none; padding: 0; margin: 0; }
+.stepper li {
+  flex: 1; position: relative; display: grid; justify-items: center; gap: 6px;
+  font-family: var(--f-brand); font-size: var(--t-label); color: var(--text); text-align: center;
+}
+.stepper li + li::before { content: ""; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: var(--rule); }
+.stepper li.done + li::before, .stepper li.current::before { background: var(--purple); }
+.stepper .dot {
+  position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--rule); background: var(--ground); color: var(--text); font-weight: 600;
+}
+.stepper li.current .dot { border-color: var(--purple); background: var(--purple); color: var(--on-purple); }
+.stepper li.done .dot { border-color: var(--purple); background: var(--ground); color: var(--purple-text); }
+.stepper li.current, .stepper li.done { color: var(--strong); }
+.stepper li.current { font-weight: 600; }
+.stepper svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.modal .stepper { padding: 8px 24px 16px; }
+.modal .stepper .dot { background: var(--modal); }
+.modal .stepper li.current .dot { background: var(--purple); }
+.entry p { margin: 0; }
+.entry .step-title { font-family: var(--f-brand); font-size: var(--t-body); font-weight: 600; color: var(--strong); }
+.entry .card p { color: var(--strong); }
+.entry .card p.hint { color: var(--text); }
+.how { margin: 0; padding-left: 22px; display: grid; gap: 8px; color: var(--strong); }
+.how li::marker { color: var(--purple-text); font-weight: 600; }
+.where { margin-top: 4px; }
+.code-form { display: grid; gap: 16px; }
+.lost { padding: 0; }
+.lost summary {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px;
+  color: var(--strong); font-weight: 600; cursor: pointer; list-style: none;
+}
+.lost summary::-webkit-details-marker { display: none; }
+.lost summary::before {
+  content: ""; flex: none; width: 8px; height: 8px;
+  border-right: 2px solid var(--purple-text); border-bottom: 2px solid var(--purple-text);
+  transform: rotate(-45deg); transition: transform .15s ease;
+}
+.lost[open] summary::before { transform: rotate(45deg); }
+.lost summary:hover { color: var(--purple-text); }
+.lost-body { display: grid; gap: 16px; padding: 0 24px 24px; }
+.lost-body > .error { margin: 0; }
+.howto { display: block; }
+.howto p { margin-bottom: 6px; }
+.howto ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; color: var(--strong); }
+.howto li::marker { color: var(--purple-text); font-weight: 600; }
+
+/* the check of the installation: a table in a frame, labels in the system font, and states in
+   the tones of the panel */
+.checks th { font-weight: 600; color: var(--strong); text-align: left; vertical-align: top; white-space: nowrap; padding-right: 16px; }
+.checks td { vertical-align: top; }
+.checks td.detail { color: var(--text); overflow-wrap: anywhere; }
+.checks code { color: var(--strong); }
+.link { color: var(--purple-text); text-decoration: underline; text-underline-offset: 3px; }
+.modal.check { width: min(760px, calc(100% - 32px)); }
 
 /* a button: quiet by default; the one main action of a screen is purple */
 .button {
@@ -354,6 +416,11 @@ code { font-family: var(--f-mono); }
   .actions .button { min-height: 44px; padding: 0 16px; }
   .modal { width: calc(100% - 16px); max-height: calc(100% - 16px); }
   .path { padding: 4px 8px 12px; }
+  .checks, .checks tbody { display: block; }
+  .checks tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 0; }
+  .checks th, .checks td { display: block; padding: 0; }
+  .checks td.detail { grid-column: 1 / -1; }
+  .modal .stepper { padding: 4px 8px 12px; }
   .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .facts dd { margin-bottom: 8px; }
   .fields { grid-template-columns: minmax(0, 1fr); }

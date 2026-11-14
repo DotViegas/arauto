@@ -46,22 +46,56 @@ pub(crate) fn client_ip(
         }
         return Ok(peer);
     }
-    let mut chain = Vec::new();
-    for value in headers.get_all(FORWARDED_FOR) {
+    // From the right: the last item is what the nearest proxy saw. The walk stops at the
+    // first address that is not a trusted proxy; what is to its left was written by the client
+    // itself, so it is never read, and an item there that is not an address changes nothing.
+    let mut read = 0usize;
+    for value in headers.get_all(FORWARDED_FOR).iter().rev() {
         let text = value.to_str().map_err(|_| Untold)?;
-        for item in text.split(',') {
-            if chain.len() >= CHAIN_MAX {
+        for item in text.rsplit(',') {
+            if read >= CHAIN_MAX {
                 return Err(Untold);
             }
-            let address: IpAddr = item.trim().parse().map_err(|_| Untold)?;
-            chain.push(canonical(address));
+            read = read.saturating_add(1);
+            let address = canonical(item.trim().parse::<IpAddr>().map_err(|_| Untold)?);
+            if !trusts(trusted_proxies, address) {
+                return Ok(address);
+            }
         }
     }
-    chain
-        .into_iter()
-        .rev()
-        .find(|address| !trusts(trusted_proxies, *address))
-        .ok_or(Untold)
+    Err(Untold)
+}
+
+/// Whether a request came from a connection that is not a trusted proxy and still brought the
+/// forwarding header: how a wrong `ARAUTO_TRUSTED_PROXIES` looks. Told from the request itself,
+/// so the check window of the panel says it whatever the log already said. Only reads.
+#[must_use]
+pub(crate) fn untrusted_forwarder(
+    source: &ClientIpSource,
+    peer: SocketAddr,
+    headers: &HeaderMap,
+) -> bool {
+    match source {
+        ClientIpSource::Socket => false,
+        ClientIpSource::Forwarded { trusted_proxies } => {
+            headers.contains_key(FORWARDED_FOR) && !trusts(trusted_proxies, canonical(peer.ip()))
+        }
+    }
+}
+
+/// Whether the hub is set to believe a proxy (`forwarded`) and the connection is not from one:
+/// no trusted proxy speaks for this request, so the hub sees the peer itself. `false` with
+/// `socket` (nothing is believed there, and `ARAUTO_TRUSTED_PROXIES` is refused) and `false`
+/// for a trusted proxy that did not say who the client is (its address is already in the
+/// list). Only reads.
+#[must_use]
+pub(crate) fn no_trusted_proxy(source: &ClientIpSource, peer: SocketAddr) -> bool {
+    match source {
+        ClientIpSource::Socket => false,
+        ClientIpSource::Forwarded { trusted_proxies } => {
+            !trusts(trusted_proxies, canonical(peer.ip()))
+        }
+    }
 }
 
 /// Says, once for each address and for a few addresses only, that a peer outside the list
@@ -90,7 +124,7 @@ fn trusts(proxies: &[Network], address: IpAddr) -> bool {
 }
 
 /// An IPv4 address written as IPv6 is the IPv4 address.
-fn canonical(address: IpAddr) -> IpAddr {
+pub(crate) fn canonical(address: IpAddr) -> IpAddr {
     match address {
         IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
         v4 => v4,
@@ -171,9 +205,48 @@ mod tests {
             let got = client_ip(&source, peer("192.0.2.10"), &headers(values));
             assert_eq!(got, Err(Untold), "{values:?}");
         }
-        let long = vec!["203.0.113.9"; CHAIN_MAX + 1].join(",");
-        let got = client_ip(&source, peer("192.0.2.10"), &headers(&[&long]));
+        // More proxies than the hub reads, with no client among them.
+        let long = vec!["192.0.2.11"; CHAIN_MAX + 1].join(",");
+        let got = client_ip(
+            &source,
+            peer("192.0.2.10"),
+            &headers(&["203.0.113.9", &long]),
+        );
         assert_eq!(got, Err(Untold));
+    }
+
+    #[test]
+    fn what_the_client_wrote_left_of_itself_changes_nothing() {
+        let source = forwarded(&["192.0.2.0/24"]);
+        // The client wrote garbage, or a chain longer than the hub reads, before the address
+        // the proxy appended: the walk from the right stops at the client and never reads it.
+        let long = vec!["203.0.113.66"; CHAIN_MAX * 2].join(",");
+        for values in [
+            &["x, 198.51.100.7"][..],
+            &["not an address", "198.51.100.7, 192.0.2.11"][..],
+            &[long.as_str(), "198.51.100.7"][..],
+        ] {
+            let got = client_ip(&source, peer("192.0.2.10"), &headers(values));
+            assert_eq!(got, Ok(ip("198.51.100.7")), "{values:?}");
+        }
+    }
+
+    #[test]
+    fn a_forwarder_outside_the_list_is_told_from_the_request() {
+        let source = forwarded(&["192.0.2.10"]);
+        let with = headers(&["203.0.113.9"]);
+        assert!(untrusted_forwarder(&source, peer("198.51.100.7"), &with));
+        assert!(!untrusted_forwarder(&source, peer("192.0.2.10"), &with));
+        assert!(!untrusted_forwarder(
+            &source,
+            peer("198.51.100.7"),
+            &headers(&[])
+        ));
+        assert!(!untrusted_forwarder(
+            &ClientIpSource::Socket,
+            peer("198.51.100.7"),
+            &with
+        ));
     }
 
     #[test]
@@ -185,5 +258,24 @@ mod tests {
             &headers(&["::ffff:203.0.113.9"]),
         );
         assert_eq!(got, Ok(ip("203.0.113.9")));
+    }
+
+    /// The window tells an admin to add a proxy to the list only when the hub believes proxies
+    /// and the connection is not from one: never with `socket` (the list is refused there), and
+    /// never for a proxy that is already in the list and said nothing about the client.
+    #[test]
+    fn no_trusted_proxy_is_told_only_for_a_peer_outside_the_list_of_a_forwarded_hub() {
+        let source = forwarded(&["10.1.0.0/16"]);
+        assert!(!no_trusted_proxy(&source, peer("10.1.0.5")));
+        assert!(no_trusted_proxy(&source, peer("198.51.100.7")));
+        assert!(no_trusted_proxy(&source, peer("10.2.0.5")));
+        assert!(!no_trusted_proxy(
+            &ClientIpSource::Socket,
+            peer("198.51.100.7")
+        ));
+        assert!(!no_trusted_proxy(
+            &ClientIpSource::Socket,
+            peer("172.18.0.2")
+        ));
     }
 }

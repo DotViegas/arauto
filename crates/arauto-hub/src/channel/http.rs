@@ -9,6 +9,7 @@
 //! |---|---|---|
 //! | connectors | `GET /v1/channel` | the websocket, after the ceiling of connections without a session (503, 429) |
 //! | connectors | `GET /v1/download/{file}` | a file of the fixed list, or 404 |
+//! | connectors | `GET /` | a fixed text that says this is not the panel |
 //! | internal | `GET /health` | `ok`, without any secret |
 //! | internal | `POST /v1/engine/{engine}/events` | the inbox of the events of the engine |
 //! | either | anything else | 404 |
@@ -238,6 +239,7 @@ async fn route<P: Purposes>(
     }
     match port {
         Port::Connectors if path == CHANNEL_PATH => channel(request, peer, hub, purposes).await,
+        Port::Connectors if path == "/" => connectors_notice(),
         Port::Connectors => match path.strip_prefix(DOWNLOAD_PREFIX) {
             Some(name) => download(&hub, name),
             None => status(StatusCode::NOT_FOUND),
@@ -253,6 +255,28 @@ async fn route<P: Purposes>(
         // Answered above; here for the match to name every port.
         Port::Internal | Port::Panel => status(StatusCode::NOT_FOUND),
     }
+}
+
+/// What `GET /` says on the port of the connectors: whoever opens this address in a browser, for
+/// example by the Open button of a host, is told it is not the panel. Fixed text: it names no
+/// host, no port and no version.
+fn connectors_notice() -> Response<Body> {
+    let mut response = Response::new(Body::from(
+        "This address is for the Arauto connectors: there is nothing to open here.\n\
+         The panel of this hub has its own address, the one set in ARAUTO_PANEL_URL.\n\
+         If the Open button of Easypanel brought you here, point that domain to the port of the panel.\n",
+    ));
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    response
 }
 
 fn download(hub: &Hub, name: &str) -> Response<Body> {

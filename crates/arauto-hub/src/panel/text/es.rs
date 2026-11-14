@@ -10,35 +10,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("M", "M"),
     ("W", "D"),
     ("Waiting for the device…", "Esperando al dispositivo…"),
-    (
-        "The passkey was not accepted. Try again.",
-        "La llave de acceso no fue aceptada. Inténtalo de nuevo.",
-    ),
-    (
-        "This browser cannot use a passkey here. Use a current browser, at the address of the panel.",
-        "Este navegador no puede usar una llave de acceso aquí. Usa un navegador actual, en la dirección del panel.",
-    ),
-    ("Sign in to the panel", "Entrar al panel"),
-    (
-        "Use the passkey you registered: on this device, or in your password manager.",
-        "Usa la llave de acceso que registraste: en este dispositivo o en tu gestor de contraseñas.",
-    ),
     ("Sign in with a passkey", "Entrar con llave de acceso"),
     ("Installation code", "Código de instalación"),
-    (
-        "First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey.",
-        "Primer acceso, o llave de acceso perdida: escribe el código que el hub escribió en su registro al arrancar, o emite uno en el servidor del hub con {command}. El código solo abre el registro de una llave de acceso.",
-    ),
     ("Continue", "Continuar"),
-    ("Register a passkey", "Registrar una llave de acceso"),
-    (
-        "A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak.",
-        "La llave de acceso se queda en este dispositivo o en tu gestor de contraseñas, y se abre con la huella, el rostro o el PIN del dispositivo. El hub guarda solo lo que la comprueba: no hay contraseña que pueda filtrarse.",
-    ),
-    (
-        "This session only reaches the registration of a passkey. The rest of the panel opens after it.",
-        "Esta sesión solo alcanza el registro de una llave de acceso. El resto del panel se abre después.",
-    ),
     ("Sign out", "Salir"),
     ("Alerts", "Alertas"),
     ("Unknown devices", "Dispositivos desconocidos"),
@@ -116,6 +90,102 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Saved: {what}", "Guardado: {what}"),
     ("Warnings that block nothing", "Avisos que no bloquean nada"),
+    (
+        "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+        "Ese código no funcionó. Usa el más reciente: el del último bloque del registro, o uno emitido en el servidor del hub.",
+    ),
+    (
+        "The hub did not accept this passkey. Try again.",
+        "El hub no aceptó esta llave de acceso. Inténtalo de nuevo.",
+    ),
+    (
+        "Your panel session ended. Type the latest code to pick up where you left off.",
+        "Tu sesión del panel terminó. Escribe el código más reciente para seguir donde lo dejaste.",
+    ),
+    (
+        "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+        "Este navegador no puede usar una llave de acceso aquí. Abre el panel en un navegador actualizado, directamente en su dirección (no dentro de otra aplicación).",
+    ),
+    (
+        "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        "La llave de acceso no se creó: la solicitud se canceló o tardó demasiado. Basta con intentarlo de nuevo.",
+    ),
+    (
+        "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        "No se usó ninguna llave de acceso. Si no está en este dispositivo, usa el dispositivo o el gestor de contraseñas donde la creaste, o abre “¿Perdiste tu llave de acceso?”.",
+    ),
+    ("Passkey", "Llave de acceso"),
+    ("Check", "Comprobar"),
+    (
+        "Welcome to your Arauto hub",
+        "Te damos la bienvenida a tu hub de Arauto",
+    ),
+    (
+        "Let's set up your first access. It takes three quick steps, and you only do it once.",
+        "Configuremos tu primer acceso. Son tres pasos rápidos, y solo lo haces una vez.",
+    ),
+    (
+        "Step 1 · Confirm it is you",
+        "Paso 1 · Confirma que eres tú",
+    ),
+    (
+        "When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you.",
+        "Cuando el hub arrancó, escribió un código de instalación en su propio registro. Solo quien cuida el servidor ve ese registro: así es como el hub sabe que eres tú.",
+    ),
+    ("Where to find the code:", "Dónde encontrar el código:"),
+    (
+        "In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})",
+        "En Easypanel, abre el servicio del hub y ve a Logs. (Con Docker: {command})",
+    ),
+    (
+        "Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code.",
+        "Busca el bloque ARAUTO FIRST ACCESS: el más reciente es el último, al final del registro. Copia su código.",
+    ),
+    ("Paste the code here:", "Pega el código aquí:"),
+    (
+        "The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest.",
+        "El código no vence y funciona una sola vez. Si el hub se reinicia, escribe uno nuevo: usa siempre el más reciente.",
+    ),
+    (
+        "Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log.",
+        "¿No puedes abrir el registro? En el servidor del hub, ejecuta {command}. Ojo: ese código nuevo cancela el del registro.",
+    ),
+    ("Good to have you back", "Qué bueno tenerte de vuelta"),
+    (
+        "Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager.",
+        "Entra con tu llave de acceso: la huella, el rostro o el PIN de este dispositivo, o tu gestor de contraseñas.",
+    ),
+    ("Lost your passkey?", "¿Perdiste tu llave de acceso?"),
+    (
+        "No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey.",
+        "No pasa nada. En el servidor del hub, ejecuta {command}. Muestra un código válido durante 10 minutos: escríbelo aquí y crea una llave de acceso nueva.",
+    ),
+    (
+        "Code accepted! Now, create your passkey",
+        "¡Código aceptado! Ahora, crea tu llave de acceso",
+    ),
+    (
+        "It is how you will enter the panel from now on, with no password to remember.",
+        "Así entrarás al panel de ahora en adelante, sin contraseña que recordar.",
+    ),
+    (
+        "The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak.",
+        "La llave de acceso se queda en este dispositivo o en tu gestor de contraseñas, y se abre con tu huella, tu rostro o el PIN del dispositivo. El hub guarda solo lo que la comprueba: no hay contraseña que pueda filtrarse.",
+    ),
+    (
+        "It will work at this address:",
+        "Funcionará en esta dirección:",
+    ),
+    ("Create my passkey", "Crear mi llave de acceso"),
+    (
+        "If you use a password manager, the passkey can go along to your other devices.",
+        "Si usas un gestor de contraseñas, la llave de acceso puede pasar a tus otros dispositivos.",
+    ),
+    (
+        "Left this page by accident? Type the same code again: it is only spent when the passkey is created.",
+        "¿Saliste de esta página sin querer? Escribe el mismo código otra vez: solo se gasta cuando se crea la llave de acceso.",
+    ),
+    ("Check the installation", "Comprobar la instalación"),
     // guide.rs
     ("Name", "Nombre"),
     ("Block", "Bloque"),
@@ -305,6 +375,27 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Reconnect {name}", "Reconectar {name}"),
     ("Connect {name}", "Conectar {name}"),
     ("Steps", "Pasos"),
+    ("How it works:", "Cómo funciona:"),
+    (
+        "You give the Hermes a name here.",
+        "Aquí le das un nombre al Hermes.",
+    ),
+    (
+        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
+        "El hub genera una invitación: un bloque de texto que pegas en el canal de órdenes de ese Hermes, y en ningún otro lugar.",
+    ),
+    (
+        "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
+        "El Hermes descarga el conector desde este hub y responde con un código de verificación de 6 dígitos.",
+    ),
+    (
+        "You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms.",
+        "Escribes el código aquí y apruebas. Listo: el Hermes aparece como conectado en cuanto su conector lo confirma.",
+    ),
+    (
+        "Let's connect your first Hermes",
+        "Conectemos tu primer Hermes",
+    ),
     // editor.rs
     (
         "Being woken requires reading. Nothing was saved.",
@@ -606,11 +697,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     // mod.rs
     (
-        "Invalid or expired code. Issue another one on the hub's server.",
-        "Código no válido o caducado. Emite otro en el servidor del hub.",
-    ),
-    (
         "Too many attempts right now. Wait a minute and try again.",
         "Demasiados intentos en este momento. Espera un minuto e inténtalo de nuevo.",
     ),
+    // check.rs
+    ("ok", "ok"),
+    ("check", "revisa"),
+    ("attention", "atención"),
+    ("later", "después"),
+    ("failed", "falló"),
+    ("Panel address", "Dirección del panel"),
+    ("Connectors address", "Dirección de los conectores"),
+    ("Your address", "Tu dirección"),
+    ("Database password", "Contraseña de la base de datos"),
+    ("Data folder", "Carpeta de datos"),
+    ("WhatsApp engine", "Motor de WhatsApp"),
+    (
+        "Your passkey works here.",
+        "Tu llave de acceso funciona aquí.",
+    ),
+    (
+        "Open it: it should say it is the address of the connectors.",
+        "Ábrela: debe decir que es la dirección de los conectores.",
+    ),
+    (
+        "The hub sees you at {address}. Is it yours? If not, the proxy is not passing the real address.",
+        "El hub te ve en {address}. ¿Es tuya? Si no lo es, el proxy no está pasando la dirección real.",
+    ),
+    (
+        "A connection from {address}, which is not in ARAUTO_TRUSTED_PROXIES, brought a forwarded address. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "Una conexión desde {address}, que no está en ARAUTO_TRUSTED_PROXIES, trajo una dirección reenviada. Añade esa dirección a ARAUTO_TRUSTED_PROXIES y despliega de nuevo.",
+    ),
+    (
+        "The hub sees you at {address}, an address of an internal network: the proxy is not trusted yet. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "El hub te ve en {address}, una dirección de red interna: todavía no se confía en el proxy. Añade esa dirección a ARAUTO_TRUSTED_PROXIES y despliega de nuevo.",
+    ),
+    (
+        "Replaced by one nobody saw.",
+        "Reemplazada por una que nadie vio.",
+    ),
+    (
+        "Not replaced by the hub: this installation sets the password of the database itself.",
+        "No reemplazada por el hub: esta instalación define la contraseña de la base de datos por su cuenta.",
+    ),
+    (
+        "The replacement failed. See the log of the hub, then run {command}.",
+        "La sustitución falló. Mira el registro del hub y después ejecuta {command}.",
+    ),
+    ("Ready for your Hermes.", "Listo para tus Hermes."),
+    (
+        "The downloads folder is empty: a Hermes cannot be connected through the panel. Rebuild the image of the hub.",
+        "La carpeta de descargas está vacía: no se puede conectar un Hermes desde el panel. Reconstruye la imagen del hub.",
+    ),
+    (
+        "It holds the master key and the password of the database. Back it up: without it, the hub cannot open what it kept encrypted.",
+        "Contiene la clave maestra y la contraseña de la base de datos. Haz una copia de seguridad: sin ella, el hub no puede abrir lo que guardó cifrado.",
+    ),
+    ("Configured.", "Configurado."),
+    (
+        "A Hermes can be connected without it; WhatsApp numbers need it.",
+        "Un Hermes se puede conectar sin él; los números de WhatsApp lo necesitan.",
+    ),
+    (
+        "The hub checked a few things by itself. Nothing here changes anything: it is only so you know how it turned out.",
+        "El hub comprobó algunas cosas por su cuenta. Nada de aquí cambia nada: es solo para que sepas cómo salió.",
+    ),
+    // installation.rs
+    (
+        "Step 3 · Let's check the installation",
+        "Paso 3 · Comprobemos la instalación",
+    ),
+    (
+        "All set: your passkey was created!",
+        "¡Todo listo: tu llave de acceso fue creada!",
+    ),
+    (
+        "The same by command: {command}",
+        "Lo mismo por comando: {command}",
+    ),
+    ("Connect my first Hermes", "Conectar mi primer Hermes"),
+    ("Do it later", "Hacerlo más tarde"),
 ];

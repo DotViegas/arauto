@@ -66,8 +66,15 @@ has a step marked with **[PROOF]**.
 - [ ] **2.1** Configure the proxy ([proxy/README.md](proxy/README.md)): only `/v1/channel` and
   `/v1/download/` reach the hub; websocket; timeout of 120 seconds; the header `X-Forwarded-For`
   **replaced** by the address of whoever arrived.
-- [ ] **2.2** From outside the server: `curl -I https://YOUR-ADDRESS/` answers 404; ports 8443,
-  8444 and 8445 do not answer directly; `curl -I https://YOUR-ADDRESS/sign-in` answers 404.
+- [ ] **2.2** From outside the server: `curl -s -o /dev/null -w '%{http_code}\n' https://YOUR-ADDRESS/`
+  (a GET: the hub answers 404 to every method other than GET, so a `curl -I`, which sends HEAD,
+  would always show 404) answers 404 if the proxy of
+  step 2.1 passes only `/v1/channel` and `/v1/download/` (it never reaches the hub); where the
+  proxy does pass `/`, the root of the port of the connectors answers 200 with a fixed text that
+  says the address is for the connectors and names no other address of the hub (in the code and
+  tested against a test hub on 13/11/2026; not yet seen behind a real proxy: this step is that
+  test). Ports 8443, 8444 and 8445 do not answer
+  directly; `curl -s -o /dev/null -w '%{http_code}\n' https://YOUR-ADDRESS/sign-in` answers 404.
 - [ ] **2.3** `curl -fsSLO https://YOUR-ADDRESS/v1/download/arauto-connector-linux-x86_64` downloads
   the file. Keep its `sha256sum` for step 3.1.
 - [ ] **2.4** `dc logs hub` does **not** have the line "a connection that is not from a trusted

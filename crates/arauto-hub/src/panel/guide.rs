@@ -257,7 +257,17 @@ fn hint(html: &mut Html, sentence: &'static str) {
 fn body(html: &mut Html, screen: &Screen) {
     match screen {
         Screen::Name { typed, error } => {
-            html.raw("<h3>")
+            html.raw("<div class=\"howto\"><p><b>")
+                .t(k("How it works:"))
+                .raw("</b></p><ol><li>")
+                .t(k("You give the Hermes a name here."))
+                .raw("</li><li>")
+                .t(k("The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else."))
+                .raw("</li><li>")
+                .t(k("The Hermes downloads the connector from this hub and answers with a verification code of 6 digits."))
+                .raw("</li><li>")
+                .t(k("You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms."))
+                .raw("</li></ol></div><h3>")
                 .t(k("What name will this Hermes have in the panel?"))
                 .raw("</h3><form id=\"guide-form\" method=\"post\" action=\"/hermes/connect\" autocomplete=\"off\"><div class=\"field\"><label for=\"guide-name\">")
                 .t(k("Name of the Hermes"))
@@ -605,6 +615,8 @@ pub fn page(frame: &Frame, hermes: &HermesPage, screen: &Screen) -> String {
     match screen.subject() {
         Some((name, true)) => html.fill(k("Reconnect {name}"), &[("name", Arg::Text(name))]),
         Some((name, false)) => html.fill(k("Connect {name}"), &[("name", Arg::Text(name))]),
+        // The first window of the first Hermes of the organization says so in its title.
+        None if hermes.rows.is_empty() => html.t(k("Let's connect your first Hermes")),
         None => html.t(k("Connect Hermes")),
     };
     html.raw("</h2><a class=\"close\" href=\"/\" aria-label=\"")
@@ -765,8 +777,40 @@ mod tests {
             typed: String::new(),
             error: None,
         });
-        assert!(name.contains("<h2 id=\"guide-title\">Connect Hermes</h2>"));
+        // While the organization has no Hermes, the window says it is about the first one.
+        assert!(name.contains("<h2 id=\"guide-title\">Let&#39;s connect your first Hermes</h2>"));
         assert!(!name.contains("class=\"done\""));
+        // "How it works" is on the first window, with its four steps.
+        assert!(name.contains("How it works:"));
+        assert!(
+            name.contains("You give the Hermes a name here.")
+                && name.contains("verification code of 6 digits")
+        );
+        // With a Hermes in the list the window has the plain title again.
+        let listed = HermesPage {
+            rows: vec![crate::panel::view::HermesRow {
+                name: "ana".to_owned(),
+                tone: crate::panel::view::Tone::Ok,
+                state: "x",
+                numbers: vec![],
+                woken: false,
+                connector: None,
+                seen: String::new(),
+                explain: None,
+                action: crate::panel::view::RowAction::Continue,
+            }],
+            ..HermesPage::default()
+        };
+        let with_one = page(
+            &Frame::default(),
+            &listed,
+            &Screen::Name {
+                typed: String::new(),
+                error: None,
+            },
+        );
+        assert!(with_one.contains("<h2 id=\"guide-title\">Connect Hermes</h2>"));
+        assert!(!with_one.contains("connect your first Hermes"));
         let done = shown(&Screen::Done {
             name: "ana".to_owned(),
             connected: true,

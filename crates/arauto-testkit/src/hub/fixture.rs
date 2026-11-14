@@ -56,6 +56,8 @@ pub struct Fixture {
     pub clock: Arc<dyn Clock>,
     /// The files the hub serves for download, read when it starts.
     pub downloads: Downloads,
+    /// How the hub reads the address of a client, when it starts.
+    pub client_ip: ClientIpSource,
 }
 
 /// The settings of the served tests: the documented values, a sweep every 200 ms, and the
@@ -119,13 +121,14 @@ impl Fixture {
             settings,
             clock,
             downloads: Downloads::empty(),
+            client_ip: ClientIpSource::Socket,
         }
     }
 
     /// Starts the hub.
     pub async fn start(&mut self) {
         let running = channel::start(
-            &support::config(&self.installation, ClientIpSource::Socket),
+            &support::config(&self.installation, self.client_ip.clone()),
             Options {
                 settings: self.settings.clone(),
                 downloads: self.downloads.clone(),
@@ -148,7 +151,7 @@ impl Fixture {
     /// Starts the hub with the port of the connectors at `connectors`: after a stop, the
     /// connectors find it where it was. The port may take a moment to be free again.
     pub async fn start_at(&mut self, connectors: SocketAddr) {
-        let mut config = support::config(&self.installation, ClientIpSource::Socket);
+        let mut config = support::config(&self.installation, self.client_ip.clone());
         config.listen = connectors;
         let mut tries = 0u32;
         loop {

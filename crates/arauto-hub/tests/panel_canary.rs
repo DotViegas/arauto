@@ -14,9 +14,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use arauto_hub::channel::Downloads;
+use arauto_hub::first_access::{self, Output};
 use arauto_hub::repo::panel::SESSION_IDLE_MS;
 use arauto_protocol::clock::{Clock, ManualClock, SystemClock};
 use arauto_protocol::invite::Invite;
+use arauto_protocol::message::DeclaredText;
 use arauto_testkit::device::{self, Enrolled};
 use arauto_testkit::http::{self, Response};
 use arauto_testkit::hub::fixture::{self, Fixture};
@@ -70,17 +72,53 @@ fn leaks(text: &str, secrets: &[(String, String)]) -> Vec<String> {
         .collect()
 }
 
-/// A verification code shows up as `123-456`, or as six digits standing alone.
-fn has_code(text: &str, code: &str) -> bool {
-    let digits: String = code.chars().filter(char::is_ascii_digit).collect();
-    if text.contains(code) {
-        return true;
+/// Where a verification code shows up in `text`: as `123-456`, or as six digits standing alone,
+/// with neither a letter nor a digit beside them. A run of six digits inside a word (a hex
+/// digest, an identifier, base64) is not a code someone wrote: the long log of every level holds
+/// many of them, and one may match by chance.
+fn code_at(text: &str, code: &str) -> Option<(usize, usize)> {
+    if let Some(at) = text.find(code) {
+        return Some((at, code.len()));
     }
-    text.match_indices(digits.as_str()).any(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + digits.len()..].chars().next();
-        !before.is_some_and(|c| c.is_ascii_digit()) && !after.is_some_and(|c| c.is_ascii_digit())
-    })
+    let digits: String = code.chars().filter(char::is_ascii_digit).collect();
+    text.match_indices(digits.as_str())
+        .find(|(at, _)| {
+            let before = text[..*at].chars().next_back();
+            let after = text[at + digits.len()..].chars().next();
+            !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
+        })
+        .map(|(at, _)| (at, digits.len()))
+}
+
+fn has_code(text: &str, code: &str) -> bool {
+    code_at(text, code).is_some()
+}
+
+/// The text around a code that was found, with the code itself masked: a failure says what
+/// carried it.
+fn around(text: &str, (at, len): (usize, usize)) -> String {
+    let mut start = at.saturating_sub(80);
+    while !text.is_char_boundary(start) {
+        start -= 1;
+    }
+    let mut end = (at + len + 80).min(text.len());
+    while !text.is_char_boundary(end) {
+        end += 1;
+    }
+    format!("{}[CODE]{}", &text[start..at], &text[at + len..end])
+}
+
+/// The secrets `place` must not hold: the pages of the guide show the invites on purpose.
+fn secrets_for(
+    place: &str,
+    secrets: &[(String, String)],
+    not_shown: &[(String, String)],
+) -> Vec<(String, String)> {
+    if place == "the pages of the guide" {
+        not_shown.to_vec()
+    } else {
+        secrets.to_vec()
+    }
 }
 
 /// The invite inside the block a page shows.
@@ -109,25 +147,75 @@ fn the_detector_sees_a_planted_secret() {
     assert!(has_code("the code 028-213 was typed", "028-213"));
     assert!(has_code(r#"{"code":"028213"}"#, "028-213"));
     assert!(!has_code("at 1800000282130", "028-213"));
+    assert!(has_code("code=028213&name=x", "028-213"));
+    assert!(!has_code("digest 3f028213a9", "028-213"));
+    let text = "before code=028213 after";
+    assert_eq!(
+        around(text, code_at(text, "028-213").unwrap()),
+        "before code=[CODE] after"
+    );
 }
 
-/// An entry code, as the command shows it, with every way it could have been written.
-async fn code(fixture: &Fixture, what: &str, secrets: &mut Vec<(String, String)>) -> String {
-    let issued = fixture.admin.panel_code(fixture.now()).await.unwrap();
-    let shown = issued.code.reveal().to_string();
+/// Every way the code `shown` could have been written, noted as secrets of `what`.
+fn spell_code(shown: &str, what: &str, secrets: &mut Vec<(String, String)>) {
     let plain = shown.replace('-', "");
     let bytes = BASE32_NOPAD
         .decode(plain.to_ascii_uppercase().as_bytes())
         .unwrap();
     assert_eq!(bytes.len(), 20);
-    secrets.push((what.to_owned(), shown.clone()));
+    secrets.push((what.to_owned(), shown.to_owned()));
     secrets.push((what.to_owned(), shown.to_ascii_uppercase()));
     for written in spellings(&bytes) {
         secrets.push((what.to_owned(), written));
     }
     // The first groups alone would already help whoever guesses.
     secrets.push((format!("{what} (its start)"), shown[..14].to_owned()));
+}
+
+/// An entry code, as the command shows it, with every way it could have been written.
+async fn code(fixture: &Fixture, what: &str, secrets: &mut Vec<(String, String)>) -> String {
+    let issued = fixture.admin.panel_code(fixture.now()).await.unwrap();
+    let shown = issued.code.reveal().to_string();
+    spell_code(&shown, what, secrets);
     shown
+}
+
+/// What the task of the first access wrote where the operator reads: the one place the start
+/// code is allowed to be. It is not the log.
+#[derive(Default)]
+struct Block(Mutex<String>);
+
+impl Output for Block {
+    fn write(&self, text: &str) {
+        self.0.lock().unwrap().push_str(text);
+    }
+}
+
+/// Everything the panel answered during the run, bodies and headers, except the cookie it sets:
+/// that one is the identifier of a session on purpose.
+static SEEN: Mutex<String> = Mutex::new(String::new());
+
+/// The same for the pages of the guide that connects a Hermes. They show the invite and its
+/// block to the admin on purpose, so they are scanned for every other secret.
+static GUIDE: Mutex<String> = Mutex::new(String::new());
+
+/// Notes an answer in [`SEEN`], or in [`GUIDE`], and gives it back.
+fn seen(path: &str, answer: Response) -> Response {
+    let mut all = if path.starts_with("/hermes/") {
+        GUIDE.lock().unwrap()
+    } else {
+        SEEN.lock().unwrap()
+    };
+    all.push_str(&answer.status.to_string());
+    all.push('\n');
+    for (name, value) in &answer.headers {
+        if name != "set-cookie" {
+            all.push_str(&format!("{name}: {value}\n"));
+        }
+    }
+    all.push_str(&answer.text());
+    all.push('\n');
+    answer
 }
 
 async fn post(fixture: &Fixture, path: &str, cookie: Option<&str>, body: &str) -> Response {
@@ -140,9 +228,12 @@ async fn post(fixture: &Fixture, path: &str, cookie: Option<&str>, body: &str) -
         headers.push(("Cookie", cookie));
     }
     let panel = fixture.running().panel_addr().unwrap();
-    http::post(panel, path, &headers, body.as_bytes(), PATIENCE)
-        .await
-        .unwrap()
+    seen(
+        path,
+        http::post(panel, path, &headers, body.as_bytes(), PATIENCE)
+            .await
+            .unwrap(),
+    )
 }
 
 async fn get(fixture: &Fixture, path: &str, cookie: Option<&str>) -> Response {
@@ -151,7 +242,10 @@ async fn get(fixture: &Fixture, path: &str, cookie: Option<&str>) -> Response {
         headers.push(("Cookie", cookie));
     }
     let panel = fixture.running().panel_addr().unwrap();
-    http::get(panel, path, &headers, PATIENCE).await.unwrap()
+    seen(
+        path,
+        http::get(panel, path, &headers, PATIENCE).await.unwrap(),
+    )
 }
 
 /// A value as a form field carries it.
@@ -215,6 +309,20 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         .with_writer(move || writer.clone())
         .init();
 
+    // R9 and R4, with the output the hub really uses: the standard error is not a line of the
+    // log. A text handed to it, with every level of the log captured, is in no captured line.
+    // The test fails when `Stderr::write` is changed to write through `tracing`.
+    {
+        use first_access::Output as _;
+        first_access::Stderr.write("PLANTED-TEXT-FOR-THE-STDERR-WRITER\n");
+        assert!(
+            !captured
+                .text()
+                .contains("PLANTED-TEXT-FOR-THE-STDERR-WRITER"),
+            "the writer of the block goes through the log"
+        );
+    }
+
     let clock = ManualClock::new(SystemClock.now_ms());
     // A hub that serves a connector: the panel makes a block for it.
     let mut fixture = Fixture::stopped(
@@ -232,6 +340,39 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     fixture.start().await;
     let mut secrets: Vec<(String, String)> = Vec::new();
     let mut codes: Vec<String> = Vec::new();
+
+    // The start code: the hub writes it where the operator reads, and nowhere else. It is
+    // typed, a passkey is registered with it, and the task writes its closing line. The code is
+    // in what the operator reads, and in no line of the log, no row, no page.
+    let block = Arc::new(Block::default());
+    let task =
+        first_access::start(fixture.hub(), block.clone(), DeclaredText::lossy("canary")).await;
+    let written = block.0.lock().unwrap().clone();
+    let start_code = written
+        .lines()
+        .find_map(|line| line.strip_prefix("INSTALLATION CODE: "))
+        .expect("the block carries the code")
+        .to_owned();
+    spell_code(&start_code, "start code", &mut secrets);
+    let mut pages = String::new();
+    for path in ["/sign-in", "/first-access", "/"] {
+        pages.push_str(&get(&fixture, path, None).await.text());
+    }
+    let started = sign_in(&fixture, &start_code, "start session", &mut secrets).await;
+    pages.push_str(&get(&fixture, "/first-access", Some(&started)).await.text());
+    pages.push_str(&get(&fixture, "/", Some(&started)).await.text());
+    assert_eq!(
+        post(&fixture, "/sign-out", Some(&started), "").await.status,
+        303
+    );
+    for _ in 0..100 {
+        if !task.running() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(!task.running());
+    assert!(block.0.lock().unwrap().contains("From now on the panel"));
 
     // A code that is cancelled by the next one, typed after it died; a code typed wrong, in
     // an address, by a request that is not of the panel; and then typed right.
@@ -256,30 +397,36 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     assert_eq!(get(&fixture, &in_the_address, None).await.status, 200);
     let panel = fixture.running().panel_addr().unwrap();
     let elsewhere = [("Host", PANEL_HOST), ("Origin", "http://evil.test")];
-    let refused = http::post(
-        panel,
+    let refused = seen(
         "/sign-in",
-        &elsewhere,
-        format!("code={entry}").as_bytes(),
-        PATIENCE,
-    )
-    .await
-    .unwrap();
+        http::post(
+            panel,
+            "/sign-in",
+            &elsewhere,
+            format!("code={entry}").as_bytes(),
+            PATIENCE,
+        )
+        .await
+        .unwrap(),
+    );
     assert_eq!(refused.status, 403);
     let not_a_form = [
         ("Host", PANEL_HOST),
         ("Origin", PANEL_ORIGIN),
         ("Content-Type", "text/plain"),
     ];
-    let refused = http::post(
-        panel,
+    let refused = seen(
         "/sign-in",
-        &not_a_form,
-        format!("code={entry}").as_bytes(),
-        PATIENCE,
-    )
-    .await
-    .unwrap();
+        http::post(
+            panel,
+            "/sign-in",
+            &not_a_form,
+            format!("code={entry}").as_bytes(),
+            PATIENCE,
+        )
+        .await
+        .unwrap(),
+    );
     assert_eq!(refused.status, 415);
 
     // A session used, then closed by its owner.
@@ -356,8 +503,20 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         "the log is captured (it has {} bytes)",
         log.len()
     );
+    // Every table of the database, not a list of the ones that were thought of.
+    let tables: Vec<String> = sqlx::query_scalar(
+        "SELECT table_name::text FROM information_schema.tables \
+         WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY 1",
+    )
+    .fetch_all(&fixture.pool)
+    .await
+    .unwrap();
+    assert!(
+        tables.len() > 10 && tables.iter().any(|table| table == "panel_passkey"),
+        "{tables:?}"
+    );
     let mut stored = String::new();
-    for table in ["panel_entry", "panel_session", "audit", "alert", "invite"] {
+    for table in &tables {
         let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT row_to_json(t)::text FROM {table} t"
         )))
@@ -367,6 +526,20 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         stored.push_str(&rows.join("\n"));
         stored.push('\n');
     }
+    // Every file under the data folder.
+    let mut files = String::new();
+    let mut folders = vec![fixture.installation.data_dir.clone()];
+    while let Some(folder) = folders.pop() {
+        for entry in std::fs::read_dir(&folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                folders.push(path);
+            } else if let Ok(bytes) = std::fs::read(&path) {
+                files.push_str(&String::from_utf8_lossy(&bytes));
+                files.push('\n');
+            }
+        }
+    }
     for action in [
         "panel.code_issued",
         "panel.signed_in",
@@ -375,11 +548,40 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     ] {
         assert!(stored.contains(action), "{action} is in the audit");
     }
-    for (place, text) in [("log", &log), ("the database", &stored)] {
-        let found = leaks(text, &secrets);
+    pages.push_str(&SEEN.lock().unwrap());
+    // What the task wrote where the operator reads holds the start code and no other secret.
+    let block_text = block.0.lock().unwrap().clone();
+    let others: Vec<(String, String)> = secrets
+        .iter()
+        .filter(|(what, _)| !what.starts_with("start code"))
+        .cloned()
+        .collect();
+    let found = leaks(&block_text, &others);
+    assert!(found.is_empty(), "the block holds: {found:?}");
+    // The pages of the guide hold the invites they show, and no other secret.
+    let guide = GUIDE.lock().unwrap().clone();
+    assert!(
+        guide.contains(&invite),
+        "the pages of the guide are scanned"
+    );
+    let not_shown: Vec<(String, String)> = secrets
+        .iter()
+        .filter(|(what, _)| what != "invite" && what != "replaced invite")
+        .cloned()
+        .collect();
+    for (place, text) in [
+        ("log", &log),
+        ("the database", &stored),
+        ("the files of the data folder", &files),
+        ("the pages", &pages),
+        ("the pages of the guide", &guide),
+    ] {
+        let found = leaks(text, &secrets_for(place, &secrets, &not_shown));
         assert!(found.is_empty(), "{place} holds: {found:?}");
         for code in &codes {
-            assert!(!has_code(text, code), "{place} holds a verification code");
+            if let Some(at) = code_at(text, code) {
+                panic!("{place} holds a verification code: {}", around(text, at));
+            }
         }
     }
 }

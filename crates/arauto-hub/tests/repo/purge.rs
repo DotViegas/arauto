@@ -595,21 +595,33 @@ fn digest() -> Vec<u8> {
     [Uuid::new_v4().into_bytes(), Uuid::new_v4().into_bytes()].concat()
 }
 
-async fn panel_entry(world: &World, state: &str, expires_at: i64) -> Uuid {
+/// A code of the panel in `state`. `kind` is `command` or `start`; a command code has a
+/// deadline and a start code has none. `at` is the moment the code stopped being accepted by
+/// the way its state says: when it was used, when it was cancelled, or its deadline when it is
+/// still issued. `deadline` is the deadline of a command code that is not issued.
+async fn panel_entry(world: &World, state: &str, kind: &str, at: i64, deadline: i64) -> Uuid {
     let id = Uuid::new_v4();
+    let expires_at = match (kind, state) {
+        ("start", _) => None,
+        (_, "issued") => Some(at),
+        _ => Some(deadline),
+    };
     sqlx::query(
-        "INSERT INTO panel_entry (id, organization_id, digest, state, created_by, created_at, \
-                                  expires_at, used_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "INSERT INTO panel_entry (id, organization_id, digest, state, kind, created_by, \
+                                  created_at, expires_at, used_at, cancelled_at, cancelled_by) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(id)
     .bind(world.org.id())
     .bind((state == "issued").then(digest))
     .bind(state)
+    .bind(kind)
     .bind(world.admin.id)
-    .bind(expires_at - 600_000)
+    .bind(at - 600_000)
     .bind(expires_at)
-    .bind((state == "used").then_some(expires_at - 1))
+    .bind((state == "used").then_some(at))
+    .bind((state == "cancelled").then_some(at))
+    .bind((state == "cancelled").then_some("command"))
     .execute(world.pool())
     .await
     .unwrap();
@@ -639,8 +651,9 @@ async fn panel_session(world: &World, open: bool, expires_at: i64) -> Uuid {
 }
 
 /// The codes and the sessions of the panel go 30 days after the moment they stopped being
-/// accepted, whatever their state says, and never before: what is still accepted is never one
-/// of the rows the purge takes.
+/// accepted, and never before: a code used or cancelled counts from that moment, not from its
+/// deadline; a command code that nobody typed counts from its deadline; and a start code that
+/// is still unspent is never purged (R15).
 #[tokio::test]
 async fn the_rows_of_the_panel_go_thirty_days_after_they_stopped_being_accepted() {
     let world = World::own().await;
@@ -650,19 +663,27 @@ async fn the_rows_of_the_panel_go_thirty_days_after_they_stopped_being_accepted(
     let mut due = Vec::new();
     let mut within = Vec::new();
     for state in ["used", "cancelled"] {
-        due.push(("panel_entry", panel_entry(&world, state, reached).await));
-        within.push(("panel_entry", panel_entry(&world, state, reached + 1).await));
+        // The deadline of a command code is later than the moment the code was spent: the
+        // days are counted from the moment it was used or cancelled.
+        due.push((
+            "panel_entry",
+            panel_entry(&world, state, "command", reached, reached + 10 * DAY_MS).await,
+        ));
+        // And an earlier deadline does not make a code that was used a moment ago due.
+        within.push((
+            "panel_entry",
+            panel_entry(&world, state, "command", reached + 1, reached - 10 * DAY_MS).await,
+        ));
+        // A start code that was used or cancelled has no deadline: it counts the same.
+        due.push((
+            "panel_entry",
+            panel_entry(&world, state, "start", reached - DAY_MS, 0).await,
+        ));
+        within.push((
+            "panel_entry",
+            panel_entry(&world, state, "start", reached + 1, 0).await,
+        ));
     }
-    // A code nobody typed stays `issued` until another is issued: it goes all the same. There
-    // is one issued code at a time, so the one within its days is the one still accepted.
-    due.push((
-        "panel_entry",
-        panel_entry(&world, "cancelled", reached - DAY_MS).await,
-    ));
-    within.push((
-        "panel_entry",
-        panel_entry(&world, "issued", now + 600_000).await,
-    ));
     for open in [true, false] {
         due.push(("panel_session", panel_session(&world, open, reached).await));
         within.push((
@@ -676,7 +697,7 @@ async fn the_rows_of_the_panel_go_thirty_days_after_they_stopped_being_accepted(
     }
 
     let purged = run(&world, 2).await;
-    assert_eq!(purged.of(Target::PanelEntries).rows, 3);
+    assert_eq!(purged.of(Target::PanelEntries).rows, 4);
     assert_eq!(purged.of(Target::PanelSessions).rows, 2);
     assert_eq!(left(&world, &due).await, []);
     assert_eq!(left(&world, &within).await, within);
@@ -684,9 +705,111 @@ async fn the_rows_of_the_panel_go_thirty_days_after_they_stopped_being_accepted(
     // One millisecond later, the ones that were one millisecond short go too.
     world.clock.advance(1);
     let purged = run(&world, 500).await;
-    assert_eq!(purged.of(Target::PanelEntries).rows, 2);
+    assert_eq!(purged.of(Target::PanelEntries).rows, 4);
     assert_eq!(purged.of(Target::PanelSessions).rows, 2);
-    assert_eq!(left(&world, &within).await.len(), 3);
+    assert_eq!(
+        left(&world, &within).await.len(),
+        2,
+        "the two sessions still in their hours"
+    );
+
+    // There is one issued code at a time. A command code nobody typed goes 30 days after its
+    // deadline, and not before.
+    let now = world.now();
+    let command = panel_entry(&world, "issued", "command", now - 30 * DAY_MS + 1, 0).await;
+    let command = [("panel_entry", command)];
+    assert_eq!(run(&world, 500).await.of(Target::PanelEntries).rows, 0);
+    assert_eq!(left(&world, &command).await, command);
+    world.clock.advance(1);
+    assert_eq!(run(&world, 500).await.of(Target::PanelEntries).rows, 1);
+    assert_eq!(left(&world, &command).await, []);
+
+    // A start code that nobody used has no deadline: however long it waits, it is kept. When
+    // it is cancelled, its days count from then.
+    let start = panel_entry(&world, "issued", "start", 0, 0).await;
+    let start = [("panel_entry", start)];
+    world.clock.advance(400 * DAY_MS);
+    assert_eq!(run(&world, 500).await.of(Target::PanelEntries).rows, 0);
+    assert_eq!(left(&world, &start).await, start);
+    sqlx::query(
+        "UPDATE panel_entry SET state = 'cancelled', digest = NULL, cancelled_by = 'command', \
+                                cancelled_at = $1 WHERE id = $2",
+    )
+    .bind(world.now())
+    .bind(start[0].1)
+    .execute(world.pool())
+    .await
+    .unwrap();
+    world.clock.advance(30 * DAY_MS - 1);
+    assert_eq!(run(&world, 500).await.of(Target::PanelEntries).rows, 0);
+    world.clock.advance(1);
+    assert_eq!(run(&world, 500).await.of(Target::PanelEntries).rows, 1);
+}
+
+/// R6 and R15: a session of the panel points at the code that opened it with a key that sets the
+/// pointer to null when the code is purged. In real use the code is spent at T, its session
+/// lasts to T + 12 hours, so the code is due 30 days after T and the session 12 hours later:
+/// the purge of the code must neither fail on the session that still points at it (a plain key
+/// would stop the run every night for 12 hours) nor take the session with it (a cascade would
+/// lose its facts early). Then the session goes at its own deadline.
+#[tokio::test]
+async fn a_code_goes_while_the_session_it_opened_stays_and_loses_its_pointer() {
+    let world = World::own().await;
+    let now = world.now();
+    let reached = now - 30 * DAY_MS;
+    let mut pairs = Vec::new();
+    for kind in ["command", "start"] {
+        let entry = panel_entry(&world, "used", kind, reached, reached + 10 * DAY_MS).await;
+        let session = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO panel_session (id, organization_id, admin_id, digest, state, \
+                                        close_reason, created_at, expires_at, closed_at, \
+                                        entry_id, reach) \
+             VALUES ($1, $2, $3, NULL, 'closed', 'expired', $4, $5, $5, $6, 'full')",
+        )
+        .bind(session)
+        .bind(world.org.id())
+        .bind(world.admin.id)
+        .bind(reached - 60_000)
+        .bind(reached + 12 * 3_600_000)
+        .bind(entry)
+        .execute(world.pool())
+        .await
+        .unwrap();
+        pairs.push((entry, session));
+    }
+
+    let purged = run(&world, 500).await;
+    assert_eq!(purged.of(Target::PanelEntries).rows, 2, "the codes go");
+    assert_eq!(
+        purged.of(Target::PanelSessions).rows,
+        0,
+        "the sessions are not due yet"
+    );
+    for (_, session) in &pairs {
+        let pointer: Option<Option<Uuid>> =
+            sqlx::query_scalar("SELECT entry_id FROM panel_session WHERE id = $1")
+                .bind(session)
+                .fetch_optional(world.pool())
+                .await
+                .unwrap();
+        assert_eq!(pointer, Some(None), "the session stays, with no pointer");
+    }
+
+    world.clock.advance(12 * 3_600_000);
+    let purged = run(&world, 500).await;
+    assert_eq!(purged.of(Target::PanelSessions).rows, 2);
+
+    // The key itself, as the database says it.
+    let action: String = sqlx::query_scalar(
+        "SELECT confdeltype::text FROM pg_constraint \
+         WHERE conrelid = 'panel_session'::regclass AND contype = 'f' \
+           AND confrelid = 'panel_entry'::regclass",
+    )
+    .fetch_one(world.pool())
+    .await
+    .unwrap();
+    assert_eq!(action, "n", "ON DELETE SET NULL");
 }
 
 // ---------------------------------------------------------------------------- the restored mode

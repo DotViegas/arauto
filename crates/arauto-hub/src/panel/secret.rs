@@ -103,13 +103,17 @@ impl EntryCode {
     /// The code as it is shown, once: eight groups of four, in lowercase.
     #[must_use]
     pub fn reveal(&self) -> Zeroizing<String> {
-        let plain = Zeroizing::new(BASE32_NOPAD.encode(self.0.expose()).to_ascii_lowercase());
+        // Encoded into a buffer that is zeroed when it is dropped, and lowered in place: no
+        // plain copy of the code is left in freed memory.
+        let mut plain = Zeroizing::new(vec![0_u8; BASE32_NOPAD.encode_len(ENTRY_LEN)]);
+        BASE32_NOPAD.encode_mut(self.0.expose(), plain.as_mut_slice());
+        plain.make_ascii_lowercase();
         let mut grouped = Zeroizing::new(String::with_capacity(ENTRY_TEXT_LEN + 7));
-        for (index, character) in plain.chars().enumerate() {
+        for (index, byte) in plain.iter().enumerate() {
             if index > 0 && index % 4 == 0 {
                 grouped.push('-');
             }
-            grouped.push(character);
+            grouped.push(char::from(*byte));
         }
         grouped
     }

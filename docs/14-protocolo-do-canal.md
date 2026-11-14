@@ -56,9 +56,20 @@ All on the port of the connectors.
 - Health and metrics stay on another port, which is not published ([15](15-mvp.md), section 6). In
   the hub, the internal port answers only `GET /health`, with `ok`; the connectors' port does not
   answer it.
-- In the hub, every other address, and every method other than `GET`, receives 404. This holds for
-  the port of the connectors and for the internal one. The panel port, when turned on, is a third
-  one: its addresses do not exist on those two, nor theirs on the panel's
+- **One exception, in the code and tested on 13/11/2026** (`channel::ports`, with the test hub):
+  `GET /` on the port of the connectors answers 200, `text/plain`, with a fixed text of three
+  lines that says the address is for the connectors, that the panel has its own address (the one
+  set in `ARAUTO_PANEL_URL`) and a pointer for the person the Open button of Easypanel brought
+  there (the wording is being corrected: the right advice is to make the panel's domain the
+  primary one, or to open the panel's address directly; see
+  [0040](decisoes/0040-painel-dentro-do-hub.md), pending decision 5). It names no host, no port
+  and no version;
+  the text carries no state of the hub. It exists because a person who opens the connectors'
+  domain by mistake (for example from the Open button of Easypanel) finds out where to go.
+- In the hub, every other address, and every method other than `GET`, receives 404 (`GET /` on
+  the internal port, too: tested). This holds for the port of the connectors and for the internal one. The
+  panel port, when turned on, is a third one: its addresses do not exist on those two, nor theirs
+  on the panel's
   ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)).
 - **Download, in the hub.** The requested name is only compared with the names of the list and never
   becomes a file path: `../`, a slash, an encoded character or a letter with its case changed simply

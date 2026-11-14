@@ -12,7 +12,7 @@
 //! | `notice` | a resolved one: confirmed, expired or discarded | `resolved_at` |
 //! | `channel_connection` | a closed one: the row of an open connection is the one T1, T2 and the end of the connection still write | `closed_at` |
 //! | `unknown_device` | a listing that is no pending proof of a restoration: that proof stays until a restored mode handles it (`docs/14-protocolo-do-canal.md`, section 6) | `seen_at`, the first time the identity presented its seal |
-//! | `panel_entry` | every entry code of the panel, used or not | its `expires_at`: past it no code is accepted |
+//! | `panel_entry` | every installation code of the panel that stopped being accepted: used, cancelled, or a command code past its 10 minutes. A start code that is still unspent is never purged | `used_at`, `cancelled_at`, or the `expires_at` of a command code |
 //! | `panel_session` | every session of the panel, closed or not | its `expires_at`: past it no session is served |
 //!
 //! A deadline has passed when the time of the hub **reached** it, as in [`super::sweep`]. A
@@ -55,7 +55,8 @@ pub enum Target {
     /// `engine_event`: the events of the engine already handled. One still to be handled is
     /// never purged: it waits for whoever reads the inbox.
     EngineEvents,
-    /// `panel_entry`: the entry codes of the panel, the days after they stopped being accepted.
+    /// `panel_entry`: the installation codes of the panel, the days after they stopped being
+    /// accepted. An unspent start code is never one of them.
     PanelEntries,
     /// `panel_session`: the sessions of the panel, the days after their hours ended.
     PanelSessions,
@@ -170,14 +171,18 @@ impl Target {
                      WHERE organization_id = $1 AND processed_at <= $2 \
                      LIMIT $3 FOR UPDATE SKIP LOCKED)"
             }
-            // A code and a session are dead by their `expires_at`, whatever their state says:
-            // nothing that is still accepted is ever one of these rows.
+            // A code stopped being accepted when it was used, when it was cancelled or, for a
+            // command code, at its `expires_at`. An unspent start code has none of the three:
+            // its time is null and it is never one of these rows. A code that was used or
+            // cancelled counts from that moment, not from its deadline.
             Target::PanelEntries => {
                 "DELETE FROM panel_entry WHERE organization_id = $1 AND id IN ( \
                      SELECT id FROM panel_entry \
-                     WHERE organization_id = $1 AND expires_at <= $2 \
+                     WHERE organization_id = $1 \
+                       AND COALESCE(used_at, cancelled_at, expires_at) <= $2 \
                      LIMIT $3 FOR UPDATE SKIP LOCKED)"
             }
+            // A session is dead by its `expires_at`, whatever its state says.
             Target::PanelSessions => {
                 "DELETE FROM panel_session WHERE organization_id = $1 AND id IN ( \
                      SELECT id FROM panel_session \

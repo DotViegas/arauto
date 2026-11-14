@@ -64,8 +64,12 @@ They hold for all code and every document.
 
 1. **No invented cryptography.** Compose known pieces and say which ones.
 2. **A long-lived secret never passes through a person:** it does not appear on a screen, in a chat,
-   log, audit or tool response. A short-lived secret (invite, pairing code, installation code)
-   appears once, where it is needed, and is never kept in the clear.
+   log, audit or tool response. A short-lived secret (invite, pairing code, the installation code
+   issued by the command) appears once, where it is needed, and is never kept in the clear. One
+   exception, and only this one: the installation code of a hub where no passkey was ever
+   registered has no deadline. It serves once: the first passkey spends it and each start of the
+   hub replaces it. Until then the hub writes it again in the output of its start, from the memory
+   of the process alone, and the database keeps only its digest.
 3. **What is only checked is kept as a public key or a digest.** What needs to be read back stays
    encrypted, with the key outside the database.
 4. **Random draws only from the system's generator.** Nothing derived from date, time, name or

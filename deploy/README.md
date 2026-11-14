@@ -50,6 +50,9 @@ that the command `admin invite` shows ([docs/02-como-funciona.md](../docs/02-com
 5. **Limit of open files** high for the hub: each connector keeps one connection.
 6. **Stop timeout** of at least 20 seconds: the hub lets the calls in progress answer before
    leaving.
+7. **One version of the hub on a database at a time.** To upgrade, stop the old hub and then start
+   the new one: two versions must not serve the same database at once (the mark of the first
+   access is written by the newer one; see [decision 0040](../docs/decisoes/0040-painel-dentro-do-hub.md)).
 
 ## The variables of the hub
 
@@ -76,8 +79,11 @@ arauto-hub serve                runs the hub
 arauto-hub health               asks the hub of this machine whether it is up (0 = it is)
 arauto-hub migrate --i-have-a-backup   applies migrations to a database that already has data
 arauto-hub admin ...            the administration, by command
-arauto-hub admin panel code     issues an installation code of the panel (10 minutes, one use):
-                                it only opens the registration of a passkey
+arauto-hub admin panel code     issues an installation code of the panel (10 minutes, one use): it
+                                only opens the registration of a passkey. The new code cancels
+                                the one in the log.
+arauto-hub admin check          the checks of the installation, the same rows as the check window
+                                of the panel (step 3); it only reads
 arauto-hub admin database rotate-password
                                 replaces the password of the database with one nobody sees
 ```

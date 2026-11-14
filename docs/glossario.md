@@ -109,7 +109,7 @@
 | **System log** | The technical log of the hub. |
 | **Purge** | Deleting what passed its retention period. |
 | **Passkey** | The access key of the phone or the computer, used in place of a password. |
-| **Installation code** | A single-use code that only opens the registration of a passkey in the panel. The hub writes one in the output of its start while no admin has a passkey, and a command on the hub's machine issues one for who lost theirs. It is a short-lived secret: it appears once, and the hub keeps only its digest ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
+| **Installation code** | A single-use code that only opens the registration of a passkey in the panel. Before the first access (no passkey was ever registered) the hub writes one in the output of its start and writes it again every 10 minutes: it has no time limit, the block with the latest time is the valid one, unless a code from the command replaced it (the hub then writes once that the code was replaced, without any code). Creating the first passkey spends it, and each start replaces it. The one the start writes is called the start code; the one the command issues, the command code. A command on the hub's machine issues another, valid for 10 minutes to be typed, for who lost the passkey or cannot open the log. The hub keeps only the digest of a code ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). |
 
 ## Conversation between Hermes
 

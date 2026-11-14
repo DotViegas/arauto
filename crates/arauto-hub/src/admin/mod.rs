@@ -941,6 +941,40 @@ impl Session {
         Ok(repo::alert::acknowledge(&self.pool, self.organization, alert, now).await?)
     }
 
+    /// `admin check`: the rows of the check of the installation, read by the same function as
+    /// the window of the panel ([`crate::check::facts`]). The addresses are the ones `env`
+    /// names; `listed` is the folder of downloads. What only the running hub sees (the address
+    /// of whoever reads the window) this does not say. Never the address or the key of the
+    /// engine.
+    ///
+    /// # Errors
+    /// What the database returns.
+    pub async fn check(
+        &self,
+        storage: &crate::config::StorageConfig,
+        listed: &[crate::download::Listed],
+        env: &impl crate::config::Lookup,
+    ) -> Result<Vec<crate::check::Row>, AdminError> {
+        let origin_of = |name: &str| {
+            env.get(name)
+                .and_then(|text| PublicUrl::parse(text.trim()).ok())
+                .map(|url| url.origin())
+        };
+        let facts = crate::check::facts(
+            crate::check::Sources {
+                pool: &self.pool,
+                organization: self.organization,
+                storage,
+                connector: crate::panel::block::connector(listed),
+            },
+            origin_of(crate::config::names::PANEL_URL),
+            origin_of(crate::config::names::PUBLIC_URL),
+            None,
+        )
+        .await?;
+        Ok(crate::check::rows(&facts))
+    }
+
     /// `admin audit --tail N`.
     ///
     /// # Errors

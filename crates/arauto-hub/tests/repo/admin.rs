@@ -1538,3 +1538,180 @@ async fn the_program_says_on_every_screen_that_the_hub_came_back_from_a_copy() {
     let status = run(&["admin", "status"]);
     assert!(status.out.contains("restored mode: ON"), "{}", status.out);
 }
+
+// ---------------------------------------------------------------------------- serve, whole
+
+/// A `serve` of the program that is running, with the lines it writes on the standard error.
+struct Serving {
+    child: std::process::Child,
+    lines: std::sync::mpsc::Receiver<String>,
+    panel: u16,
+}
+
+impl Serving {
+    /// Starts `arauto-hub serve` on free ports of this machine, with a panel. Its standard
+    /// error is a pipe, not a terminal.
+    fn start(fresh: &Fresh) -> Self {
+        use std::io::BufRead;
+        let ports: Vec<std::net::TcpListener> = (0..3)
+            .map(|_| std::net::TcpListener::bind("127.0.0.1:0").unwrap())
+            .collect();
+        let port = |index: usize| ports[index].local_addr().unwrap().port();
+        let (connectors, internal, panel) = (port(0), port(1), port(2));
+        drop(ports);
+        let mut child = Command::new(env!("CARGO_BIN_EXE_arauto-hub"))
+            .arg("serve")
+            .env_remove("ARAUTO_TRUSTED_PROXIES")
+            .env_remove("RUST_LOG")
+            .env("ARAUTO_DATABASE_URL", fresh.db.url().expose())
+            .env("ARAUTO_DATA_DIR", fresh.data_dir())
+            .env("ARAUTO_ALLOW_UNSAFE_DB", "1")
+            .env("ARAUTO_LISTEN", format!("127.0.0.1:{connectors}"))
+            .env("ARAUTO_LISTEN_INTERNAL", format!("127.0.0.1:{internal}"))
+            .env("ARAUTO_CLIENT_IP_SOURCE", "socket")
+            .env(
+                "ARAUTO_PUBLIC_URL",
+                format!("http://localhost:{connectors}"),
+            )
+            .env("ARAUTO_LISTEN_PANEL", format!("127.0.0.1:{panel}"))
+            .env("ARAUTO_PANEL_URL", format!("http://localhost:{panel}"))
+            .env("USER", "tester")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let (sender, lines) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stderr).lines() {
+                let Ok(line) = line else { return };
+                if sender.send(line).is_err() {
+                    return;
+                }
+            }
+        });
+        Self {
+            child,
+            lines,
+            panel,
+        }
+    }
+
+    /// Everything the program wrote until the end of the block with the installation code, and
+    /// the code.
+    fn until_the_code(&self) -> (Vec<String>, String) {
+        let mut seen = Vec::new();
+        let mut code = None;
+        loop {
+            let line = self
+                .lines
+                .recv_timeout(std::time::Duration::from_secs(60))
+                .unwrap_or_else(|_| panic!("no complete block was written. Seen: {seen:#?}"));
+            if let Some(found) = line.strip_prefix("INSTALLATION CODE: ") {
+                code = Some(found.to_owned());
+            }
+            let end = line.starts_with("=== end of ARAUTO FIRST ACCESS");
+            seen.push(line);
+            if end && let Some(code) = code {
+                return (seen, code);
+            }
+        }
+    }
+
+    async fn type_code(&self, code: &str) -> arauto_testkit::http::Response {
+        let host = format!("localhost:{}", self.panel);
+        let origin = format!("http://{host}");
+        let headers = [
+            ("Host", host.as_str()),
+            ("Origin", origin.as_str()),
+            ("Content-Type", "application/x-www-form-urlencoded"),
+        ];
+        arauto_testkit::http::post(
+            std::net::SocketAddr::from(([127, 0, 0, 1], self.panel)),
+            "/sign-in",
+            &headers,
+            format!("code={code}").as_bytes(),
+            std::time::Duration::from_secs(15),
+        )
+        .await
+        .unwrap()
+    }
+
+    fn stop(self) {
+        drop(self);
+    }
+}
+
+impl Drop for Serving {
+    /// The program is killed whatever happens to the test, so that none is left running.
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// R1, R8, R9, R16 and R17 through the program itself: `serve` writes the block after the panel
+/// listens (a connection to the panel works by then), with the origin of the panel and no color
+/// on a pipe; the code in it opens the registration of a passkey; and a second `serve` on the
+/// same database writes the block of a new code, after which the old one is refused.
+///
+/// The stop of the program is not exercised: a console signal cannot be sent to a child on
+/// Windows without `unsafe`, so the process is killed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn serve_writes_the_block_once_the_panel_listens_with_no_color_on_a_pipe() {
+    let fresh = Fresh::new().await;
+    let (first, first_code, first_seen) = tokio::task::block_in_place(|| {
+        let serving = Serving::start(&fresh);
+        let (seen, code) = serving.until_the_code();
+        (serving, code, seen)
+    });
+    let text = first_seen.join("\n");
+    let listening = first_seen
+        .iter()
+        .position(|line| line.contains("the panel of the admin is listening"))
+        .unwrap_or_else(|| panic!("the panel was not announced before the block: {text}"));
+    let block = first_seen
+        .iter()
+        .position(|line| line.starts_with("=== ARAUTO FIRST ACCESS ("))
+        .unwrap();
+    assert!(
+        listening < block,
+        "the block came before the panel listened"
+    );
+    assert!(
+        first_seen
+            .iter()
+            .any(|line| line == "Type the code there and create your passkey.")
+    );
+    assert!(
+        first_seen
+            .iter()
+            .any(|line| line == &format!("Open: http://localhost:{}", first.panel))
+    );
+    // A pipe is not a terminal: no color escape.
+    assert!(!text.contains(char::from(27)), "{text}");
+    // The panel answers by now, and the code opens the registration of a passkey.
+    let typed = first.type_code(&first_code).await;
+    assert_eq!(
+        (typed.status, typed.header("location")),
+        (303, Some("/first-access")),
+        "{}",
+        typed.text()
+    );
+    first.stop();
+
+    // A second start writes a new block with a new code, and the old one is dead.
+    let (second, second_code) = tokio::task::block_in_place(|| {
+        let serving = Serving::start(&fresh);
+        let (_, code) = serving.until_the_code();
+        (serving, code)
+    });
+    assert_ne!(second_code, first_code);
+    let old = second.type_code(&first_code).await;
+    assert_eq!(old.status, 200);
+    assert!(old.text().contains("That code did not work"));
+    let new = second.type_code(&second_code).await;
+    assert_eq!(new.status, 303);
+    second.stop();
+}

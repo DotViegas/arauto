@@ -86,6 +86,19 @@
       say('waiting');
       fetch(form.getAttribute('data-start'), { method: 'POST', credentials: 'same-origin' })
         .then(function (answer) {
+          if (answer.status === 401) {
+            // The panel session is gone (the hub restarted, or the code was replaced): send the
+            // form with no credential, and the hub answers with the page that says so.
+            var gone = new Error('ended');
+            gone.leaving = true;
+            HTMLFormElement.prototype.submit.call(form);
+            throw gone;
+          }
+          if (answer.status === 429) {
+            var busy = new Error('busy');
+            busy.busy = true;
+            throw busy;
+          }
           if (!answer.ok) throw new Error('refused');
           return answer.json();
         })
@@ -98,9 +111,14 @@
           // Not `requestSubmit`: this handler must not run again.
           HTMLFormElement.prototype.submit.call(form);
         })
-        .catch(function () {
+        .catch(function (error) {
+          if (error && error.leaving) return;
           button.disabled = false;
-          say('failed');
+          if (error && error.busy) { say('busy'); return; }
+          // The person closed the dialog of the browser, or it took too long: say that, and
+          // that trying again is enough. Anything else is a refusal.
+          var name = error && error.name;
+          say(name === 'NotAllowedError' || name === 'AbortError' ? 'cancelled' : 'failed');
         });
     });
   }

@@ -10,35 +10,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("M", "ब"),
     ("W", "ज"),
     ("Waiting for the device…", "डिवाइस की प्रतीक्षा…"),
-    (
-        "The passkey was not accepted. Try again.",
-        "पासकी स्वीकार नहीं हुई। फिर से कोशिश करें।",
-    ),
-    (
-        "This browser cannot use a passkey here. Use a current browser, at the address of the panel.",
-        "यह ब्राउज़र यहाँ पासकी इस्तेमाल नहीं कर सकता। पैनल के पते पर कोई नया ब्राउज़र इस्तेमाल करें।",
-    ),
-    ("Sign in to the panel", "पैनल में साइन इन करें"),
-    (
-        "Use the passkey you registered: on this device, or in your password manager.",
-        "वह पासकी इस्तेमाल करें जो आपने रजिस्टर की है: इस डिवाइस पर या अपने पासवर्ड मैनेजर में।",
-    ),
     ("Sign in with a passkey", "पासकी से साइन इन करें"),
     ("Installation code", "इंस्टॉलेशन कोड"),
-    (
-        "First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey.",
-        "पहली बार, या पासकी खो गई है: वह कोड लिखें जो हब ने शुरू होते समय अपने लॉग में लिखा था, या हब के सर्वर पर {command} से नया जारी करें। कोड केवल पासकी का रजिस्ट्रेशन खोलता है।",
-    ),
     ("Continue", "जारी रखें"),
-    ("Register a passkey", "पासकी रजिस्टर करें"),
-    (
-        "A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak.",
-        "पासकी इस डिवाइस पर या आपके पासवर्ड मैनेजर में रहती है, और डिवाइस के फ़िंगरप्रिंट, चेहरे या पिन से खुलती है। हब केवल वही रखता है जिससे उसकी जाँच होती है: लीक होने के लिए कोई पासवर्ड नहीं है।",
-    ),
-    (
-        "This session only reaches the registration of a passkey. The rest of the panel opens after it.",
-        "यह सत्र केवल पासकी के रजिस्ट्रेशन तक पहुँचता है। पैनल का बाकी हिस्सा उसके बाद खुलता है।",
-    ),
     ("Sign out", "साइन आउट करें"),
     ("Alerts", "अलर्ट"),
     ("Unknown devices", "अज्ञात डिवाइस"),
@@ -113,6 +87,93 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Saved: {what}", "सहेजा गया: {what}"),
     ("Warnings that block nothing", "चेतावनियाँ जो कुछ नहीं रोकतीं"),
+    (
+        "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+        "उस कोड ने काम नहीं किया। सबसे ताज़ा कोड इस्तेमाल करें: लॉग के आखिरी ब्लॉक वाला, या हब के सर्वर पर जारी किया गया।",
+    ),
+    (
+        "The hub did not accept this passkey. Try again.",
+        "हब ने यह पासकी स्वीकार नहीं की। फिर से कोशिश करें।",
+    ),
+    (
+        "Your panel session ended. Type the latest code to pick up where you left off.",
+        "आपका पैनल सत्र समाप्त हो गया। जहाँ छोड़ा था वहीं से आगे बढ़ने के लिए सबसे ताज़ा कोड लिखें।",
+    ),
+    (
+        "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+        "यह ब्राउज़र यहाँ पासकी इस्तेमाल नहीं कर सकता। पैनल को किसी अपडेटेड ब्राउज़र में, सीधे उसके पते पर खोलें (किसी दूसरे ऐप के अंदर नहीं)।",
+    ),
+    (
+        "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        "पासकी नहीं बनी: अनुरोध रद्द हो गया या उसमें बहुत देर लगी। बस फिर से कोशिश करें।",
+    ),
+    (
+        "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        "कोई पासकी इस्तेमाल नहीं हुई। अगर वह इस डिवाइस पर नहीं है, तो वह डिवाइस या पासवर्ड मैनेजर इस्तेमाल करें जहाँ आपने उसे बनाया था, या “पासकी खो गई?” खोलें।",
+    ),
+    ("Passkey", "पासकी"),
+    ("Check", "जाँच"),
+    ("Welcome to your Arauto hub", "आपके Arauto हब में आपका स्वागत है"),
+    (
+        "Let's set up your first access. It takes three quick steps, and you only do it once.",
+        "आइए पहली बार के लिए आपका एक्सेस सेट करें। इसमें तीन छोटे चरण लगते हैं, और यह सिर्फ़ एक बार करना होता है।",
+    ),
+    ("Step 1 · Confirm it is you", "चरण 1 · पुष्टि करें कि यह आप हैं"),
+    (
+        "When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you.",
+        "हब ने शुरू होते समय अपने लॉग में एक इंस्टॉलेशन कोड लिखा था। यह लॉग सिर्फ़ वही देख सकता है जो सर्वर संभालता है: इसी से हब जानता है कि यह आप हैं।",
+    ),
+    ("Where to find the code:", "कोड कहाँ मिलेगा:"),
+    (
+        "In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})",
+        "Easypanel में हब की सर्विस खोलें और Logs पर जाएँ। (Docker में: {command})",
+    ),
+    (
+        "Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code.",
+        "ARAUTO FIRST ACCESS ब्लॉक ढूँढें: सबसे नया ब्लॉक आखिरी होता है, लॉग के सबसे नीचे। उसका कोड कॉपी करें।",
+    ),
+    ("Paste the code here:", "कोड यहाँ पेस्ट करें:"),
+    (
+        "The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest.",
+        "कोड की समय-सीमा खत्म नहीं होती और यह सिर्फ़ एक बार काम करता है। हब दोबारा चालू हो तो वह नया कोड लिखता है: हमेशा सबसे ताज़ा कोड इस्तेमाल करें।",
+    ),
+    (
+        "Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log.",
+        "लॉग नहीं खुल रहा? हब के सर्वर पर {command} चलाएँ। ध्यान दें: वह नया कोड लॉग वाले कोड को रद्द कर देता है।",
+    ),
+    ("Good to have you back", "आपका फिर से स्वागत है"),
+    (
+        "Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager.",
+        "अपनी पासकी से साइन इन करें: इस डिवाइस का फ़िंगरप्रिंट, चेहरा या पिन, या आपका पासवर्ड मैनेजर।",
+    ),
+    ("Lost your passkey?", "पासकी खो गई?"),
+    (
+        "No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey.",
+        "कोई बात नहीं। हब के सर्वर पर {command} चलाएँ। वह 10 मिनट तक मान्य एक कोड दिखाता है: उसे यहाँ लिखें और नई पासकी बनाएँ।",
+    ),
+    (
+        "Code accepted! Now, create your passkey",
+        "कोड स्वीकार हो गया! अब अपनी पासकी बनाएँ",
+    ),
+    (
+        "It is how you will enter the panel from now on, with no password to remember.",
+        "अब से आप इसी से पैनल में साइन इन करेंगे, याद रखने के लिए कोई पासवर्ड नहीं।",
+    ),
+    (
+        "The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak.",
+        "पासकी इस डिवाइस पर या आपके पासवर्ड मैनेजर में रहती है, और आपके फ़िंगरप्रिंट, चेहरे या डिवाइस के पिन से खुलती है। हब केवल वही रखता है जिससे पासकी की जाँच होती है: लीक होने के लिए कोई पासवर्ड नहीं है।",
+    ),
+    ("It will work at this address:", "यह इस पते पर काम करेगी:"),
+    ("Create my passkey", "मेरी पासकी बनाएँ"),
+    (
+        "If you use a password manager, the passkey can go along to your other devices.",
+        "अगर आप पासवर्ड मैनेजर इस्तेमाल करते हैं, तो पासकी आपके दूसरे डिवाइसों पर भी पहुँच सकती है।",
+    ),
+    (
+        "Left this page by accident? Type the same code again: it is only spent when the passkey is created.",
+        "गलती से यह पेज छोड़ दिया? वही कोड फिर से लिखें: वह तभी इस्तेमाल हुआ माना जाता है जब पासकी बन जाती है।",
+    ),
+    ("Check the installation", "इंस्टॉलेशन की जाँच करें"),
     // guide.rs
     ("Name", "नाम"),
     ("Block", "ब्लॉक"),
@@ -302,6 +363,27 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Reconnect {name}", "{name} को फिर से कनेक्ट करें"),
     ("Connect {name}", "{name} को कनेक्ट करें"),
     ("Steps", "चरण"),
+    ("How it works:", "यह कैसे काम करता है:"),
+    (
+        "You give the Hermes a name here.",
+        "आप यहाँ Hermes को एक नाम देते हैं।",
+    ),
+    (
+        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
+        "हब एक आमंत्रण बनाता है: टेक्स्ट का एक ब्लॉक, जिसे आप उस Hermes के कमांड चैनल में पेस्ट करते हैं, और कहीं नहीं।",
+    ),
+    (
+        "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
+        "Hermes इस हब से कनेक्टर डाउनलोड करता है और 6 अंकों के सत्यापन कोड के साथ जवाब देता है।",
+    ),
+    (
+        "You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms.",
+        "आप कोड यहाँ लिखते हैं और स्वीकृत करते हैं। बस: उसका कनेक्टर पुष्टि करते ही Hermes कनेक्टेड दिखने लगता है।",
+    ),
+    (
+        "Let's connect your first Hermes",
+        "आइए आपका पहला Hermes कनेक्ट करें",
+    ),
     // editor.rs
     (
         "Being woken requires reading. Nothing was saved.",
@@ -591,11 +673,78 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     // mod.rs
     (
-        "Invalid or expired code. Issue another one on the hub's server.",
-        "कोड अमान्य है या उसकी समय-सीमा खत्म हो गई है। हब के सर्वर पर दूसरा कोड जारी करें।",
-    ),
-    (
         "Too many attempts right now. Wait a minute and try again.",
         "अभी बहुत ज़्यादा प्रयास हुए हैं। एक मिनट रुकें और फिर से कोशिश करें।",
     ),
+    // check.rs
+    ("ok", "ठीक"),
+    ("check", "देखें"),
+    ("attention", "ध्यान दें"),
+    ("later", "बाद में"),
+    ("failed", "विफल"),
+    ("Panel address", "पैनल का पता"),
+    ("Connectors address", "कनेक्टरों का पता"),
+    ("Your address", "आपका पता"),
+    ("Database password", "डेटाबेस का पासवर्ड"),
+    ("Data folder", "डेटा फ़ोल्डर"),
+    ("WhatsApp engine", "WhatsApp इंजन"),
+    ("Your passkey works here.", "आपकी पासकी यहाँ काम करती है।"),
+    (
+        "Open it: it should say it is the address of the connectors.",
+        "इसे खोलें: उसे बताना चाहिए कि यह कनेक्टरों का पता है।",
+    ),
+    (
+        "The hub sees you at {address}. Is it yours? If not, the proxy is not passing the real address.",
+        "हब आपको {address} पर देखता है। क्या यह आपका है? अगर नहीं, तो प्रॉक्सी असली पता आगे नहीं भेज रहा।",
+    ),
+    (
+        "A connection from {address}, which is not in ARAUTO_TRUSTED_PROXIES, brought a forwarded address. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "{address} ARAUTO_TRUSTED_PROXIES में नहीं है, फिर भी वहाँ से आए एक कनेक्शन में आगे भेजा गया पता था। उस कनेक्शन का पता ARAUTO_TRUSTED_PROXIES में जोड़ें और फिर से डिप्लॉय करें।",
+    ),
+    (
+        "The hub sees you at {address}, an address of an internal network: the proxy is not trusted yet. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "हब आपको {address} पर देखता है, जो एक आंतरिक नेटवर्क का पता है: प्रॉक्सी पर अभी भरोसा नहीं किया गया है। इसे ARAUTO_TRUSTED_PROXIES में जोड़ें और फिर से डिप्लॉय करें।",
+    ),
+    (
+        "Replaced by one nobody saw.",
+        "ऐसे पासवर्ड से बदल दिया गया जिसे किसी ने नहीं देखा।",
+    ),
+    (
+        "Not replaced by the hub: this installation sets the password of the database itself.",
+        "हब ने नहीं बदला: यह इंस्टॉलेशन डेटाबेस का पासवर्ड खुद तय करता है।",
+    ),
+    (
+        "The replacement failed. See the log of the hub, then run {command}.",
+        "बदलना विफल रहा। हब का लॉग देखें, फिर {command} चलाएँ।",
+    ),
+    ("Ready for your Hermes.", "आपके Hermes के लिए तैयार।"),
+    (
+        "The downloads folder is empty: a Hermes cannot be connected through the panel. Rebuild the image of the hub.",
+        "डाउनलोड फ़ोल्डर खाली है: पैनल से Hermes कनेक्ट नहीं किया जा सकता। हब की इमेज फिर से बनाएँ।",
+    ),
+    (
+        "It holds the master key and the password of the database. Back it up: without it, the hub cannot open what it kept encrypted.",
+        "इसमें मास्टर कुंजी और डेटाबेस का पासवर्ड रहता है। इसका बैकअप रखें: इसके बिना हब वह नहीं खोल सकता जो उसने एन्क्रिप्ट करके रखा है।",
+    ),
+    ("Configured.", "सेट है।"),
+    (
+        "A Hermes can be connected without it; WhatsApp numbers need it.",
+        "इसके बिना भी Hermes कनेक्ट किया जा सकता है; WhatsApp नंबरों के लिए यह ज़रूरी है।",
+    ),
+    (
+        "The hub checked a few things by itself. Nothing here changes anything: it is only so you know how it turned out.",
+        "हब ने कुछ चीज़ें अपने आप जाँचीं। यहाँ से कुछ भी नहीं बदलता: यह सिर्फ़ इसलिए है कि आपको पता रहे कि नतीजा क्या रहा।",
+    ),
+    // installation.rs
+    (
+        "Step 3 · Let's check the installation",
+        "चरण 3 · आइए इंस्टॉलेशन की जाँच करें",
+    ),
+    (
+        "All set: your passkey was created!",
+        "सब तैयार: आपकी पासकी बन गई!",
+    ),
+    ("The same by command: {command}", "कमांड से भी यही: {command}"),
+    ("Connect my first Hermes", "मेरा पहला Hermes कनेक्ट करें"),
+    ("Do it later", "बाद में करें"),
 ];

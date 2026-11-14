@@ -24,9 +24,11 @@ mod access;
 mod connect;
 mod database;
 mod entry;
+mod first_access;
 mod language;
 mod pages;
 mod passkey;
+mod screens;
 mod session;
 
 /// How long a request of a test may take.
@@ -36,7 +38,10 @@ pub const PATIENCE: Duration = Duration::from_secs(15);
 pub const COOKIE: &str = "arauto-panel";
 
 /// The sentence of every refusal of the entry.
-pub const REFUSED: &str = "Invalid or expired code";
+pub const REFUSED: &str = "That code did not work";
+
+/// What the entry says when the hub refused a passkey answer.
+pub const PASSKEY_REFUSED: &str = "The hub did not accept this passkey. Try again.";
 
 /// A browser of a test, pointed at the panel of a hub.
 #[derive(Debug, Clone, Copy)]
@@ -128,7 +133,12 @@ impl Browser {
         let mut authenticator = SoftAuthenticator::new(PANEL_ORIGIN);
         let kept = self.register(&cookie, &mut authenticator).await;
         assert_eq!(kept.status, 303, "{}", kept.text());
-        assert_eq!(kept.header("location"), Some("/"));
+        // The first passkey of a hub ends in the check of the installation; later ones go home.
+        assert!(
+            matches!(kept.header("location"), Some("/installation?welcome" | "/")),
+            "{:?}",
+            kept.header("location")
+        );
         (cookie, authenticator)
     }
 

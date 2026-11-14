@@ -219,6 +219,10 @@ pub struct Hub {
     send_ceiling: SendCeiling,
     /// The panel of the admin, when the hub was told to listen for it.
     panel: Option<PanelState>,
+    /// Signalled when the first passkey of the organization is kept: the only thing a request
+    /// does about the first access. The task of the first access listens
+    /// ([`crate::first_access`]).
+    first_passkey: crate::first_access::Signal,
 }
 
 impl std::fmt::Debug for Hub {
@@ -451,6 +455,29 @@ impl Hub {
         }
     }
 
+    /// The first passkey of the organization was kept: tells the task of the first access,
+    /// which reads the database and writes what it has to write. Nothing else comes of it, so
+    /// a call that is not the registration of a passkey only makes the task look sooner. Only
+    /// the registration of the first passkey calls it in the hub; the tests of the task call
+    /// it to wake the task.
+    pub fn first_passkey_kept(&self) {
+        self.first_passkey.kept();
+    }
+
+    /// How many times a request told the task of the first access that the first passkey was
+    /// kept, since the hub started. Only the registration of the first passkey does; the
+    /// tests of the first access count it.
+    #[must_use]
+    pub fn first_passkey_signals(&self) -> u64 {
+        self.first_passkey.count()
+    }
+
+    /// Resolves when [`Self::first_passkey_kept`] is called, even when it was called before
+    /// anyone waited.
+    pub(crate) async fn first_passkey_signal(&self) {
+        self.first_passkey.wait().await;
+    }
+
     /// What the panel of the admin keeps in memory. `None` when the hub has no panel.
     pub(crate) fn panel(&self) -> Option<&PanelState> {
         self.panel.as_ref()
@@ -652,10 +679,19 @@ pub async fn start<P: Purposes>(
         None => None,
     };
     let panel_addr = panel.as_ref().map(|(_, address)| *address);
-    let panel_state = config
-        .panel
-        .as_ref()
-        .map(|panel| PanelState::new(&panel.url, &config.public_url, &options.downloads));
+    // The panel serves one organization: the one the admin command resolves. Found once, now;
+    // with zero or several the panel says nothing of a first access.
+    let panel_organization = if config.panel.is_some() {
+        crate::panel::served_organization(
+            db::organizations_for_system_task(&pool, SystemTask::LocalAdmin).await,
+        )
+    } else {
+        None
+    };
+    let panel_state = config.panel.as_ref().map(|panel| {
+        PanelState::new(&panel.url, &config.public_url, &options.downloads)
+            .with_organization(panel_organization)
+    });
     let hub = Arc::new(Hub {
         pool,
         sweep_pool,
@@ -685,6 +721,7 @@ pub async fn start<P: Purposes>(
             arauto_protocol::limits::WHATSAPP_SEND_WINDOW_MS,
         ),
         panel: panel_state,
+        first_passkey: crate::first_access::Signal::default(),
         settings,
     });
     let purposes = Arc::new(options.purposes);

@@ -10,35 +10,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("M", "M"),
     ("W", "R"),
     ("Waiting for the device…", "En attente de l'appareil…"),
-    (
-        "The passkey was not accepted. Try again.",
-        "La clé d'accès n'a pas été acceptée. Réessayez.",
-    ),
-    (
-        "This browser cannot use a passkey here. Use a current browser, at the address of the panel.",
-        "Ce navigateur ne peut pas utiliser de clé d'accès ici. Utilisez un navigateur récent, à l'adresse du panneau.",
-    ),
-    ("Sign in to the panel", "Entrer dans le panneau"),
-    (
-        "Use the passkey you registered: on this device, or in your password manager.",
-        "Utilisez la clé d'accès que vous avez enregistrée : sur cet appareil ou dans votre gestionnaire de mots de passe.",
-    ),
     ("Sign in with a passkey", "Entrer avec une clé d'accès"),
     ("Installation code", "Code d'installation"),
-    (
-        "First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey.",
-        "Premier accès, ou clé d'accès perdue : saisissez le code que le hub a écrit dans son journal au démarrage, ou émettez-en un sur le serveur du hub avec {command}. Le code n'ouvre que l'enregistrement d'une clé d'accès.",
-    ),
     ("Continue", "Continuer"),
-    ("Register a passkey", "Enregistrer une clé d'accès"),
-    (
-        "A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak.",
-        "La clé d'accès reste sur cet appareil ou dans votre gestionnaire de mots de passe, et s'ouvre avec l'empreinte, le visage ou le code PIN de l'appareil. Le hub ne garde que ce qui la vérifie : il n'y a aucun mot de passe à faire fuiter.",
-    ),
-    (
-        "This session only reaches the registration of a passkey. The rest of the panel opens after it.",
-        "Cette session n'atteint que l'enregistrement d'une clé d'accès. Le reste du panneau s'ouvre ensuite.",
-    ),
     ("Sign out", "Quitter"),
     ("Alerts", "Alertes"),
     ("Unknown devices", "Appareils inconnus"),
@@ -119,6 +93,102 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Warnings that block nothing",
         "Avertissements qui ne bloquent rien",
     ),
+    (
+        "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+        "Ce code n'a pas fonctionné. Utilisez le plus récent : celui du dernier bloc du journal, ou un code émis sur le serveur du hub.",
+    ),
+    (
+        "The hub did not accept this passkey. Try again.",
+        "Le hub n'a pas accepté cette clé d'accès. Réessayez.",
+    ),
+    (
+        "Your panel session ended. Type the latest code to pick up where you left off.",
+        "Votre session du panneau a pris fin. Saisissez le code le plus récent pour reprendre là où vous en étiez.",
+    ),
+    (
+        "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+        "Ce navigateur ne peut pas utiliser de clé d'accès ici. Ouvrez le panneau dans un navigateur à jour, directement à son adresse (et non dans une autre application).",
+    ),
+    (
+        "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        "La clé d'accès n'a pas été créée : la demande a été annulée ou a pris trop de temps. Réessayez simplement.",
+    ),
+    (
+        "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        "Aucune clé d'accès n'a été utilisée. Si elle ne se trouve pas sur cet appareil, utilisez l'appareil ou le gestionnaire de mots de passe où vous l'avez créée, ou ouvrez « Vous avez perdu votre clé d'accès ? ».",
+    ),
+    ("Passkey", "Clé d'accès"),
+    ("Check", "Vérifier"),
+    (
+        "Welcome to your Arauto hub",
+        "Bienvenue sur votre hub Arauto",
+    ),
+    (
+        "Let's set up your first access. It takes three quick steps, and you only do it once.",
+        "Configurons votre premier accès. Ce sont trois étapes rapides, et vous ne le faites qu'une seule fois.",
+    ),
+    (
+        "Step 1 · Confirm it is you",
+        "Étape 1 · Confirmez que c'est bien vous",
+    ),
+    (
+        "When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you.",
+        "Au démarrage, le hub a écrit un code d'installation dans son propre journal. Seule la personne qui s'occupe du serveur voit ce journal : c'est ainsi que le hub sait que c'est vous.",
+    ),
+    ("Where to find the code:", "Où trouver le code :"),
+    (
+        "In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})",
+        "Dans Easypanel, ouvrez le service du hub et allez dans Logs. (Avec Docker : {command})",
+    ),
+    (
+        "Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code.",
+        "Cherchez le bloc ARAUTO FIRST ACCESS : le plus récent est le dernier, tout en bas du journal. Copiez son code.",
+    ),
+    ("Paste the code here:", "Collez le code ici :"),
+    (
+        "The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest.",
+        "Le code n'expire pas et ne fonctionne qu'une seule fois. Si le hub redémarre, il en écrit un nouveau : utilisez toujours le plus récent.",
+    ),
+    (
+        "Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log.",
+        "Vous n'arrivez pas à ouvrir le journal ? Sur le serveur du hub, exécutez {command}. Attention : ce nouveau code annule celui du journal.",
+    ),
+    ("Good to have you back", "Ravi de vous revoir"),
+    (
+        "Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager.",
+        "Entrez avec votre clé d'accès : l'empreinte, le visage ou le code PIN de cet appareil, ou votre gestionnaire de mots de passe.",
+    ),
+    ("Lost your passkey?", "Vous avez perdu votre clé d'accès ?"),
+    (
+        "No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey.",
+        "Pas de problème. Sur le serveur du hub, exécutez {command}. La commande affiche un code valable 10 minutes : saisissez-le ici et créez une nouvelle clé d'accès.",
+    ),
+    (
+        "Code accepted! Now, create your passkey",
+        "Code accepté ! Créez maintenant votre clé d'accès",
+    ),
+    (
+        "It is how you will enter the panel from now on, with no password to remember.",
+        "C'est avec elle que vous entrerez dans le panneau désormais, sans mot de passe à retenir.",
+    ),
+    (
+        "The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak.",
+        "La clé d'accès reste sur cet appareil ou dans votre gestionnaire de mots de passe, et s'ouvre avec votre empreinte, votre visage ou le code PIN de l'appareil. Le hub ne garde que ce qui vérifie la clé : il n'y a aucun mot de passe qui puisse fuiter.",
+    ),
+    (
+        "It will work at this address:",
+        "Elle fonctionnera à cette adresse :",
+    ),
+    ("Create my passkey", "Créer ma clé d'accès"),
+    (
+        "If you use a password manager, the passkey can go along to your other devices.",
+        "Si vous utilisez un gestionnaire de mots de passe, la clé d'accès peut passer sur vos autres appareils.",
+    ),
+    (
+        "Left this page by accident? Type the same code again: it is only spent when the passkey is created.",
+        "Vous avez quitté cette page par erreur ? Saisissez à nouveau le même code : il n'est consommé qu'au moment où la clé d'accès est créée.",
+    ),
+    ("Check the installation", "Vérifier l'installation"),
     // guide.rs
     ("Name", "Nom"),
     ("Block", "Bloc"),
@@ -314,6 +384,27 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Reconnect {name}", "Reconnecter {name}"),
     ("Connect {name}", "Connecter {name}"),
     ("Steps", "Étapes"),
+    ("How it works:", "Comment ça marche :"),
+    (
+        "You give the Hermes a name here.",
+        "Ici, vous donnez un nom au Hermes.",
+    ),
+    (
+        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
+        "Le hub émet une invitation : un bloc de texte que vous collez dans le canal de commande de ce Hermes, et nulle part ailleurs.",
+    ),
+    (
+        "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
+        "Le Hermes télécharge le connecteur depuis ce hub et répond avec un code de vérification à 6 chiffres.",
+    ),
+    (
+        "You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms.",
+        "Vous saisissez le code ici et approuvez. C'est fait : le Hermes apparaît comme connecté dès que son connecteur le confirme.",
+    ),
+    (
+        "Let's connect your first Hermes",
+        "Connectons votre premier Hermes",
+    ),
     // editor.rs
     (
         "Being woken requires reading. Nothing was saved.",
@@ -612,11 +703,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     // mod.rs
     (
-        "Invalid or expired code. Issue another one on the hub's server.",
-        "Code invalide ou expiré. Émettez-en un autre sur le serveur du hub.",
-    ),
-    (
         "Too many attempts right now. Wait a minute and try again.",
         "Trop de tentatives pour le moment. Attendez une minute et réessayez.",
     ),
+    // check.rs
+    ("ok", "ok"),
+    ("check", "à vérifier"),
+    ("attention", "attention"),
+    ("later", "plus tard"),
+    ("failed", "échec"),
+    ("Panel address", "Adresse du panneau"),
+    ("Connectors address", "Adresse des connecteurs"),
+    ("Your address", "Votre adresse"),
+    ("Database password", "Mot de passe de la base de données"),
+    ("Data folder", "Dossier des données"),
+    ("WhatsApp engine", "Moteur WhatsApp"),
+    (
+        "Your passkey works here.",
+        "Votre clé d'accès fonctionne ici.",
+    ),
+    (
+        "Open it: it should say it is the address of the connectors.",
+        "Ouvrez-la : elle doit indiquer qu'il s'agit de l'adresse des connecteurs.",
+    ),
+    (
+        "The hub sees you at {address}. Is it yours? If not, the proxy is not passing the real address.",
+        "Le hub vous voit à {address}. Est-ce la vôtre ? Sinon, le proxy ne transmet pas la vraie adresse.",
+    ),
+    (
+        "A connection from {address}, which is not in ARAUTO_TRUSTED_PROXIES, brought a forwarded address. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "Une connexion venue de {address}, qui ne figure pas dans ARAUTO_TRUSTED_PROXIES, a apporté une adresse transmise. Ajoutez l'adresse de cette connexion à ARAUTO_TRUSTED_PROXIES et déployez de nouveau.",
+    ),
+    (
+        "The hub sees you at {address}, an address of an internal network: the proxy is not trusted yet. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "Le hub vous voit à {address}, une adresse de réseau interne : le proxy n'est pas encore considéré comme fiable. Ajoutez-la à ARAUTO_TRUSTED_PROXIES et déployez de nouveau.",
+    ),
+    (
+        "Replaced by one nobody saw.",
+        "Remplacé par un mot de passe que personne n'a vu.",
+    ),
+    (
+        "Not replaced by the hub: this installation sets the password of the database itself.",
+        "Non remplacé par le hub : cette installation définit elle-même le mot de passe de la base de données.",
+    ),
+    (
+        "The replacement failed. See the log of the hub, then run {command}.",
+        "Le remplacement a échoué. Consultez le journal du hub, puis exécutez {command}.",
+    ),
+    ("Ready for your Hermes.", "Prêt pour vos Hermes."),
+    (
+        "The downloads folder is empty: a Hermes cannot be connected through the panel. Rebuild the image of the hub.",
+        "Le dossier des téléchargements est vide : un Hermes ne peut pas être connecté depuis le panneau. Reconstruisez l'image du hub.",
+    ),
+    (
+        "It holds the master key and the password of the database. Back it up: without it, the hub cannot open what it kept encrypted.",
+        "Il contient la clé maîtresse et le mot de passe de la base de données. Sauvegardez-le : sans lui, le hub ne peut pas ouvrir ce qu'il a conservé chiffré.",
+    ),
+    ("Configured.", "Configuré."),
+    (
+        "A Hermes can be connected without it; WhatsApp numbers need it.",
+        "Un Hermes peut être connecté sans lui ; les numéros WhatsApp en ont besoin.",
+    ),
+    (
+        "The hub checked a few things by itself. Nothing here changes anything: it is only so you know how it turned out.",
+        "Le hub a vérifié certains points tout seul. Rien ici ne modifie quoi que ce soit : c'est seulement pour que vous sachiez comment cela s'est passé.",
+    ),
+    // installation.rs
+    (
+        "Step 3 · Let's check the installation",
+        "Étape 3 · Vérifions l'installation",
+    ),
+    (
+        "All set: your passkey was created!",
+        "C'est fait : votre clé d'accès a été créée !",
+    ),
+    (
+        "The same by command: {command}",
+        "La même chose par commande : {command}",
+    ),
+    ("Connect my first Hermes", "Connecter mon premier Hermes"),
+    ("Do it later", "Le faire plus tard"),
 ];

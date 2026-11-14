@@ -23,7 +23,7 @@ SEALED CREDENTIAL  born in the hub       to use the hub it has to be swapped for
 |---|---|
 | What goes through the chat? | Only the invite, which dies on the first use, and the verification code, which is not a secret. |
 | Who creates the secrets? | The identity is born in the connector. The sealed credential is born in the hub's vault. |
-| Does any person see a long-lived secret? | No. None appears on screen, in a log or in a tool response. |
+| Does any person see a long-lived secret? | No. None appears on screen, in a log or in a tool response. The one secret the hub writes in its log is the installation code of a hub where no passkey was ever registered: it serves once, the first passkey spends it and each start replaces it. |
 | What if the credential is copied? | Whoever uses the copy is found out when the real device presents its own again. The limits are in section 6. |
 | What does the design not solve? | A taken-over admin account, a breached hub server and an exposed engine. See section 6 and [05](05-modelo-de-ameacas.md). |
 
@@ -483,7 +483,7 @@ of the design: they only become a guarantee after the tests of Phase 1 and Phase
 2. Leaked before its use, it gives no access without an authenticated admin typing the attacker's
    code.
 3. The private part of the identity is born in Hermes and is never transmitted or shown.
-4. No long-lived secret goes through the chat, appears on screen or goes into a log.
+4. No long-lived secret goes through the chat, appears on screen or goes into a log. The installation code of a hub where no passkey was ever registered goes into the output of its start until the first passkey: it serves once, and each start replaces it.
 5. Whoever takes a copy of the connector's files outside and uses it is found out when the real
    device presents its credential again. If the real Hermes is on, with the connector in a version
    the hub accepts, and reaches the hub, this happens in seconds; in the worst case, in up to 90

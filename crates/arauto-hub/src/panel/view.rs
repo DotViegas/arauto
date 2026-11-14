@@ -264,9 +264,51 @@ pub struct AccessPage {
 /// woken, in each language.
 pub(super) const VERB_LETTERS: [&str; 4] = [k("R"), k("S"), k("M"), k("W")];
 
+/// What a page of the entry or of the registration tells the visitor went wrong, or ended.
+/// Each one is one fixed sentence of the screens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Said {
+    /// A code was refused. One sentence for every reason: wrong, spent, replaced or past its
+    /// minutes, so the page never says which.
+    CodeRefused,
+    /// The hub did not accept a passkey answer.
+    PasskeyRefused,
+    /// Too many codes typed in a minute.
+    TooManyCodes,
+    /// Too many passkey challenges asked in a minute.
+    TooManyChallenges,
+    /// The panel session of the registration is gone, or its code is no longer unspent.
+    SessionEnded,
+}
+
+impl Said {
+    /// The sentence, of the screens.
+    #[must_use]
+    pub const fn sentence(self) -> &'static str {
+        match self {
+            Said::CodeRefused => k(
+                "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+            ),
+            Said::PasskeyRefused => k("The hub did not accept this passkey. Try again."),
+            Said::TooManyCodes | Said::TooManyChallenges => {
+                k("Too many attempts right now. Wait a minute and try again.")
+            }
+            Said::SessionEnded => {
+                k("Your panel session ended. Type the latest code to pick up where you left off.")
+            }
+        }
+    }
+}
+
+/// What a browser without passkeys is told.
+const UNSUPPORTED: &str = k(
+    "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+);
+
 /// The form that asks the browser for a passkey. The script does the asking: it gets the
 /// challenge from `start`, hands it to the browser, and sends what the browser answers in the
-/// field `credential` of this form. Without the script the form says the browser cannot.
+/// field `credential` of this form. Without the script the form says the browser cannot. The
+/// sentences the script shows are written here, in the language of the page.
 fn passkey_form(html: &mut Html, kind: &'static str, action: &'static str, button: &'static str) {
     html.raw("<form class=\"passkey\" method=\"post\" action=\"")
         .raw(action)
@@ -277,87 +319,202 @@ fn passkey_form(html: &mut Html, kind: &'static str, action: &'static str, butto
         .raw("/start\" data-waiting=\"")
         .t(k("Waiting for the device…"))
         .raw("\" data-failed=\"")
-        .t(k("The passkey was not accepted. Try again."))
-        .raw("\" data-unsupported=\"")
-        .t(k("This browser cannot use a passkey here. Use a current browser, at the address of the panel."))
+        .t(k("The hub did not accept this passkey. Try again."))
+        .raw("\" data-busy=\"")
+        .t(Said::TooManyChallenges.sentence())
+        .raw("\" data-cancelled=\"");
+    if kind == "create" {
+        html.t(k(
+            "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        ));
+    } else {
+        html.t(k(
+            "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        ));
+    }
+    html.raw("\" data-unsupported=\"")
+        .t(UNSUPPORTED)
         .raw("\"><input type=\"hidden\" name=\"credential\"><div><button class=\"button primary\" type=\"submit\">")
         .t(button)
         .raw("</button></div><p class=\"status\" role=\"status\"></p><noscript><p class=\"error\">")
-        .t(k("This browser cannot use a passkey here. Use a current browser, at the address of the panel."))
+        .t(UNSUPPORTED)
         .raw("</p></noscript></form>");
 }
 
-/// The page of the entry: the passkey, and the installation code for who has none yet.
-/// `refusal` is a sentence of the screens.
-#[must_use]
-pub fn sign_in(lang: Lang, refusal: Option<&'static str>) -> String {
-    let mut html = Html::new(lang);
-    head(&mut html, Over::Passkey);
-    html.raw("<main class=\"entry\">")
-        .raw(LOGO)
-        .raw("<h1>")
-        .t(k("Sign in to the panel"))
-        .raw("</h1>");
-    if let Some(refusal) = refusal {
+/// The three steps of the first access, at the top of its pages: `current` is 0, 1 or 2. The
+/// steps before it show a check mark; the one it names is purple.
+pub(super) fn stepper(html: &mut Html, current: usize) {
+    html.raw("<ol class=\"stepper\" aria-label=\"")
+        .t(k("Steps"))
+        .raw("\">");
+    for (index, label) in [k("Code"), k("Passkey"), k("Check")]
+        .into_iter()
+        .enumerate()
+    {
+        html.raw(if index < current {
+            "<li class=\"done\"><span class=\"dot\"><svg viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2.5 7.5l3 3 6-6.5\"/></svg></span>"
+        } else if index == current {
+            "<li class=\"current\" aria-current=\"step\"><span class=\"dot\">"
+        } else {
+            "<li><span class=\"dot\">"
+        });
+        if index >= current {
+            html.number(index.saturating_add(1)).raw("</span>");
+        }
+        html.raw("<span class=\"label\">")
+            .t(label)
+            .raw("</span></li>");
+    }
+    html.raw("</ol>");
+}
+
+/// The error line of an entry page.
+fn say(html: &mut Html, said: Option<Said>) {
+    if let Some(said) = said {
         html.raw("<p class=\"error\" role=\"alert\">")
-            .t(refusal)
+            .t(said.sentence())
             .raw("</p>");
     }
-    html.raw("<div class=\"card\"><p class=\"hint\">")
-        .t(k(
-            "Use the passkey you registered: on this device, or in your password manager.",
-        ))
-        .raw("</p>");
-    passkey_form(
-        &mut html,
-        "get",
-        "/passkey/sign-in",
-        k("Sign in with a passkey"),
-    );
-    html.raw("</div><form class=\"card\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\"><div class=\"field\"><label for=\"code\">")
+}
+
+/// The field where an installation code is typed, and the button. Typed, never shown.
+fn code_form(html: &mut Html) {
+    html.raw("<form class=\"code-form\" method=\"post\" action=\"/sign-in\" autocomplete=\"off\"><div class=\"field\"><label for=\"code\">")
         .t(k("Installation code"))
-        .raw("</label><input id=\"code\" name=\"code\" type=\"password\" inputmode=\"text\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"64\" required></div><p class=\"hint\">")
-        .fill(
-            k("First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey."),
-            &[("command", Arg::Code("arauto-hub admin panel code"))],
-        )
-        .raw("</p><div><button class=\"button\" type=\"submit\">")
+        .raw("</label><input id=\"code\" name=\"code\" type=\"password\" inputmode=\"text\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"64\" required></div><div><button class=\"button primary\" type=\"submit\">")
         .t(k("Continue"))
         .raw("</button></div></form>");
+}
+
+/// The page of the entry. `first_access_pending` is whether the organization never had a
+/// passkey: then it is step 1 of the first access and has no passkey form at all; otherwise it
+/// is the page of who comes back: the passkey, and below it the way back from a lost one.
+#[must_use]
+pub fn sign_in(lang: Lang, first_access_pending: bool, refusal: Option<Said>) -> String {
+    let mut html = Html::new(lang);
+    // Step 1 has no passkey form, so it has no use for the script.
+    head(
+        &mut html,
+        if first_access_pending {
+            Over::Nothing
+        } else {
+            Over::Passkey
+        },
+    );
+    html.raw("<main class=\"entry\">").raw(LOGO);
+    if first_access_pending {
+        stepper(&mut html, 0);
+        html.raw("<h1>")
+            .t(k("Welcome to your Arauto hub"))
+            .raw("</h1><p>")
+            .t(k("Let's set up your first access. It takes three quick steps, and you only do it once."))
+            .raw("</p>");
+        say(&mut html, refusal);
+        html.raw("<div class=\"card\"><h2 class=\"step-title\">")
+            .t(k("Step 1 · Confirm it is you"))
+            .raw("</h2><p>")
+            .t(k("When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you."))
+            .raw("</p><p class=\"where\"><b>")
+            .t(k("Where to find the code:"))
+            .raw("</b></p><ol class=\"how\"><li>")
+            .fill(
+                k("In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})"),
+                &[("command", Arg::Code("docker compose --env-file arauto.env logs hub"))],
+            )
+            .raw("</li><li>")
+            .t(k("Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code."))
+            .raw("</li><li>")
+            .t(k("Paste the code here:"))
+            .raw("</li></ol>");
+        code_form(&mut html);
+        html.raw("<p class=\"hint\">")
+            .t(k("The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest."))
+            .raw("</p><p class=\"hint\">")
+            .fill(
+                k("Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log."),
+                &[("command", Arg::Code("arauto-hub admin panel code"))],
+            )
+            .raw("</p></div>");
+    } else {
+        html.raw("<h1>")
+            .t(k("Good to have you back"))
+            .raw("</h1><p>")
+            .t(k("Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager."))
+            .raw("</p>");
+        // A code refusal is said beside the field of the code, which then stays open.
+        let by_code = matches!(
+            refusal,
+            Some(Said::CodeRefused | Said::TooManyCodes | Said::SessionEnded)
+        );
+        if !by_code {
+            say(&mut html, refusal);
+        }
+        html.raw("<div class=\"card\">");
+        passkey_form(
+            &mut html,
+            "get",
+            "/passkey/sign-in",
+            k("Sign in with a passkey"),
+        );
+        html.raw(if by_code {
+            "</div><details class=\"lost card\" open><summary>"
+        } else {
+            "</div><details class=\"lost card\"><summary>"
+        })
+        .t(k("Lost your passkey?"))
+        .raw("</summary><div class=\"lost-body\"><p>")
+        .fill(
+            k("No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey."),
+            &[("command", Arg::Code("arauto-hub admin panel code"))],
+        )
+        .raw("</p>");
+        if by_code {
+            say(&mut html, refusal);
+        }
+        code_form(&mut html);
+        html.raw("</div></details>");
+    }
     language(&mut html);
     html.raw("</main>").raw(TAIL);
     html.finish()
 }
 
-/// The page a session opened by a code reaches: the registration of a passkey, and nothing
-/// else. `refusal` is a sentence of the screens.
+/// Step 2 of the first access, and the registration of a new passkey after a lost one: the page
+/// a panel session opened by a code reaches, and nothing else. `origin` is the one of
+/// `ARAUTO_PANEL_URL`, never what the request said.
 #[must_use]
-pub fn first_access(lang: Lang, refusal: Option<&'static str>) -> String {
+pub fn first_access(lang: Lang, origin: &str, refusal: Option<Said>) -> String {
     let mut html = Html::new(lang);
     head(&mut html, Over::Passkey);
-    html.raw("<main class=\"entry\">")
-        .raw(LOGO)
-        .raw("<h1>")
-        .t(k("Register a passkey"))
-        .raw("</h1>");
-    if let Some(refusal) = refusal {
-        html.raw("<p class=\"error\" role=\"alert\">")
-            .t(refusal)
-            .raw("</p>");
-    }
-    html.raw("<div class=\"card\"><p>")
-        .t(k("A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak."))
+    html.raw("<main class=\"entry\">").raw(LOGO);
+    stepper(&mut html, 1);
+    html.raw("<h1>")
+        .t(k("Code accepted! Now, create your passkey"))
+        .raw("</h1><p>")
+        .t(k(
+            "It is how you will enter the panel from now on, with no password to remember.",
+        ))
         .raw("</p>");
+    say(&mut html, refusal);
+    html.raw("<div class=\"card\"><p>")
+        .t(k("The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak."))
+        .raw("</p><p>")
+        .t(k("It will work at this address:"))
+        .raw(" <code>")
+        .text(origin)
+        .raw("</code></p>");
     passkey_form(
         &mut html,
         "create",
         "/passkey/register",
-        k("Register a passkey"),
+        k("Create my passkey"),
     );
     html.raw("<p class=\"hint\">")
-        .t(k("This session only reaches the registration of a passkey. The rest of the panel opens after it."))
+        .t(k("If you use a password manager, the passkey can go along to your other devices."))
+        .raw("</p><p class=\"hint\">")
+        .t(k("Left this page by accident? Type the same code again: it is only spent when the passkey is created."))
         .raw("</p></div><form method=\"post\" action=\"/sign-out\"><button class=\"sign-out\" type=\"submit\">")
-        .t(k("Sign out"))
+        .t(k("Cancel"))
         .raw("</button></form>");
     language(&mut html);
     html.raw("</main>").raw(TAIL);
@@ -453,12 +610,14 @@ fn close(html: &mut Html) {
             k("In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server."),
             &[("command", Arg::Code("arauto-hub admin"))],
         )
-        .raw("</p>");
+        .raw("</p><p class=\"footer next\"><a class=\"footer-link\" href=\"/installation\">")
+        .t(k("Check the installation"))
+        .raw("</a></p>");
     language(html);
     html.raw("</div>");
 }
 
-fn state(html: &mut Html, tone: Tone, label: &'static str) {
+pub(super) fn state(html: &mut Html, tone: Tone, label: &'static str) {
     html.raw("<span class=\"")
         .raw(tone.state_class())
         .raw("\">")
@@ -864,17 +1023,16 @@ mod tests {
             hermes(&empty, &HermesPage::default()),
             numbers(&empty, &NumbersPage::default()),
             accesses(&empty, &AccessPage::default()),
-            sign_in(Lang::En, None),
-            sign_in(
-                Lang::En,
-                Some(k(
-                    "Invalid or expired code. Issue another one on the hub's server.",
-                )),
-            ),
-            first_access(Lang::En, None),
+            sign_in(Lang::En, true, None),
+            sign_in(Lang::En, true, Some(Said::CodeRefused)),
+            sign_in(Lang::En, false, None),
+            sign_in(Lang::En, false, Some(Said::CodeRefused)),
+            sign_in(Lang::En, false, Some(Said::PasskeyRefused)),
+            first_access(Lang::En, "https://panel.example.com", None),
             first_access(
                 Lang::En,
-                Some(k("The passkey was not accepted. Try again.")),
+                "https://panel.example.com",
+                Some(Said::PasskeyRefused),
             ),
         ] {
             // Only a page that asks the browser for a passkey loads the script, and it is
@@ -919,6 +1077,109 @@ mod tests {
             hermes(&empty, &HermesPage::default())
                 .contains("<h1>Your Hermes and their <b>[numbers]</b></h1>")
         );
+    }
+
+    #[test]
+    fn the_entry_of_a_first_access_has_no_passkey_form_and_the_one_of_a_return_has_the_passkey() {
+        let first = sign_in(Lang::En, true, None);
+        assert!(first.contains("Welcome to your Arauto hub"));
+        assert!(first.contains("Step 1 \u{b7} Confirm it is you"));
+        assert!(first.contains("<ol class=\"stepper\""));
+        assert!(first.contains("<li class=\"current\" aria-current=\"step\">"));
+        assert!(first.contains("<code>docker compose --env-file arauto.env logs hub</code>"));
+        assert!(first.contains("<code>arauto-hub admin panel code</code>"));
+        assert!(
+            !first.contains("data-passkey") && !first.contains("/passkey/"),
+            "no passkey form at all before the first access"
+        );
+        assert!(!first.contains("<details"));
+        // The code is typed in a field that never shows it.
+        assert!(first.contains("name=\"code\" type=\"password\""));
+
+        let back = sign_in(Lang::En, false, None);
+        assert!(back.contains("Good to have you back"));
+        assert!(back.contains("data-passkey=\"get\""));
+        assert!(!back.contains("Welcome to your Arauto hub"));
+        assert!(!back.contains("class=\"stepper\""));
+        assert!(
+            back.contains("<details class=\"lost card\"><summary>Lost your passkey?</summary>")
+        );
+        assert!(!back.contains("<details class=\"lost card\" open>"));
+        // A refused code opens it, with the one sentence beside the field.
+        let refused = sign_in(Lang::En, false, Some(Said::CodeRefused));
+        assert!(refused.contains("<details class=\"lost card\" open>"));
+        assert_eq!(refused.matches("That code did not work.").count(), 1);
+        // A refused passkey does not open it.
+        assert!(!sign_in(Lang::En, false, Some(Said::PasskeyRefused)).contains(" open>"));
+    }
+
+    #[test]
+    fn only_a_refusal_of_codes_opens_the_way_back_from_a_lost_passkey() {
+        let too_many = tr(
+            Lang::En,
+            k("Too many attempts right now. Wait a minute and try again."),
+        );
+        for (said, open) in [
+            (Some(Said::CodeRefused), true),
+            (Some(Said::TooManyCodes), true),
+            // The message asks for the latest code: the field of the code is opened beside it.
+            (Some(Said::SessionEnded), true),
+            (Some(Said::TooManyChallenges), false),
+            (Some(Said::PasskeyRefused), false),
+            (None, false),
+        ] {
+            let page = sign_in(Lang::En, false, said);
+            assert_eq!(
+                page.contains("<details class=\"lost card\" open>"),
+                open,
+                "{said:?}"
+            );
+            if let Some(said) = said {
+                // The part before any apostrophe, which the page escapes.
+                let probe = said.sentence().split('\'').next().unwrap();
+                // The element of the message: the same sentence is also an attribute of the passkey form,
+                // for the script.
+                let at = page
+                    .find(&format!("<p class=\"error\" role=\"alert\">{probe}"))
+                    .unwrap();
+                // Said beside the field of the code when it opens it, above the passkey otherwise.
+                assert_eq!(at > page.find("<summary>").unwrap(), open, "{said:?}");
+            }
+        }
+        assert!(sign_in(Lang::En, false, Some(Said::TooManyChallenges)).contains(too_many));
+    }
+
+    #[test]
+    fn the_registration_shows_the_origin_it_was_given_and_the_script_reads_its_texts_from_it() {
+        let page = first_access(Lang::En, "https://panel.example.com", None);
+        assert!(page.contains("<code>https://panel.example.com</code>"));
+        assert!(page.contains("Code accepted! Now, create your passkey"));
+        // The second step of the path is the current one, and the first has its check mark.
+        assert!(page.contains("<li class=\"done\"><span class=\"dot\"><svg"));
+        assert!(
+            page.contains(
+                "<li class=\"current\" aria-current=\"step\"><span class=\"dot\">2</span>"
+            )
+        );
+        // Cancel posts the sign-out.
+        assert!(page.contains("action=\"/sign-out\""));
+        assert!(page.contains(">Cancel</button>"));
+        // The data the script reads: one text for a creation cancelled, another for a sign-in.
+        for attribute in [
+            "data-waiting=\"",
+            // What the script says when the hub answers 429 to the ask for a challenge.
+            "data-busy=\"Too many attempts right now. Wait a minute and try again.\"",
+            "data-failed=\"The hub did not accept this passkey. Try again.\"",
+            "data-unsupported=\"This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).\"",
+            "data-cancelled=\"The passkey was not created: the request was cancelled or took too long. Just try again.\"",
+        ] {
+            assert!(page.contains(attribute), "{attribute}");
+        }
+        let get = sign_in(Lang::En, false, None);
+        assert!(get.contains("data-cancelled=\"No passkey was used. If it is not on this device"));
+        // The origin is a value: it is escaped like any other.
+        let hostile = first_access(Lang::En, "<script>x</script>", None);
+        assert!(!hostile.contains("<script>x"));
     }
 
     #[test]

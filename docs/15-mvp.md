@@ -64,20 +64,34 @@ the command are the same program and use the same write functions.
  arauto-hub admin engine|number|access ...    engine, numbers and access matrix (M3)
  arauto-hub admin alerts [--ack ID]           the alerts the panel shows
  arauto-hub admin audit [--tail N]
- arauto-hub admin panel code                  issues the entry code of the panel
+ arauto-hub admin panel code                  issues an installation code of the panel
+ arauto-hub admin check                       the checks of the installation (the window of step 3)
 ```
 
-**The panel, in the hub, on 12/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md), proposal). The hub serves the panel
-on a third port, turned off by default. One enters with an entry code: the command above shows it
-once, it is valid for 10 minutes and for one entry, and it is typed on the screen, never shown by
-it. The panel has three read-only screens (Hermes, WhatsApps and Accesses), the alert banner and, since
-13/11/2026, the guide to connect Hermes: name, block, typed code and approval, through the same
-functions as `hermes add`, `invite`, `approve` and `deny`. On the same day the editing of the access
-of a Hermes on a number (the `access grant`, the `wake-wait` and the `access remove`) and the
-`revoke` went in. Pairing numbers and choosing the chats of an access remain only through the
-command. By decision of the maintainer, the panel session acts without a passkey while it does not exist, and
-for that reason the panel stays closed, reached through a tunnel. It was tested only by the
-automatic tests; it never ran on a server and never connected a real Hermes.
+**The panel, in the hub, on 12/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md),
+proposal). The hub serves the panel on a third port, turned off by default. One enters with a
+passkey, and only with one. The first passkey is registered with an installation code, which is
+typed on the screen and never shown by it: before the first access the hub writes it in the output
+of its start, with no time limit, and again every 10 minutes (the block with the latest time is the
+valid one), and it works once; the command above issues another, valid for 10 minutes, for who lost
+the passkey or cannot open the log. The panel has three read-only screens (Hermes, WhatsApps and
+Accesses), the alert banner and, since 13/11/2026, the guide to connect Hermes: name, block, typed
+code and approval, through the same functions as `hermes add`, `invite`, `approve` and `deny`. On
+the same day the editing of the access of a Hermes on a number (the `access grant`, the `wake-wait`
+and the `access remove`) and the `revoke` went in. Pairing numbers and choosing the chats of an
+access remain only through the command. The panel session acts while it lasts: the passkey is asked
+at the entry and not again on each action (decision 0040, proposal; asking again on every action, as
+decision 0019 says, is not built). The panel is meant to stay open to the internet behind its
+passkey, on an address of its own (proposal: no server has run it yet). It was tested only by the
+automatic tests; it never ran on a server and never connected a real Hermes. Since 13/11/2026 the
+entry is built to be found without effort: step 1 (the code), step 2 (the passkey) and step 3 (a
+window that checks the installation, also by `arauto-hub admin check`). The lifecycle of the code,
+the entry by state, the three steps, the check window and the command, the one refusal sentence,
+the ceilings of attempts (per address and for everyone, apart for codes and for challenges) and
+the root of the port of the connectors are in the code and passed the automatic tests of
+13/11/2026, against a test hub and a fake authenticator. No real browser, Easypanel or proxy has
+run them. The block written at the start has a heading with the date, and the code is never in
+the database in the clear (only its digest).
 
 - When approving a reconnect, the command shows the last use of the current device and requires
   `--recognized` or `--not-recognized` (04, C10). Without one of the two, it does not approve. In the
@@ -137,7 +151,7 @@ that of [06-modelo-de-dados.md](06-modelo-de-dados.md), with the names in Englis
 | chamada_ferramenta | `tool_call` | Short retention. |
 | instalacao, chave_hub | `installation`, `hub_key` | |
 | (new) alert | `alert` | What the panel shows in the strip at the top. |
-| (new) entry code, sessao_painel | `panel_entry`, `panel_session` | Only the digest of each one. [decision 0040](decisoes/0040-painel-dentro-do-hub.md). |
+| (new) installation code, sessao_painel | `panel_entry`, `panel_session` | Only the digest of each one. [decision 0040](decisoes/0040-painel-dentro-do-hub.md). |
 | (new) link | `peer_link` | [13](13-conversa-entre-hermes.md) |
 | (new) thread, note | `peer_thread`, `peer_message` | The text of the note goes encrypted. |
 | (new) retention | `retention` | Retention period per table. |
@@ -158,7 +172,7 @@ Rules that hold for the database:
    appears without this parameter. In the hub, the list has the entry by the identity and the entry
    by the invite (the engine's comes in M3), and the named tasks: installation, administration
    command, queues, deadlines, purge, mark, seal of an unknown device and start of `serve`. On
-   12/11/2026 the two entries of the panel went in: by the digest of the entry code and by the
+   12/11/2026 the two entries of the panel went in: by the digest of the entry code (now the installation code) and by the
    digest of the identifier of the panel session. The only function that writes without an organization is that of the refusals of
    invites nobody issued. The test reads all the hub code that reaches the database, not only that
    of the repository, and each exception on the list says why it exists.
@@ -212,14 +226,16 @@ Rules that hold for the database:
     repeated enrollment, wrong code, device expired by deadline, swap without "saved", the alerts of
     reuse and of a seal without explanation, connection taken over, note ceiling, unknown device
     listed and migration. Expiry by deadline stays out because the C11 list does not include it.
-    From the panel, on 12/11/2026: the entry is a security event; the entry code issued and the
+    From the panel, on 12/11/2026: the entry is a security event; the entry code (now the installation code) issued and the
     exit are not.
 11. **Purge.** A task of the hub deletes in small batches, with the hub's time, by the period of
     each table: notes, 30 days; tool calls, 7; resolved notices, 7; engine events already handled,
     1; connections and unknown devices, 90. On 11/11/2026 the periods are in the `retention` table,
     but the task does not exist yet. See also the second open point of
-    [14](14-protocolo-do-canal.md), section 13. On 12/11/2026 the entry codes and the panel
-    sessions went in: 30 days after the moment they stopped being valid.
+    [14](14-protocolo-do-canal.md), section 13. On 12/11/2026 the entry codes (now the installation codes) and the panel
+    sessions went in: 30 days after the moment they stopped being valid. On 13/11/2026: an unspent
+    start code is never purged; a code leaves 30 days after its use, its cancellation or, for a
+    command code, its deadline.
 12. **The database is accessed directly**, with no connection pooler in transaction mode. The hub
     has two connection pools of fixed size: that of the connectors (16 to start with) and one of 2,
     only for the sweep. Waiting for a connection has a deadline of 5 seconds. The sweep pool exists

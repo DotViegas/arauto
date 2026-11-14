@@ -145,7 +145,7 @@ The panel shows, per Hermes, "Can be woken: yes or no", with the reason.
 |---|---|
 | Health | One address that says whether the hub is alive and another that says whether it is ready (database, engine, keys). |
 | Metrics | Connections per device, notice queue, handshake failures, state of each number. |
-| System log | Structured, with organization and device. Never message content nor a secret. The only exception is the installation code of the first start, which is valid once. |
+| System log | Structured, with organization and device. Never message content nor a secret. The only exception is the installation code of a hub where no passkey was ever registered: it goes straight to the standard error of the start (not through the tracing lines of the log), with no deadline, serves once, is written again every 10 minutes until the first passkey, or until a command code replaces it, and is replaced by each start ([0040](decisoes/0040-painel-dentro-do-hub.md)). |
 | Database backup | PostgreSQL's own: continuous or, at the least, daily ([15](15-mvp.md), section 6). |
 | Engine sessions | Outside the ordinary backup: whoever has the engine session has the number. |
 | Master key and audit mark | Outside the database and outside the database backup. The master key, in two places. |

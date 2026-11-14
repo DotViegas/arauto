@@ -8,10 +8,11 @@ there are T1, T4 and T6, read-only, the alert banner, and T2 with T3, in a singl
 over the list: name, block, code and done. In T1 each line has the buttons to connect, continue or
 reconnect, and the one to revoke, which asks first; delete and "can be woken" are still only in the
 command. In T6 each cell opens the access editor, in a window; choosing the chats of the scope
-"only chosen chats" is still only in the command. The other screens and the passkey are still
-design. T0 does not exist: one gets in with an entry code, issued by a command
-on the hub's machine. The panel session already lasts 12 hours, or 30 minutes without use, and,
-while the passkey does not exist, it is the session that authorizes the actions.
+"only chosen chats" is still only in the command. The other screens are still
+design. T0 exists in part (see below): one gets in with a passkey, whose first registration is
+opened by an installation code. The panel session lasts 12 hours, or 30 minutes without use, and
+it is the session that authorizes the actions: asking for the passkey again on every action is
+not built.
 
 ## Summary
 
@@ -54,15 +55,47 @@ by periodic query to the hub.
 
 ## T0. First access
 
-- **Shows:** three steps. (1) The installation code, which the hub shows in the system log on the
-  first start, and the registration of the passkey of the first admin. (2) The addresses of the hub:
-  the panel's and the connectors', which goes in every block. (3) The engine: address and API key,
-  with a "Test" button.
-- **Rule:** without the installation code nobody creates the first admin. It is valid once and for a
-  short time. Once the admin is created, the code is no longer valid; a new one only comes out by a
-  command on the server, for when the only admin loses the passkey.
-- **Errors:** wrong installation code; engine does not answer, key refused or version not tested.
-  Step 3 may be left for later.
+- **Shows:** three steps. (1) The installation code, which the hub writes in the output of its
+  start until the first passkey. (2) The registration of the passkey of the first admin, at the
+  address of the panel. (3) A window that checks the installation: the addresses of the panel and
+  of the connectors, the address the hub sees, the password of the database, the connector, the
+  data folder and whether an engine is set. The engine setup (address, API key, a "Test" button)
+  is still a proposal (see below).
+- **Rule:** without the installation code nobody creates the first admin. It works once. The one
+  the hub writes in its log at the start has no deadline and is written again every 10 minutes
+  while it is unspent; each start writes a new one, and the latest is the one that works. Typing
+  it does not spend it: creating the passkey does. Once the first passkey is kept, the start no
+  longer writes a code; a new one only comes out by a command on the server, valid for 10
+  minutes, for when the only admin loses the passkey
+  ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)).
+- **Errors:** wrong installation code (one sentence for every refusal, which does not say whether
+  the code was wrong, spent, replaced or past its time); engine does not answer, key refused or
+  version not tested. The engine setup may be left for later.
+- **In the hub, on 13/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)).
+  *Built and tested by the automatic tests (13/11/2026):* the lifecycle of the installation code
+  described in the rule above; the block the hub writes in its own output, with the code, at the
+  start and every 10 minutes until the first passkey (its heading carries the date, `YYYY-MM-DD
+  HH:MM:SS UTC`, and no line of fixed text is over 80 columns); the entry by state (step 1 with
+  no passkey form before the first access; the page of who is back after it, with "Lost your
+  passkey?" under the passkey, open when a code was refused); step 2 (the registration, which
+  shows the address of `ARAUTO_PANEL_URL`); step 3 as a check window (`/installation`, also by
+  `arauto-hub admin check`, which prints the same rows from the same function) with the addresses
+  of the panel and of the connectors, the address the hub sees, the password of the database, the
+  connector, the data folder and the engine; the same refusal page for every refused code; the
+  ceilings of attempts per address and for everyone, in separate buckets for codes and for
+  challenges. In the entry page, the command to read the log with Docker is
+  `docker compose --env-file arauto.env logs hub`. The automatic tests ran against a test hub and
+  a fake authenticator: no real browser, Easypanel or proxy has run them.
+  *Still a proposal:* the engine step (address, key and a "Test" button): the check window only
+  says whether an engine is set, and never shows its address or key.
+  *Pending decision (the maintainer's approval of the text):* three English lines that only
+  `arauto-hub admin check` prints, and that are outside the approved texts: "Not set in this
+  environment.", "Only the running hub sees it: open the panel and the check window." and
+  "Replaced when the first passkey is registered.". The window shows no sentence for the state
+  "later" of the database password.
+  The step 1 sentence that says which block to take is "Find the ARAUTO FIRST ACCESS block: the
+  newest one is the last, at the bottom of the log. Copy its code." (approved on 13/11/2026): it
+  asks for no search, since the Easypanel log viewer has none.
 
 ## T1. Hermes
 

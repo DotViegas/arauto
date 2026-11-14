@@ -3,10 +3,11 @@
 //!
 //! | Address | What it answers |
 //! |---|---|
-//! | `GET /sign-in` | the page where the entry code is typed |
+//! | `GET /sign-in` | the entry: step 1 of the first access, or the passkey of who comes back |
 //! | `POST /sign-in` | spends the code and opens a session |
 //! | `POST /sign-out` | closes the session |
 //! | `GET /` | the Hermes |
+//! | `GET /installation` | the window that checks the installation ([`installation`]) |
 //! | `GET /whatsapps` | the numbers |
 //! | `GET /accesses` | the matrix of accesses |
 //! | `GET /assets/{file}` | the sheet, the fonts and the script of the panel |
@@ -32,6 +33,7 @@
 //! What the pages show is what `arauto-hub admin` shows, through the same repository
 //! functions; what they change, they change by the functions that command calls.
 
+mod attempts;
 pub mod block;
 mod connect;
 mod data;
@@ -39,26 +41,30 @@ pub mod editor;
 pub mod guide;
 mod html;
 mod http;
+pub mod installation;
 pub mod passkey;
 pub mod secret;
 pub mod text;
 pub mod view;
 
+use std::net::IpAddr;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 
-use arauto_protocol::limits::MINUTE_MS;
 use axum::body::Body;
 use axum::http::{HeaderMap, Method, Request, Response, StatusCode, header};
 use dashmap::DashMap;
 use hyper::body::Incoming;
 use uuid::Uuid;
 
+use self::attempts::{Attempts, Kind};
 use self::passkey::{RelyingParty, StoredPasskey};
 use self::secret::{EntryCode, SessionSecret};
+use self::view::Said;
 use crate::audit::{Actor, AuditError};
-use crate::channel::client_ip::client_ip;
+use crate::channel::client_ip::{client_ip, no_trusted_proxy, untrusted_forwarder};
 use crate::channel::{Downloads, Hub};
+use crate::check;
 use crate::config::{PasswordRotation, PublicUrl};
 use crate::db::{self, ResolvedOrg, Rotated, RotationError, When};
 use crate::download::Listed;
@@ -66,18 +72,6 @@ use crate::repo::panel::{
     NewPasskey, PanelSession, Registered, SESSION_IDLE_MS, SESSION_VALIDITY_MS, SignIn,
 };
 use crate::repo::{self, RepoError};
-
-/// How many times a minute the hub looks an entry code up, from everyone together. A code
-/// has 160 bits: this does not protect the code, it keeps a flood away from the database.
-const ATTEMPTS_PER_MINUTE: u32 = 30;
-
-/// What the page of the entry says when it refuses. One sentence for every reason.
-const REFUSED: &str = text::k("Invalid or expired code. Issue another one on the hub's server.");
-
-const TOO_MANY: &str = text::k("Too many attempts right now. Wait a minute and try again.");
-
-/// What a page says when a passkey ceremony did not end well. One sentence for every reason.
-const PASSKEY_REFUSED: &str = text::k("The passkey was not accepted. Try again.");
 
 /// The name a passkey shows for the admin of the panel, in the list of the authenticator.
 const PASSKEY_USER: &str = "admin";
@@ -134,8 +128,11 @@ pub struct PanelState {
     /// When each open session was last used. A session that is not here is not served: the
     /// hub that knew it stopped.
     seen: DashMap<Uuid, i64>,
-    /// The minute being counted and how many entry codes were looked up in it.
-    attempts: Mutex<(i64, u32)>,
+    /// The ceilings on what a visitor with no session asks: per address and for everyone.
+    attempts: Attempts,
+    /// The organization this panel serves: the one the admin command resolves, found when the
+    /// hub started. `None` with zero or several: the entry then says nothing of a first access.
+    organization: Option<ResolvedOrg>,
     /// The address of the hub that goes in a block: the one the connectors reach.
     hub_url: PublicUrl,
     /// The connector a block tells a Hermes to download, when the hub serves one.
@@ -163,24 +160,31 @@ impl PanelState {
             },
             secure,
             seen: DashMap::new(),
-            attempts: Mutex::new((0, 0)),
+            attempts: Attempts::default(),
+            organization: None,
             hub_url: hub_url.clone(),
             connector: block::connector(&downloads.listed()).cloned(),
             relying: RelyingParty::new(&url.origin()).ok(),
         }
     }
 
-    /// Counts one look at an entry code. `false` when this minute already had its share.
-    fn attempt(&self, now: i64) -> bool {
-        let mut window = self.attempts.lock().unwrap_or_else(PoisonError::into_inner);
-        if now.saturating_sub(window.0) >= MINUTE_MS || now < window.0 {
-            *window = (now, 0);
-        }
-        if window.1 >= ATTEMPTS_PER_MINUTE {
-            return false;
-        }
-        window.1 = window.1.saturating_add(1);
-        true
+    /// The organization this panel serves, found when the hub started: the one the first access
+    /// is issued for, so the entry and the start code never disagree.
+    #[must_use]
+    pub(crate) const fn organization(&self) -> Option<ResolvedOrg> {
+        self.organization
+    }
+
+    /// The organization this panel serves, found when the hub started.
+    #[must_use]
+    pub(crate) fn with_organization(mut self, organization: Option<ResolvedOrg>) -> Self {
+        self.organization = organization;
+        self
+    }
+
+    /// Counts one ask of a visitor with no session. `false` when it is over a ceiling.
+    fn allow(&self, kind: Kind, address: Option<IpAddr>, now: i64) -> bool {
+        self.attempts.allow(kind, address, now)
     }
 
     /// A session was opened now.
@@ -210,6 +214,12 @@ impl PanelState {
         alive
     }
 
+    /// `https://host[:port]`, the address of the panel: where the block of the first access
+    /// says to open it.
+    pub(crate) fn origin(&self) -> &str {
+        &self.origin
+    }
+
     fn closed(&self, session: Uuid) {
         self.seen.remove(&session);
     }
@@ -220,6 +230,25 @@ impl PanelState {
             self.cookie,
             if self.secure { "; Secure" } else { "" }
         )
+    }
+}
+
+/// The organization the panel serves, from what the hub found when it started: the one the
+/// admin command resolves. Zero or several give `None`, and the entry then says nothing of a
+/// first access; a database that did not answer gives `None` too, said in the log, so the
+/// entry of a new hub is not the page of who comes back without a word.
+pub(crate) fn served_organization<T: Copy>(found: Result<Vec<T>, db::DbError>) -> Option<T> {
+    match found.as_deref() {
+        Ok([organization]) => Some(*organization),
+        Ok(_) => None,
+        Err(error) => {
+            tracing::warn!(
+                %error,
+                "the organization of the panel could not be read: until the hub starts again, \
+                 its entry shows the page of who comes back"
+            );
+            None
+        }
     }
 }
 
@@ -320,7 +349,7 @@ pub(crate) async fn route(
     if !http::header_is(&parts.headers, header::HOST, &panel.authority) {
         return http::plain(
             StatusCode::MISDIRECTED_REQUEST,
-            "This is not the address of the panel.\n",
+            "This is not the address of the panel.\nOpen the panel at the address set in ARAUTO_PANEL_URL: a passkey works only there.\n",
         );
     }
     let path = parts.uri.path();
@@ -332,7 +361,7 @@ pub(crate) async fn route(
     if writes && !http::header_is(&parts.headers, header::ORIGIN, &panel.origin) {
         return http::plain(
             StatusCode::FORBIDDEN,
-            "This request did not come from a page of the panel.\n",
+            "This request did not come from a page of the panel. Open the panel at its address and try again.\n",
         );
     }
     let answer = match (reads, path) {
@@ -354,9 +383,12 @@ pub(crate) async fn route(
         (true, "/first-access") => first_access_page(&hub, panel, &parts.headers).await,
         (false, "/passkey/register/start") => register_start(&hub, panel, &parts.headers).await,
         (false, "/passkey/register") => register(&hub, panel, peer, &parts.headers, body).await,
-        (false, "/passkey/sign-in/start") => Ok(passkey_start(&hub, panel)),
+        (false, "/passkey/sign-in/start") => passkey_start(&hub, panel, peer, &parts.headers).await,
         (false, "/passkey/sign-in") => {
             passkey_sign_in(&hub, panel, peer, &parts.headers, body).await
+        }
+        (true, "/installation") => {
+            installation(&hub, panel, peer, &parts.headers, parts.uri.query()).await
         }
         (true, "/" | "/whatsapps" | "/accesses") => {
             page(&hub, panel, &parts.headers, path, parts.uri.query()).await
@@ -384,9 +416,32 @@ async fn sign_in_page(
             "/first-access"
         }));
     }
+    entry(hub, panel, headers, StatusCode::OK, None).await
+}
+
+/// Whether the organization this panel serves never had its first access. Only reads the
+/// durable mark of the first passkey: losing or removing every passkey later does not bring
+/// the first access back. With no organization to serve it says no.
+async fn first_access_pending(hub: &Hub, panel: &PanelState) -> Result<bool, RepoError> {
+    match panel.organization {
+        Some(organization) => Ok(!repo::panel::first_access_done(hub.pool(), organization).await?),
+        None => Ok(false),
+    }
+}
+
+/// The page of the entry of the state the hub is in, with what happened to the visitor. It
+/// only reads.
+async fn entry(
+    hub: &Hub,
+    panel: &PanelState,
+    headers: &HeaderMap,
+    status: StatusCode,
+    said: Option<Said>,
+) -> Result<Response<Body>, RepoError> {
+    let pending = first_access_pending(hub, panel).await?;
     Ok(http::page(
-        StatusCode::OK,
-        view::sign_in(lang_of(headers), None),
+        status,
+        view::sign_in(lang_of(headers), pending, said),
     ))
 }
 
@@ -401,7 +456,7 @@ async fn first_access_page(
         Some((_, session)) if session.full => Ok(http::see_other("/")),
         Some(_) => Ok(http::page(
             StatusCode::OK,
-            view::first_access(lang_of(headers), None),
+            view::first_access(lang_of(headers), panel.origin(), None),
         )),
     }
 }
@@ -414,7 +469,12 @@ async fn register_start(
     headers: &HeaderMap,
 ) -> Result<Response<Body>, RepoError> {
     let Some((organization, session)) = any_session_of(hub, panel, headers).await? else {
-        return Ok(http::plain(StatusCode::FORBIDDEN, "There is no session.\n"));
+        // 401, not 403: the script of the page sends the form with no credential then, and the
+        // registration answers with the page that says the panel session ended.
+        return Ok(http::plain(
+            StatusCode::UNAUTHORIZED,
+            "The panel session ended.\n",
+        ));
     };
     let Some(relying) = &panel.relying else {
         return Ok(http::plain(StatusCode::NOT_FOUND, "not found\n"));
@@ -439,7 +499,7 @@ async fn register(
     body: Incoming,
 ) -> Result<Response<Body>, RepoError> {
     let Some((organization, session)) = any_session_of(hub, panel, headers).await? else {
-        return Ok(http::see_other("/sign-in"));
+        return session_ended(hub, panel, headers).await;
     };
     let answered = match http::form_field(headers, body, "credential").await {
         Ok(answered) => answered,
@@ -448,7 +508,7 @@ async fn register(
     let refused = || {
         http::page(
             StatusCode::OK,
-            view::first_access(lang_of(headers), Some(PASSKEY_REFUSED)),
+            view::first_access(lang_of(headers), panel.origin(), Some(Said::PasskeyRefused)),
         )
     };
     let (Some(relying), Some(answered)) = (&panel.relying, answered) else {
@@ -466,9 +526,6 @@ async fn register(
     };
     let now = hub.now_ms();
     let address = client_ip(hub.client_ip_source(), peer, headers).ok();
-    // Read before the passkey is kept: whether this one is the first of the installation.
-    let first = hub.storage().password_rotation == PasswordRotation::AtFirstAccess
-        && !repo::panel::has_passkey(hub.pool(), organization).await?;
     let kept = repo::panel::register_passkey(
         hub.pool(),
         hub.mark(),
@@ -480,16 +537,69 @@ async fn register(
     )
     .await;
     match kept {
-        Ok(Registered::Kept { .. }) => {
+        Ok(Registered::Kept { first, .. }) => {
             if first {
-                replace_database_password(hub, organization).await;
+                if hub.storage().password_rotation == PasswordRotation::AtFirstAccess {
+                    replace_database_password(hub, organization).await;
+                }
+                // The only thing a request does about the first access: tell the task that
+                // owns the block of the log. It reads the database and writes the closing line,
+                // after what the replacement of the password wrote.
+                hub.first_passkey_kept();
             }
-            Ok(http::see_other("/"))
+            // The first passkey ends in the check of the installation; later ones go home.
+            Ok(http::see_other(if first {
+                "/installation?welcome"
+            } else {
+                "/"
+            }))
         }
-        Ok(Registered::NoSession) => Ok(http::see_other("/sign-in")),
+        // The passkey is kept and the audit mark did not follow: the admin is told, as for
+        // every security write, and the task still hears of the first passkey now rather than
+        // at its next look.
+        Ok(Registered::KeptMarkBehind { first, error, .. }) => {
+            let shown = failed(&error);
+            hub.security_write_failed(organization, None, error).await;
+            if first {
+                // The mark of the first access is set: no later passkey replaces the password,
+                // so it is replaced now, as when the audit mark follows.
+                if hub.storage().password_rotation == PasswordRotation::AtFirstAccess {
+                    replace_database_password(hub, organization).await;
+                }
+                hub.first_passkey_kept();
+                // The passkey is kept and the session reaches the whole panel: the person lands
+                // on the check window like anyone else, where the frame shows the alert that
+                // the audit mark did not follow. A bare 500 would say the passkey was lost.
+                return Ok(http::see_other("/installation?welcome"));
+            }
+            Ok(shown)
+        }
+        // Its code is no longer unspent: the session is closed and nothing was kept.
+        Ok(Registered::NoSession) => {
+            panel.closed(session.id);
+            session_ended(hub, panel, headers).await
+        }
         Ok(Registered::Repeated) => Ok(refused()),
         Err(error) => security_failed(hub, organization, error).await,
     }
+}
+
+/// The panel session of a registration is gone, or its code is no longer unspent: the entry of
+/// the state the hub is in, with the sentence that says so, and the dead cookie dropped.
+async fn session_ended(
+    hub: &Hub,
+    panel: &PanelState,
+    headers: &HeaderMap,
+) -> Result<Response<Body>, RepoError> {
+    let page = entry(
+        hub,
+        panel,
+        headers,
+        StatusCode::OK,
+        Some(Said::SessionEnded),
+    )
+    .await?;
+    Ok(http::with_cookie(page, &panel.set_cookie("", 0)))
 }
 
 /// The first passkey of the installation is kept: when `ARAUTO_DATABASE_PASSWORD` asks for it,
@@ -543,20 +653,50 @@ async fn security_failed(
     Err(error)
 }
 
+/// The address of the client of a request, as the hub tells it: what the audit records.
+fn address_of(hub: &Hub, peer: SocketAddr, headers: &HeaderMap) -> Option<IpAddr> {
+    client_ip(hub.client_ip_source(), peer, headers).ok()
+}
+
+/// The address the ceilings count a request under: the client, as the hub tells it. When a
+/// trusted proxy brought a forwarded address the hub cannot read, the request is counted under
+/// the proxy itself, with the ceiling of one address: a header the client spoils never takes
+/// it out of the ceiling per address.
+fn counted_as(address: Option<IpAddr>, peer: SocketAddr) -> IpAddr {
+    address.unwrap_or_else(|| canonical_ip(peer))
+}
+
 /// The challenge of a sign-in, for the script of the page of the entry. It needs no session,
-/// so it shares the ceiling of the looks at entry codes: a flood does not fill the memory
-/// of the ceremonies.
-fn passkey_start(hub: &Hub, panel: &PanelState) -> Response<Body> {
-    if !panel.attempt(hub.now_ms()) {
-        return http::plain(StatusCode::TOO_MANY_REQUESTS, "Too many attempts.\n");
+/// so it has its own ceiling of challenges, per address and for everyone: a flood does not fill
+/// the memory of the ceremonies. While the first access was not done there is no passkey to
+/// sign in with, and it answers 404.
+async fn passkey_start(
+    hub: &Hub,
+    panel: &PanelState,
+    peer: SocketAddr,
+    headers: &HeaderMap,
+) -> Result<Response<Body>, RepoError> {
+    let address = address_of(hub, peer, headers);
+    if !panel.allow(
+        Kind::Challenges,
+        Some(counted_as(address, peer)),
+        hub.now_ms(),
+    ) {
+        return Ok(http::plain(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many attempts.\n",
+        ));
+    }
+    if first_access_pending(hub, panel).await? {
+        return Ok(http::plain(StatusCode::NOT_FOUND, "not found\n"));
     }
     let Some(relying) = &panel.relying else {
-        return http::plain(StatusCode::NOT_FOUND, "not found\n");
+        return Ok(http::plain(StatusCode::NOT_FOUND, "not found\n"));
     };
-    match relying.start_authentication() {
+    Ok(match relying.start_authentication() {
         Ok(options) => http::json(options),
         Err(_) => http::plain(StatusCode::SERVICE_UNAVAILABLE, "Try again.\n"),
-    }
+    })
 }
 
 /// Checks what a browser answered to the challenge of a sign-in and opens a session that
@@ -569,38 +709,37 @@ async fn passkey_sign_in(
     body: Incoming,
 ) -> Result<Response<Body>, RepoError> {
     let now = hub.now_ms();
-    if !panel.attempt(now) {
-        return Ok(http::page(
+    let address = address_of(hub, peer, headers);
+    if !panel.allow(Kind::Challenges, Some(counted_as(address, peer)), now) {
+        return entry(
+            hub,
+            panel,
+            headers,
             StatusCode::TOO_MANY_REQUESTS,
-            view::sign_in(lang_of(headers), Some(TOO_MANY)),
-        ));
+            Some(Said::TooManyChallenges),
+        )
+        .await;
     }
     let answered = match http::form_field(headers, body, "credential").await {
         Ok(answered) => answered,
         Err(error) => return Ok(http::plain(error.status(), "The form was not read.\n")),
     };
-    let refused = || {
-        http::page(
-            StatusCode::OK,
-            view::sign_in(lang_of(headers), Some(PASSKEY_REFUSED)),
-        )
-    };
     let (Some(relying), Some(answered)) = (&panel.relying, answered) else {
-        return Ok(refused());
+        return refused_passkey(hub, panel, headers).await;
     };
     // The challenge is spent here, whatever comes next.
     let Ok(pending) = relying.claim_authentication(answered.as_bytes()) else {
-        return Ok(refused());
+        return refused_passkey(hub, panel, headers).await;
     };
     let Some(organization) =
         db::organization_of_panel_passkey(hub.pool(), pending.credential_id()).await?
     else {
-        return Ok(refused());
+        return refused_passkey(hub, panel, headers).await;
     };
     let Some(stored) =
         repo::panel::passkey(hub.pool(), organization, pending.credential_id()).await?
     else {
-        return Ok(refused());
+        return refused_passkey(hub, panel, headers).await;
     };
     let checked = relying.finish_authentication(
         pending,
@@ -612,9 +751,8 @@ async fn passkey_sign_in(
         }),
     );
     let Ok(checked) = checked else {
-        return Ok(refused());
+        return refused_passkey(hub, panel, headers).await;
     };
-    let address = client_ip(hub.client_ip_source(), peer, headers).ok();
     let opened = repo::panel::sign_in_with_passkey(
         hub.pool(),
         hub.mark(),
@@ -631,9 +769,25 @@ async fn passkey_sign_in(
             let cookie = panel.set_cookie(&opened.secret.reveal(), SESSION_VALIDITY_MS / 1_000);
             Ok(http::with_cookie(http::see_other("/"), &cookie))
         }
-        Ok(None) => Ok(refused()),
+        Ok(None) => refused_passkey(hub, panel, headers).await,
         Err(error) => security_failed(hub, organization, error).await,
     }
+}
+
+/// The page of the entry, after the hub did not accept a passkey answer.
+async fn refused_passkey(
+    hub: &Hub,
+    panel: &PanelState,
+    headers: &HeaderMap,
+) -> Result<Response<Body>, RepoError> {
+    entry(
+        hub,
+        panel,
+        headers,
+        StatusCode::OK,
+        Some(Said::PasskeyRefused),
+    )
+    .await
 }
 
 async fn sign_in(
@@ -644,30 +798,31 @@ async fn sign_in(
     body: Incoming,
 ) -> Result<Response<Body>, RepoError> {
     let now = hub.now_ms();
-    if !panel.attempt(now) {
-        return Ok(http::page(
+    let address = address_of(hub, peer, headers);
+    if !panel.allow(Kind::Codes, Some(counted_as(address, peer)), now) {
+        return entry(
+            hub,
+            panel,
+            headers,
             StatusCode::TOO_MANY_REQUESTS,
-            view::sign_in(lang_of(headers), Some(TOO_MANY)),
-        ));
+            Some(Said::TooManyCodes),
+        )
+        .await;
     }
     let typed = match http::form_field(headers, body, "code").await {
         Ok(typed) => typed,
         Err(error) => return Ok(http::plain(error.status(), "The form was not read.\n")),
     };
-    let refused = || {
-        http::page(
-            StatusCode::OK,
-            view::sign_in(lang_of(headers), Some(REFUSED)),
-        )
-    };
+    // One page for every refused code: wrong, spent, replaced or past its minutes. They are
+    // the same bytes, so the answer never says which one it was.
+    let refused = || entry(hub, panel, headers, StatusCode::OK, Some(Said::CodeRefused));
     let Some(code) = typed.as_deref().and_then(|typed| EntryCode::parse(typed)) else {
-        return Ok(refused());
+        return refused().await;
     };
     let digest = code.digest();
     let Some(organization) = db::organization_of_panel_entry(hub.pool(), &digest).await? else {
-        return Ok(refused());
+        return refused().await;
     };
-    let address = client_ip(hub.client_ip_source(), peer, headers).ok();
     match repo::panel::sign_in(hub.pool(), hub.mark(), organization, &digest, address, now).await {
         Ok(SignIn::Opened(opened)) => {
             panel.opened(opened.id, now);
@@ -675,8 +830,9 @@ async fn sign_in(
             // The session a code opens only reaches the registration of a passkey.
             Ok(http::with_cookie(http::see_other("/first-access"), &cookie))
         }
-        Ok(SignIn::Refused) => Ok(refused()),
-        // The session may be open with the audit mark behind: the admin asks for another code.
+        Ok(SignIn::Refused) => refused().await,
+        // The session may be open with the audit mark behind; typing the same code again closes
+        // it and opens another (R7), so no new code is needed.
         Err(error) => security_failed(hub, organization, error).await,
     }
 }
@@ -697,6 +853,58 @@ async fn sign_out(
         http::see_other("/sign-in"),
         &panel.set_cookie("", 0),
     ))
+}
+
+/// The window that checks the installation: a read, for a session that reaches the whole
+/// panel. `?welcome` is right after the first passkey.
+async fn installation(
+    hub: &Hub,
+    panel: &PanelState,
+    peer: SocketAddr,
+    headers: &HeaderMap,
+    query: Option<&str>,
+) -> Result<Response<Body>, RepoError> {
+    let organization = match any_session_of(hub, panel, headers).await? {
+        Some((organization, session)) if session.full => organization,
+        Some(_) => return Ok(http::see_other("/first-access")),
+        None => return Ok(http::see_other("/sign-in")),
+    };
+    let lang = lang_of(headers);
+    let frame = data::frame(hub, organization, lang).await?;
+    let hermes = data::hermes(hub, organization, lang).await?;
+    // What only the running hub knows: who is reading, as it sees them, told from this
+    // request alone.
+    let peer_ip = canonical_ip(peer);
+    let seen = client_ip(hub.client_ip_source(), peer, headers).unwrap_or(peer_ip);
+    let reader = check::Reader {
+        seen,
+        peer: peer_ip,
+        untrusted_forwarder: untrusted_forwarder(hub.client_ip_source(), peer, headers),
+        no_trusted_proxy: no_trusted_proxy(hub.client_ip_source(), peer),
+    };
+    // The rest is read as `arauto-hub admin check` reads it.
+    let facts = check::facts(
+        check::Sources {
+            pool: hub.pool(),
+            organization,
+            storage: hub.storage(),
+            connector: panel.connector.as_ref(),
+        },
+        Some(panel.origin.clone()),
+        Some(panel.hub_url.origin()),
+        Some(reader),
+    )
+    .await?;
+    let rows = check::rows(&facts);
+    let welcome = query.is_some_and(|query| query.split('&').any(|pair| pair == "welcome"));
+    Ok(http::page(
+        StatusCode::OK,
+        installation::page(&frame, &hermes, &rows, welcome),
+    ))
+}
+
+fn canonical_ip(peer: SocketAddr) -> IpAddr {
+    crate::channel::client_ip::canonical(peer.ip())
 }
 
 async fn page(
@@ -815,20 +1023,28 @@ mod tests {
     }
 
     #[test]
-    fn the_looks_at_entry_codes_have_a_ceiling_per_minute() {
+    fn the_looks_at_entry_codes_have_a_ceiling_per_address_and_one_for_everyone() {
         let panel = panel("https://panel.example.com");
         let start = 1_800_000_000_000;
-        for _ in 0..ATTEMPTS_PER_MINUTE {
-            assert!(panel.attempt(start));
+        let address = Some("198.51.100.1".parse().unwrap());
+        for _ in 0..attempts::PER_ADDRESS_PER_MINUTE {
+            assert!(panel.allow(Kind::Codes, address, start));
         }
-        assert!(!panel.attempt(start));
-        assert!(!panel.attempt(start + MINUTE_MS - 1));
-        assert!(
-            panel.attempt(start + MINUTE_MS),
-            "a new minute, a new share"
+        assert!(!panel.allow(Kind::Codes, address, start));
+        // Another address is not stopped by it.
+        assert!(panel.allow(Kind::Codes, Some("198.51.100.2".parse().unwrap()), start));
+    }
+
+    #[test]
+    fn the_panel_serves_one_organization_or_none() {
+        let (one, other) = (Uuid::new_v4(), Uuid::new_v4());
+        assert_eq!(served_organization(Ok(vec![one])), Some(one));
+        assert_eq!(served_organization::<Uuid>(Ok(vec![])), None);
+        assert_eq!(served_organization(Ok(vec![one, other])), None);
+        assert_eq!(
+            served_organization::<Uuid>(Err(db::DbError::Query(sqlx::Error::PoolTimedOut))),
+            None
         );
-        // A clock that went back does not lock the entry forever.
-        assert!(panel.attempt(start - 10 * MINUTE_MS));
     }
 
     #[test]
@@ -873,6 +1089,11 @@ mod tests {
                 "the script of the panel has {forbidden}"
             );
         }
+        // A dialog the person closed, or one that took too long, is not a refusal: the script
+        // says the text of the form for it.
+        assert!(script.contains(
+            "say(name === 'NotAllowedError' || name === 'AbortError' ? 'cancelled' : 'failed');"
+        ));
         // One call, to an address written by the hub in the page, with nothing in it.
         assert_eq!(script.matches("fetch(").count(), 1);
         assert!(script.contains(

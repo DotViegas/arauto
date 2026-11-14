@@ -10,35 +10,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("M", "И"),
     ("W", "П"),
     ("Waiting for the device…", "Ожидание устройства…"),
-    (
-        "The passkey was not accepted. Try again.",
-        "Ключ доступа не принят. Попробуйте ещё раз.",
-    ),
-    (
-        "This browser cannot use a passkey here. Use a current browser, at the address of the panel.",
-        "Этот браузер не может использовать ключ доступа здесь. Откройте адрес панели в современном браузере.",
-    ),
-    ("Sign in to the panel", "Вход в панель"),
-    (
-        "Use the passkey you registered: on this device, or in your password manager.",
-        "Используйте зарегистрированный ключ доступа: на этом устройстве или в менеджере паролей.",
-    ),
     ("Sign in with a passkey", "Войти с ключом доступа"),
     ("Installation code", "Код установки"),
-    (
-        "First access, or a lost passkey: type the code the hub wrote in its log when it started, or issue one on the hub's server with {command}. The code only opens the registration of a passkey.",
-        "Первый вход или потерянный ключ доступа: введите код, который хаб записал в журнал при запуске, или выпустите новый на сервере хаба командой {command}. Код открывает только регистрацию ключа доступа.",
-    ),
     ("Continue", "Продолжить"),
-    ("Register a passkey", "Зарегистрировать ключ доступа"),
-    (
-        "A passkey stays on this device or in your password manager, and opens with the fingerprint, the face or the PIN of the device. The hub keeps only what checks it: there is no password to leak.",
-        "Ключ доступа хранится на этом устройстве или в менеджере паролей и открывается отпечатком пальца, лицом или PIN-кодом устройства. Хаб хранит только то, чем его можно проверить: пароля, который мог бы утечь, нет.",
-    ),
-    (
-        "This session only reaches the registration of a passkey. The rest of the panel opens after it.",
-        "Этот сеанс открывает только регистрацию ключа доступа. Остальная панель откроется после неё.",
-    ),
     ("Sign out", "Выйти"),
     ("Alerts", "Оповещения"),
     ("Unknown devices", "Неизвестные устройства"),
@@ -119,6 +93,102 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Warnings that block nothing",
         "Предупреждения, которые ничего не блокируют",
     ),
+    (
+        "That code did not work. Use the latest one: the one in the last block of the log, or one issued on the hub's server.",
+        "Этот код не подошёл. Используйте самый последний: тот, что в последнем блоке журнала, или выпущенный на сервере хаба.",
+    ),
+    (
+        "The hub did not accept this passkey. Try again.",
+        "Хаб не принял этот ключ доступа. Попробуйте ещё раз.",
+    ),
+    (
+        "Your panel session ended. Type the latest code to pick up where you left off.",
+        "Сеанс панели завершился. Введите самый последний код, чтобы продолжить с того места, где остановились.",
+    ),
+    (
+        "This browser cannot use a passkey here. Open the panel in an up-to-date browser, directly at its address (not inside another app).",
+        "Этот браузер здесь не может использовать ключ доступа. Откройте панель в актуальном браузере, напрямую по её адресу (а не внутри другого приложения).",
+    ),
+    (
+        "The passkey was not created: the request was cancelled or took too long. Just try again.",
+        "Ключ доступа не создан: запрос был отменён или занял слишком много времени. Просто попробуйте ещё раз.",
+    ),
+    (
+        "No passkey was used. If it is not on this device, use the device or the password manager where you created it, or open “Lost your passkey?”.",
+        "Ключ доступа не использовался. Если его нет на этом устройстве, используйте устройство или менеджер паролей, где вы его создали, либо откройте «Потеряли ключ доступа?».",
+    ),
+    ("Passkey", "Ключ доступа"),
+    ("Check", "Проверка"),
+    (
+        "Welcome to your Arauto hub",
+        "Добро пожаловать в ваш хаб Arauto",
+    ),
+    (
+        "Let's set up your first access. It takes three quick steps, and you only do it once.",
+        "Настроим первый вход. Это три быстрых шага, и выполнить их нужно только один раз.",
+    ),
+    (
+        "Step 1 · Confirm it is you",
+        "Шаг 1 · Подтвердите, что это вы",
+    ),
+    (
+        "When the hub started, it wrote an installation code in its own log. Only whoever looks after the server sees that log: that is how the hub knows it is you.",
+        "Когда хаб запустился, он записал код установки в свой журнал. Видеть этот журнал может только тот, кто обслуживает сервер: так хаб понимает, что это вы.",
+    ),
+    ("Where to find the code:", "Где найти код:"),
+    (
+        "In Easypanel, open the service of the hub and go to Logs. (With Docker: {command})",
+        "В Easypanel откройте сервис хаба и перейдите в Logs. (Через Docker: {command})",
+    ),
+    (
+        "Find the ARAUTO FIRST ACCESS block: the newest one is the last, at the bottom of the log. Copy its code.",
+        "Найдите блок ARAUTO FIRST ACCESS: самый новый — последний, в самом конце журнала. Скопируйте его код.",
+    ),
+    ("Paste the code here:", "Вставьте код сюда:"),
+    (
+        "The code does not expire and works only once. If the hub restarts, it writes a new one: always use the latest.",
+        "У кода нет срока действия, и он работает только один раз. Если хаб перезапустится, он запишет новый: всегда используйте самый последний.",
+    ),
+    (
+        "Cannot open the log? On the hub's server, run {command}. Careful: that new code cancels the one in the log.",
+        "Не получается открыть журнал? На сервере хаба выполните {command}. Внимание: этот новый код отменяет код из журнала.",
+    ),
+    ("Good to have you back", "Рады снова видеть вас"),
+    (
+        "Enter with your passkey: the fingerprint, the face or the PIN of this device, or your password manager.",
+        "Войдите с ключом доступа: отпечатком пальца, лицом или PIN-кодом этого устройства либо через менеджер паролей.",
+    ),
+    ("Lost your passkey?", "Потеряли ключ доступа?"),
+    (
+        "No problem. On the hub's server, run {command}. It shows a code valid for 10 minutes: type it here and create a new passkey.",
+        "Ничего страшного. На сервере хаба выполните {command}. Команда покажет код, действующий 10 минут: введите его здесь и создайте новый ключ доступа.",
+    ),
+    (
+        "Code accepted! Now, create your passkey",
+        "Код принят! Теперь создайте ключ доступа",
+    ),
+    (
+        "It is how you will enter the panel from now on, with no password to remember.",
+        "С его помощью вы теперь будете входить в панель, и запоминать пароль не нужно.",
+    ),
+    (
+        "The passkey stays on this device or in your password manager, and opens with your fingerprint, your face or the PIN of the device. The hub keeps only what checks the passkey: there is no password to leak.",
+        "Ключ доступа хранится на этом устройстве или в менеджере паролей и открывается отпечатком пальца, лицом или PIN-кодом устройства. Хаб хранит только то, чем ключ проверяется: пароля, который мог бы утечь, нет.",
+    ),
+    (
+        "It will work at this address:",
+        "Он будет работать по этому адресу:",
+    ),
+    ("Create my passkey", "Создать мой ключ доступа"),
+    (
+        "If you use a password manager, the passkey can go along to your other devices.",
+        "Если вы пользуетесь менеджером паролей, ключ доступа может появиться и на других ваших устройствах.",
+    ),
+    (
+        "Left this page by accident? Type the same code again: it is only spent when the passkey is created.",
+        "Случайно покинули эту страницу? Введите тот же код ещё раз: он расходуется только при создании ключа доступа.",
+    ),
+    ("Check the installation", "Проверить установку"),
     // guide.rs
     ("Name", "Имя"),
     ("Block", "Блок"),
@@ -311,6 +381,27 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Reconnect {name}", "Переподключить {name}"),
     ("Connect {name}", "Подключить {name}"),
     ("Steps", "Шаги"),
+    ("How it works:", "Как это работает:"),
+    (
+        "You give the Hermes a name here.",
+        "Здесь вы даёте Hermes имя.",
+    ),
+    (
+        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
+        "Хаб создаёт приглашение: блок текста, который вы вставляете в командный канал этого Hermes, и больше никуда.",
+    ),
+    (
+        "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
+        "Hermes скачивает коннектор с этого хаба и отвечает проверочным кодом из 6 цифр.",
+    ),
+    (
+        "You type the code here and approve. Done: the Hermes shows as connected as soon as its connector confirms.",
+        "Вы вводите код здесь и одобряете. Готово: Hermes отображается как подключённый, как только его коннектор это подтвердит.",
+    ),
+    (
+        "Let's connect your first Hermes",
+        "Подключим ваш первый Hermes",
+    ),
     // editor.rs
     (
         "Being woken requires reading. Nothing was saved.",
@@ -612,11 +703,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     // mod.rs
     (
-        "Invalid or expired code. Issue another one on the hub's server.",
-        "Код неверен или срок его действия истёк. Выпустите другой на сервере хаба.",
-    ),
-    (
         "Too many attempts right now. Wait a minute and try again.",
         "Сейчас слишком много попыток. Подождите минуту и попробуйте снова.",
     ),
+    // check.rs
+    ("ok", "ок"),
+    ("check", "проверить"),
+    ("attention", "внимание"),
+    ("later", "позже"),
+    ("failed", "сбой"),
+    ("Panel address", "Адрес панели"),
+    ("Connectors address", "Адрес коннекторов"),
+    ("Your address", "Ваш адрес"),
+    ("Database password", "Пароль базы данных"),
+    ("Data folder", "Папка данных"),
+    ("WhatsApp engine", "Движок WhatsApp"),
+    (
+        "Your passkey works here.",
+        "Ваш ключ доступа работает здесь.",
+    ),
+    (
+        "Open it: it should say it is the address of the connectors.",
+        "Откройте его: должно появиться сообщение, что это адрес коннекторов.",
+    ),
+    (
+        "The hub sees you at {address}. Is it yours? If not, the proxy is not passing the real address.",
+        "Хаб видит вас по адресу {address}. Это ваш адрес? Если нет, прокси не передаёт настоящий адрес.",
+    ),
+    (
+        "A connection from {address}, which is not in ARAUTO_TRUSTED_PROXIES, brought a forwarded address. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "Соединение с адреса {address}, которого нет в ARAUTO_TRUSTED_PROXIES, передало пересланный адрес. Добавьте адрес этого соединения в ARAUTO_TRUSTED_PROXIES и разверните заново.",
+    ),
+    (
+        "The hub sees you at {address}, an address of an internal network: the proxy is not trusted yet. Add it to ARAUTO_TRUSTED_PROXIES and deploy again.",
+        "Хаб видит вас по адресу {address}, это адрес внутренней сети: прокси пока не считается доверенным. Добавьте его в ARAUTO_TRUSTED_PROXIES и разверните заново.",
+    ),
+    (
+        "Replaced by one nobody saw.",
+        "Заменён на тот, который никто не видел.",
+    ),
+    (
+        "Not replaced by the hub: this installation sets the password of the database itself.",
+        "Не заменён хабом: эта установка сама задаёт пароль базы данных.",
+    ),
+    (
+        "The replacement failed. See the log of the hub, then run {command}.",
+        "Замена не удалась. Посмотрите журнал хаба и выполните {command}.",
+    ),
+    ("Ready for your Hermes.", "Готов к работе с вашими Hermes."),
+    (
+        "The downloads folder is empty: a Hermes cannot be connected through the panel. Rebuild the image of the hub.",
+        "Папка загрузок пуста: подключить Hermes через панель нельзя. Пересоберите образ хаба.",
+    ),
+    (
+        "It holds the master key and the password of the database. Back it up: without it, the hub cannot open what it kept encrypted.",
+        "Она хранит главный ключ и пароль базы данных. Сделайте резервную копию: без неё хаб не сможет открыть то, что хранил зашифрованным.",
+    ),
+    ("Configured.", "Настроен."),
+    (
+        "A Hermes can be connected without it; WhatsApp numbers need it.",
+        "Hermes можно подключить и без него; номера WhatsApp без него работать не будут.",
+    ),
+    (
+        "The hub checked a few things by itself. Nothing here changes anything: it is only so you know how it turned out.",
+        "Хаб проверил некоторые вещи сам. Здесь ничего не меняется: это просто чтобы вы знали, как всё прошло.",
+    ),
+    // installation.rs
+    (
+        "Step 3 · Let's check the installation",
+        "Шаг 3 · Проверим установку",
+    ),
+    (
+        "All set: your passkey was created!",
+        "Готово: ваш ключ доступа создан!",
+    ),
+    (
+        "The same by command: {command}",
+        "То же командой: {command}",
+    ),
+    ("Connect my first Hermes", "Подключить мой первый Hermes"),
+    ("Do it later", "Сделать позже"),
 ];

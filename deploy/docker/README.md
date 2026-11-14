@@ -87,14 +87,19 @@ of it when you finish.
 1. In the `arauto.env`, uncomment `ARAUTO_LISTEN_PANEL` and `ARAUTO_PANEL_URL`, and run
    `docker compose --env-file arauto.env up -d`.
 2. From your computer, open a tunnel to the server: `ssh -L 8445:127.0.0.1:8445 YOUR-SERVER`.
-3. Get the installation code. While no passkey exists, the hub writes one in the output of its
-   start (`docker compose --env-file arauto.env logs hub`, the line `INSTALLATION CODE:`), valid
-   for 30 minutes; restart the hub for another. At any time,
-   `docker compose --env-file arauto.env exec hub arauto-hub admin panel code` issues one, valid
-   for 10 minutes. It serves once. It is a secret: do not paste it in a chat or in a report.
+3. Get the installation code. While no passkey was ever registered, the hub writes one in the
+   output of its start, and again every 10 minutes
+   (`docker compose --env-file arauto.env logs hub`, search for `INSTALLATION CODE` and take the
+   block with the latest time). That code has no time limit and works once; each restart of the
+   hub writes a new one. At any time,
+   `docker compose --env-file arauto.env exec hub arauto-hub admin panel code` issues another,
+   valid for 10 minutes, which cancels the one in the log. It is a secret: do not paste it in a
+   chat or in a report.
 4. Open `http://localhost:8445` in the browser, type the code and register a passkey: the
-   fingerprint, the face or the PIN of your device. From then on the panel is entered with the
-   passkey, and the code is only for who lost it.
+   fingerprint, the face or the PIN of your phone or computer. From then on the panel is entered with the
+   passkey, and the code is only for who lost it. The last step is a window that checks the
+   installation; `docker compose --env-file arauto.env exec hub arauto-hub admin check` prints the
+   same rows.
 
 The address in the browser has to be exactly that of `ARAUTO_PANEL_URL`: with another name, the hub
 answers 421. The panel session lasts 12 hours, or 30 minutes without use, and ends when the hub
@@ -218,11 +223,17 @@ for the chat to stay quiet for 6 seconds before waking; change it with `admin ac
 ```
 git pull
 docker compose --env-file arauto.env build
+docker compose --env-file arauto.env stop hub
 docker compose --env-file arauto.env run --rm hub migrate --i-have-a-backup
 docker compose --env-file arauto.env up -d
 ```
 
 Make the backup of the database before the `migrate`: the name of the argument is the reminder.
+
+Stop the old hub before the new one starts: two versions of the hub must not serve the same
+database at once. The mark of the first access is written by the newer version; if an older one
+kept a passkey meanwhile, the start of the newer one repairs the mark by itself, but an overlap is
+not supported ([decision 0040](../../docs/decisoes/0040-painel-dentro-do-hub.md)).
 
 ## What to check on the first use on a server
 

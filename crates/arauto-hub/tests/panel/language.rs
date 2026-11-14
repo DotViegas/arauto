@@ -49,12 +49,16 @@ async fn the_browser_chooses_the_language_and_the_person_may_choose_another() {
     for accept in [None, Some("it-IT, nl;q=0.8"), Some(""), Some("<script>")] {
         let page = read(&browser, "/sign-in", accept, None).await;
         assert_eq!(lang_of(&page), "en", "{accept:?}");
-        assert!(page.contains("Sign in to the panel"));
+        assert!(page.contains("Welcome to your Arauto hub"));
     }
     // The first language of the browser that the panel speaks.
     for (accept, tag, title) in [
-        ("pt-BR,pt;q=0.9,en;q=0.8", "pt-BR", "Entrar no painel"),
-        ("pt-PT", "pt-BR", "Entrar no painel"),
+        (
+            "pt-BR,pt;q=0.9,en;q=0.8",
+            "pt-BR",
+            "Boas-vindas ao seu hub do Arauto",
+        ),
+        ("pt-PT", "pt-BR", "Boas-vindas ao seu hub do Arauto"),
         ("it, es;q=0.9, en;q=0.1", "es", ""),
         ("fr-CA", "fr", ""),
         ("de;q=0.7, ja;q=0.9", "ja", ""),
@@ -67,11 +71,14 @@ async fn the_browser_chooses_the_language_and_the_person_may_choose_another() {
         assert_eq!(lang_of(&page), tag, "{accept}");
         assert!(page.contains(title), "{accept}: {page}");
         // The sentence is not the English one, and the page still has its form and its field.
+        // Every language, not only Portuguese: a translation pasted as the English sentence
+        // would leave step 1 in English, and the completeness test of the catalogs does not see
+        // that.
         assert!(
-            !page.contains("Sign in to the panel"),
+            !page.contains("Welcome to your Arauto hub"),
             "{accept} was left in English"
         );
-        assert!(page.contains("<form class=\"card\" method=\"post\" action=\"/sign-in\""));
+        assert!(page.contains("<form class=\"code-form\" method=\"post\" action=\"/sign-in\""));
         // Every language is offered by its own name, with the one of the page marked.
         assert!(
             page.contains(&format!("<option value=\"{tag}\" selected>")),

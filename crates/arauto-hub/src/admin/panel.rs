@@ -5,8 +5,9 @@
 //! The panel has no password: it is entered with a passkey. The code is the way to register
 //! one when there is none yet, or when the only one was lost. Whoever can run this command
 //! on the machine of the hub, or read the log of its start, already holds the database and
-//! the master key: the code is drawn, shown once, and opens one session that only reaches
-//! the registration of a passkey (`docs/decisoes/0040-painel-dentro-do-hub.md`).
+//! the master key: the code is drawn and shown once. Typed, it opens one session that only
+//! reaches the registration of a passkey, and that registration is what spends the code
+//! (`docs/decisoes/0040-painel-dentro-do-hub.md`).
 
 use std::path::PathBuf;
 
@@ -20,7 +21,7 @@ use crate::config::StorageConfig;
 use crate::db::{self, ResolvedOrg, RotationError, When};
 use crate::db_password::DATABASE_SECRET_FILE;
 use crate::mark::Mark;
-use crate::repo::panel::{INSTALLATION_VALIDITY_MS, IssuedEntry, PANEL_ACTOR};
+use crate::repo::panel::{IssuedEntry, IssuedStart, PANEL_ACTOR};
 use crate::repo::{self, Admin};
 
 impl Session {
@@ -43,12 +44,17 @@ impl Session {
         }
     }
 
-    /// Issues an entry code of the panel. The one issued before stops being accepted.
+    /// Issues a command code of the panel (`arauto-hub admin panel code`): valid for 10
+    /// minutes to be typed, in every state of the hub. The unspent code, of either kind,
+    /// stops being accepted.
     ///
     /// # Errors
     /// What the database or the generator of the system return.
     pub async fn panel_code(&self, now: i64) -> Result<IssuedEntry, AdminError> {
-        Ok(repo::panel::issue_entry(&self.pool, self.organization, &self.admin, now).await?)
+        Ok(
+            repo::panel::issue_command_code(&self.pool, self.organization, &self.admin, now)
+                .await?,
+        )
     }
 
     /// `admin database rotate-password`: replaces the password of the database role with one
@@ -80,25 +86,19 @@ impl Session {
         Ok(storage.data_dir.join(DATABASE_SECRET_FILE))
     }
 
-    /// What the hub does when it starts with a panel: while no admin has a passkey, it
-    /// issues an installation code, for the log of the start. `None` once a passkey exists:
-    /// then a code only comes out of the command, asked for by a person.
+    /// What the hub does when it starts with a panel: while the first access was never done,
+    /// it issues a start code, with no deadline, for the log of the start. `None` once the
+    /// organization has kept its first passkey: the durable mark stays even if every passkey
+    /// is removed or lost later, and then a code only comes out of the command, asked for by a
+    /// person.
+    ///
+    /// The mark is read in the same write that would issue the code
+    /// ([`repo::panel::issue_start_code`]), so a first passkey kept at the same moment by
+    /// another hub never leaves a start code behind it.
     ///
     /// # Errors
     /// What the database or the generator of the system return.
-    pub async fn installation_code(&self, now: i64) -> Result<Option<IssuedEntry>, AdminError> {
-        if repo::panel::has_passkey(&self.pool, self.organization).await? {
-            return Ok(None);
-        }
-        Ok(Some(
-            repo::panel::issue_entry_for(
-                &self.pool,
-                self.organization,
-                &self.admin,
-                INSTALLATION_VALIDITY_MS,
-                now,
-            )
-            .await?,
-        ))
+    pub async fn installation_code(&self, now: i64) -> Result<Option<IssuedStart>, AdminError> {
+        Ok(repo::panel::issue_start_code(&self.pool, self.organization, &self.admin, now).await?)
     }
 }

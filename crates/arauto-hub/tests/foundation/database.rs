@@ -474,3 +474,114 @@ async fn the_key_of_an_organization_comes_back_from_the_database() {
             .is_err()
     );
 }
+
+/// R15 and R1b, on a database that already has data: the codes that exist become command codes
+/// with the deadline they have (the ones that are dead stay dead), a cancelled one says when it
+/// was cancelled, and an organization that has a passkey, removed or not, has done its first
+/// access.
+#[tokio::test]
+async fn the_codes_and_the_passkeys_that_exist_are_carried_to_the_first_access_migration() {
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 15)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+
+    let with_a_passkey = uuid::Uuid::new_v4();
+    let without = uuid::Uuid::new_v4();
+    let admin = uuid::Uuid::new_v4();
+    for (id, name) in [(with_a_passkey, "one"), (without, "two")] {
+        sqlx::query(
+            "INSERT INTO organization (id, name, state, key_enc, created_at) \
+             VALUES ($1, $2, 'active', decode('00', 'hex'), 1)",
+        )
+        .bind(id)
+        .bind(name)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query(
+        "INSERT INTO admin (id, organization_id, name, kind, created_at) \
+         VALUES ($1, $2, 'a', 'local', 1)",
+    )
+    .bind(admin)
+    .bind(with_a_passkey)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO panel_passkey (id, organization_id, admin_id, credential_id, user_handle, \
+                                    static_state, dynamic_state, state, created_at, removed_at) \
+         VALUES (gen_random_uuid(), $1, $2, decode('01', 'hex'), decode('02', 'hex'), \
+                 decode('03', 'hex'), decode('04', 'hex'), 'removed', 777, 800)",
+    )
+    .bind(with_a_passkey)
+    .bind(admin)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let digest = vec![7u8; 32];
+    for (state, expires_at, digest, used_at) in [
+        ("used", 1_000_i64, None, Some(900_i64)),
+        ("cancelled", 2_000, None, None),
+        ("issued", 3_000, Some(digest), None),
+    ] {
+        sqlx::query(
+            "INSERT INTO panel_entry (id, organization_id, digest, state, created_by, \
+                                      created_at, expires_at, used_at) \
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, 1, $5, $6)",
+        )
+        .bind(with_a_passkey)
+        .bind(digest)
+        .bind(state)
+        .bind(admin)
+        .bind(expires_at)
+        .bind(used_at)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    }
+
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+
+    type Entry = (String, String, Option<i64>, Option<i64>, Option<String>);
+    let entries: Vec<Entry> = sqlx::query_as(
+        "SELECT state, kind, expires_at, cancelled_at, cancelled_by FROM panel_entry \
+         ORDER BY expires_at",
+    )
+    .fetch_all(&db.pool)
+    .await
+    .unwrap();
+    let command = |state: &str, expires_at: i64, cancelled: Option<i64>| {
+        (
+            state.to_owned(),
+            "command".to_owned(),
+            Some(expires_at),
+            cancelled,
+            cancelled.map(|_| "command".to_owned()),
+        )
+    };
+    assert_eq!(
+        entries,
+        [
+            command("used", 1_000, None),
+            command("cancelled", 2_000, Some(2_000)),
+            command("issued", 3_000, None),
+        ]
+    );
+    let marks: Vec<(uuid::Uuid, Option<i64>)> =
+        sqlx::query_as("SELECT id, panel_first_passkey_at FROM organization")
+            .fetch_all(&db.pool)
+            .await
+            .unwrap();
+    for (id, mark) in marks {
+        assert_eq!(mark, (id == with_a_passkey).then_some(777), "{id}");
+    }
+}

@@ -29,8 +29,14 @@ async fn the_panel_answers_only_on_its_own_port() {
             "/sign-in",
             "/whatsapps",
             "/accesses",
+            "/installation",
             "/assets/panel.css",
         ] {
+            // R13: on the port of the connectors, `/` is the one fixed text that says it is not
+            // the panel; every other path, and `/` on the internal port, stay 404.
+            if path == "/" && port == fixture.running().connectors_addr() {
+                continue;
+            }
             for host in [PANEL_HOST, "arauto.test"] {
                 let answer = http::get(port, path, &[("Host", host)], PATIENCE)
                     .await
@@ -169,7 +175,19 @@ async fn the_code_opens_one_session_and_only_once() {
     // other page, and the page of the entry, lead to it, and nothing of the panel is shown.
     let reached = browser.get("/first-access", Some(&cookie)).await;
     assert_eq!(reached.status, 200);
-    assert!(reached.text().contains("<h1>Register a passkey</h1>"));
+    assert!(
+        reached
+            .text()
+            .contains("<h1>Code accepted! Now, create your passkey</h1>")
+    );
+    // Step 2 tells where the passkey will work: the origin of ARAUTO_PANEL_URL, with its scheme,
+    // and never the Host of the request.
+    let text = reached.text();
+    assert!(
+        text.contains(&format!("<code>{PANEL_ORIGIN}</code>")),
+        "{text}"
+    );
+    assert!(!text.contains(&format!("<code>{PANEL_HOST}</code>")));
     for path in ["/", "/whatsapps", "/accesses", "/sign-in"] {
         let sent = browser.get(path, Some(&cookie)).await;
         assert_eq!(sent.status, 303, "{path}");
@@ -196,7 +214,8 @@ async fn the_code_opens_one_session_and_only_once() {
     let mut authenticator = SoftAuthenticator::new(PANEL_ORIGIN);
     let kept = browser.register(&cookie, &mut authenticator).await;
     assert_eq!(kept.status, 303, "{}", kept.text());
-    assert_eq!(kept.header("location"), Some("/"));
+    // The first passkey of the hub ends in the check of the installation.
+    assert_eq!(kept.header("location"), Some("/installation?welcome"));
     let home = browser.get("/", Some(&cookie)).await;
     assert_eq!(home.status, 200);
     assert!(
@@ -297,8 +316,10 @@ async fn a_new_code_cancels_the_one_before() {
     assert_ne!(first, second);
 
     assert!(browser.enter(&first).await.text().contains(REFUSED));
-    assert_eq!(browser.enter(&second).await.status, 303);
+    let cookie = cookie_of(&browser.enter(&second).await).unwrap();
 
+    // Typing the code did not spend it: it is the one unspent code, with its digest, until a
+    // passkey is registered in the session it opened.
     let kept = rows(&fixture, "panel_entry").await;
     assert_eq!(kept.len(), 2);
     assert_eq!(
@@ -307,6 +328,18 @@ async fn a_new_code_cancels_the_one_before() {
             .count(),
         1
     );
+    assert_eq!(
+        kept.iter()
+            .filter(|row| row.contains("\"state\":\"issued\"") && !row.contains("\"digest\":null"))
+            .count(),
+        1
+    );
+    let mut authenticator = SoftAuthenticator::new(PANEL_ORIGIN);
+    assert_eq!(
+        browser.register(&cookie, &mut authenticator).await.status,
+        303
+    );
+    let kept = rows(&fixture, "panel_entry").await;
     assert!(
         kept.iter().all(|row| row.contains("\"digest\":null")),
         "{kept:?}"
@@ -320,8 +353,15 @@ async fn neither_secret_is_kept_in_the_database_nor_written_in_the_audit() {
     let entry = code(&fixture).await;
     // A second code stays issued, so that a digest of a code is in the database too.
     let answer = browser.enter(&entry).await;
-    let waiting = code(&fixture).await;
     let cookie = cookie_of(&answer).unwrap();
+    // The code is spent by the passkey registered in the session it opened, which then
+    // reaches the whole panel; the code issued after it is the one that waits.
+    let mut authenticator = SoftAuthenticator::new(PANEL_ORIGIN);
+    assert_eq!(
+        browser.register(&cookie, &mut authenticator).await.status,
+        303
+    );
+    let waiting = code(&fixture).await;
     let identifier = cookie.split_once('=').unwrap().1.to_owned();
 
     // Every way the bytes of each secret could have been written.
