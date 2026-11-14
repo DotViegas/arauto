@@ -2,7 +2,7 @@
 //!
 //! | Piece | What it does |
 //! |---|---|
-//! | [`registry`] | The program `ARAUTO_HERMES_BIN` points to: it records each call, keeps the servers of tools registered with `mcp add` and drops them with `mcp remove`, as the command of Hermes does. The connector runs it as it would run Hermes: no code of the tests is in the connector. The example `fake_hermes` of the connector is this program. |
+//! | [`registry`] | The program `ARAUTO_HERMES_BIN` points to: it records each call, keeps the servers of tools registered with `mcp add` (it asks its questions on the input, as Hermes v0.22.5 does), prints them with `mcp list` and drops them with `mcp remove`, as the command of Hermes does. The connector runs it as it would run Hermes: no code of the tests is in the connector. The example `fake_hermes` of the connector is this program. |
 //! | [`FakeHermes`] | Its folder, its records, and the side of Hermes that starts servers of tools: each copy of the registered command, with its input and output through pipes and a **filtered environment**, as Hermes does (`referencia/hermes-fatos.md`): the folder of the user, the path of the programs, the temporary folders, and nothing else. |
 //! | [`McpCopy`] | One copy, as a client of MCP talks to it: `initialize`, `tools/list`, `tools/call`, or any line at all. It is killed, or closed as Hermes closes it: the input first, the force 2 seconds later. |
 //!
@@ -12,6 +12,7 @@
 //! hermes(.exe)     the registry program, copied here: what ARAUTO_HERMES_BIN gets
 //! calls.jsonl      every call it received
 //! servers.json     the servers of tools registered
+//! input.log        what `mcp add` read on its input
 //! refuse           while it exists, every call is refused
 //! user/            the folder of the user of this Hermes: HOME, or USERPROFILE on Windows
 //! ```

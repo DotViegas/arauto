@@ -8,7 +8,7 @@
 //! | The same invite again, request denied or expired | AR-301, AR-302 or AR-303. The folder of that request is discarded only if it has no `credential.seal`. |
 //! | The hub refuses the invite (AR-101, AR-102) | The folder created for this request is discarded. Nothing else changes. |
 //! | A new invite, with an old request without credential in the folder | The old request is discarded and a new one is created, with a new identity. |
-//! | The enrollment worked and the registration in Hermes failed | AR-601. The request stays open on the hub; running it again tries the registration again. |
+//! | The enrollment worked and the registration in Hermes failed | AR-601 (when the program of Hermes was not found, with a sentence of its own that says where to look). The request stays open on the hub; running it again tries the registration again. |
 //! | A device of the same hub is in the folder | A reconnection: the device in use goes on until the new one has its first credential confirmed. |
 //! | A device of another hub is in the folder | AR-105. The same address with another key is another hub. |
 //!
@@ -244,7 +244,7 @@ async fn locked(
                 hermes
                     .add(home, settings)
                     .await
-                    .map_err(|_| Said::code(ErrorCode::Ar601))?;
+                    .map_err(|error| error.said())?;
                 mark_registered(&dir).await;
                 true
             } else {
@@ -271,7 +271,7 @@ async fn locked(
             hermes
                 .add(home, settings)
                 .await
-                .map_err(|_| Said::code(ErrorCode::Ar601))?;
+                .map_err(|error| error.said())?;
             mark_registered(&dir).await;
             Ok((Joined::AlreadyApproved { registered: true }, changed))
         }

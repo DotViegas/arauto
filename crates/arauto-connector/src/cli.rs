@@ -100,6 +100,7 @@ impl Exit {
             },
             Said::Unreachable(_) => Exit::Hub,
             Said::Local(Local::HubAddress | Local::PlainNotLocal | Local::HubKey) => Exit::Usage,
+            Said::Local(Local::HermesNotFound) => Exit::Registration,
             Said::Local(Local::Unregister) => Exit::Unregister,
             Said::Local(Local::Internal) => Exit::Failure,
             Said::Local(_) => Exit::Local,
@@ -401,6 +402,10 @@ mod tests {
         assert_eq!(Exit::of(Said::code(ErrorCode::Ar105)), Exit::OtherHub);
         assert_eq!(Exit::of(Said::code(ErrorCode::Ar202)), Exit::Hub);
         assert_eq!(Exit::of(Said::code(ErrorCode::Ar601)), Exit::Registration);
+        assert_eq!(
+            Exit::of(Said::Local(Local::HermesNotFound)),
+            Exit::Registration
+        );
         assert_eq!(Exit::of(Said::code(ErrorCode::Ar505)), Exit::LeavePending);
         assert_eq!(Exit::of(Said::Local(Local::PlainNotLocal)), Exit::Usage);
         assert_eq!(Exit::of(Said::Local(Local::Busy)), Exit::Local);

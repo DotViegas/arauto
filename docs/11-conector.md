@@ -135,6 +135,34 @@ The connector registers itself through the official Hermes command:
 hermes mcp add arauto --command ~/.arauto/arauto-connector --args mcp
 ```
 
+What the connector does (proposal until a trial on a real Hermes passes; the behavior of
+Hermes below was checked on v0.22.5 on 14/11/2026, in
+[hermes-fatos.md](../referencia/hermes-fatos.md)):
+
+1. **Finds the program.** `ARAUTO_HERMES_BIN`, when set, is used exactly. Otherwise it tries
+   `hermes` through the `PATH` and, only if the system says that program does not exist, on
+   Unix, these fixed absolute places in order: `/opt/hermes/bin/hermes`,
+   `/opt/hermes/.venv/bin/hermes` and `.local/bin/hermes` in the folder of the user. The first
+   that starts wins. Nothing from the hub or from the command line of `join` enters that list.
+   If none exists, the failure says the program was not found and that `ARAUTO_HERMES_BIN` names
+   it (AR-601).
+2. **Answers the questions.** `hermes mcp add` asks on the terminal whether to overwrite an
+   existing entry and whether to enable all the tools, and saves nothing if nobody answers, with
+   the exit code 0 all the same. The connector gives it `y`, newline, `y`, newline on a pipe and
+   closes the pipe. Its output is not read.
+3. **Checks the list.** The command is only a success if a following `hermes mcp list` has a row
+   whose first word is exactly `arauto` and that does not say `disabled`. The text of the list
+   is read for this and for nothing else, up to 64 KiB: it is never logged, shown or put in an
+   error.
+4. **A disabled row is a failure.** If the row is there but disabled (Hermes could not probe the
+   server and saved it anyway), the connector removes the entry, as far as it can, and fails
+   (AR-601); the same `join` again tries again. A missing row also fails.
+
+Not guaranteed: another version of Hermes may ask other questions, or print the list in another
+format; the check depends on that format. In either case the registration fails (AR-601) and the
+connector does not report one it could not see. The time limit of each run of the command is 30
+seconds.
+
 - The entry contains no secret, and it is the only change that stays in the configuration of Hermes.
 - Hermes checks every tool server entry when saving and when starting, and refuses the ones that
   look like an attack. The connector follows the format Hermes accepts: one program with one

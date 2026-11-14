@@ -287,7 +287,11 @@ async fn the_block_reaches_three_copies_and_each_one_answers() {
         "--args".to_owned(),
     ];
     expected.extend(args.iter().cloned());
-    assert_eq!(hermes.calls(), vec![expected]);
+    // The registration, and the list that proves it.
+    assert_eq!(
+        hermes.calls(),
+        vec![expected, vec!["mcp".to_owned(), "list".to_owned()]]
+    );
     assert_eq!(
         hermes.registered(SERVER_NAME),
         Some(Registered {

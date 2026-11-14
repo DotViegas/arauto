@@ -29,6 +29,10 @@ pub enum Local {
     Busy,
     /// The connector could not copy itself to its fixed place.
     Program,
+    /// The program of Hermes was not found, in the `PATH` nor in the usual places. Its sentence
+    /// starts with AR-601, the code it has outside, and says what the catalog of the protocol
+    /// does not: where to look.
+    HermesNotFound,
     /// The files were deleted, and removing the registration from Hermes failed.
     Unregister,
     /// There is no device in the folder.
@@ -50,6 +54,7 @@ impl Local {
         Local::Damaged,
         Local::Busy,
         Local::Program,
+        Local::HermesNotFound,
         Local::Unregister,
         Local::NoDevice,
         Local::Random,
@@ -89,6 +94,11 @@ impl Local {
             Local::Program => {
                 "The connector could not copy itself to its fixed place. The connection request \
                  is still open; repeating the same join tries again."
+            }
+            Local::HermesNotFound => {
+                "AR-601: the program of Hermes was not found. The operator must set ARAUTO_HERMES_BIN to its \
+                 path. The connection request is still open; repeating the same join tries \
+                 again."
             }
             Local::Unregister => {
                 "The files of this device were deleted, but removing the MCP server arauto from \

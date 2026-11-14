@@ -15,7 +15,7 @@ Marking: **[code]** read in the installed code; **[observed]** seen in a running
 |---|---|
 | The MCP client speaks stdio, HTTP and SSE. There is no websocket as a transport. | [code] `tools/mcp_tool.py` |
 | There is OAuth for MCP servers, including the device flow (RFC 8628), started only by `hermes mcp login`. | [code] `tools/mcp_oauth_device.py` |
-| Official command: `hermes mcp add NAME --command PROGRAM --args ...` or `--url ADDRESS --auth oauth\|header`. Also `remove`, `list`, `test`. | [observed] help of the command |
+| Official command: `hermes mcp add NAME --command PROGRAM --args ...` or `--url ADDRESS --auth oauth\|header`. Also `remove`, `list`, `test`. | [observed] help of the command; it is **not** non-interactive: see "Registering a stdio server" below. |
 | The list of servers is reconciled by itself, in less than a minute, without restarting. | [observed] |
 | An MCP server appears on all of Hermes's conversation platforms, unless configured per platform. | [observed] |
 | Every server entry is checked on saving and on starting. One that uses a command interpreter with a network call or with a sign of data being sent out is refused. | [code] `hermes_cli/mcp_security.py` |
@@ -68,7 +68,7 @@ These are the assumptions about Hermes:
 
 | Assumption | Why it matters |
 |---|---|
-| The registration of the connector through the official command passes the check of entries. | Without this there is no quick mode. |
+| The registration of the connector through the official command passes the check of entries. Not proved: the trial of 14/11/2026 (below) registered an entry, but **interactively**, and the check of entries is still to be seen. | Without this there is no quick mode. |
 | How many Hermes processes start the server when panel and scheduled routines are active. | It defines the work of the leader. |
 | The server entry accepts a reference to a Hermes variable in the environment field. | It is the cleanest path to the key of the local API. |
 | Whether the block triggers the terminal's approval request or not. | The flow works in both cases; the screen needs to say what to expect. |
@@ -90,3 +90,38 @@ sentence and the instruction page of
 [decision 0042](../docs/decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md). That design is a
 proposal **not tried on a real Hermes yet**. When it is, record here the version, the date and what
 the Hermes said.
+
+## Registering a stdio server (checked 14/11/2026)
+
+**Checked on 14/11/2026, on Hermes Agent v0.22.5, in a throwaway container with an empty data
+folder. [observed]**, except where marked. Another version may differ.
+
+| # | Fact |
+|---|---|
+| F1 | `hermes mcp add arauto --command <absolute path> --args mcp` starts the server, lists its tools, then asks on the terminal "Enable all N tools? [Y/n/select]". With the standard input at end of file it prints "Cancelled.", saves **nothing** and exits 0. |
+| F2 | With `y` and a newline on the standard input it saves the entry, enabled, and exits 0. |
+| F3 | When an entry of that name already exists it first asks "Server 'arauto' already exists. Overwrite? [y/N]" (end of file = cancelled, exit 0). With `y`, newline, `y`, newline it overwrites and saves it enabled. |
+| F4 | When the probe of the server fails it asks "Save config anyway (you can test later)? [y/N]"; with `y` it saves the entry **disabled**, exit 0. |
+| F5 | The exit code is 0 in every one of those cases: it says nothing about whether the entry was saved. |
+| F6 | `hermes mcp list` prints a table. The row of a server starts, after spaces, with its name and holds "✓ enabled" or the word "disabled". Example row: `  arauto           /opt/data/.arauto/arauto-...   all          ✓ enabled`. With no server the name does not appear. |
+| F7 | `hermes mcp remove arauto` with the standard input at end of file removes the entry (the default answer is yes), exit 0. When the entry does not exist it prints "not found", exit 0. |
+| F8 | In the Docker install the program is `/opt/hermes/bin/hermes` (a small shim) and `/opt/hermes/.venv/bin/hermes`. The `PATH` of the container has both, but the terminal in which the agent runs commands did **not** have `hermes` on its `PATH` (observed on a production Hermes). The install script for Linux and macOS puts the launcher in `~/.local/bin` ([read] in its documentation, **not run**). |
+
+Consequence for the connector (`docs/11-conector.md`, section 4): the registration needs
+answers on the standard input and a check in the list, and the program of Hermes may have to be
+looked for in fixed places. The line above, that the stdio registration passes by itself, was
+never proved and is not a fact.
+
+**Checked on 14/11/2026, same version, same kind of throwaway container.** A whole `join` with
+the connector built from the working tree, as the user of Hermes, with `hermes` taken out of the
+`PATH` and an empty data folder: the connector found the program in the fixed places, the entry
+was saved enabled (`command` the fixed path of the connector, `args` only `mcp`), `hermes mcp
+list` showed it and the verification code came out, in about 10 seconds. The list read by a
+program came without color codes.
+
+| | Fact |
+|---|---|
+| F9 | The shim `/opt/hermes/bin/hermes`, run by the administrator of the system, changes to the user of Hermes before it runs. A connector kept by the administrator in a private folder is then not executable by the probe ("Permission denied"), and the entry is saved disabled. Run as the user of Hermes, as the agent's terminal does, the same command works. |
+
+Not checked: the approval and the tools after it on a real Hermes; a native install (outside a
+container); whether a running Hermes picks the new entry up by itself.
