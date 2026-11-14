@@ -22,6 +22,7 @@ use uuid::Uuid;
 
 use super::alert::{self, AlertDetails, AlertKind, NewAlert};
 use super::closing::close_device;
+use super::invite::close_join_page;
 use super::sweep::{APPROVED_WINDOW_MS, expire_device, has_passed};
 use super::{Admin, Locked, RepoError, lock_hermes_by_name, notify_hub, stored_address};
 use crate::audit::{self, Action, Actor, Details, Event, Outcome, TargetKind};
@@ -338,6 +339,7 @@ pub async fn approve(
     .bind(admin.id)
     .execute(write.connection())
     .await?;
+    close_join_page(write.connection(), organization, request.id).await?;
     let mut details = Details::new()
         .id("hermes", locked.hermes.id)
         .flag("reconnect", replaces.is_some());

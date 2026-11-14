@@ -57,11 +57,11 @@ Los documentos enlazados desde esta página están escritos en inglés.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../marca/em-uma-tela-es-escuro.svg">
-    <img src="../marca/em-uma-tela-es-claro.svg" width="674" alt="En tres pasos. 1: en el panel, eliges Conectar Hermes y pegas un bloque en el canal de mando de Hermes. 2: Hermes instala el conector y responde con un código de verificación, que escribes en el panel. 3: marcas los accesos y Hermes empieza a leer y actuar en los números que autorizaste.">
+    <img src="../marca/em-uma-tela-es-claro.svg" width="674" alt="En tres pasos. 1: en el panel, eliges Conectar Hermes copias un mensaje corto y lo envías en el canal de mando de Hermes. 2: Hermes instala el conector y responde con un código de verificación, que escribes en el panel. 3: marcas los accesos y Hermes empieza a leer y actuar en los números que autorizaste.">
   </picture>
 </p>
 
-- **Conectar es copiar y pegar.** Una invitación de un solo uso, válida durante 15 minutos.
+- **Conectar es copiar y enviar.** (Aún no probado en un Hermes real; un bloque de comando queda como alternativa.) Una invitación de un solo uso, válida durante 15 minutos.
 - **Ningún secreto duradero pasa por el chat.** Las credenciales las crean las dos máquinas y
   cambian en cada conexión.
 - **Las conversaciones quedan archivadas en tu hub.** Hermes las consulta cuando se lo piden; no

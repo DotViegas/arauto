@@ -76,7 +76,8 @@ They hold for all code and every document.
    counter.
 5. **A read request does not change state.** Opening an address never spends an invite.
 6. **The hub does not send free text to the LLM.** A notice is a pointer; the fixed sentence and the
-   descriptions of the tools stay in the connector.
+   descriptions of the tools stay in the connector. The hub may serve a fixed page compiled into it, whose only
+   fields have a strict format (host, Hermes name, UTC time, version, file name).
 7. **The connector does not execute a command from the hub.** The only thing it discards on
    information from the hub is a connection request that has not received a credential yet. The
    folder of an old device goes away by decision of the connector, after another one takes over and

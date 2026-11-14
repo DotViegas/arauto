@@ -10,8 +10,9 @@ to all of them is on this page.
 | [`proxy/`](proxy/README.md) | Whoever needs an example of a proxy in front of the hub (Caddy or NGINX). | Examples written, not tested. |
 | [`kubernetes/`](kubernetes/README.md) | Whoever runs on Kubernetes. | Only the list of what the manifests need to guarantee. The manifests have not been written. |
 
-The connector is not installed from here: it is downloaded from the hub itself, through the block
-that the command `admin invite` shows ([docs/02-como-funciona.md](../docs/02-como-funciona.md)).
+The connector is not installed from here: it is downloaded from the hub itself, through the
+connection sentence (or, as a fallback, the block) that the command `admin invite` shows
+([docs/02-como-funciona.md](../docs/02-como-funciona.md)) (proposal, not tried on a real Hermes yet).
 
 ## The parts
 
@@ -65,7 +66,7 @@ that the command `admin invite` shows ([docs/02-como-funciona.md](../docs/02-com
 | `ARAUTO_LISTEN_INTERNAL` | The address of the internal port. |
 | `ARAUTO_LISTEN_PANEL` | The address of the port of the panel. Without it, the panel stays off. |
 | `ARAUTO_PANEL_URL` | The address the admin opens in the browser: `https://` and only the name (and the port), or `http://localhost` with the port, by tunnel. It comes together with the one above. |
-| `ARAUTO_PUBLIC_URL` | The address that goes in the block: `https://` and only the name (and the port). |
+| `ARAUTO_PUBLIC_URL` | The address that goes in the connection sentence, in the page it points to and in the block: `https://` and only the name (and the port). |
 | `ARAUTO_CLIENT_IP_SOURCE` | Where the address of a connector comes from: `socket` or `forwarded`. |
 | `ARAUTO_TRUSTED_PROXIES` | With `forwarded`: the proxies the hub believes. |
 | `ARAUTO_DOWNLOAD_DIR` | The folder with the connectors served at `/v1/download/`. The image already brings it. |

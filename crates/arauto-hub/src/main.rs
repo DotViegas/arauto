@@ -89,10 +89,14 @@ enum InstalledCommand {
         #[command(subcommand)]
         command: HermesCommand,
     },
-    /// Issues an invite and shows the block, to connect or to reconnect a Hermes.
+    /// Issues an invite and shows the message for the Hermes (with --command, the block), to
+    /// connect or to reconnect a Hermes.
     Invite {
         /// The name of the Hermes.
         name: String,
+        /// Shows the block with the commands instead of the message.
+        #[arg(long)]
+        command: bool,
     },
     /// Approves the pending request of a Hermes with the code it answered.
     Approve {
@@ -880,13 +884,18 @@ async fn run_installed(
                 render::hermes_removed(&session.hermes_remove(&name, now).await?)
             }
         },
-        InstalledCommand::Invite { name } => {
+        InstalledCommand::Invite { name, command } => {
             let public_url = PublicUrl::read(&ProcessEnv)?;
             let listed = downloads()?.1;
             render::block(
                 &session.invite(&name, &public_url, now).await?,
                 &listed,
                 now,
+                if command {
+                    render::Shown::Command
+                } else {
+                    render::Shown::Sentence
+                },
             )
         }
         InstalledCommand::Approve {

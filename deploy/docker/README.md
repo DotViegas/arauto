@@ -120,7 +120,8 @@ docker compose --env-file arauto.env exec hub arauto-hub admin hermes add atendi
 docker compose --env-file arauto.env exec hub arauto-hub admin invite atendimento
 ```
 
-The `invite` shows the block: the address of the hub, the hub key, the invite (valid for
+The `invite` shows the connection sentence, to send to Hermes as a new message in its command channel
+(proposal, not tried on a real Hermes yet), and with `--command`, the block. The block holds: the address of the hub, the hub key, the invite (valid for
 15 minutes and one use), the address of the connector, the SHA-256 of the file and **one command
 only**, chained: it downloads the connector to `~/.arauto`, checks the SHA-256 written in the block
 and only then runs the `join`. If the file does not match, nothing runs.

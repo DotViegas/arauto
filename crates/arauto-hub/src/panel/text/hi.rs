@@ -176,7 +176,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Check the installation", "इंस्टॉलेशन की जाँच करें"),
     // guide.rs
     ("Name", "नाम"),
-    ("Block", "ब्लॉक"),
     ("Code", "कोड"),
     ("Done", "पूर्ण"),
     ("Invite issued", "आमंत्रण जारी हुआ"),
@@ -199,10 +198,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "पैनल में इस Hermes का नाम क्या होगा?",
     ),
     ("Name of the Hermes", "Hermes का नाम"),
-    (
-        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
-        "छोटे अक्षर, अंक, हाइफ़न और अंडरस्कोर, अधिकतम 32 वर्ण, शुरुआत किसी अक्षर या अंक से। नाम ब्लॉक में दिखता है और बाद में नहीं बदलता।",
-    ),
     (
         "Preparing a secure connection",
         "सुरक्षित कनेक्शन तैयार किया जा रहा है",
@@ -243,10 +238,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "This hub has no connector to serve",
         "इस हब के पास देने के लिए कोई कनेक्टर नहीं है",
-    ),
-    (
-        "The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
-        "ब्लॉक Hermes को इस हब से कनेक्टर डाउनलोड करने को कहता है, और डाउनलोड फ़ोल्डर खाली है। कुछ भी जारी नहीं हुआ। {name} का आमंत्रण हब के सर्वर पर {command} कमांड से जारी करें।",
     ),
     (
         "Waiting for the Hermes {name}",
@@ -367,10 +358,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "You give the Hermes a name here.",
         "आप यहाँ Hermes को एक नाम देते हैं।",
-    ),
-    (
-        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
-        "हब एक आमंत्रण बनाता है: टेक्स्ट का एक ब्लॉक, जिसे आप उस Hermes के कमांड चैनल में पेस्ट करते हैं, और कहीं नहीं।",
     ),
     (
         "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
@@ -747,4 +734,49 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("The same by command: {command}", "कमांड से भी यही: {command}"),
     ("Connect my first Hermes", "मेरा पहला Hermes कनेक्ट करें"),
     ("Do it later", "बाद में करें"),
+    (
+        "I am asking you myself: connect this Hermes to our Arauto hub as \"{name}\".",
+        "यह मेरा अपना अनुरोध है: इस Hermes को हमारे Arauto हब से \"{name}\" नाम से कनेक्ट करें।",
+    ),
+    (
+        "Read {page} and follow it. Ask me if anything is unclear.",
+        "{page} पढ़ें और उसके अनुसार करें। कुछ भी स्पष्ट न हो तो मुझसे पूछें।",
+    ),
+    ("Hub:", "हब:"),
+    ("Hub key:", "हब की कुंजी:"),
+    ("Connector sha256:", "कनेक्टर sha256:"),
+    (
+        "Invite (one use, until {deadline} UTC):",
+        "आमंत्रण (एक बार के लिए, {deadline} UTC तक):",
+    ),
+    (
+        "When it is done, send me only the verification code.",
+        "काम पूरा होने पर मुझे सिर्फ़ सत्यापन कोड भेजें।",
+    ),
+    (
+        "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+        "इसे नए संदेश के रूप में भेजें, उसकी किसी सूचना के जवाब के रूप में नहीं। अगर वह पुष्टि माँगे, तो अपने शब्दों में जवाब दें।",
+    ),
+    ("Show the command instead", "इसके बजाय कमांड दिखाएँ"),
+    (
+        "Send one or the other, not both: they carry the same invite.",
+        "दोनों में से एक ही भेजें, दोनों नहीं: दोनों में एक ही आमंत्रण है।",
+    ),
+    (
+        "Click the message to copy it.",
+        "संदेश को कॉपी करने के लिए उस पर क्लिक करें।",
+    ),
+    ("Message", "संदेश"),
+    (
+        "The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else.",
+        "हब एक आमंत्रण बनाता है और उसके साथ एक संदेश लिखता है, जिसे आप उस Hermes के कमांड चैनल में भेजते हैं, और कहीं नहीं।",
+    ),
+    (
+        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
+        "छोटे अक्षर, अंक, हाइफ़न और अंडरस्कोर, अधिकतम 32 वर्ण, शुरुआत अक्षर या अंक से। नाम संदेश में दिखता है और बाद में बदलता नहीं।",
+    ),
+    (
+        "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
+        "संदेश Hermes को इस हब से कनेक्टर डाउनलोड करने को कहता है, और डाउनलोड फ़ोल्डर खाली है। कुछ भी जारी नहीं हुआ। {name} का आमंत्रण हब के सर्वर पर {command} कमांड से जारी करें।",
+    ),
 ];

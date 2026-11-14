@@ -17,6 +17,7 @@ mod abuse;
 mod ceilings;
 mod copies;
 mod deadlines;
+mod join_page;
 mod leave;
 mod mass;
 mod ports;

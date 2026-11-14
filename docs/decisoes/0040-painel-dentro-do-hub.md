@@ -427,3 +427,7 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
   keeping the last use of the session in the database (it survives the restart of the hub, but is
   a write in a read request); password (the 0019 already discarded it); a panel with no script at
   all (the block would not be copied with one click, which is what the approved design asks for).
+
+## Change of 14/11/2026
+
+The guide to connect a Hermes shows the connection sentence first and the block behind "Show the command instead"; step 2 is called "Message". The instruction page and `/llms.txt` are served on the port of the connectors, not on the panel port. The maintainer asked for the link and the page and approved the design on 14/11/2026. Decision [0042](0042-frase-de-conexao-e-pagina-de-instrucoes.md). Nothing else in this decision is reopened. The design was not tried on a real Hermes yet.

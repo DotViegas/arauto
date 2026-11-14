@@ -156,46 +156,54 @@
     }
     if (!block) return;
 
-    var text = document.getElementById('guide-text');
     var said = document.getElementById('guide-copied');
-    block.setAttribute('role', 'button');
-    block.setAttribute('tabindex', '0');
 
-    function done(copied) {
-      block.classList.remove('copied');
-      void block.offsetWidth; // the animation starts again at every click
-      block.classList.add('copied');
-      if (said) {
-        said.textContent = guide.getAttribute(copied ? 'data-copied' : 'data-selected') || '';
-        said.hidden = false;
+    // A block of text that copies itself when it is clicked: the sentence, and the command
+    // behind it. Both say the same thing when they are copied.
+    function copyable(block, text) {
+      block.setAttribute('role', 'button');
+      block.setAttribute('tabindex', '0');
+
+      function done(copied) {
+        block.classList.remove('copied');
+        void block.offsetWidth; // the animation starts again at every click
+        block.classList.add('copied');
+        if (said) {
+          said.textContent = guide.getAttribute(copied ? 'data-copied' : 'data-selected') || '';
+          said.hidden = false;
+        }
+        if (!copied) {
+          var range = document.createRange();
+          range.selectNodeContents(text);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        guide.classList.add('was-copied');
       }
-      if (!copied) {
-        var range = document.createRange();
-        range.selectNodeContents(text);
-        var selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
+
+      function copy() {
+        var write = navigator.clipboard && navigator.clipboard.writeText;
+        if (!write) { done(false); return; }
+        // A browser that does not answer in 0.8 s leaves the text selected, to copy by hand.
+        var answered = false;
+        setTimeout(function () { if (!answered) { answered = true; done(false); } }, 800);
+        navigator.clipboard.writeText(text.textContent).then(
+          function () { if (!answered) { answered = true; done(true); } },
+          function () { if (!answered) { answered = true; done(false); } });
       }
-      guide.classList.add('was-copied');
+
+      block.addEventListener('click', copy);
+      block.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          copy();
+        }
+      });
     }
 
-    function copy() {
-      var write = navigator.clipboard && navigator.clipboard.writeText;
-      if (!write) { done(false); return; }
-      // A browser that does not answer in 0.8 s leaves the text selected, to copy by hand.
-      var answered = false;
-      setTimeout(function () { if (!answered) { answered = true; done(false); } }, 800);
-      navigator.clipboard.writeText(text.textContent).then(
-        function () { if (!answered) { answered = true; done(true); } },
-        function () { if (!answered) { answered = true; done(false); } });
-    }
-
-    block.addEventListener('click', copy);
-    block.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        copy();
-      }
-    });
+    copyable(block, document.getElementById('guide-text'));
+    var command = document.getElementById('guide-command-block');
+    if (command) copyable(command, document.getElementById('guide-command'));
   });
 })();

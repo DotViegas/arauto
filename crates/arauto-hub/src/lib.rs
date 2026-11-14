@@ -38,6 +38,7 @@ pub mod db_password;
 pub mod download;
 pub mod engine;
 pub mod first_access;
+pub mod join_page;
 pub mod logging;
 pub mod mark;
 pub mod panel;

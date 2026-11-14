@@ -83,7 +83,8 @@ has a step marked with **[PROOF]**.
 
 ## Phase 3: the first Hermes
 
-- [ ] **3.1** `adm hermes add atendimento` and `adm invite atendimento`. Expected: the block with
+- [ ] **3.0 [PROOF]** The connection sentence and the instruction page were never tried on a real Hermes. Send the sentence that `adm invite atendimento` prints (or the one in the panel) as a new message in the command channel, and write down what the Hermes did: whether it read the page, asked, refused or ran the steps, and why. The first real attempt with the block alone was refused by a production Hermes on 14/11/2026, cause unknown. Use `--command` only as the fallback.
+- [ ] **3.1** `adm hermes add atendimento` and `adm invite atendimento --command`. Expected: the block with
   the address of the hub (`wss://...`), the hub key, the invite, **one** line `connector:`, the
   `sha256:` equal to that of step 2.3, and one command only, chained. The invite is a secret: do
   not paste it in a report.

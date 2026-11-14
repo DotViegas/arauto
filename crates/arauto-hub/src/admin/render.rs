@@ -400,10 +400,26 @@ pub fn wake(name: &str, on: bool, outcome: WakeOutcome) -> Report {
     Report::done(text)
 }
 
-/// `admin invite`: the block. **This shows the invite**, the one secret this command ever
-/// prints, and it is the only time it appears.
+/// What `admin invite` shows of the invite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shown {
+    /// The connection sentence, in English, to send to the Hermes as a message. The default.
+    Sentence,
+    /// The block with the commands, as it always was (`--command`).
+    Command,
+}
+
+/// `admin invite`: the sentence or the block. **This shows the invite**, the one secret this
+/// command ever prints, and it is the only time it appears.
+///
+/// The sentence needs a connector to point at; without one, the text is the block's.
 #[must_use]
-pub fn block(block: &Block, downloads: &[crate::download::Listed], now: i64) -> Report {
+pub fn block(
+    block: &Block,
+    downloads: &[crate::download::Listed],
+    now: i64,
+    shown: Shown,
+) -> Report {
     let issued = &block.issued;
     let mut text = String::new();
     let kind = if issued.reconnect {
@@ -432,6 +448,24 @@ pub fn block(block: &Block, downloads: &[crate::download::Listed], now: i64) -> 
             text,
             "The device in use goes on until the new one confirms its first credential."
         );
+    }
+    if shown == Shown::Sentence
+        && let Some(connector) = crate::download::connector(downloads)
+        && let Some(sentence) =
+            crate::panel::block::sentence(block, connector, crate::panel::text::Lang::En)
+    {
+        let _ = writeln!(text);
+        let _ = writeln!(
+            text,
+            "Send this to the Hermes, as a new message in its command channel:"
+        );
+        let _ = writeln!(text);
+        text.push_str(&sentence);
+        let _ = writeln!(text);
+        let _ = writeln!(text, "{SEND_HINT}");
+        let _ = writeln!(text);
+        let _ = writeln!(text, "{}", closing_line(issued.hermes.name.as_str()));
+        return Report::done(text);
     }
     let _ = writeln!(text);
     let _ = writeln!(text, "hub:     {}", block.hub_url);
@@ -481,13 +515,19 @@ pub fn block(block: &Block, downloads: &[crate::download::Listed], now: i64) -> 
         );
     }
     let _ = writeln!(text);
-    let _ = writeln!(
-        text,
-        "The invite is shown only now. The Hermes answers a six-digit code: type it in `admin \
-         approve {}`.",
-        issued.hermes.name.as_str()
-    );
+    let _ = writeln!(text, "{}", closing_line(issued.hermes.name.as_str()));
     Report::done(text)
+}
+
+/// The hint beside the sentence, as the panel words it.
+const SEND_HINT: &str = "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.";
+
+/// The closing line of `admin invite`, the same for the sentence and for the block.
+fn closing_line(name: &str) -> String {
+    format!(
+        "The invite is shown only now. The Hermes answers a six-digit code: type it in `admin \
+         approve {name}`."
+    )
 }
 
 fn last_use(last: &LastUse) -> String {

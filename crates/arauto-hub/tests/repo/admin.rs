@@ -431,14 +431,85 @@ async fn the_admin_command_from_init_to_revoke() {
         Err(AdminError::NoSuchHermes)
     ));
     let block = session.invite("vendas", &url, NOW).await.unwrap();
-    let shown = render::block(&block, &[], NOW).text;
+    let shown = render::block(&block, &[], NOW, render::Shown::Command).text;
     // With the connector to download, the block says where it is and what its file must be.
     let connector = arauto_hub::download::Listed {
         name: "arauto-connector-linux-x86_64".to_owned(),
         size: 3,
         sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_owned(),
     };
-    let with_download = render::block(&block, std::slice::from_ref(&connector), NOW).text;
+    let with_download = render::block(
+        &block,
+        std::slice::from_ref(&connector),
+        NOW,
+        render::Shown::Command,
+    )
+    .text;
+    // The sentence is the default: the same invite, in the words the panel writes in English,
+    // and none of the commands. Without a connector to point at, it is the block.
+    let sentence = render::block(
+        &block,
+        std::slice::from_ref(&connector),
+        NOW,
+        render::Shown::Sentence,
+    )
+    .text;
+    assert!(
+        sentence.contains("Send this to the Hermes, as a new message in its command channel:"),
+        "{sentence}"
+    );
+    assert!(
+        sentence.contains(
+            "I am asking you myself: connect this Hermes to our Arauto hub as \"vendas\"."
+        ),
+        "{sentence}"
+    );
+    assert!(
+        sentence.contains("https://hub.example.com/v1/join/"),
+        "{sentence}"
+    );
+    assert!(
+        sentence.contains(&format!("Connector sha256: {}", connector.sha256)),
+        "{sentence}"
+    );
+    assert!(
+        sentence.contains(&format!(
+            "until {} UTC): {}",
+            // The deadline of the invite, to the minute.
+            arauto_hub::join_page::utc_minute(block.issued.expires_at),
+            block.issued.invite.reveal().as_str()
+        )),
+        "{sentence}"
+    );
+    // The hint and the closing line are whole, byte for byte: no run of spaces left where a
+    // line break was, and the closing line is the block's own.
+    assert!(
+        sentence.contains(
+            "\nSend it as a new message, not as a reply to one of its notices. If it asks you to \
+             confirm, answer in your own words.\n"
+        ),
+        "{sentence}"
+    );
+    let closing = "The invite is shown only now. The Hermes answers a six-digit code: type it in \
+                   `admin approve vendas`.\n";
+    assert!(sentence.ends_with(closing), "{sentence}");
+    assert!(with_download.ends_with(closing), "{with_download}");
+    assert!(!sentence.contains("  "), "{sentence}");
+    for command in ["curl", "sha256sum", "&&", "$HOME"] {
+        assert!(!sentence.contains(command), "{command}: {sentence}");
+    }
+    assert_eq!(
+        sentence
+            .matches(block.issued.invite.reveal().as_str())
+            .count(),
+        1,
+        "the invite appears once"
+    );
+    assert_eq!(
+        render::block(&block, &[], NOW, render::Shown::Sentence).text,
+        shown,
+        "with no connector the text is the block's"
+    );
     assert!(
         with_download.contains(
             "connector: https://hub.example.com/v1/download/arauto-connector-linux-x86_64"

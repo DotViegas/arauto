@@ -55,11 +55,11 @@ affiliated with the authors of Hermes Agent or with WhatsApp.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/marca/em-uma-tela-en-escuro.svg">
-    <img src="docs/marca/em-uma-tela-en-claro.svg" width="692" alt="In three steps. 1: in the panel, you choose Connect Hermes and paste a block into Hermes's command channel. 2: it installs the connector and replies with a verification code, which you type into the panel. 3: you grant access and it starts reading and acting on the numbers you allowed.">
+    <img src="docs/marca/em-uma-tela-en-claro.svg" width="692" alt="In three steps. 1: in the panel, you choose Connect Hermes, copy a short message and send it in Hermes's command channel. 2: it installs the connector and replies with a verification code, which you type into the panel. 3: you grant access and it starts reading and acting on the numbers you allowed.">
   </picture>
 </p>
 
-- **Connecting is copy and paste.** A single-use invite, valid for 15 minutes.
+- **Connecting is copy and send.** (Not tried on a real Hermes yet; a command block stays as the fallback.) A single-use invite, valid for 15 minutes.
 - **No long-lived secret goes through the chat.** Credentials are created by the two machines and
   change on every connection.
 - **Conversations are archived in your hub.** Hermes looks them up when asked; it does not have to

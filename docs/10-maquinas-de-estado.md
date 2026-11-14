@@ -31,6 +31,12 @@ Every deadline uses only the clock of the hub.
 - In the hub, the digest is also deleted when the invite is cancelled, and not only when it expires
   ([14](14-protocolo-do-canal.md), section 12). An expired invite that an enrollment finds is
   closed right there.
+- **The instruction page of the invite** ([14](14-protocolo-do-canal.md), section 1; proposal, not tried
+  on a real Hermes) serves while the invite is **issued** and not expired, or **used** and its device
+  is **pending** before the verification deadline. It stops, and its digest is erased in the same
+  write, when the invite is cancelled or expires, and when the request is approved, denied, expires
+  or is closed. A new invite for the same Hermes does either of those to the old one. Reading the
+  page never changes a state.
 - A used invite, presented by **another identity** while the request is pending: refusal and an
   **alert** in the panel.
 - In any other case of an invite that is not valid: refusal and only a record in the audit. **It

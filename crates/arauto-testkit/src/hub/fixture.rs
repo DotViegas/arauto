@@ -13,6 +13,7 @@ use arauto_hub::admin::Session;
 use arauto_hub::channel::{self, ChannelSettings, Downloads, Hub, Options, Running, Served};
 use arauto_hub::config::{ClientIpSource, PublicUrl};
 use arauto_hub::db::{self, PoolOptions};
+use arauto_hub::join_page::PageHandle;
 use arauto_hub::mark::Mark;
 use arauto_hub::repo::approval::{ApproveOutcome, Recognized};
 use arauto_protocol::clock::{Clock, SystemClock};
@@ -224,10 +225,15 @@ impl Fixture {
 
     /// `admin invite NAME`.
     pub async fn invite(&self, name: &str) -> Invite {
+        self.invite_with_page(name).await.0
+    }
+
+    /// `admin invite NAME`, with the handle of the instruction page that came with the invite.
+    pub async fn invite_with_page(&self, name: &str) -> (Invite, PageHandle) {
         let public = PublicUrl::parse("http://127.0.0.1:1").unwrap();
         let block = self.admin.invite(name, &public, self.now()).await.unwrap();
         let issued = *block.issued;
-        issued.invite
+        (issued.invite, issued.page)
     }
 
     /// The device enrolls with a new invite of `name`, and returns the code it would show.

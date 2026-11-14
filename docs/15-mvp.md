@@ -55,7 +55,7 @@ the command are the same program and use the same write functions.
  arauto-hub migrate --i-have-a-backup         applies migrations to a database that already has data
  arauto-hub admin status                      situation, public key of the hub, restored mode
  arauto-hub admin hermes add|list|remove      the Hermes lines
- arauto-hub admin invite NAME                 issues the invite and shows the block (connect or reconnect)
+ arauto-hub admin invite NAME                 issues the invite and shows the connection sentence, or the block with --command (connect or reconnect)
  arauto-hub admin approve NAME [CODE]       the code is TYPED; without it, the command asks
  arauto-hub admin deny|revoke NAME
  arauto-hub admin wake NAME on|off            may be woken
@@ -75,8 +75,9 @@ typed on the screen and never shown by it: before the first access the hub write
 of its start, with no time limit, and again every 10 minutes (the block with the latest time is the
 valid one), and it works once; the command above issues another, valid for 10 minutes, for who lost
 the passkey or cannot open the log. The panel has three read-only screens (Hermes, WhatsApps and
-Accesses), the alert banner and, since 13/11/2026, the guide to connect Hermes: name, block, typed
-code and approval, through the same functions as `hermes add`, `invite`, `approve` and `deny`. On
+Accesses), the alert banner and, since 13/11/2026, the guide to connect Hermes: name, block (since 14/11/2026 the
+connection sentence, with the block as the fallback; not tried on a real Hermes), typed code and
+approval, through the same functions as `hermes add`, `invite`, `approve` and `deny`. On
 the same day the editing of the access of a Hermes on a number (the `access grant`, the `wake-wait`
 and the `access remove`) and the `revoke` went in. Pairing numbers and choosing the chats of an
 access remain only through the command. The panel session acts while it lasts: the passkey is asked
@@ -366,7 +367,7 @@ static binary for Linux x86_64.
 | hub | `ARAUTO_DATA_DIR` | Master key and mark. Outside the database volume. |
 | hub | `ARAUTO_LISTEN`, `ARAUTO_LISTEN_INTERNAL` | The port of the connectors; the internal port (health and engine events). |
 | hub | `ARAUTO_LISTEN_PANEL`, `ARAUTO_PANEL_URL` | The port of the panel and the address the admin opens in the browser. Without the two, the panel stays off; one without the other, `serve` does not come up. |
-| hub | `ARAUTO_PUBLIC_URL` | The address that goes in the block: `https://host[:port]`, with no path, or `http://` only for 127.0.0.1, `[::1]` and `localhost`. |
+| hub | `ARAUTO_PUBLIC_URL` | The address that goes in the sentence, the instruction page and the block: `https://host[:port]`, with no path, or `http://` only for 127.0.0.1, `[::1]` and `localhost`. |
 | hub | `ARAUTO_CLIENT_IP_SOURCE`, `ARAUTO_TRUSTED_PROXIES` | Where the connector's address comes from: `socket`, or `forwarded` with the list of trusted proxies. Mandatory: without it `serve` does not come up. |
 | hub | `ARAUTO_ALLOW_UNSAFE_DB` | `1` lets the hub come up on a database with `fsync` off. For tests only. |
 

@@ -37,16 +37,18 @@ line, and all of it again for each new agent. With one agent, it is bearable. Wi
 **One screen.** The panel lists the connected Hermes and the WhatsApp numbers, and shows in a matrix
 what each Hermes may do on each number.
 
-**Connecting is copy and paste.** You click "Connect Hermes", copy a block and paste it into the
-command channel of your Hermes. It installs a small program, the connector, and answers with a
-verification code. You type the code in the panel.
+**Connecting is copy and send.** You click "Connect Hermes", copy a short message and send it, as a
+new message, in the command channel of your Hermes. The message points to an instruction page of the
+hub. Hermes installs a small program, the connector, and answers with a verification code. You type
+the code in the panel. (A command block stays as the fallback. This path was not tried on a real
+Hermes yet.)
 
 **The chats are archived.** Hermes does not need to answer every message that arrives. The chats of
 the numbers are kept in your hub, as in a WhatsApp Web of its own: when someone asks for something
 that depends on WhatsApp, it opens, reads what is there and acts. Waking Hermes when a message
 arrives is one more permission, given per number and per chat.
 
-**No long-lived secret passes through the chat.** The block carries only an invite, which is valid
+**No long-lived secret passes through the chat.** The message carries only an invite, which is valid
 for 15 minutes and one use. The real credentials are created by the two machines, between
 themselves, and are swapped on every connection.
 
@@ -59,7 +61,7 @@ themselves, and are swapped on every connection.
 | What it counts as | Order. | Information. Never an order. |
 | Who takes care of it | Hermes, without Arauto. | Arauto. |
 
-It is in the command channel that you paste the connection block.
+It is in the command channel that you send the connection message.
 
 ## For whom
 

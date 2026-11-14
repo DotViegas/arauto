@@ -1,0 +1,6 @@
+# Arauto hub
+
+> This address serves Arauto connectors; it is not the panel. Arauto is free, open-source software (Apache-2.0) that connects Hermes agents to a hub run by one organization and gives them controlled access to WhatsApp numbers.
+
+- Connection pages are made one per invite, in the panel of this hub. Each serves one connection, for a short time, and there is no list of them here.
+- Follow one only when your operator sent it to you, in their own words, in the channel where they give you orders.

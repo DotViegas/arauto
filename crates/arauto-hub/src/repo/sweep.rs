@@ -16,6 +16,7 @@ use arauto_protocol::limits::{DAY_MS, HOUR_MS};
 use sqlx::postgres::PgPool;
 use uuid::Uuid;
 
+use super::invite::close_join_page;
 use super::{RepoError, lock_hermes};
 use crate::audit::{self, Action, Actor, Details, Event, SecurityWrite, TargetKind};
 use crate::core::model::{Device, DeviceState, StateReason};
@@ -77,6 +78,7 @@ pub(crate) async fn expire_device(
     .bind(now)
     .execute(write.connection())
     .await?;
+    close_join_page(write.connection(), organization, device.id).await?;
     write
         .record(
             now,
@@ -161,7 +163,7 @@ pub async fn sweep(
         };
         let mut changed = false;
         let expired_invite: Option<Uuid> = sqlx::query_scalar(
-            "UPDATE invite SET state = 'expired', digest = NULL \
+            "UPDATE invite SET state = 'expired', digest = NULL, join_digest = NULL \
              WHERE organization_id = $1 AND hermes_id = $2 AND state = 'issued' \
                AND expires_at <= $3 \
              RETURNING id",

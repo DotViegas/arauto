@@ -206,7 +206,7 @@ pub async fn enroll(
     // it: the digest is erased, and a clock that goes back does not make it hold again (C1).
     if found.state == InviteState::Issued && has_passed(Some(found.expires_at), now) {
         sqlx::query(
-            "UPDATE invite SET state = 'expired', digest = NULL \
+            "UPDATE invite SET state = 'expired', digest = NULL, join_digest = NULL \
              WHERE organization_id = $1 AND id = $2",
         )
         .bind(organization.id())

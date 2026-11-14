@@ -109,6 +109,37 @@ pub fn address(channel_url: &str, name: &str) -> Option<String> {
     ))
 }
 
+/// The connector a block tells a Hermes to download: the first of the list a Unix shell
+/// runs. A program for Windows is downloaded and checked by hand, never by this chain.
+#[must_use]
+pub fn connector(listed: &[Listed]) -> Option<&Listed> {
+    listed.iter().find(|file| !file.name.ends_with(".exe"))
+}
+
+/// The address of the instruction page of the handle `handle`, from the address of the
+/// channel of the hub (`wss://host/v1/channel` gives `https://host/v1/join/handle`).
+#[must_use]
+pub fn page_address(channel_url: &str, handle: &str) -> Option<zeroize::Zeroizing<String>> {
+    let (scheme, rest) = if let Some(rest) = channel_url.strip_prefix("wss://") {
+        ("https://", rest)
+    } else {
+        ("http://", channel_url.strip_prefix("ws://")?)
+    };
+    let host = rest.split('/').next()?;
+    // The handle is a short-lived secret: the address is built once, at its exact size, in a
+    // buffer that is wiped when dropped, so that no copy of the handle is left behind by a
+    // growth of the buffer.
+    let prefix = crate::join_page::JOIN_PREFIX;
+    let mut address = zeroize::Zeroizing::new(String::with_capacity(
+        scheme.len() + host.len() + prefix.len() + handle.len(),
+    ));
+    address.push_str(scheme);
+    address.push_str(host);
+    address.push_str(prefix);
+    address.push_str(handle);
+    Some(address)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

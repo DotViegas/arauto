@@ -45,11 +45,13 @@ All on the port of the connectors.
 |---|---|
 | `GET /v1/channel` | The websocket. It serves the enrollment, the channel and the closing request. |
 | `GET /v1/download/{file}` | The connector, in an exact version. Public and with no secret. It only serves names from a fixed list, built at startup. |
+| `GET /v1/join/{handle}` | **Proposal, built, not tried on a real Hermes.** The instruction page of one invite: English only, Markdown text. See "The instruction page" below. |
+| `GET /llms.txt` | **Proposal, built, not tried on a real Hermes.** A short fixed text: what this address is (not the panel), that connection pages are made one per invite in the panel, and, when it is known, where the source is. |
 
-- A read request does not change state: opening either of them does not spend an invite.
+- A read request does not change state: opening any of them does not spend an invite.
 - **There is no address that hands over the hub key.** The connector only accepts the key that came
-  in the block, and only discovers the versions through the `hello`. Whoever installs reads the
-  public key in the admin command.
+  in the sentence or the block, and only discovers the versions through the `hello`. Whoever installs reads the
+  public key in the admin command. The instruction page does not hold it either.
 - The connector validates the TLS certificate of the address against the public authorities. A
   `ws://` address, without TLS, is only accepted for `127.0.0.1` and `localhost`, in development. A
   private authority is left for after the MVP.
@@ -66,6 +68,33 @@ All on the port of the connectors.
   and no version;
   the text carries no state of the hub. It exists because a person who opens the connectors'
   domain by mistake (for example from the Open button of Easypanel) finds out where to go.
+- **The instruction page, in the hub** (proposal; the hub's suite checks it, nothing was tried on a
+  real Hermes). Decision [0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md).
+  - **The handle** is not the invite: 16 bytes from the system generator, written as 26 lowercase
+    base32 characters, born with the invite. The hub keeps only its digest, SHA-256 of
+    `"arauto join page\0"` followed by the 16 bytes, and erases it with the invite. It is never
+    logged: the router logs no path.
+  - **The page is a fixed text compiled into the hub.** Its only fields have a strict format: the
+    host of the hub (from `ARAUTO_PUBLIC_URL`, never from the request), the name of the Hermes, the
+    UTC deadline, the version and file name of the connector, and, when it is known at build time (not today: the
+    `repository` metadata is pending, decision 0042), the public address of the project's source. It never holds the invite, the hub key or the connector digest: those travel
+    only in the person's sentence, and the page tells the agent to recognize each by its form.
+  - **When it serves.** While the invite is `issued` and not expired, or `used` with its device
+    `pending` and the verification deadline not passed. The hub erases the digest when the invite
+    is cancelled, expires or is superseded, and when the request is approved, denied, expires or is
+    closed. A new invite for the same Hermes kills the old page.
+  - **What a GET does.** It only reads: one query, no lock; it never spends or changes the invite.
+    Unknown, malformed, expired, cancelled or decided handles get one 404 with a fixed text,
+    byte-identical in every case. Other methods on these addresses get today's empty 404.
+  - **Headers** on the page, on the 404 and on `/llms.txt`: `Cache-Control: no-store`,
+    `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`.
+    Page and `/llms.txt` are `text/markdown; charset=utf-8`; the 404 is `text/plain`.
+  - **Ceiling.** At most 4 lookups at once; beyond that, 503 with a fixed text. A hub with no
+    connector to serve answers the same 404 for every handle.
+  - **What is not guaranteed.** The address can leak (preview services, access logs of a proxy). It
+    reveals the name of the Hermes, the deadline and, by the switch from 200 to 404, roughly when
+    the request ended. It does not reveal the invite. Whether a real Hermes accepts the page is
+    pending ([05](05-modelo-de-ameacas.md)).
 - In the hub, every other address, and every method other than `GET`, receives 404 (`GET /` on
   the internal port, too: tested). This holds for the port of the connectors and for the internal one. The
   panel port, when turned on, is a third one: its addresses do not exist on those two, nor theirs

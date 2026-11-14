@@ -57,11 +57,11 @@ Die von dieser Seite aus verlinkten Dokumente sind auf Englisch verfasst.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../marca/em-uma-tela-de-escuro.svg">
-    <img src="../marca/em-uma-tela-de-claro.svg" width="710" alt="In drei Schritten. 1: Im Panel wählst du „Hermes verbinden“ und fügst einen Block in den Befehlskanal von Hermes ein. 2: Hermes installiert den Connector und antwortet mit einem Prüfcode, den du im Panel eingibst. 3: Du legst die Zugriffe fest, und Hermes beginnt, auf den freigegebenen Nummern zu lesen und zu handeln.">
+    <img src="../marca/em-uma-tela-de-claro.svg" width="710" alt="In drei Schritten. 1: Im Panel wählst du „Hermes verbinden“ kopierst eine kurze Nachricht und sendest sie im Befehlskanal von Hermes. 2: Hermes installiert den Connector und antwortet mit einem Prüfcode, den du im Panel eingibst. 3: Du legst die Zugriffe fest, und Hermes beginnt, auf den freigegebenen Nummern zu lesen und zu handeln.">
   </picture>
 </p>
 
-- **Verbinden heißt kopieren und einfügen.** Eine Einladung zur einmaligen Verwendung, 15 Minuten
+- **Verbinden heißt kopieren und senden.** (Noch nicht an einem echten Hermes erprobt; ein Befehlsblock bleibt als Ausweichweg.) Eine Einladung zur einmaligen Verwendung, 15 Minuten
   gültig.
 - **Kein dauerhaftes Geheimnis läuft über den Chat.** Die Zugangsdaten werden von den beiden
   Maschinen erzeugt und wechseln bei jeder Verbindung.

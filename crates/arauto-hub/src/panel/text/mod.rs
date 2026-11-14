@@ -10,8 +10,10 @@
 //!   translation keeps the placeholders of its key and has no markup.
 //! - **The language is chosen by the browser** (`Accept-Language`), unless the person chose
 //!   one in the panel: that choice is a cookie with the tag of the language and nothing else.
-//! - **What is not translated:** the block that goes to the Hermes, the names of commands,
-//!   and the values that come from devices and from the engine.
+//! - **What is translated, and what is not:** the connection sentence that goes to the Hermes is
+//!   translated (its labels and its two sentences; the values in it are appended by the code).
+//!   The block of the command, the instruction page and `/llms.txt` are not, and neither are the
+//!   names of commands or the values that come from devices and from the engine.
 
 mod de;
 mod es;
@@ -253,6 +255,13 @@ pub enum Piece<'t> {
 #[must_use]
 pub fn fill(lang: Lang, key: &'static str, values: &[(&str, &str)]) -> String {
     let mut out = String::new();
+    fill_into(&mut out, lang, key, values);
+    out
+}
+
+/// [`fill`], written at the end of `out`. A caller whose values are secret gives a buffer that
+/// is wiped when dropped and already has the room, so that no copy is left behind.
+pub fn fill_into(out: &mut String, lang: Lang, key: &'static str, values: &[(&str, &str)]) {
     for piece in pieces(tr(lang, key)) {
         match piece {
             Piece::Plain(text) => out.push_str(text),
@@ -263,7 +272,6 @@ pub fn fill(lang: Lang, key: &'static str, values: &[(&str, &str)]) -> String {
             }
         }
     }
-    out
 }
 
 #[cfg(test)]
@@ -345,7 +353,7 @@ mod tests {
     }
 
     /// The code of the panel that writes sentences, as text: this test reads it.
-    const SOURCES: [(&str, &str); 8] = [
+    const SOURCES: [(&str, &str); 9] = [
         ("view.rs", include_str!("../view.rs")),
         ("guide.rs", include_str!("../guide.rs")),
         ("editor.rs", include_str!("../editor.rs")),
@@ -354,6 +362,7 @@ mod tests {
         ("mod.rs", include_str!("../mod.rs")),
         ("check.rs", include_str!("../../check.rs")),
         ("installation.rs", include_str!("../installation.rs")),
+        ("block.rs", include_str!("../block.rs")),
     ];
 
     /// Every sentence the code marks with `k("...")`, outside the tests of each file.

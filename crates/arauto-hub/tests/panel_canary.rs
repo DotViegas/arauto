@@ -121,10 +121,29 @@ fn secrets_for(
     }
 }
 
-/// The invite inside the block a page shows.
-fn invite_of(page: &str) -> String {
+/// The text of the page of the sentence the guide shows: the address of the instruction page
+/// in it, as a path of the port of the connectors, and the bytes of its handle.
+fn page_of(page: &str) -> (String, Vec<u8>) {
     let start = page
         .find("<pre id=\"guide-text\">")
+        .expect("the page shows a sentence");
+    let end = start + page[start..].find("</pre>").unwrap();
+    let text = &page[start..end];
+    let at = text.find("/v1/join/").expect("the sentence names a page");
+    let rest = &text[at..];
+    let path: String = rest.chars().take_while(|c| !c.is_whitespace()).collect();
+    let handle = path.rsplit('/').next().unwrap().trim_end_matches('.');
+    assert_eq!(handle.len(), 26, "{path}");
+    let bytes = BASE32_NOPAD
+        .decode(handle.to_ascii_uppercase().as_bytes())
+        .unwrap();
+    (path.trim_end_matches('.').to_owned(), bytes)
+}
+
+/// The invite inside the block of the command a page shows.
+fn invite_of(page: &str) -> String {
+    let start = page
+        .find("<pre id=\"guide-command\">")
         .expect("the page shows a block");
     let end = start + page[start..].find("</pre>").unwrap();
     let text = page[start..end].replace("&quot;", "\"");
@@ -460,17 +479,47 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     // A Hermes connected through the guide: the block is shown, the invite is used, and a
     // code is typed wrong, out of the format and right. An invite that another one replaces
     // is a secret too.
-    let replaced = invite_of(
-        &post(&fixture, "/hermes/connect", Some(&last), "name=canario")
-            .await
-            .text(),
-    );
-    let invite = invite_of(
-        &post(&fixture, "/hermes/invite", Some(&last), "name=canario")
-            .await
-            .text(),
-    );
+    let first_page = post(&fixture, "/hermes/connect", Some(&last), "name=canario")
+        .await
+        .text();
+    let second_page = post(&fixture, "/hermes/invite", Some(&last), "name=canario")
+        .await
+        .text();
+    let replaced = invite_of(&first_page);
+    let invite = invite_of(&second_page);
     assert_ne!(replaced, invite);
+    // The handles of the instruction pages: they are in the sentence, in front of the admin,
+    // and in no log, no audit and no row. The page of the old invite is dead, the new one
+    // serves; their bodies and `/llms.txt` are checked with the other pages.
+    let (replaced_path, replaced_bytes) = page_of(&first_page);
+    let (invite_path, invite_bytes) = page_of(&second_page);
+    for written in spellings(&replaced_bytes) {
+        secrets.push(("replaced page handle".to_owned(), written));
+    }
+    for written in spellings(&invite_bytes) {
+        secrets.push(("page handle".to_owned(), written));
+    }
+    let connectors = fixture.addr();
+    let dead = http::get(connectors, &replaced_path, &[], PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(dead.status, 404);
+    let alive = http::get(connectors, &invite_path, &[], PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(alive.status, 200);
+    let llms = http::get(connectors, "/llms.txt", &[], PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(llms.status, 200);
+    let mut instruction_pages = String::new();
+    for answer in [&dead, &alive, &llms] {
+        for (name, value) in &answer.headers {
+            instruction_pages.push_str(&format!("{name}: {value}\n"));
+        }
+        instruction_pages.push_str(&answer.text());
+        instruction_pages.push('\n');
+    }
     secrets.push(("replaced invite".to_owned(), replaced));
     secrets.push(("invite".to_owned(), invite.clone()));
     let device = fixture.device();
@@ -549,6 +598,7 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
         assert!(stored.contains(action), "{action} is in the audit");
     }
     pages.push_str(&SEEN.lock().unwrap());
+    pages.push_str(&instruction_pages);
     // What the task wrote where the operator reads holds the start code and no other secret.
     let block_text = block.0.lock().unwrap().clone();
     let others: Vec<(String, String)> = secrets
@@ -566,7 +616,12 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     );
     let not_shown: Vec<(String, String)> = secrets
         .iter()
-        .filter(|(what, _)| what != "invite" && what != "replaced invite")
+        .filter(|(what, _)| {
+            !matches!(
+                what.as_str(),
+                "invite" | "replaced invite" | "page handle" | "replaced page handle"
+            )
+        })
         .cloned()
         .collect();
     for (place, text) in [

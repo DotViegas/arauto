@@ -433,3 +433,15 @@ code { font-family: var(--f-mono); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* the command behind the connection sentence: a details element, closed until asked for */
+.fallback { display: grid; gap: 10px; }
+.fallback summary { min-height: 44px; display: flex; align-items: center; gap: 10px; color: var(--strong); font-weight: 600; cursor: pointer; list-style: none; }
+.fallback summary::-webkit-details-marker { display: none; }
+.fallback summary::before {
+  content: ""; flex: none; width: 8px; height: 8px;
+  border-right: 2px solid var(--purple-text); border-bottom: 2px solid var(--purple-text);
+  transform: rotate(-45deg); transition: transform .15s ease;
+}
+.fallback[open] summary::before { transform: rotate(45deg); }
+.fallback summary:hover { color: var(--purple-text); }

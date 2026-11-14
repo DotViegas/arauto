@@ -9,6 +9,8 @@
 //! |---|---|---|
 //! | connectors | `GET /v1/channel` | the websocket, after the ceiling of connections without a session (503, 429) |
 //! | connectors | `GET /v1/download/{file}` | a file of the fixed list, or 404 |
+//! | connectors | `GET /v1/join/{handle}` | the instruction page of one invite, or one fixed 404 |
+//! | connectors | `GET /llms.txt` | a fixed text for agents: what this address is |
 //! | connectors | `GET /` | a fixed text that says this is not the panel |
 //! | internal | `GET /health` | `ok`, without any secret |
 //! | internal | `POST /v1/engine/{engine}/events` | the inbox of the events of the engine |
@@ -46,6 +48,7 @@ use super::link::{self, LinkInfo, Start};
 use super::settings::{READ_BUFFER_BYTES, duration};
 use super::{Hub, Purposes, TaskGuard, handshake};
 use crate::engine::inbox;
+use crate::join_page::{JOIN_PREFIX, LLMS_PATH};
 
 /// The path of the websocket.
 pub const CHANNEL_PATH: &str = "/v1/channel";
@@ -240,6 +243,10 @@ async fn route<P: Purposes>(
     match port {
         Port::Connectors if path == CHANNEL_PATH => channel(request, peer, hub, purposes).await,
         Port::Connectors if path == "/" => connectors_notice(),
+        Port::Connectors if path == LLMS_PATH => crate::join_page::llms(),
+        Port::Connectors if path.starts_with(JOIN_PREFIX) => {
+            crate::join_page::answer(&hub, &path[JOIN_PREFIX.len()..]).await
+        }
         Port::Connectors => match path.strip_prefix(DOWNLOAD_PREFIX) {
             Some(name) => download(&hub, name),
             None => status(StatusCode::NOT_FOUND),

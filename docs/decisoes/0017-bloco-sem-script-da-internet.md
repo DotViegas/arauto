@@ -17,3 +17,7 @@ The block downloads the connector to a file, in an exact version, checks the SHA
 - The invite does not appear in a server log or in a preview.
 - All the installation logic stays in the connector. What the LLM sees in the chat does not teach how to register tool servers.
 - It is still a program from the internet running on Hermes. What changes is that the version is fixed and checkable.
+
+## Change of 14/11/2026
+
+The block is no longer what the panel shows first: it stays behind "Show the command instead" and with `--command` in the admin command, unchanged. The rule of this decision is kept in the steps of the instruction page: download to a file, an exact version, check the digest, and only then run; no script from the internet; the invite as an argument, never in an address. The maintainer asked for the link and the page and approved the design on 14/11/2026. Decision [0042](0042-frase-de-conexao-e-pagina-de-instrucoes.md). Nothing else in this decision is reopened. The design was not tried on a real Hermes yet.

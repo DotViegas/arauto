@@ -113,6 +113,9 @@ pub struct ChannelSettings {
     /// Sendings a Hermes may make on one number in a minute (`docs/08-permissoes.md`,
     /// section 7).
     pub sends_per_minute: u32,
+    /// Reads of connection pages at once, in the whole hub; one more is answered "busy". A
+    /// test sets it to zero to see that ceiling.
+    pub join_lookups_max: usize,
 }
 
 impl Default for ChannelSettings {
@@ -134,6 +137,7 @@ impl Default for ChannelSettings {
             purge: PurgeSettings::default(),
             engine: crate::engine::EngineSettings::default(),
             sends_per_minute: arauto_protocol::limits::WHATSAPP_SENDS_PER_MINUTE,
+            join_lookups_max: crate::join_page::JOIN_LOOKUPS_MAX,
         }
     }
 }

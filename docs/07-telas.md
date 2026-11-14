@@ -21,7 +21,7 @@ Menu:  Hermes · WhatsApps · Accesses · Audit · Settings
 
 T0 First access         create the first admin and point to the engine
 T1 Hermes               the list, with the state of each one
-T2 Connect Hermes       the block and the wait
+T2 Connect Hermes       the connection sentence and the wait
 T3 Confirm connection   type the verification code
 T4 WhatsApps            the list of numbers
 T5 Pair WhatsApp        pairing code or QR
@@ -109,7 +109,7 @@ by periodic query to the hub.
 - **Actions:** Connect Hermes; Accesses; Reconnect; Rename; Revoke (asks for the name typed);
   Delete (only with no invite issued and no device pending, approved, active, suspended or in
   quarantine).
-- **Empty:** "No Hermes connected. You paste a block into Hermes's command channel and type here
+- **Empty:** "No Hermes connected. You send a message to Hermes's command channel and type here
   the verification code it answers."
 - **Quarantine:** "The hub no longer trusts the credential of {name}. Reason: a credential already
   swapped was presented | two connections at the same time | unreadable credential | the last use
@@ -133,11 +133,14 @@ by periodic query to the hub.
 ```
 Connect Hermes: Ana                   The invite is valid for 14:32 more · single use
 ┌──────────────────────────────────────────────────────────────────┐
-│ (the block, read-only)                                             │
+│ (the connection sentence, read-only, in the language of the panel) │
 └──────────────────────────────────────────────────────────────────┘
-[ Copy block ]    What does this block do?    Cancel invite
+Send it as a new message, not as a reply to one of its notices. If it asks
+you to confirm, answer in your own words.
+Click the message to copy it.    Cancel invite
+> Show the command instead      (the old block; send one or the other, not both)
 
-1. Paste it into the command channel of Hermes "Ana". Nowhere else.
+1. Send it in the command channel of Hermes "Ana". Nowhere else.
 2. It will answer a 6-digit verification code. Come back here.
 
 [x] Invite issued                 14:02:11
@@ -150,15 +153,18 @@ Connect Hermes: Ana                   The invite is valid for 14:32 more · sing
 - **The steps:** "Connector up" lights up on the first channel connection of the device, waiting or
   already in the swap. It and the one for the code light up in any order.
 - **Name:** unique, 3 to 32 characters, only letters, numbers, space and hyphen. A short name with no
-  symbols reduces what it manages to carry into the block.
-- **The block only exists on this screen and in this tab.** The hub does not keep the invite.
-  Reloading shows "The invite is valid for mm:ss more, but the block cannot be shown again".
-- **There is no "send by e-mail" or "send by WhatsApp".** A block that reached Hermes through
+  symbols reduces what it manages to carry into the sentence.
+- **The sentence only exists on this screen and in this tab.** The hub does not keep the invite.
+  Reloading shows "The invite is valid for mm:ss more, but the message cannot be shown again". The
+  instruction page it points to keeps serving until the request is decided or the invite expires
+  ([14](14-protocolo-do-canal.md), section 1).
+- **Status: proposal.** The sentence and the page were not tried on a real Hermes yet.
+- **There is no "send by e-mail" or "send by WhatsApp".** A sentence or block that reached Hermes through
   a number of the hub would arrive as data, and must be refused.
 - **If Hermes asks for approval to run the command,** the one who approves is you, in the command
   channel.
 - **Timed help:** 90 seconds without an enrollment open "Nothing has arrived yet", with the three
-  causes: Hermes is waiting for your approval; Hermes does not reach the hub; the block was pasted
+  causes: Hermes is waiting for your approval; Hermes does not reach the hub; the message was sent
   somewhere else.
 
 ## T3. Confirm connection

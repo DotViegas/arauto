@@ -1,0 +1,3 @@
+This address no longer serves.
+If you already ran the connector and have a verification code, send it to your operator.
+Otherwise tell them; they can issue a new invite in the panel.

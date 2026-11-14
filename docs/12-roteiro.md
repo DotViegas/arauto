@@ -45,7 +45,7 @@ proofs below do not run.
 | Hermes accepts the connector as a tool server | Register a minimal program through the official command, in versions 0.22 and 0.23, and restart Hermes. Also measure how long it takes to start the program without being restarted. |
 | How the connector obtains the key of the local API | Test the first path of [11-conector.md](11-conector.md), section 6; if it does not work, the second ([decision 0023](decisoes/0023-chave-da-api-local.md)). |
 | The block arrives identical through WhatsApp | Paste from the phone and from the computer and compare byte by byte on Hermes's side. |
-| What Hermes does on receiving the block | Whether it asks for human approval, whether it keeps the procedure in memory, how much time the terminal gives the command. |
+| What Hermes does on receiving the connection sentence and reading the instruction page (not tried yet; the block alone was refused on 14/11/2026, cause unknown) | Whether it asks for human approval, whether it keeps the procedure in memory, how much time the terminal gives the command. |
 | How many copies of the connector Hermes starts | Bring up all of Hermes's processes and count. |
 | Hermes restarts a tool server that exits | Terminate the minimal program and see whether, and in how long, it comes back. |
 | The call to the local API | Address, body, in which conversation the run happens and how to use the repetition identifier. |

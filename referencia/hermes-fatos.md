@@ -76,3 +76,17 @@ These are the assumptions about Hermes:
 | Address, body and repetition identifier of the call to the local API. | It is through it that Hermes is woken. |
 | Hermes restarts a tool server that exits. | It is how the connector changes version on a reconnect. |
 | The behavior of version 0.23.0 on each line of this file. | 0.23 opens more tools by default. |
+
+## First real connection attempt (14/11/2026)
+
+**Fact, [observed], 14/11/2026.** The first real attempt to connect a production Hermes with the
+connection block alone (the text of [02](../docs/02-como-funciona.md), section 1, now the
+fallback) was **refused by that Hermes**. The cause is **unknown**: the Hermes version was not
+recorded here.
+
+**Not known:** which part of the block it refused (the command, the form of the message, the
+channel it came from, or something else); and whether it would also refuse the connection
+sentence and the instruction page of
+[decision 0042](../docs/decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md). That design is a
+proposal **not tried on a real Hermes yet**. When it is, record here the version, the date and what
+the Hermes said.

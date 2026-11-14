@@ -57,11 +57,11 @@ Les documents liés depuis cette page sont rédigés en anglais.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../marca/em-uma-tela-fr-escuro.svg">
-    <img src="../marca/em-uma-tela-fr-claro.svg" width="772" alt="En trois étapes. 1 : dans le panneau, vous choisissez Connecter Hermes et vous collez un bloc dans le canal de commande de Hermes. 2 : il installe le connecteur et renvoie un code de vérification, que vous saisissez dans le panneau. 3 : vous cochez les accès et il se met à lire et à agir sur les numéros que vous avez autorisés.">
+    <img src="../marca/em-uma-tela-fr-claro.svg" width="772" alt="En trois étapes. 1 : dans le panneau, vous choisissez Connecter Hermes et vous copiez un court message pour l'envoyer dans le canal de commande de Hermes. 2 : il installe le connecteur et renvoie un code de vérification, que vous saisissez dans le panneau. 3 : vous cochez les accès et il se met à lire et à agir sur les numéros que vous avez autorisés.">
   </picture>
 </p>
 
-- **Connecter, c'est copier-coller.** Une invitation à usage unique, valable 15 minutes.
+- **Connecter, c'est copier et envoyer.** (Pas encore essayé sur un vrai Hermes ; un bloc de commande reste en solution de repli.) Une invitation à usage unique, valable 15 minutes.
 - **Aucun secret durable ne passe par le chat.** Les identifiants sont créés par les deux machines
   et changent à chaque connexion.
 - **Les conversations sont archivées dans votre hub.** Hermes les consulte quand on le lui

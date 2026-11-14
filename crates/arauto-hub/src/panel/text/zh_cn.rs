@@ -176,7 +176,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Check the installation", "检查安装情况"),
     // guide.rs
     ("Name", "名称"),
-    ("Block", "文本块"),
     ("Code", "验证码"),
     ("Done", "完成"),
     ("Invite issued", "邀请已签发"),
@@ -199,10 +198,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "这个 Hermes 在面板中叫什么名称？",
     ),
     ("Name of the Hermes", "Hermes 的名称"),
-    (
-        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
-        "小写字母、数字、连字符和下划线，最多 32 个字符，以字母或数字开头。名称会出现在文本块中，之后不能更改。",
-    ),
     ("Preparing a secure connection", "正在准备安全连接"),
     (
         "The hub drew the invite of {name}.",
@@ -234,10 +229,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "This hub has no connector to serve",
         "此 hub 没有可提供的连接器",
-    ),
-    (
-        "The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
-        "文本块会让 Hermes 从此 hub 下载连接器，但下载文件夹是空的。未签发任何内容。请在 hub 的服务器上用 {command} 命令签发 {name} 的邀请。",
     ),
     ("Waiting for the Hermes {name}", "正在等待 Hermes {name}"),
     (
@@ -346,10 +337,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "You give the Hermes a name here.",
         "您在这里给 Hermes 起个名字。",
-    ),
-    (
-        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
-        "hub 会生成一个邀请：一段文本，您只需把它粘贴到该 Hermes 的指令通道中，不要粘贴到别处。",
     ),
     (
         "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
@@ -723,4 +710,46 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Connect my first Hermes", "连接我的第一个 Hermes"),
     ("Do it later", "以后再说"),
+    (
+        "I am asking you myself: connect this Hermes to our Arauto hub as \"{name}\".",
+        "是我本人在请你：把这个 Hermes 以“{name}”的名称连接到我们的 Arauto hub。",
+    ),
+    (
+        "Read {page} and follow it. Ask me if anything is unclear.",
+        "请阅读 {page} 并按其中的说明操作。如有不清楚的地方，请问我。",
+    ),
+    ("Hub:", "hub："),
+    ("Hub key:", "hub 密钥："),
+    ("Connector sha256:", "连接器 sha256："),
+    (
+        "Invite (one use, until {deadline} UTC):",
+        "邀请（仅限一次，有效期至 {deadline} UTC）：",
+    ),
+    (
+        "When it is done, send me only the verification code.",
+        "完成后，请只把验证码发给我。",
+    ),
+    (
+        "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+        "请把它作为一条新消息发送，不要作为对它某条通知的回复。如果它要求您确认，请用您自己的话回答。",
+    ),
+    ("Show the command instead", "改为显示指令"),
+    (
+        "Send one or the other, not both: they carry the same invite.",
+        "两种方式只需发送其中一种，不要都发：它们包含同一个邀请。",
+    ),
+    ("Click the message to copy it.", "点击消息即可复制。"),
+    ("Message", "消息"),
+    (
+        "The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else.",
+        "hub 会生成一个邀请并用它写成一条消息，您只需把这条消息发到该 Hermes 的指令通道，不要发到其他任何地方。",
+    ),
+    (
+        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
+        "小写字母、数字、连字符和下划线，最多 32 个字符，以字母或数字开头。名称会显示在消息中，之后不能更改。",
+    ),
+    (
+        "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
+        "这条消息会让 Hermes 从此 hub 下载连接器，而下载文件夹是空的。没有签发任何内容。请在 hub 的服务器上用 {command} 命令签发 {name} 的邀请。",
+    ),
 ];

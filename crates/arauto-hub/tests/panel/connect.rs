@@ -46,14 +46,35 @@ fn unescaped(text: &str) -> String {
         .replace("&amp;", "&")
 }
 
-/// The block a page shows, as the admin would copy it.
-fn block_of(page: &str) -> String {
+/// The text of the `<pre>` with this id, as the admin would copy it.
+fn pre_of(page: &str, id: &str) -> String {
+    let open = format!("<pre id=\"{id}\">");
     let start = page
-        .find("<pre id=\"guide-text\">")
-        .unwrap_or_else(|| panic!("the page shows no block: {page}"))
-        + "<pre id=\"guide-text\">".len();
+        .find(&open)
+        .unwrap_or_else(|| panic!("the page shows no {id}: {page}"))
+        + open.len();
     let end = start + page[start..].find("</pre>").unwrap();
     unescaped(&page[start..end])
+}
+
+/// The block of the command a page shows, behind "Show the command instead".
+fn block_of(page: &str) -> String {
+    pre_of(page, "guide-command")
+}
+
+/// The connection sentence a page shows.
+fn sentence_of(page: &str) -> String {
+    pre_of(page, "guide-text")
+}
+
+/// The path of the instruction page in a sentence, as the port of the connectors reads it.
+fn page_path_of(sentence: &str) -> String {
+    let at = sentence
+        .find("http://127.0.0.1:1/v1/join/")
+        .unwrap_or_else(|| panic!("the sentence names no page: {sentence}"));
+    let rest = &sentence[at + "http://127.0.0.1:1".len()..];
+    let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+    rest[..end].trim_end_matches('.').to_owned()
 }
 
 /// The invite inside a block: the last thing in quotes on the line of `join`.
@@ -130,8 +151,10 @@ async fn wait_page(browser: &Browser, cookie: &str, name: &str) -> String {
 fn approved_block() -> String {
     let document = include_str!("../../../../docs/02-como-funciona.md").replace("\r\n", "\n");
     let section = document
-        .split("\n### The block\n")
+        .split("\n### The block")
         .nth(1)
+        .and_then(|rest| rest.split_once('\n'))
+        .map(|(_title_tail, rest)| rest)
         .expect("the document has the section of the block");
     let fenced = section
         .split("\n```\n")
@@ -196,6 +219,40 @@ async fn the_guide_connects_a_hermes_from_the_name_to_the_session() {
         "{block}"
     );
     let invite = invite_of(&block);
+    // The sentence, in front, with the same invite, the digest of the file and the key of the
+    // hub, and the page it points at serves while the invite does.
+    let sentence = sentence_of(&page);
+    assert!(
+        sentence.starts_with(
+            "I am asking you myself: connect this Hermes to our Arauto hub as \"atendimento\".\n"
+        ),
+        "{sentence}"
+    );
+    assert_eq!(sentence.lines().count(), 7, "{sentence}");
+    for value in [
+        invite.as_str(),
+        CONNECTOR_SHA256,
+        fixture.hub_key_text().as_str(),
+        "ws://127.0.0.1:1/v1/channel",
+    ] {
+        assert_eq!(sentence.matches(value).count(), 1, "{value}: {sentence}");
+    }
+    assert!(
+        !sentence.contains("curl") && !sentence.contains("sha256sum"),
+        "the sentence is no command"
+    );
+    let served = http::get(fixture.addr(), &page_path_of(&sentence), &[], PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(served.status, 200);
+    assert!(served.text().contains("a Hermes named `atendimento`"));
+    assert!(
+        !served.text().contains(&invite),
+        "the page never holds the invite"
+    );
+    assert!(
+        page.contains("<details class=\"fallback\"><summary>Show the command instead</summary>")
+    );
     // The words are the ones of the document, which only change with the maintainer's
     // approval: the block is that text with its fields filled, and nothing else.
     let approved = approved_block()
@@ -497,6 +554,12 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
         .post("/hermes/connect", Some(&cookie), "name=vendas")
         .await;
     let first_invite = invite_of(&block_of(&first.text()));
+    let first_page = page_path_of(&sentence_of(&first.text()));
+    let page_status = |path: String| {
+        let addr = fixture.addr();
+        async move { http::get(addr, &path, &[], PATIENCE).await.unwrap().status }
+    };
+    assert_eq!(page_status(first_page.clone()).await, 200);
     assert!(
         !first
             .text()
@@ -541,6 +604,12 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
     );
     let second_invite = invite_of(&block_of(&second.text()));
     assert_ne!(first_invite, second_invite);
+    // The page of the cancelled invite is gone with it, and the new one serves.
+    assert_eq!(page_status(first_page).await, 404);
+    assert_eq!(
+        page_status(page_path_of(&sentence_of(&second.text()))).await,
+        200
+    );
 
     let device = fixture.device();
     let refused = device
@@ -758,4 +827,49 @@ async fn what_a_device_says_of_itself_is_shown_as_text() {
         "the text did not close the guide"
     );
     assert_eq!(page.matches("<h1>").count(), 1);
+}
+
+/// The sentence is written in the language the panel is showing; the values in it, and the page
+/// it points at, are not translated.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_sentence_follows_the_language_of_the_panel() {
+    let fixture = serving().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    let portuguese = format!("{cookie}; arauto-panel-lang=pt-BR");
+    let issued = browser
+        .post("/hermes/connect", Some(&portuguese), "name=atendimento")
+        .await;
+    assert_eq!(issued.status, 200, "{}", issued.text());
+    let page = issued.text();
+    let sentence = sentence_of(&page);
+    assert!(
+        sentence.starts_with(
+            "Eu mesmo estou pedindo: conecte este Hermes ao nosso hub Arauto como \"atendimento\".
+"
+        ),
+        "{sentence}"
+    );
+    for label in [
+        "Chave do hub: arh1",
+        "sha256 do conector: ",
+        "Convite (uso único, até ",
+        "Quando terminar, me envie só o código de verificação.",
+    ] {
+        assert!(sentence.contains(label), "{label}: {sentence}");
+    }
+    assert!(!sentence.contains("I am asking you myself"));
+    assert!(page.contains("Mostrar o comando em vez disso"));
+    assert!(page.contains("Envie como uma mensagem nova"));
+    // The block of the command is the same text in every language.
+    assert!(block_of(&page).starts_with("Connect this Hermes to the Arauto hub."));
+    // The page it points at is in English, whatever the panel speaks.
+    let served = http::get(fixture.addr(), &page_path_of(&sentence), &[], PATIENCE)
+        .await
+        .unwrap();
+    assert!(
+        served
+            .text()
+            .starts_with("# Connect a Hermes to an Arauto hub")
+    );
 }

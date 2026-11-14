@@ -191,7 +191,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Check the installation", "Проверить установку"),
     // guide.rs
     ("Name", "Имя"),
-    ("Block", "Блок"),
     ("Code", "Код"),
     ("Done", "Готово"),
     ("Invite issued", "Приглашение выпущено"),
@@ -217,10 +216,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Какое имя будет у этого Hermes в панели?",
     ),
     ("Name of the Hermes", "Имя Hermes"),
-    (
-        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
-        "Строчные буквы, цифры, дефис и подчёркивание, до 32 символов, первый символ — буква или цифра. Имя попадает в блок и потом не меняется.",
-    ),
     (
         "Preparing a secure connection",
         "Подготовка защищённого подключения",
@@ -261,10 +256,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "This hub has no connector to serve",
         "У этого хаба нет коннектора для раздачи",
-    ),
-    (
-        "The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
-        "Блок велит Hermes скачать коннектор с этого хаба, а папка загрузок пуста. Ничего не выпущено. Выпустите приглашение для {name} командой {command} на сервере хаба.",
     ),
     ("Waiting for the Hermes {name}", "Ожидание Hermes {name}"),
     (
@@ -385,10 +376,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "You give the Hermes a name here.",
         "Здесь вы даёте Hermes имя.",
-    ),
-    (
-        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
-        "Хаб создаёт приглашение: блок текста, который вы вставляете в командный канал этого Hermes, и больше никуда.",
     ),
     (
         "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
@@ -783,4 +770,49 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Connect my first Hermes", "Подключить мой первый Hermes"),
     ("Do it later", "Сделать позже"),
+    (
+        "I am asking you myself: connect this Hermes to our Arauto hub as \"{name}\".",
+        "Это моя личная просьба: подключите этот Hermes к нашему хабу Arauto под именем «{name}».",
+    ),
+    (
+        "Read {page} and follow it. Ask me if anything is unclear.",
+        "Прочитайте {page} и выполняйте то, что там написано. Если что-то непонятно, спросите меня.",
+    ),
+    ("Hub:", "Хаб:"),
+    ("Hub key:", "Ключ хаба:"),
+    ("Connector sha256:", "sha256 коннектора:"),
+    (
+        "Invite (one use, until {deadline} UTC):",
+        "Приглашение (одноразовое, до {deadline} UTC):",
+    ),
+    (
+        "When it is done, send me only the verification code.",
+        "Когда всё будет готово, пришлите мне только проверочный код.",
+    ),
+    (
+        "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+        "Отправьте этот текст новым сообщением, а не ответом на одно из уведомлений Hermes. Если Hermes попросит подтвердить, ответьте своими словами.",
+    ),
+    ("Show the command instead", "Показать команду вместо этого"),
+    (
+        "Send one or the other, not both: they carry the same invite.",
+        "Отправьте одно из двух, но не оба: в них одно и то же приглашение.",
+    ),
+    (
+        "Click the message to copy it.",
+        "Нажмите на сообщение, чтобы скопировать его.",
+    ),
+    ("Message", "Сообщение"),
+    (
+        "The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else.",
+        "Хаб создаёт приглашение и пишет с ним сообщение, которое вы отправляете в командный канал этого Hermes, и больше никуда.",
+    ),
+    (
+        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
+        "Строчные буквы, цифры, дефис и подчёркивание, до 32 символов, первый символ — буква или цифра. Имя попадает в сообщение и потом не меняется.",
+    ),
+    (
+        "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
+        "Сообщение велит Hermes скачать коннектор с этого хаба, а папка загрузок пуста. Ничего не выпущено. Выпустите приглашение для {name} командой {command} на сервере хаба.",
+    ),
 ];

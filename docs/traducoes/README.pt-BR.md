@@ -56,11 +56,11 @@ Os documentos ligados a partir desta página estão escritos em inglês.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../marca/em-uma-tela-pt-BR-escuro.svg">
-    <img src="../marca/em-uma-tela-pt-BR-claro.svg" width="687" alt="Em três passos. 1: no painel, você escolhe Conectar Hermes e cola um bloco no canal de comando do Hermes. 2: ele instala o conector e responde um código de conferência, que você digita no painel. 3: você marca os acessos e ele passa a ler e agir nos números que você liberou.">
+    <img src="../marca/em-uma-tela-pt-BR-claro.svg" width="687" alt="Em três passos. 1: no painel, você escolhe Conectar Hermes e copia uma mensagem curta e a envia no canal de comando do Hermes. 2: ele instala o conector e responde um código de conferência, que você digita no painel. 3: você marca os acessos e ele passa a ler e agir nos números que você liberou.">
   </picture>
 </p>
 
-- **Conectar é copiar e colar.** Um convite de uso único, válido por 15 minutos.
+- **Conectar é copiar e enviar.** (Ainda não testado em um Hermes real; um bloco de comando continua como alternativa.) Um convite de uso único, válido por 15 minutos.
 - **Nenhum segredo duradouro passa pelo chat.** As credenciais são criadas pelas duas máquinas e
   trocam a cada conexão.
 - **As conversas ficam arquivadas no seu hub.** O Hermes consulta quando pedem; não precisa responder

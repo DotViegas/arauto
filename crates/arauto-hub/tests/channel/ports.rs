@@ -34,6 +34,8 @@ async fn health_answers_only_on_the_internal_port_and_says_nothing_else() {
         &format!("/v1/download/{LISTED}"),
         "/",
         "/health/",
+        "/llms.txt",
+        "/v1/join/x",
     ] {
         let answer = http::get(internal, path, &[], PATIENCE).await.unwrap();
         assert_eq!(answer.status, 404, "{path}");

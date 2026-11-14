@@ -139,7 +139,7 @@ hermes mcp add arauto --command ~/.arauto/arauto-connector --args mcp
 - Hermes checks every tool server entry when saving and when starting, and refuses the ones that
   look like an attack. The connector follows the format Hermes accepts: one program with one
   argument, with no command interpreter. The project does not try to get around that check.
-- If Hermes asks for human approval to run the block, the one who approves is the operator. The
+- If Hermes asks for human approval to run the block or the steps of the instruction page, the one who approves is the operator. The
   flow works with or without that request.
 - Hermes starts the connector by itself, in under a minute, without restarting.
 

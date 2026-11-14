@@ -20,7 +20,15 @@ const DANCING: &str = include_str!("assets/mascot-dancing.svg");
 const WAVING: &str = include_str!("assets/mascot-waving.svg");
 
 /// The names of the steps, in the path at the top.
-const STEPS: [&str; 4] = [k("Name"), k("Block"), k("Code"), k("Done")];
+const STEPS: [&str; 4] = [k("Name"), k("Message"), k("Code"), k("Done")];
+
+/// Beside the sentence: how to send it. The Hermes may answer a reply with a question.
+const SEND_HINT: &str = k(
+    "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+);
+
+/// Inside the fallback: the sentence and the command carry the same invite.
+const ONE_OR_OTHER: &str = k("Send one or the other, not both: they carry the same invite.");
 
 /// What the hub observes, one after the other, while a Hermes connects.
 const OBSERVED: [&str; 4] = [
@@ -85,12 +93,14 @@ pub enum Screen {
         /// Why it came back.
         error: Option<&'static str>,
     },
-    /// Step 2: the block, the only time it appears.
+    /// Step 2: the connection sentence and, behind it, the block: the only time they appear.
     Block {
         /// The Hermes.
         name: String,
-        /// The text of the block. **It holds the invite.**
-        text: Zeroizing<String>,
+        /// The connection sentence, in the language of the page. **It holds the invite.**
+        sentence: Zeroizing<String>,
+        /// The block of the command, the fallback. **It holds the invite.**
+        command: Zeroizing<String>,
         /// For how many seconds the invite is still accepted.
         seconds: i64,
         /// The Hermes has a device in use.
@@ -262,7 +272,7 @@ fn body(html: &mut Html, screen: &Screen) {
                 .raw("</b></p><ol><li>")
                 .t(k("You give the Hermes a name here."))
                 .raw("</li><li>")
-                .t(k("The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else."))
+                .t(k("The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else."))
                 .raw("</li><li>")
                 .t(k("The Hermes downloads the connector from this hub and answers with a verification code of 6 digits."))
                 .raw("</li><li>")
@@ -277,7 +287,7 @@ fn body(html: &mut Html, screen: &Screen) {
             hint(
                 html,
                 k(
-                    "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
+                    "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
                 ),
             );
             html.raw("</div></form>");
@@ -289,7 +299,8 @@ fn body(html: &mut Html, screen: &Screen) {
         }
         Screen::Block {
             name,
-            text,
+            sentence,
+            command,
             seconds,
             reconnect,
             cancelled,
@@ -307,16 +318,32 @@ fn body(html: &mut Html, screen: &Screen) {
                     &[("name", Arg::Strong(name)), ("time", Arg::Clock(*seconds))],
                 )
                 .raw("</p><div class=\"block\" id=\"guide-block\" aria-describedby=\"guide-how\"><pre id=\"guide-text\">")
-                .text(text)
+                .text(sentence)
                 .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>")
                 .t(k("Copied"))
                 .raw("</span></span></div><p class=\"hint\" id=\"guide-how\"><span class=\"with-script\">")
-                .t(k("Click the block to copy it."))
+                .t(k("Click the message to copy it."))
                 .raw(" </span><span class=\"no-script\">")
                 .t(k("Select the whole text and copy it."))
                 .raw(" </span>")
                 .t(k("It only appears here, once."))
                 .raw("</p><p class=\"copied-note\" id=\"guide-copied\" role=\"status\" hidden></p>");
+            hint(html, SEND_HINT);
+            // The block of the command stays behind a control: the same invite, the way it
+            // always was, for a Hermes the sentence does not move.
+            html.raw("<details class=\"fallback\"><summary>")
+                .t(k("Show the command instead"))
+                .raw("</summary><div class=\"block\" id=\"guide-command-block\" aria-describedby=\"guide-command-how\"><pre id=\"guide-command\">")
+                .text(command)
+                .raw("</pre><span class=\"stamp\" aria-hidden=\"true\"><span>")
+                .t(k("Copied"))
+                .raw("</span></span></div><p class=\"hint\" id=\"guide-command-how\"><span class=\"with-script\">")
+                .t(k("Click the block to copy it."))
+                .raw(" </span><span class=\"no-script\">")
+                .t(k("Select the whole text and copy it."))
+                .raw(" </span></p>");
+            hint(html, ONE_OR_OTHER);
+            html.raw("</details>");
             if *cancelled {
                 hint(html, k("The invite issued before was cancelled."));
             }
@@ -338,7 +365,7 @@ fn body(html: &mut Html, screen: &Screen) {
                 .t(k("This hub has no connector to serve"))
                 .raw("</h3><p>")
                 .fill(
-                    k("The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server."),
+                    k("The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server."),
                     &[
                         ("name", Arg::Text(name)),
                         ("command", Arg::Code("arauto-hub admin invite")),
@@ -698,7 +725,8 @@ mod tests {
             },
             Screen::Block {
                 name: hostile(),
-                text: Zeroizing::new(hostile()),
+                sentence: Zeroizing::new(hostile()),
+                command: Zeroizing::new(hostile()),
                 seconds: 900,
                 reconnect: true,
                 cancelled: true,
@@ -824,14 +852,27 @@ mod tests {
     fn the_block_waits_for_the_mascot_and_the_way_on_waits_for_the_copy() {
         let block = shown(&Screen::Block {
             name: "ana".to_owned(),
-            text: Zeroizing::new("the block".to_owned()),
+            sentence: Zeroizing::new("the sentence".to_owned()),
+            command: Zeroizing::new("the command".to_owned()),
             seconds: 900,
             reconnect: false,
             cancelled: false,
             closed_request: false,
         });
         assert!(block.contains("class=\"modal guide preparing\""));
-        assert!(block.contains("<pre id=\"guide-text\">the block</pre>"));
+        assert!(block.contains("<pre id=\"guide-text\">the sentence</pre>"));
+        // The command stays behind a control, with the same invite, and the page says so.
+        assert!(
+            block.contains(
+                "<details class=\"fallback\"><summary>Show the command instead</summary>"
+            )
+        );
+        assert!(block.contains("<pre id=\"guide-command\">the command</pre>"));
+        let (before, behind) = block.split_once("<details").unwrap();
+        assert!(before.contains("the sentence") && !before.contains("the command"));
+        assert!(behind.contains("the command") && !behind.contains("the sentence"));
+        assert!(block.contains("Send it as a new message, not as a reply to one of its notices."));
+        assert!(block.contains("Send one or the other, not both"));
         assert!(block.contains("class=\"button primary after-copy appear\" id=\"guide-next\" href=\"/hermes/wait?name=ana\""));
         assert!(block.contains("<h2 id=\"guide-title\">Connect ana</h2>"));
         assert!(!block.contains("was cancelled") && !block.contains("keeps working"));

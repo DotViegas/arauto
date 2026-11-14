@@ -83,6 +83,11 @@ mode on clears all the pending ones in the same write ([14](14-protocolo-do-cana
 
 **convite**: `id`, `hermes_id`, `resumo` (SHA-256 of the invite, unique; erased when it expires and,
 in the hub, also when it is cancelled), `criado_por`, `expira_em`, `estado`, `usado_em`, `aparelho_id`.
+In the code, `join_digest` (SHA-256 of the handle of the instruction page, unique, with a domain prefix; null
+when there is no page): it is only set while the invite is `issued` or `used`, and erased when the
+invite is cancelled, expires or is superseded, and when the request of its device is approved,
+denied, expires or is closed ([decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md)).
+The handle itself is never kept.
 
 **conexao_canal**: `id`, `aparelho_id`, `ip`, `versao`, `aberta_em`, `troca_confirmada_em`,
 `fechada_em`, `motivo`. A connection without `troca_confirmada_em` never got to be a channel session.

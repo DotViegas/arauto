@@ -45,3 +45,4 @@ prototype, or is **pending**.
 | 0039 | [The access matrix and the WhatsApp tools in the first MVP](0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md) | proposal |
 | 0040 | [The panel inside the hub: its own port, entry by passkey and the first screens](0040-painel-dentro-do-hub.md) | proposal |
 | 0041 | [The password of the database, drawn by the hub](0041-senha-do-banco-sorteada-pelo-hub.md) | proposal |
+| 0042 | [The connection sentence and the instruction page](0042-frase-de-conexao-e-pagina-de-instrucoes.md) | proposal |

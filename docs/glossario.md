@@ -44,8 +44,11 @@
 | Term | What it is |
 |---|---|
 | **Connect** | To link a Hermes to the hub. It applies only to Hermes. |
-| **Block** | The text the admin copies from the panel and pastes into Hermes's command channel. |
-| **Invite** | A temporary secret that goes inside the block. It is valid for 15 minutes and for one use. It only serves to ask for a connection. |
+| **Connection sentence** | **Proposal, not tried on a real Hermes.** A short message in the first person, in the language of the panel, that the admin copies from the panel and sends to Hermes as a new message in its command channel. It carries the address of the instruction page, the hub address, the hub key, the connector digest and the invite ([decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md)). |
+| **Instruction page** | **Proposal, not tried on a real Hermes.** A fixed Markdown page, in English, that the hub serves for one invite at `/v1/join/{handle}`. It explains and lists the steps; it is not an order and never holds the invite, the hub key or the connector digest. |
+| **Handle** | The random part of the address of an instruction page: 16 bytes from the system generator, kept in the database only as a digest and erased with the invite. It is not the invite and opens nothing but the page. |
+| **Block** | The text with the whole command that the admin can copy from the panel and paste into Hermes's command channel. Since the connection sentence, it is the fallback ("Show the command instead"). |
+| **Invite** | A temporary secret that goes inside the sentence (or the block). It is never an address: the address of the page holds a handle, which is another thing. It is valid for 15 minutes and for one use. It only serves to ask for a connection. |
 | **Enrollment** | The moment a connector presents an invite to the hub. |
 | **Connection request** | What an enrollment creates. It gives access to nothing until the admin types the code. |
 | **Verification code** | Six digits the connector shows and the admin types in the panel. It is not a secret. |
@@ -57,7 +60,7 @@
 | **Generation zero** | An approved device that has not confirmed its first credential yet. |
 | **Vault** | The part of the hub that draws random values and seals. |
 | **Master key** | The key of the vault. It stays outside the database. |
-| **Hub key** | The key pair of the hub. The public part goes in every block: it is how the connector recognizes the right hub. |
+| **Hub key** | The key pair of the hub. The public part goes in every connection sentence and block: it is how the connector recognizes the right hub. |
 | **Release key** | The project key that signs each published version of the connector. It is in no hub. |
 | **Channel** | The outbound connection from the connector to the hub, encrypted end to end. |
 | **Handshake** | The initial exchange in which connector and hub recognize each other and agree on the key of the conversation. |
@@ -145,7 +148,7 @@ The word "session" always comes with its owner:
 | Do not use | Use | Reason |
 |---|---|---|
 | ticket, token, Hermes key | sealed credential | "Ticket" was once confused with the invite. |
-| connection link | invite, block | The invite is not an address: it goes as an argument of the connector. |
+| connection link | invite, connection sentence, block | The invite is not an address: it goes as an argument of the connector. |
 | pair a Hermes | connect a Hermes | Pairing is for numbers. |
 | tenant, slot | Hermes, organization | They were names from the source service. |
 | device, for WhatsApp | linked device | A device is an installation of the connector. |
@@ -159,6 +162,7 @@ The documents were written in Portuguese until 13/11/2026. The terms above repla
 | Portuguese | English |
 |---|---|
 | convite · bloco · inscrição · pedido de conexão | invite · block · enrollment · connection request |
+| frase de conexão · página de instruções | connection sentence · instruction page |
 | código de conferência · código de instalação | verification code · installation code |
 | aparelho · credencial lacrada · lacre · caixa preta · chave-mestra | device · sealed credential · seal · vault · master key |
 | conectar · parear · reconectar · revogar · acordar | connect · pair · reconnect · revoke · wake |

@@ -191,7 +191,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Check the installation", "Vérifier l'installation"),
     // guide.rs
     ("Name", "Nom"),
-    ("Block", "Bloc"),
     ("Code", "Code"),
     ("Done", "Terminé"),
     ("Invite issued", "Invitation émise"),
@@ -217,10 +216,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Quel nom ce Hermes portera-t-il dans le panneau ?",
     ),
     ("Name of the Hermes", "Nom du Hermes"),
-    (
-        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
-        "Lettres minuscules, chiffres, trait d'union et tiret bas, jusqu'à 32 caractères, en commençant par une lettre ou un chiffre. Le nom apparaît dans le bloc et ne change plus ensuite.",
-    ),
     (
         "Preparing a secure connection",
         "Préparation d'une connexion sécurisée",
@@ -261,10 +256,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "This hub has no connector to serve",
         "Ce hub n'a aucun connecteur à fournir",
-    ),
-    (
-        "The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
-        "Le bloc demande au Hermes de télécharger le connecteur depuis ce hub, et le dossier des téléchargements est vide. Rien n'a été émis. Émettez l'invitation de {name} avec la commande {command}, sur le serveur du hub.",
     ),
     (
         "Waiting for the Hermes {name}",
@@ -388,10 +379,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "You give the Hermes a name here.",
         "Ici, vous donnez un nom au Hermes.",
-    ),
-    (
-        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
-        "Le hub émet une invitation : un bloc de texte que vous collez dans le canal de commande de ce Hermes, et nulle part ailleurs.",
     ),
     (
         "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
@@ -783,4 +770,52 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Connect my first Hermes", "Connecter mon premier Hermes"),
     ("Do it later", "Le faire plus tard"),
+    (
+        "I am asking you myself: connect this Hermes to our Arauto hub as \"{name}\".",
+        "Je vous le demande moi-même : connectez ce Hermes à notre hub Arauto sous le nom « {name} ».",
+    ),
+    (
+        "Read {page} and follow it. Ask me if anything is unclear.",
+        "Lisez {page} et suivez ses instructions. Si quelque chose n'est pas clair, demandez-moi.",
+    ),
+    ("Hub:", "Hub :"),
+    ("Hub key:", "Clé du hub :"),
+    ("Connector sha256:", "sha256 du connecteur :"),
+    (
+        "Invite (one use, until {deadline} UTC):",
+        "Invitation (usage unique, jusqu'au {deadline} UTC) :",
+    ),
+    (
+        "When it is done, send me only the verification code.",
+        "Quand c'est fait, envoyez-moi seulement le code de vérification.",
+    ),
+    (
+        "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+        "Envoyez-le comme un nouveau message, et non en réponse à l'un de ses avis. S'il vous demande de confirmer, répondez avec vos propres mots.",
+    ),
+    (
+        "Show the command instead",
+        "Afficher la commande à la place",
+    ),
+    (
+        "Send one or the other, not both: they carry the same invite.",
+        "Envoyez l'un ou l'autre, pas les deux : ils contiennent la même invitation.",
+    ),
+    (
+        "Click the message to copy it.",
+        "Cliquez sur le message pour le copier.",
+    ),
+    ("Message", "Message"),
+    (
+        "The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else.",
+        "Le hub émet une invitation et rédige avec elle un message, que vous envoyez dans le canal de commande de ce Hermes, et nulle part ailleurs.",
+    ),
+    (
+        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
+        "Lettres minuscules, chiffres, trait d'union et tiret bas, jusqu'à 32 caractères, commençant par une lettre ou un chiffre. Le nom apparaît dans le message et ne change plus ensuite.",
+    ),
+    (
+        "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
+        "Le message demande au Hermes de télécharger le connecteur depuis ce hub, et le dossier des téléchargements est vide. Rien n'a été émis. Émettez l'invitation de {name} avec la commande {command}, sur le serveur du hub.",
+    ),
 ];

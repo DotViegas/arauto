@@ -48,7 +48,7 @@ use arauto_protocol::noise::{PublicKey, StaticKeypair};
 use dashmap::DashMap;
 use sqlx::postgres::PgPool;
 use tokio::net::TcpListener;
-use tokio::sync::{Notify, watch};
+use tokio::sync::{Notify, Semaphore, watch};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -66,6 +66,7 @@ use crate::audit::AuditError;
 use crate::config::{ClientIpSource, ServeConfig, StorageConfig};
 use crate::db::{self, DbError, PoolOptions, ResolvedOrg, SystemTask};
 use crate::engine::{self, Engines};
+use crate::join_page::{BadPageField, JoinPage};
 use crate::mark::Mark;
 use crate::panel::PanelState;
 use crate::repo::enroll::RefusedEnrollments;
@@ -146,6 +147,9 @@ pub enum ServeError {
     /// A blocking task of the start did not return.
     #[error("a task of the start did not return")]
     Task,
+    /// A fixed field of the connection page is outside its format.
+    #[error(transparent)]
+    JoinPage(#[from] BadPageField),
 }
 
 /// The tasks of the hub that are still running, for the stop to wait for them.
@@ -205,6 +209,11 @@ pub struct Hub {
     keypair: StaticKeypair,
     client_ip: ClientIpSource,
     downloads: Downloads,
+    /// The fixed fields of the instruction page of an invite. `None` when the hub serves no
+    /// connector to point at.
+    join_page: Option<JoinPage>,
+    /// How many instruction pages are read from the database at one time.
+    join_lookups: Semaphore,
     admission: Arc<Admission>,
     budget: Arc<HubBudget>,
     links: DashMap<u64, LinkHandle>,
@@ -285,6 +294,14 @@ impl Hub {
 
     pub(crate) fn downloads(&self) -> &Downloads {
         &self.downloads
+    }
+
+    pub(crate) fn join_page(&self) -> Option<&JoinPage> {
+        self.join_page.as_ref()
+    }
+
+    pub(crate) fn join_lookups(&self) -> &Semaphore {
+        &self.join_lookups
     }
 
     pub(crate) fn admission(&self) -> &Arc<Admission> {
@@ -632,6 +649,10 @@ pub async fn start<P: Purposes>(
     clock: Arc<dyn Clock>,
 ) -> Result<Running, ServeError> {
     let settings = options.settings;
+    let join_page = JoinPage::new(
+        &config.public_url,
+        crate::download::connector(&options.downloads.listed()),
+    )?;
     let pool = db::open(&config.storage, settings.pool).await?;
     let sweep_pool = db::open(
         &config.storage,
@@ -702,6 +723,8 @@ pub async fn start<P: Purposes>(
         keypair,
         client_ip: config.client_ip.clone(),
         downloads: options.downloads,
+        join_page,
+        join_lookups: Semaphore::new(settings.join_lookups_max),
         admission: Admission::new(
             settings.without_session_max,
             settings.without_session_per_origin_max,

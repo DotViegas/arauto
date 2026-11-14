@@ -105,7 +105,8 @@ fn wait_of(name: &HermesName) -> Response<Body> {
     http::see_other_to(&format!("/hermes/wait?name={}", name.as_str()))
 }
 
-/// Issues the invite of `name` and shows the block: the only time the invite appears.
+/// Issues the invite of `name` and shows the sentence and the block: the only time the invite
+/// appears.
 async fn issue(
     hub: &Hub,
     panel: &PanelState,
@@ -126,12 +127,16 @@ async fn issue(
         Err(AdminError::NoSuchHermes) => return Ok(http::see_other("/")),
         Err(error) => return failed(hub, organization, lang, error).await,
     };
-    let Some(text) = block::text(&issued, connector) else {
+    let (Some(sentence), Some(command)) = (
+        block::sentence(&issued, connector, lang),
+        block::text(&issued, connector),
+    ) else {
         return failed(hub, organization, lang, AdminError::Task).await;
     };
     let screen = Screen::Block {
         name: name.as_str().to_owned(),
-        text,
+        sentence,
+        command,
         seconds: issued.issued.expires_at.saturating_sub(now).max(0) / 1_000,
         reconnect: issued.issued.reconnect,
         cancelled: issued.issued.cancelled.is_some(),

@@ -15,6 +15,7 @@ use sqlx::postgres::PgPool;
 use uuid::Uuid;
 
 use super::alert::{self, AlertDetails, AlertKind, NewAlert};
+use super::invite::close_join_page;
 use super::{Admin, Locked, RepoError, lock_hermes_by_name, lock_hermes_of_device, notify_hub};
 use crate::audit::{self, Action, Actor, Details, Event, SecurityWrite, TargetKind};
 use crate::core::model::{Device, DeviceState, StateReason};
@@ -63,6 +64,7 @@ pub(crate) async fn close_device(
     .bind(now)
     .execute(write.connection())
     .await?;
+    close_join_page(write.connection(), organization, device.id).await?;
     let mut event = Event::new(action, actor.clone())
         .in_organization(organization)
         .about(TargetKind::Device, device.id)
@@ -94,7 +96,7 @@ pub(crate) async fn cancel_issued_invite(
     now: i64,
 ) -> Result<Option<Uuid>, RepoError> {
     let cancelled: Option<Uuid> = sqlx::query_scalar(
-        "UPDATE invite SET state = 'cancelled', digest = NULL \
+        "UPDATE invite SET state = 'cancelled', digest = NULL, join_digest = NULL \
          WHERE organization_id = $1 AND hermes_id = $2 AND state = 'issued' \
          RETURNING id",
     )

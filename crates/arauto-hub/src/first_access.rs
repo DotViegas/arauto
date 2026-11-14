@@ -135,7 +135,7 @@ impl fmt::Debug for Holder {
 
 /// `YYYY-MM-DD HH:MM:SS`, in UTC, of a time in milliseconds. The date is there so that "the
 /// block with the latest time" stays right across midnight.
-fn clock_time(at_ms: i64) -> String {
+pub(crate) fn clock_time(at_ms: i64) -> String {
     let at = at_ms.div_euclid(1_000);
     let days = at.div_euclid(86_400);
     let seconds = at.rem_euclid(86_400);

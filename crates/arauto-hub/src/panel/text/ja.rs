@@ -185,7 +185,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Check the installation", "インストールの確認"),
     // guide.rs
     ("Name", "名前"),
-    ("Block", "ブロック"),
     ("Code", "コード"),
     ("Done", "完了"),
     ("Invite issued", "招待を発行しました"),
@@ -208,10 +207,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "この Hermes をパネルで何という名前にしますか?",
     ),
     ("Name of the Hermes", "Hermes の名前"),
-    (
-        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
-        "英小文字、数字、ハイフン、アンダースコアが使えます。32 文字以内で、先頭は英字または数字にしてください。名前はブロックに表示され、あとから変更できません。",
-    ),
     (
         "Preparing a secure connection",
         "安全な接続を準備しています",
@@ -252,10 +247,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "This hub has no connector to serve",
         "このハブには配布できるコネクターがありません",
-    ),
-    (
-        "The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
-        "ブロックは Hermes にこのハブからコネクターをダウンロードするよう指示しますが、ダウンロード用フォルダーが空です。何も発行されていません。{name} の招待は、ハブのサーバーで {command} コマンドを使って発行してください。",
     ),
     (
         "Waiting for the Hermes {name}",
@@ -379,10 +370,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "You give the Hermes a name here.",
         "ここで Hermes に名前を付けます。",
-    ),
-    (
-        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
-        "ハブが招待を生成します。これはテキストのブロックで、その Hermes のコマンドチャネルにだけ貼り付けます。ほかの場所には貼り付けません。",
     ),
     (
         "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
@@ -774,4 +761,49 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Connect my first Hermes", "最初の Hermes を接続する"),
     ("Do it later", "あとで行う"),
+    (
+        "I am asking you myself: connect this Hermes to our Arauto hub as \"{name}\".",
+        "私自身がお願いしています。この Hermes を、私たちの Arauto ハブに「{name}」として接続してください。",
+    ),
+    (
+        "Read {page} and follow it. Ask me if anything is unclear.",
+        "{page} を読んで、その手順に従ってください。わからないことがあれば私に聞いてください。",
+    ),
+    ("Hub:", "ハブ:"),
+    ("Hub key:", "ハブキー:"),
+    ("Connector sha256:", "コネクター sha256:"),
+    (
+        "Invite (one use, until {deadline} UTC):",
+        "招待（1回限り、{deadline} UTC まで）:",
+    ),
+    (
+        "When it is done, send me only the verification code.",
+        "完了したら、確認コードだけを私に送ってください。",
+    ),
+    (
+        "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+        "新しいメッセージとして送ってください。Hermes からの通知への返信としては送らないでください。確認を求められたら、ご自身の言葉で答えてください。",
+    ),
+    ("Show the command instead", "代わりにコマンドを表示"),
+    (
+        "Send one or the other, not both: they carry the same invite.",
+        "どちらか一方だけを送ってください。両方とも同じ招待を含んでいます。",
+    ),
+    (
+        "Click the message to copy it.",
+        "メッセージをクリックするとコピーできます。",
+    ),
+    ("Message", "メッセージ"),
+    (
+        "The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else.",
+        "ハブが招待を発行し、それを含むメッセージを作成します。このメッセージは、その Hermes のコマンドチャネルにだけ送ってください。ほかの場所には送らないでください。",
+    ),
+    (
+        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
+        "英小文字、数字、ハイフン、アンダースコアが使えます。32 文字以内で、先頭は英字または数字にしてください。名前はメッセージに表示され、あとから変更できません。",
+    ),
+    (
+        "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
+        "メッセージは Hermes にこのハブからコネクターをダウンロードするよう指示しますが、ダウンロード用フォルダーが空です。何も発行されていません。{name} の招待は、ハブのサーバーで {command} コマンドを使って発行してください。",
+    ),
 ];

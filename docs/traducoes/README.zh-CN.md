@@ -53,11 +53,11 @@ Hermes Agent 是 Nous Research 的 AI 智能体。Arauto 是一个独立项目�
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../marca/em-uma-tela-zh-CN-escuro.svg">
-    <img src="../marca/em-uma-tela-zh-CN-claro.svg" width="553" alt="分三步。1：在面板中选择“连接 Hermes”，把一段文本块粘贴到 Hermes 的指令通道。2：Hermes 安装连接器并回复一个验证码，你在面板中输入它。3：你勾选权限，Hermes 开始在你授权的号码上读取消息并执行操作。">
+    <img src="../marca/em-uma-tela-zh-CN-claro.svg" width="553" alt="分三步。1：在面板中选择“连接 Hermes”，复制一条简短消息，发送到 Hermes 的指令通道。2：Hermes 安装连接器并回复一个验证码，你在面板中输入它。3：你勾选权限，Hermes 开始在你授权的号码上读取消息并执行操作。">
   </picture>
 </p>
 
-- **连接就是复制和粘贴。** 一次性邀请，有效期 15 分钟。
+- **连接就是复制并发送。**（尚未在真实的 Hermes 上试过；命令块仍作为备用方案。） 一次性邀请，有效期 15 分钟。
 - **任何长期有效的密钥都不会经过聊天。** 凭据由两台机器自行生成，并在每次连接时更换。
 - **对话归档在你的 hub 中。** Hermes 在被要求时才去查阅，不必回复每一条消息。
 - **由你决定，按号码、按对话，** 每个 Hermes 可以做什么：读取、发送、修改和被唤醒。

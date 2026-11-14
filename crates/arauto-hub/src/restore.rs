@@ -342,11 +342,17 @@ pub async fn enter(
         .await?;
     }
     // The digest goes with the invite: nothing stays that could be presented again.
-    let invites_cancelled =
-        sqlx::query("UPDATE invite SET state = 'cancelled', digest = NULL WHERE state = 'issued'")
-            .execute(&mut *transaction)
-            .await?
-            .rows_affected();
+    let invites_cancelled = sqlx::query(
+        "UPDATE invite SET state = 'cancelled', digest = NULL, join_digest = NULL \
+         WHERE state = 'issued'",
+    )
+    .execute(&mut *transaction)
+    .await?
+    .rows_affected();
+    // The page of a used invite goes too: its request is closed just below.
+    sqlx::query("UPDATE invite SET join_digest = NULL WHERE join_digest IS NOT NULL")
+        .execute(&mut *transaction)
+        .await?;
     let requests_closed = sqlx::query(
         "UPDATE device \
          SET state_reason = CASE state WHEN 'pending' THEN 'restored_pending' \

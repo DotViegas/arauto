@@ -197,7 +197,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Check the installation", "Installation prüfen"),
     // guide.rs
     ("Name", "Name"),
-    ("Block", "Block"),
     ("Code", "Code"),
     ("Done", "Fertig"),
     ("Invite issued", "Einladung ausgestellt"),
@@ -223,10 +222,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Welchen Namen soll dieser Hermes im Panel haben?",
     ),
     ("Name of the Hermes", "Name des Hermes"),
-    (
-        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the block and does not change afterwards.",
-        "Kleinbuchstaben, Ziffern, Bindestrich und Unterstrich, bis zu 32 Zeichen, beginnend mit einem Buchstaben oder einer Ziffer. Der Name erscheint im Block und ändert sich danach nicht mehr.",
-    ),
     (
         "Preparing a secure connection",
         "Sichere Verbindung wird vorbereitet",
@@ -267,10 +262,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "This hub has no connector to serve",
         "Dieser Hub hat keinen Connector zum Bereitstellen",
-    ),
-    (
-        "The block tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
-        "Der Block weist den Hermes an, den Connector von diesem Hub herunterzuladen, und der Download-Ordner ist leer. Es wurde nichts ausgestellt. Stellen Sie die Einladung für {name} mit dem Befehl {command} auf dem Server des Hubs aus.",
     ),
     (
         "Waiting for the Hermes {name}",
@@ -394,10 +385,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "You give the Hermes a name here.",
         "Hier geben Sie dem Hermes einen Namen.",
-    ),
-    (
-        "The hub draws an invite: a block of text you paste in the command channel of that Hermes, and nowhere else.",
-        "Der Hub erzeugt eine Einladung: einen Textblock, den Sie im Befehlskanal dieses Hermes einfügen, und nirgendwo sonst.",
     ),
     (
         "The Hermes downloads the connector from this hub and answers with a verification code of 6 digits.",
@@ -786,4 +773,52 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Connect my first Hermes", "Meinen ersten Hermes verbinden"),
     ("Do it later", "Später erledigen"),
+    (
+        "I am asking you myself: connect this Hermes to our Arauto hub as \"{name}\".",
+        "Ich bitte Sie persönlich darum: Verbinden Sie diesen Hermes als „{name}“ mit unserem Arauto-Hub.",
+    ),
+    (
+        "Read {page} and follow it. Ask me if anything is unclear.",
+        "Lesen Sie {page} und befolgen Sie die Anweisungen darauf. Fragen Sie mich, wenn etwas unklar ist.",
+    ),
+    ("Hub:", "Hub:"),
+    ("Hub key:", "Hub-Schlüssel:"),
+    ("Connector sha256:", "sha256 des Connectors:"),
+    (
+        "Invite (one use, until {deadline} UTC):",
+        "Einladung (einmalig, bis {deadline} UTC):",
+    ),
+    (
+        "When it is done, send me only the verification code.",
+        "Wenn Sie fertig sind, schicken Sie mir nur den Prüfcode.",
+    ),
+    (
+        "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",
+        "Senden Sie den Text als neue Nachricht, nicht als Antwort auf einen seiner Hinweise. Wenn er Sie um eine Bestätigung bittet, antworten Sie mit Ihren eigenen Worten.",
+    ),
+    (
+        "Show the command instead",
+        "Stattdessen den Befehl anzeigen",
+    ),
+    (
+        "Send one or the other, not both: they carry the same invite.",
+        "Senden Sie eins von beiden, nicht beides: Beide enthalten dieselbe Einladung.",
+    ),
+    (
+        "Click the message to copy it.",
+        "Klicken Sie auf die Nachricht, um sie zu kopieren.",
+    ),
+    ("Message", "Nachricht"),
+    (
+        "The hub draws an invite and writes a message with it, which you send in the command channel of that Hermes, and nowhere else.",
+        "Der Hub erzeugt eine Einladung und schreibt damit eine Nachricht, die Sie im Befehlskanal dieses Hermes senden, und nirgendwo sonst.",
+    ),
+    (
+        "Lowercase letters, digits, hyphen and underscore, up to 32 characters, starting with a letter or a digit. The name appears in the message and does not change afterwards.",
+        "Kleinbuchstaben, Ziffern, Bindestrich und Unterstrich, bis zu 32 Zeichen, beginnend mit einem Buchstaben oder einer Ziffer. Der Name erscheint in der Nachricht und ändert sich danach nicht mehr.",
+    ),
+    (
+        "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
+        "Die Nachricht weist den Hermes an, den Connector von diesem Hub herunterzuladen, und der Download-Ordner ist leer. Es wurde nichts ausgestellt. Stellen Sie die Einladung für {name} mit dem Befehl {command} auf dem Server des Hubs aus.",
+    ),
 ];

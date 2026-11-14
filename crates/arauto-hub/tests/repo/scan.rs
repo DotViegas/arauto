@@ -25,6 +25,11 @@ const WITHOUT_ORGANIZATION: &[(&str, &str)] = &[
         "writes the refusals of invites nobody issued: they belong to no organization",
     ),
     (
+        "join_page",
+        "finds an invite by the digest of the handle in the address of its page, which names no \
+         organization; it is one read-only SELECT and the row it finds says which one it is",
+    ),
+    (
         "retention",
         "reads the days each table is kept: they are of the installation, the same for every \
          organization, and the purge then deletes organization by organization",

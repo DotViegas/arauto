@@ -16,8 +16,10 @@ And a fourth, of security: the proxy **writes** the header `X-Forwarded-For` wit
 whoever arrived, **replacing** what came from outside. The hub only believes this header when the
 connection comes from an address of `ARAUTO_TRUSTED_PROXIES`.
 
-Only two paths need to reach the hub: `/v1/channel` and `/v1/download/`. The rest can answer 404
-at the proxy itself.
+Four paths need to reach the hub: `/v1/channel`, `/v1/download/`, and, for the connection sentence
+of the panel, `/v1/join/` (the instruction page of an invite) and `/llms.txt`. The two last ones are
+a proposal, built and not tried on a real Hermes. Without them the address in the sentence answers
+404 at the proxy. The rest can answer 404 at the proxy itself.
 
 The panel does **not** go in this site. It has a port of its own in the hub (8445), off by default,
 and the foreseen path is a tunnel to it ([guide](../docker/README.md)). Whoever wants to open it
@@ -28,7 +30,7 @@ above belong to the channel and do not apply to it.
 
 ```
 arauto.example.org {
-    @arauto path /v1/channel /v1/download/*
+    @arauto path /v1/channel /v1/download/* /v1/join/* /llms.txt
     handle @arauto {
         reverse_proxy 127.0.0.1:8443 {
             flush_interval -1
@@ -66,6 +68,18 @@ server {
     }
 
     location /v1/download/ {
+        proxy_pass http://127.0.0.1:8443;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+
+    location /v1/join/ {
+        proxy_pass http://127.0.0.1:8443;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+
+    location = /llms.txt {
         proxy_pass http://127.0.0.1:8443;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $remote_addr;
