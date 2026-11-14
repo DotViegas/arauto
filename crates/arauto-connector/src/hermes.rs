@@ -2,7 +2,7 @@
 //! (`docs/11-conector.md`, section 4; `referencia/hermes-fatos.md`):
 //!
 //! ```text
-//! hermes mcp add arauto --command <folder>/arauto-connector --args mcp [--home <folder>]
+//! hermes mcp add arauto --command <folder>/arauto-connector --args mcp --home <folder>
 //! hermes mcp list
 //! hermes mcp remove arauto
 //! ```
@@ -18,8 +18,11 @@
 //! - Every argument is a fixed word or an absolute path of this machine; a path with a control
 //!   character, or that is not text, is refused. Nothing that came from the hub or from the
 //!   block becomes an argument.
-//! - `--home` goes in the arguments when the folder is not the default one: Hermes starts the
-//!   connector with a filtered environment, where `ARAUTO_HOME` would not arrive.
+//! - `--home` always goes in the arguments, also for the default folder: Hermes starts the
+//!   connector with a filtered environment, where `ARAUTO_HOME` would not arrive, and in a
+//!   container (checked on v0.22.5) with another `HOME` than the one of the terminal where
+//!   `join` ran. Without the folder in the entry, the copy Hermes starts would look for its
+//!   devices in a folder that is not the one `join` wrote.
 //! - **`add` asks questions.** Hermes v0.22.5 asks on the terminal whether to overwrite an
 //!   entry that exists and whether to enable all the tools, and saves nothing when the input
 //!   ends without an answer, with the exit code 0 all the same. So `add` gives it the bytes
@@ -144,10 +147,10 @@ impl Hermes {
         }
     }
 
-    /// `hermes mcp add arauto --command PROGRAM --args mcp [--home HOME]`, answered, and then
+    /// `hermes mcp add arauto --command PROGRAM --args mcp --home HOME`, answered, and then
     /// checked in `hermes mcp list`.
     pub(crate) async fn add(&self, home: &Home, settings: &Settings) -> Result<(), HermesError> {
-        let arguments = add_arguments(&home.program(), (!home.is_default()).then(|| home.root()))?;
+        let arguments = add_arguments(&home.program(), Some(home.root()))?;
         #[cfg(feature = "testing")]
         if let Some(answer) = &settings.testing.hermes {
             return if answer(&arguments) {

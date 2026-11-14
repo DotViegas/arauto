@@ -91,6 +91,14 @@ sentence and the instruction page of
 proposal **not tried on a real Hermes yet**. When it is, record here the version, the date and what
 the Hermes said.
 
+**Fact, [observed], 14/11/2026, Hermes Agent v0.22.5 (Docker install).** The same production
+Hermes received the connection sentence in Portuguese, as a new message, and did **not** refuse:
+it read the instruction page, downloaded the connector, checked the digest and ran `join`. The
+connection then stopped at the registration (AR-601), for the reasons in the next section, and
+the Hermes did not try another way, as the page tells it. One attempt, one Hermes: it shows the
+sentence can be accepted, not that it always is. The connection was not completed in that
+attempt.
+
 ## Registering a stdio server (checked 14/11/2026)
 
 **Checked on 14/11/2026, on Hermes Agent v0.22.5, in a throwaway container with an empty data
@@ -123,5 +131,15 @@ program came without color codes.
 |---|---|
 | F9 | The shim `/opt/hermes/bin/hermes`, run by the administrator of the system, changes to the user of Hermes before it runs. A connector kept by the administrator in a private folder is then not executable by the probe ("Permission denied"), and the entry is saved disabled. Run as the user of Hermes, as the agent's terminal does, the same command works. |
 
-Not checked: the approval and the tools after it on a real Hermes; a native install (outside a
-container); whether a running Hermes picks the new entry up by itself.
+**Checked on 14/11/2026, same version, by running the terminal tool of Hermes itself
+(`tools/terminal_tool.py`) and reading its code in the image.**
+
+| | Fact |
+|---|---|
+| F10 | In a container, when the folder `home` exists inside the data folder, the terminal of the agent runs with `HOME` at that folder (`/opt/data/home`), while the server of tools that Hermes starts keeps the `HOME` of the Hermes process (`/opt/data`). [code] `hermes_constants.get_subprocess_home`, `tools/mcp_tool_config._build_safe_env`; [observed]. A connector that looks for its folder by `HOME` finds one folder in `join` and another when Hermes starts it: after the approval it stays without a hub. With the folder in the entry (`--home`), the same trial reached "active" on the hub and `arauto_status` answered connected. |
+| F11 | The terminal tool remembers the folder where the last command of the session ended and, before each next command, runs `cd` to it; when that folder no longer exists, **every** command of the session fails before it starts, with `cd: ...: No such file or directory` and exit 126, until a command is given an explicit working folder. [code] `tools/environments/base_session_env.py`; [observed], with the same message a production Hermes showed. A page whose command ends inside `~/.arauto` leaves the session there. |
+| F12 | The `PATH` of the terminal tool was `/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games`: without the folders of Hermes. [observed] |
+| F13 | The command of the instruction page (full paths, no `cd`) passed through the terminal tool without any approval question, and the whole of it took about 10 seconds. [observed] |
+
+Not checked: a native install (outside a container); whether a running Hermes picks the new
+entry up by itself or needs a new session; the tools of WhatsApp after an access is granted.

@@ -16,13 +16,16 @@ on a server yet. What was observed on the screens of Easypanel 2.38.0 on 13/11/2
 oldest to the newest and the viewer has no search; the Open button points to the primary domain,
 and a "Make primary" star exists; a Console button exists. In particular, nobody has seen:
 
-- Easypanel build the image from the repository;
 - a passkey registered by a real browser, or the hub replacing the password of the database on a
   server;
-- the primary domain moved to another one, and the Open button following it;
 - what the Console of a Compose service opens (the guide gives another way);
 - whether the Logs screen colors lines;
 - a template of Easypanel in JSON for this recipe.
+
+Seen on 14/11/2026, on a service created from zero: Easypanel built the image from the repository;
+the panel's domain was made the primary one and the Open button followed it; and a new Compose
+service came with a domain of its own on port 80, already primary, which has to be edited or
+replaced. Destroying the service left its volumes on the server.
 
 The first use is the test.
 
@@ -68,7 +71,7 @@ service: renaming either one is the same as changing the address.
    **Observed on Easypanel 2.38.0:** the **Open** button points to the primary domain of the
    service (the one with the filled star), and with two domains it pointed to the first one
    created. Create the panel's domain (`hub:8445`) first, or press its star ("Make primary"), so
-   the button lands on the panel (moving the primary was not tried yet). **If it does not,** open the address of the panel directly in the
+   the button lands on the panel ("Make primary" asks for a confirmation). **If it does not,** open the address of the panel directly in the
    browser: it works the same. A connector's domain opened by mistake answers a short text that
    says it is for the connectors and that the panel has its own address. Until the change of that
    text is approved (decision 0040, pending decision 5), its last line says to point that domain to
@@ -137,7 +140,7 @@ data folder and the engine. What they cannot see from inside:
 
 ## What is not guaranteed
 
-- **Proposal, not checked on Easypanel:** moving the primary domain, the console, the templates and
+- **Proposal, not checked on Easypanel:** the console, the templates and
   the colors of the Logs screen (see "What is left to prove"; the rest is in
   [`referencia/easypanel-fatos.md`](../../referencia/easypanel-fatos.md)).
 - Until the first passkey, the database has the password written in `compose.yaml`, the same for

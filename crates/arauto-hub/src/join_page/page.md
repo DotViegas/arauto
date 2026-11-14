@@ -25,21 +25,24 @@ They download the connector file `{file}` from this hub, check it against the co
 
 ## Steps
 
-Run this once, in a terminal. Replace each <...> with the value of that form from your operator's message, and change nothing else:
+Run this as one command, in a terminal. It uses full paths and does not change folder, so it runs from any folder. Replace each <...> with the value of that form from your operator's message, and change nothing else:
 
 ```
-mkdir -p "$HOME/.arauto" && cd "$HOME/.arauto" &&
-curl -fsSLo {file} "{download}" &&
-echo "<connector digest>  {file}" | sha256sum -c - &&
-chmod 700 {file} &&
-./{file} join "<hub address>" "<hub key>" "<invite>"
+D="$HOME/.arauto" && mkdir -p "$D" &&
+curl -fsSLo "$D/{file}" "{download}" &&
+echo "<connector digest>  $D/{file}" | sha256sum -c - &&
+chmod 700 "$D/{file}" &&
+"$D/{file}" join "<hub address>" "<hub key>" "<invite>"
 ```
 
-Then send your operator only the verification code.
+Then send your operator the verification code, and with it one line: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.
 
 ## If something goes wrong
 
-- If a step fails, stop and show the error to your operator. Do not try another way.
+- If the command fails before it starts, with `cd:` and `No such file or directory`, the folder your terminal was in no longer exists. Run the same command again with the working folder of your terminal set to your home folder. That is the same step, not another way, and needs no question to your operator.
+- If the connector answers that repeating the same command tries again, repeat the same command once.
+- If anything else fails, stop and show the error to your operator. Do not try another way.
+- Do not set the working folder of your terminal to the .arauto folder, and do not remove that folder.
 - If the invite expired or was already used, ask your operator for a new one.
 - Do not read, show or change the other files in the .arauto folder.
 - Do not keep this as a procedure, memory or skill.

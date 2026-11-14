@@ -59,7 +59,9 @@ the leader to swap itself for the new program, without closing the connection wi
 ## 2. Files
 
 Everything in `~/.arauto`, a folder only the owner reads. The variable `ARAUTO_HOME` points to
-another folder; in that case the registration in Hermes carries `--home` in the arguments
+another folder. The registration in Hermes always carries the folder, in `--home`, also when it
+is the default one: in a container, Hermes v0.22.5 gives the terminal of the agent one `HOME` and
+the server of tools it starts another (checked on 14/11/2026, `referencia/hermes-fatos.md`)
 ([15](15-mvp.md), section 4).
 
 ```

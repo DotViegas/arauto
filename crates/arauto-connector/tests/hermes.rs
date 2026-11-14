@@ -575,19 +575,17 @@ async fn the_folder_reaches_the_registration_and_the_copies() {
         assert_eq!(ran.code, Some(0), "{how}: {ran:?}");
         let registered = hermes.registered(SERVER_NAME).unwrap();
         assert_eq!(registered.command, program_at(&home), "{how}");
-        if how == "default" {
-            assert_eq!(registered.args, ["mcp"], "{how}");
-        } else {
-            assert_eq!(
-                registered.args,
-                [
-                    "mcp".to_owned(),
-                    "--home".to_owned(),
-                    home.display().to_string()
-                ],
-                "{how}"
-            );
-        }
+        // Also for the default folder: the copy Hermes starts may have another HOME than the
+        // terminal where `join` ran.
+        assert_eq!(
+            registered.args,
+            [
+                "mcp".to_owned(),
+                "--home".to_owned(),
+                home.display().to_string()
+            ],
+            "{how}"
+        );
         approve(&fixture, &name, &code_in(&ran.stdout)).await;
         // The variable never reaches what Hermes starts: only what the entry carries does.
         assert!(
