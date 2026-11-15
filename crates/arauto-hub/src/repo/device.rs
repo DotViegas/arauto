@@ -65,7 +65,7 @@ pub struct Standing {
     pub hermes: Uuid,
     /// The name of the Hermes.
     pub name: HermesName,
-    /// Whether the Hermes can be woken.
+    /// Whether the Hermes may be woken by WhatsApp (the switch; notes do not depend on it).
     pub can_be_woken: bool,
 }
 

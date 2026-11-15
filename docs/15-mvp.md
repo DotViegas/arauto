@@ -59,7 +59,7 @@ the command are the same program and use the same write functions.
  arauto-hub admin invite NAME                 issues the invite and shows the connection sentence, or the block with --command (connect or reconnect)
  arauto-hub admin approve NAME [CODE]       the code is TYPED; without it, the command asks
  arauto-hub admin deny|revoke NAME
- arauto-hub admin wake NAME on|off            may be woken
+ arauto-hub admin wake NAME on|off            may be woken by WhatsApp (notes: the wake mark of the link)
  arauto-hub admin peers allow|deny|list       the peer list (--wake, --both)
  arauto-hub admin threads [NAME]              threads: who, when and how much; never the text
  arauto-hub admin engine|number|access ...    engine, numbers and access matrix (M3)
@@ -222,7 +222,7 @@ Rules that hold for the database:
     do not generate one event each ([13](13-conversa-entre-hermes.md), section 7). In the hub, each
     event says whether it is a security one, and the list is closed and has a test. Security events
     are: the installation, the organization, the hub key, the admins, creating and deleting Hermes,
-    changing the "may be woken", invite used or cancelled, approving and denying, activating,
+    changing "woken by WhatsApp", invite used or cancelled, approving and denying, activating,
     quarantine, replacement, revocation, confirmed swap, the links of the peer list and the restored
     mode. Not security events: the three events of the org chart (`org_level.changed`, `org_member.changed`, `org_chart.published`; the link events inside a publish are the usual security ones), invite issued, expired, refused or used
     by another identity,

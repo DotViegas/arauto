@@ -265,9 +265,10 @@ pub struct Hermes {
     pub name: HermesName,
     /// How its connector runs.
     pub mode: HermesMode,
-    /// Whether a notice may start a run of this Hermes.
+    /// Whether a WhatsApp notice may start a run of this Hermes: the switch "woken by WhatsApp".
+    /// A note from another Hermes does not depend on it (decision 0045).
     pub can_be_woken: bool,
-    /// Why it can be woken, as the admin wrote it.
+    /// Why it may be woken, as the admin wrote it.
     pub wake_reason: Option<String>,
     /// When the line was created.
     pub created_at: i64,

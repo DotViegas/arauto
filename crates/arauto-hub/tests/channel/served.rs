@@ -106,7 +106,8 @@ async fn a_connector_enters_with_the_invite_and_the_code_and_reaches_the_session
 }
 
 /// `arauto_status` is answered by the hub, without the engine: connected, the name, whether
-/// it can be woken, the numbers (none yet) and the links with other Hermes. No secret.
+/// what can wake it (`woken_by`: a note through a marked link, WhatsApp through the switch and
+/// the verb), the numbers (none yet) and the links with other Hermes. No secret.
 #[tokio::test(flavor = "multi_thread")]
 async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
     let fixture = Fixture::new(settings()).await;
@@ -122,6 +123,7 @@ async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
             "connected": true,
             "hermes": name,
             "can_be_woken": false,
+            "woken_by": {"notes": false, "whatsapp": false},
             "numbers": [],
             "peers": {"enabled": false, "can_send": false, "can_receive": false},
         })
@@ -129,9 +131,9 @@ async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
     // A link from another Hermes to this one: it can receive, not send.
     let other = fixture.hermes().await;
     sqlx::query(
-        "INSERT INTO peer_link (organization_id, from_hermes_id, to_hermes_id, created_at, \
+        "INSERT INTO peer_link (organization_id, from_hermes_id, to_hermes_id, wake, created_at, \
                                 changed_at) \
-         SELECT o.organization_id, o.id, t.id, 1, 1 FROM hermes o, hermes t \
+         SELECT o.organization_id, o.id, t.id, TRUE, 1, 1 FROM hermes o, hermes t \
          WHERE o.name = $1 AND t.name = $2",
     )
     .bind(&other)
@@ -166,6 +168,26 @@ async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
         "{text}"
     );
     assert!(text.contains(r#""can_be_woken":true"#), "{text}");
+    // The mark of the link wakes by notes; the switch is on but no access has the verb, so
+    // WhatsApp does not.
+    assert!(
+        text.contains(r#""woken_by":{"notes":true,"whatsapp":false}"#),
+        "{text}"
+    );
+    // The mark goes off: nothing wakes it, with the switch still on.
+    sqlx::query("UPDATE peer_link SET wake = FALSE")
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+    let CallOutcome::Ok(content) = session.call(ARAUTO_STATUS, json!({})).await.unwrap() else {
+        panic!("not answered");
+    };
+    let text = serde_json::Value::Object(content.into_map()).to_string();
+    assert!(text.contains(r#""can_be_woken":false"#), "{text}");
+    assert!(
+        text.contains(r#""woken_by":{"notes":false,"whatsapp":false}"#),
+        "{text}"
+    );
     // Nothing of the credential, of the identity or of the key of the hub.
     let credential = session.device().disk().credential().unwrap();
     for secret in [

@@ -160,7 +160,7 @@ pub struct HermesRow {
     pub state: &'static str,
     /// The aliases of the numbers it reaches.
     pub numbers: Vec<String>,
-    /// Whether it can be woken.
+    /// Whether the switch "woken by WhatsApp" is on.
     pub woken: bool,
     /// The version its connector declared. Not verified.
     pub connector: Option<String>,
@@ -722,7 +722,7 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         .raw("</th><th scope=\"col\">")
         .t(k("Numbers"))
         .raw("</th><th scope=\"col\">")
-        .t(k("Can be woken"))
+        .t(k("Woken by WhatsApp"))
         .raw("</th><th scope=\"col\">")
         .t(k("Connector"))
         .raw("</th><th scope=\"col\">")

@@ -34,7 +34,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Connect Hermes", "Hermes कनेक्ट करें"),
     ("State", "स्थिति"),
     ("Numbers", "नंबर"),
-    ("Can be woken", "जगाया जा सकता है"),
     ("Connector", "कनेक्टर"),
     ("Seen", "देखा गया"),
     ("Actions", "कार्रवाइयाँ"),
@@ -835,10 +834,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Kind: {kind}", "प्रकार: {kind}"),
     ("Wakes {name}", "{name} को जगाता है"),
-    (
-        "{name} cannot be woken now: this mark only applies once it can.",
-        "{name} को अभी जगाया नहीं जा सकता: यह निशान तभी लागू होता है जब उसे जगाया जा सके।",
-    ),
     ("Create the way back", "वापसी का लिंक बनाएँ"),
     ("Remove the way back", "वापसी का लिंक हटाएँ"),
     ("Remove", "हटाएँ"),
@@ -853,10 +848,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Move right", "दाईं ओर ले जाएँ"),
     ("Change them in Accesses", "इन्हें पहुँच टैब में बदलें"),
     ("No access to any number.", "किसी भी नंबर तक पहुँच नहीं है।"),
-    (
-        "Change it with the command {command}.",
-        "इसे {command} कमांड से बदलें।",
-    ),
     ("Link to", "किससे लिंक करें"),
     ("Add link", "लिंक जोड़ें"),
     ("Links of this Hermes", "इस Hermes के लिंक"),
@@ -1243,5 +1234,16 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
         "फ़ोन पर: WhatsApp › लिंक किए गए डिवाइस › डिवाइस लिंक करें › इसके बजाय फ़ोन नंबर से लिंक करें, और यह कोड लिखें:",
+    ),
+    // decision 0045
+    ("Woken by WhatsApp", "WhatsApp से जगाया जाना"),
+    (
+        "With this mark, a note on this link wakes {name}, within the notice limits.",
+        "इस निशान के साथ, इस लिंक से भेजा गया नोट {name} को जगाता है, सूचना की सीमाओं के भीतर।",
+    ),
+    ("This Hermes, on every number", "यह Hermes, हर नंबर पर"),
+    (
+        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        "इसके बिना, कोई भी WhatsApp संदेश इस Hermes को किसी भी नंबर पर नहीं जगाता। दूसरे Hermes के नोट इस पर निर्भर नहीं हैं।",
     ),
 ];

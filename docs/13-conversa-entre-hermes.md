@@ -1,7 +1,8 @@
 # 13 — Conversation between Hermes
 
 **Status: proposal**, to be validated in the first MVP ([15-mvp.md](15-mvp.md)). Revised on
-10/11/2026, after the design review. How one Hermes sends a note to another through the hub, who
+10/11/2026, after the design review.
+Changed on 15/11/2026 by [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md): the wake mark of the link is enough to wake by a note. How one Hermes sends a note to another through the hub, who
 may send to whom and what keeps two Hermes from entering a loop.
 
 ## Summary
@@ -47,7 +48,7 @@ A link says: **from A to B**. It has two marks.
 | Mark | What it allows |
 |---|---|
 | **Send note** | A sends a note to B. Every link has it. |
-| **Wake** | A note from A wakes B. It only applies if B can also be woken ([08](08-permissoes.md), section 4). |
+| **Wake** | A note from A wakes B. The mark is enough: the switch "woken by WhatsApp" of B is not consulted ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026). |
 
 Rules:
 
@@ -108,7 +109,7 @@ The one that checks the format when building the sentence is the connector
   carriage return is only valid attached to a line break) or a character that reverses the
   direction of writing. Those characters serve to hide or rewrite what appears in a terminal. Files
   are not in the first version.
-- In step 6 a notice applies when: the link has wake, B can be woken, B has an active device and
+- In step 6 a notice applies when: the link has wake, B has an active device and
   the notice ceilings were not exceeded. With one missing, the note is kept with no notice.
 - If the channel drops before the answer of step 7, the call comes back with AR-207: the note may
   have been kept. The sentence says to check with the reading of the thread before sending again.
@@ -162,8 +163,8 @@ Delivery rules:
 - **One pending notice per sender.** While B does not receive the notice of A, the new notes from A
   only add to the count. A queue full of notes never pushes out a WhatsApp notice.
 - The first notice leaves at once. The next one, from the same sender, only after 10 seconds.
-- The notice is re-evaluated at delivery: if the link lost the wake, if it left, or if B can no
-  longer be woken, it is discarded.
+- The notice is re-evaluated at delivery: if the link lost the wake, if it left, or if either Hermes
+  was removed, it is discarded. The WhatsApp switch of B is not consulted.
 - Otherwise, the rules of every notice apply ([08](08-permissoes.md), section 4): at least once,
   with confirmation, for up to 24 hours.
 - A notice that the ceiling blocked is **discarded**, never postponed. If it were postponed, the
@@ -198,6 +199,8 @@ How it is counted:
 - AR-706 carries `retry_after_s`: in how many seconds the ceiling comes back. The fixed sentence
   says that time and that insisting does not help.
 - The wake ceiling of the connector is the last barrier: it applies even against a faulty hub.
+- Since [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md) one mark per link turns waking on, so two marked links in both directions
+  are a possible loop with no second step; these ceilings and the connector's bound it.
 - The values are fixed in the first version and are starting points, to be calibrated in the MVP.
 
 With that: A and B waking each other stop at 10 notices per hour in each direction; a triangle, at

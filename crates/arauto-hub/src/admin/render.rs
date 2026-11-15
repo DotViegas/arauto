@@ -304,9 +304,9 @@ pub fn hermes_list(lines: &[HermesLine]) -> Report {
     let mut text = String::new();
     for line in lines {
         let wake = if line.hermes.can_be_woken {
-            "can be woken"
+            "woken by WhatsApp"
         } else {
-            "is not woken"
+            "not woken by WhatsApp"
         };
         let last = line
             .in_use
@@ -388,8 +388,12 @@ pub fn revoked(name: &str, what: &Closed) -> Report {
 /// `admin wake`.
 #[must_use]
 pub fn wake(name: &str, on: bool, outcome: WakeOutcome) -> Report {
-    let state = if on { "can be woken" } else { "is not woken" };
-    let text = match outcome {
+    let state = if on {
+        "can be woken by WhatsApp"
+    } else {
+        "is not woken by WhatsApp"
+    };
+    let mut text = match outcome {
         WakeOutcome::Changed => format!("Hermes {} now {state}.\n", escape(name)),
         WakeOutcome::Unchanged | WakeOutcome::NotFound => {
             format!(
@@ -398,6 +402,10 @@ pub fn wake(name: &str, on: bool, outcome: WakeOutcome) -> Report {
             )
         }
     };
+    text.push_str(
+        "Notes from other Hermes do not depend on this: a link with the wake mark wakes its \
+         receiver (see `arauto-hub admin link list`).\n",
+    );
     Report::done(text)
 }
 

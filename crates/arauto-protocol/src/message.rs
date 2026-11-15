@@ -633,7 +633,8 @@ pub struct Session {
     pub hermes: HermesName,
     /// The released tools.
     pub tools: ToolList,
-    /// Whether this Hermes may be woken up.
+    /// Whether a WhatsApp message may wake this Hermes: the switch of the Hermes. A note from
+    /// another Hermes does not depend on it (decision 0045).
     pub wake: bool,
 }
 

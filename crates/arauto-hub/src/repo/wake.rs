@@ -4,7 +4,7 @@
 //!
 //! A message wakes a Hermes when, at that moment: the number is in use (connected, or coming
 //! back: its notices then wait for it in the queue); the Hermes may be
-//! woken and has an active device; and the matrix gives it the verb "be woken" in that chat
+//! woken by WhatsApp (the switch) and has an active device; and the matrix gives it the verb "be woken" in that chat
 //! (the line of the chat when there is one, which replaces the verbs of the number whole;
 //! otherwise the verbs of the number, with the scope "all", and only in a chat with one
 //! person: a group wakes only by a line of its own). A message the number itself sent wakes

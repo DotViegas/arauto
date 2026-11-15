@@ -145,8 +145,9 @@ pub fn render(report: &Report) -> String {
             let _ = writeln!(text, "Leader: running{process}");
             if let Some(device) = &leader.device {
                 let _ = writeln!(text, "Channel: {}", channel(&device.channel));
-                // Two different things: what the admin allowed, and whether this connector
-                // has the means. Without both, no notice wakes the Hermes.
+                // Two different things: what the admin allowed for WhatsApp, and whether this
+                // connector has the means. Without the key, no notice of any kind wakes the
+                // Hermes.
                 let (allowed, means) = match device.channel {
                     ChannelStatus::Session {
                         can_be_woken,
@@ -162,7 +163,7 @@ pub fn render(report: &Report) -> String {
                     ),
                     _ => ("unknown", "unknown"),
                 };
-                let _ = writeln!(text, "Waking allowed by the admin: {allowed}");
+                let _ = writeln!(text, "Waking by WhatsApp allowed by the admin: {allowed}");
                 let _ = writeln!(text, "Key of the local API of Hermes: {means}");
             }
             if let Some(request) = &leader.request {

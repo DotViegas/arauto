@@ -177,6 +177,7 @@ fn status_of(name: &str) -> Value {
         "connected": true,
         "hermes": name,
         "can_be_woken": false,
+        "woken_by": {"notes": false, "whatsapp": false},
         "numbers": [],
         "peers": {"enabled": false, "can_send": false, "can_receive": false},
     })

@@ -105,6 +105,9 @@ pub struct PeerLinks {
     pub outbound: bool,
     /// A link from another Hermes to this one: it can receive.
     pub inbound: bool,
+    /// A link from a live Hermes to this one has the wake mark: a note on it wakes this
+    /// Hermes (decision 0045).
+    pub wakes_in: bool,
 }
 
 /// Whether the Hermes `hermes` has links with other Hermes, in each direction.
@@ -116,17 +119,21 @@ pub async fn peer_links(
     organization: ResolvedOrg,
     hermes: Uuid,
 ) -> Result<PeerLinks, RepoError> {
-    let (outbound, inbound): (bool, bool) = sqlx::query_as(
+    let (outbound, inbound, wakes_in): (bool, bool, bool) = sqlx::query_as(
         "SELECT EXISTS (SELECT 1 FROM peer_link \
                         WHERE organization_id = $1 AND from_hermes_id = $2), \
                 EXISTS (SELECT 1 FROM peer_link \
-                        WHERE organization_id = $1 AND to_hermes_id = $2)",
+                        WHERE organization_id = $1 AND to_hermes_id = $2),                 EXISTS (SELECT 1 FROM peer_link l                         JOIN hermes f ON f.organization_id = l.organization_id                                      AND f.id = l.from_hermes_id                         WHERE l.organization_id = $1 AND l.to_hermes_id = $2                           AND l.wake AND f.deleted_at IS NULL)",
     )
     .bind(organization.id())
     .bind(hermes)
     .fetch_one(pool)
     .await?;
-    Ok(PeerLinks { outbound, inbound })
+    Ok(PeerLinks {
+        outbound,
+        inbound,
+        wakes_in,
+    })
 }
 
 /// A Hermes line and what is connected to it.
@@ -317,7 +324,7 @@ pub enum WakeOutcome {
     NotFound,
 }
 
-/// Marks whether a Hermes can be woken: whether a notice may start a run of it.
+/// Marks whether a Hermes may be woken by WhatsApp (the switch; notes do not depend on it): whether a WhatsApp notice may start a run of it.
 ///
 /// # Errors
 /// [`RepoError::Restored`] when the database is behind the audit mark: nothing is written.

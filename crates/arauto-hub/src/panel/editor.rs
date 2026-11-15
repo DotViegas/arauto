@@ -59,6 +59,9 @@ pub struct Editing {
     pub lines: usize,
     /// The access as it is saved now, in one sentence.
     pub today: String,
+    /// The switch "woken by WhatsApp" of the Hermes, as it is saved now: it holds for every
+    /// number, and notes from other Hermes do not depend on it.
+    pub woken_by_whatsapp: bool,
     /// Why the form came back.
     pub error: Option<&'static str>,
 }
@@ -298,6 +301,21 @@ pub fn page(frame: &Frame, accesses: &AccessPage, editing: &Editing) -> String {
             "May start a chat with someone who never talked to the number (requires sending and every chat)",
         ),
     );
+    html.raw("</fieldset><fieldset><legend>")
+        .t(k("This Hermes, on every number"))
+        .raw("</legend>");
+    option(
+        &mut html,
+        "checkbox",
+        "whatsapp_wake",
+        "on",
+        editing.woken_by_whatsapp,
+        Some(k("Woken by WhatsApp")),
+        k(
+            "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        ),
+    );
+    html.raw("<input type=\"hidden\" name=\"whatsapp_wake_shown\" value=\"1\">");
     html.raw("</fieldset></div></form><p class=\"sentence\" id=\"editor-sentence\"><span class=\"no-script\">")
         .t(k("Today:"))
         .raw(" </span>")
@@ -372,9 +390,13 @@ async fn saved(
         return Ok(None);
     }
     let lines = repo::hermes::list(hub.pool(), organization, false).await?;
-    if !lines.iter().any(|line| line.hermes.name == *hermes) {
+    let Some(woken_by_whatsapp) = lines
+        .iter()
+        .find(|line| line.hermes.name == *hermes)
+        .map(|line| line.hermes.can_be_woken)
+    else {
         return Ok(None);
-    }
+    };
     let listed = repo::access::list(hub.pool(), organization, Some(hermes)).await?;
     let found = listed.iter().find(|access| access.number == *number);
     let (grant, wait_s, lines) = found.map_or(
@@ -409,6 +431,7 @@ async fn saved(
             wait_s,
             lines,
         ),
+        woken_by_whatsapp,
         error: None,
     }))
 }
@@ -502,8 +525,17 @@ async fn save(
     };
     // A wait that is not a number is out of its range: nothing is guessed.
     let wait = field("wait").map_or(Some(editing.wait_s), |text| text.parse::<u32>().ok());
+    // The switch is only written when the form carried it (an older page never touches it).
+    let switch = form
+        .field("whatsapp_wake_shown")
+        .is_some()
+        .then(|| on("whatsapp_wake"));
+    let switch_now = editing.woken_by_whatsapp;
     // The form comes back as it was sent, with why.
     editing.grant = grant;
+    if let Some(wanted) = switch {
+        editing.woken_by_whatsapp = wanted;
+    }
     editing.wait_s = wait.unwrap_or(editing.wait_s);
     let now = hub.now_ms();
     let nothing = !(grant.verbs.read || grant.verbs.send || grant.verbs.modify || grant.verbs.wake);
@@ -532,6 +564,13 @@ async fn save(
                 }
             }
         }
+    };
+    // The third write, after the two of the access: the function of the command.
+    let outcome = match (outcome, switch) {
+        (Ok(()), Some(wanted)) if wanted != switch_now => {
+            admin.wake(hermes.as_str(), wanted, now).await.map(|_| ())
+        }
+        (other, _) => other,
     };
     match outcome {
         Ok(()) => Ok(saved_at(&hermes, &number)),
@@ -716,6 +755,7 @@ mod tests {
             wait_s: 7,
             lines: 2,
             today: HOSTILE.to_owned(),
+            woken_by_whatsapp: true,
             error: Some(WAKE_NEEDS_READ),
         };
         let shown = page(&Frame::default(), &AccessPage::default(), &editing);

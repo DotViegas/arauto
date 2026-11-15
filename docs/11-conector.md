@@ -22,7 +22,7 @@ that has not received a credential yet.
 |---|---|
 | `join HUB KEY INVITE` | Creates the folder of the request with a new identity and does the enrollment with the hub of that key. If the hub accepts, it copies itself to the fixed path `~/.arauto/arauto-connector` (through a temporary file and a rename, because the old program may be running), registers the tool server in Hermes and shows the verification code. It ends in seconds. With `--no-register`, for development, it skips the registration. |
 | `mcp` | What Hermes starts. It speaks MCP over stdio with Hermes and keeps the channel with the hub. |
-| `status` | Hub, version, situation of the device, whether the Hermes can be woken. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. |
+| `status` | Hub, version, situation of the device, whether the admin allowed waking by WhatsApp. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. |
 | `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. |
 | `leave --local` | Deletes the files and the registration without talking to the hub. It exists for when the hub no longer exists or changed its key. It is for a person to run: the device stays valid in the hub until it is revoked in the panel. |
 
@@ -208,7 +208,7 @@ left.
 |---|---|
 | The server entry references Hermes's variable | Hermes itself hands the key to the child. Nothing is copied. It depends on Hermes accepting the reference in that field. |
 | The connector reads the key from Hermes's secrets file | It always works. An outside program reading that file needs to be told to whoever installs. |
-| No key, no waking | Hermes uses the tools when asked and is never woken. The panel shows "Can be woken: no". |
+| No key, no waking | Hermes uses the tools when asked and is never woken. The connector's `status` says "Key of the local API of Hermes: not configured". |
 
 Address, body of the call and the use of the API's repetition identifier are deliverables of Phase 1.
 

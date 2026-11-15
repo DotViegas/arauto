@@ -23,7 +23,7 @@
 //!
 //! | Module | What it holds |
 //! |---|---|
-//! | [`hermes`] | The lines of Hermes: create, list, remove, "can be woken". |
+//! | [`hermes`] | The lines of Hermes: create, list, remove, "woken by WhatsApp". |
 //! | [`invite`] | Issuing an invite, which also closes the request in progress. |
 //! | [`enroll`] | The enrollment: every line of the table of C3. |
 //! | [`approval`] | Approving with the typed code, and denying. |

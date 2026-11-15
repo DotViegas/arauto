@@ -40,7 +40,7 @@ pub enum ChannelStatus {
     Session {
         /// The name of this Hermes.
         hermes: HermesName,
-        /// Whether the admin allowed waking it.
+        /// Whether the admin allowed waking by WhatsApp (the switch). Notes do not depend on it.
         can_be_woken: bool,
         /// Whether this connector has the key of the local API of Hermes: without it, no
         /// notice wakes the Hermes, whatever the admin allowed.

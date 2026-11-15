@@ -10,8 +10,8 @@ error.
 **In the hub, on 13/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md), proposal):
 there are T1, T4 and T6, read-only, the alert banner, and T2 with T3, in a single guide, in a window
 over the list: name, block, code and done. In T1 each line has the buttons to connect, continue or
-reconnect, and the one to revoke, which asks first; delete and "can be woken" are still only in the
-command. In T6 each cell opens the access editor, in a window; choosing the chats of the scope
+reconnect, and the one to revoke, which asks first; delete is still only in the
+command (15/11/2026, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md): the switch "woken by WhatsApp" is set in the access editor too). In T6 each cell opens the access editor, in a window; choosing the chats of the scope
 "only chosen chats" is still only in the command. The other screens are still
 design. T0 exists in part (see below): one gets in with a passkey, whose first registration is
 opened by an installation code. The panel session lasts 12 hours, or 30 minutes without use, and
@@ -113,7 +113,7 @@ click could lose a click that lands in the instant of a swap.
 ## T1. Hermes
 
 - **Shows:** counters ("5 connected, 1 waiting, 0 in alert") and one line per Hermes: name,
-  state ([10](10-maquinas-de-estado.md), section 3), numbers with access, whether it can be woken,
+  state ([10](10-maquinas-de-estado.md), section 3), numbers with access, whether WhatsApp may wake it ("Woken by WhatsApp"),
   connector version, last seen.
 - **Hermes card:** the limit of the protection; observed address, current and previous; what the
   device declared, marked as not verified; date of the connection; notices in the queue; latest
@@ -292,6 +292,7 @@ R read · S send · M modify · W be woken
   chats", chat lines. The screen writes the resulting sentence: "Hermes Bento may read in 3
   chats of the number Counter. It does not send, does not modify and is not woken."
 - **Save** applies on the next call, without restarting anything.
+- The editor also holds the switch "Woken by WhatsApp" of the Hermes, for every number; notes do not depend on it ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)).
 - **Warnings that do not block:** two Hermes woken or sending in the same chats; a restrictive chat
   line under the scope "all"; **send** granted on a number marked as "command".
 - **Empty:** "Connect a Hermes first"; "Add a WhatsApp first"; "Nobody has access to
@@ -331,12 +332,12 @@ It is in Settings.
 **Proposal, built in the hub on 14/11/2026, tried only in a desktop Chrome without a window (15/11/2026).** Decision [0043](decisoes/0043-organograma-e-niveis.md). The menu has it after Accesses.
 
 - **Shows:** a map with one band per level, the top one first, and a card per Hermes (state dot, name, the numbers it has and whether it answers or only reads, "not placed yet" when it has no place). Arrows mark the links. Their kind comes from the levels: from a higher level to a lower one, instruction; lower to higher, request; same level, note. The kind is only shown here; it gives no permission. A list view shows the same data (levels, Hermes, links) and is the way for the keyboard: everything the map does is there. Only Hermes are on the chart.
-- **Actions (all on a draft):** add, rename, reorder and remove (when empty) levels, from 1 to 12; drag a Hermes to another level or place; draw a link by dragging from the card's handle to another card; click an arrow for its kind, the wake mark, the way back and removal; write a role text of up to 280 characters per Hermes, for the admin's own reading; undo.
+- **Actions (all on a draft):** add, rename, reorder and remove (when empty) levels, from 1 to 12; drag a Hermes to another level or place; draw a link by dragging from the card's handle to another card; click an arrow for its kind, the wake mark (the window says the mark is enough to wake by a note), the way back and removal; write a role text of up to 280 characters per Hermes, for the admin's own reading; undo.
 - **Publish:** shows a summary of the changes, with the warning that links are security rules and that a link crosses numbers, and writes everything in one go. Nothing is written before it. The links, with their wake mark, go through the same code as the command `admin link add|remove`.
 - **Stale:** if the chart changed meanwhile (another admin, a command, a Hermes created or removed), nothing is published, the page shows the fresh state and keeps the draft to apply again.
 - **Empty:** "No Hermes yet. Connect the first one in the Hermes tab." With no level, the draft starts with one level holding every Hermes.
 - **Without script:** three read-only lists (levels, Hermes, links) and a sentence saying that editing needs the script.
 - **Live refresh:** the tab refreshes the states like the others, but pauses while there is a draft.
 - **Narrow screens:** the view starts as a list; the map scrolls sideways.
-- **Does not do:** edit accesses to numbers (the card shows them and points to Accesses); edit "can be woken" (command only); put people on the chart; put a Hermes in two levels; tell any Hermes about levels, roles or kinds (stage B, pending). The command twin is `arauto-hub admin org show` and `org publish`.
+- **Does not do:** edit accesses to numbers (the card shows them and points to Accesses); edit the WhatsApp switch (the drawer shows it in its numbers section; it is set in the access editor and by the command); put people on the chart; put a Hermes in two levels; tell any Hermes about levels, roles or kinds (stage B, pending). The command twin is `arauto-hub admin org show` and `org publish`.
 - **Not guaranteed:** the draft is lost if the panel session ends before Publish; Publish does not ask for the passkey again (the note on top of this file covers it).

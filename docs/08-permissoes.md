@@ -98,9 +98,13 @@ What Hermes does on waking is defined by the instructions of Hermes itself, not 
 The notice of a note between Hermes follows the same rules, with the ceilings of
 [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), section 6.
 
-The panel shows, per Hermes, whether it can be woken. When it cannot, the verb stays disabled, with
-the reason. While the key of Hermes's local API is not resolved
-([11-conector.md](11-conector.md), section 6), no Hermes can.
+It does not depend on the switch of the Hermes: the wake mark of the link is enough ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
+
+The panel shows, per Hermes, whether WhatsApp may wake it ("Woken by WhatsApp": the switch of the
+Hermes, set in the access editor and by `arauto-hub admin wake NAME on|off`). A WhatsApp message
+wakes a Hermes only with that switch on and the verb "be woken" in the chat. Notes do not depend on
+the switch. Without the key of Hermes's local API ([11-conector.md](11-conector.md), section 6) no
+notice of either kind wakes it.
 
 ## 5. What the hub does not decide
 

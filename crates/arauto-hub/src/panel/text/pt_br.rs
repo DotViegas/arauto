@@ -37,7 +37,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Connect Hermes", "Conectar Hermes"),
     ("State", "Estado"),
     ("Numbers", "Números"),
-    ("Can be woken", "Pode ser acordado"),
     ("Connector", "Conector"),
     ("Seen", "Visto"),
     ("Actions", "Ações"),
@@ -870,10 +869,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Kind: {kind}", "Tipo: {kind}"),
     ("Wakes {name}", "Acorda {name}"),
-    (
-        "{name} cannot be woken now: this mark only applies once it can.",
-        "{name} não pode ser acordado agora: esta marca só vale quando puder.",
-    ),
     ("Create the way back", "Criar a volta"),
     ("Remove the way back", "Remover a volta"),
     ("Remove", "Remover"),
@@ -888,10 +883,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Move right", "Mover para a direita"),
     ("Change them in Accesses", "Altere em Acessos"),
     ("No access to any number.", "Sem acesso a nenhum número."),
-    (
-        "Change it with the command {command}.",
-        "Altere com o comando {command}.",
-    ),
     ("Link to", "Ligar a"),
     ("Add link", "Criar ligação"),
     ("Links of this Hermes", "Ligações deste Hermes"),
@@ -1295,4 +1286,18 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Open the WAHA window", "Abrir a janela do WAHA"),
     ("Try again", "Tentar de novo"),
+    // decision 0045
+    ("Woken by WhatsApp", "Acordado pelo WhatsApp"),
+    (
+        "With this mark, a note on this link wakes {name}, within the notice limits.",
+        "Com esta marca, um recado nesta ligação acorda {name}, dentro dos limites de aviso.",
+    ),
+    (
+        "This Hermes, on every number",
+        "Este Hermes, em todos os números",
+    ),
+    (
+        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        "sem isto, nenhuma mensagem de WhatsApp acorda este Hermes, em nenhum número. Os recados de outros Hermes não dependem disto.",
+    ),
 ];

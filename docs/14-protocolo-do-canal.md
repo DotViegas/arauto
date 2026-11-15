@@ -337,7 +337,7 @@ is too old presents itself this way at the leader's startup and, after that, onc
 | connector | `check_ok` | `nonce` | The same one. CONTROL flag. |
 | hub | `credential` | `generation`, `sealed` | The new credential, already written as pending. |
 | connector | `saved` | `generation`, `digest` (SHA-256 of the block received) | The "saved", after the write is guaranteed on disk. |
-| hub | `session` | `hermes` (name), `tools` (names released), `wake` (may be woken) | The promotion was written. The channel session starts here. |
+| hub | `session` | `hermes` (name), `tools` (names released), `wake` (the switch "woken by WhatsApp"; a note does not depend on it, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)) | The promotion was written. The channel session starts here. |
 | hub | `tools` | `tools` | The list of released tools changed. |
 | connector | `call` | `id`, `tool`, `args` | Tool call. |
 | hub | `result` | `id`, `ok`, and `content` or `code`; optional `retry_after_s` | Response. A refusal carries only the code; the sentence stays in the connector. |

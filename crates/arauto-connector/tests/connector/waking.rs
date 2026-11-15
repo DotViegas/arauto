@@ -94,8 +94,8 @@ async fn notices(fixture: &Fixture) -> Vec<String> {
         .unwrap()
 }
 
-/// Two Hermes connected; the second may be woken by the messages of the first, and its
-/// connector wakes through `target`.
+/// Two Hermes connected; the link from the first wakes the second (the WhatsApp switch of the
+/// second stays off), and its connector wakes through `target`.
 async fn pair(
     fixture: &Fixture,
     target: Option<WakeTarget>,
@@ -106,7 +106,6 @@ async fn pair(
     let (second, mut watch, _) = settings();
     let (woken, folder, b) = connected(fixture, second.waking(target), &mut watch).await;
     let now = fixture.now();
-    fixture.admin.wake(&woken, true, now).await.unwrap();
     fixture
         .admin
         .link_add(&sender, &woken, true, false, now)

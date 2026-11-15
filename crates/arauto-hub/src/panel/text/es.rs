@@ -37,7 +37,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Connect Hermes", "Conectar Hermes"),
     ("State", "Estado"),
     ("Numbers", "Números"),
-    ("Can be woken", "Puede ser despertado"),
     ("Connector", "Conector"),
     ("Seen", "Visto"),
     ("Actions", "Acciones"),
@@ -868,10 +867,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Kind: {kind}", "Tipo: {kind}"),
     ("Wakes {name}", "Despierta a {name}"),
-    (
-        "{name} cannot be woken now: this mark only applies once it can.",
-        "{name} no puede ser despertado ahora: esta marca solo vale cuando pueda.",
-    ),
     ("Create the way back", "Crear la vuelta"),
     ("Remove the way back", "Eliminar la vuelta"),
     ("Remove", "Eliminar"),
@@ -886,10 +881,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Move right", "Mover a la derecha"),
     ("Change them in Accesses", "Cámbialos en Accesos"),
     ("No access to any number.", "Sin acceso a ningún número."),
-    (
-        "Change it with the command {command}.",
-        "Cámbialo con el comando {command}.",
-    ),
     ("Link to", "Enlazar con"),
     ("Add link", "Añadir enlace"),
     ("Links of this Hermes", "Enlaces de este Hermes"),
@@ -1300,5 +1291,19 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
         "En el teléfono: WhatsApp › Dispositivos vinculados › Vincular un dispositivo › Vincular con número de teléfono, y escribe este código:",
+    ),
+    // decision 0045
+    ("Woken by WhatsApp", "Despertado por WhatsApp"),
+    (
+        "With this mark, a note on this link wakes {name}, within the notice limits.",
+        "Con esta marca, una nota por este enlace despierta a {name}, dentro de los límites de avisos.",
+    ),
+    (
+        "This Hermes, on every number",
+        "Este Hermes, en todos los números",
+    ),
+    (
+        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        "sin esto, ningún mensaje de WhatsApp despierta a este Hermes, en ningún número. Las notas de otros Hermes no dependen de esto.",
     ),
 ];

@@ -121,7 +121,8 @@ enum InstalledCommand {
         /// The name of the Hermes.
         name: String,
     },
-    /// Says whether a Hermes can be woken.
+    /// Says whether a Hermes may be woken by WhatsApp messages (for notes: the wake mark of
+    /// the link).
     Wake {
         /// The name of the Hermes.
         name: String,
@@ -205,7 +206,7 @@ enum LinkCommand {
         from: String,
         /// The Hermes that receives.
         to: String,
-        /// A message of FROM wakes TO (TO must also be allowed to be woken: `admin wake`).
+        /// A message of FROM wakes TO (the mark alone is enough; `admin wake` is for WhatsApp).
         #[arg(long)]
         wake: bool,
         /// The link back too, from TO to FROM, with the same wake mark.

@@ -79,7 +79,7 @@ actions! {
     HermesCreated => "hermes.created", true;
     /// A Hermes line was removed.
     HermesRemoved => "hermes.removed", true;
-    /// Whether a Hermes can be woken changed.
+    /// Whether a Hermes may be woken by WhatsApp (the switch; notes do not depend on it) changed.
     HermesWakeChanged => "hermes.wake_changed", true;
     /// An invite was issued.
     InviteIssued => "invite.issued", false;

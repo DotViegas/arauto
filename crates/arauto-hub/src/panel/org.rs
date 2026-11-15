@@ -105,8 +105,8 @@ const SAY: &[(&str, &str)] = &[
     ("kind-of", k("Kind: {kind}")),
     ("wakes-name", k("Wakes {name}")),
     (
-        "not-wakeable",
-        k("{name} cannot be woken now: this mark only applies once it can."),
+        "wake-hint",
+        k("With this mark, a note on this link wakes {name}, within the notice limits."),
     ),
     ("way-back-create", k("Create the way back")),
     ("way-back-remove", k("Remove the way back")),
@@ -124,7 +124,6 @@ const SAY: &[(&str, &str)] = &[
     ("move-right", k("Move right")),
     ("change-in-accesses", k("Change them in Accesses")),
     ("no-access", k("No access to any number.")),
-    ("wake-command", k("Change it with the command {command}.")),
     ("link-to", k("Link to")),
     ("add-link", k("Add link")),
     ("links-of", k("Links of this Hermes")),
@@ -152,7 +151,7 @@ const SAY: &[(&str, &str)] = &[
     ("back", k("Back")),
     ("close", k("Close")),
     ("numbers", k("Numbers")),
-    ("can-be-woken", k("Can be woken")),
+    ("woken-by-whatsapp", k("Woken by WhatsApp")),
     ("yes", k("yes")),
     ("no", k("no")),
     ("change-link-new", k("New link: {from} → {to} ({kind})")),
@@ -583,7 +582,7 @@ fn write(frame: &Frame, page: &OrgPage, said: Said, echo: Option<&str>) -> Strin
             .number(ROLE_MAX_CHARS)
             .raw("\" data-max-x=\"")
             .number(usize::from(MAP_X_MAX))
-            .raw("\" data-wake-command=\"arauto-hub admin wake {name} on\" data-accesses=\"/accesses\"");
+            .raw("\" data-accesses=\"/accesses\"");
         for (name, key) in SAY {
             html.raw(" data-say-").raw(name).raw("=\"").t(key).raw("\"");
         }
@@ -901,6 +900,14 @@ mod tests {
         assert!(html.contains("<section class=\"org-static\">"));
         assert!(html.contains("Editing the org chart needs the script of the panel."));
         assert!(html.contains("keeps the books"));
+        // The switch is no business of this page: the mark of the link is enough to wake by a
+        // note, and the switch "woken by WhatsApp" is set in the access editor.
+        assert!(!html.contains("data-wake-command"));
+        for gone in ["not-wakeable", "wake-command", "can-be-woken"] {
+            assert!(!html.contains(&format!("data-say-{gone}=")), "{gone}");
+        }
+        assert!(html.contains("data-say-wake-hint=\"With this mark, a note on this link wakes"));
+        assert!(html.contains("data-say-woken-by-whatsapp=\"Woken by WhatsApp\""));
         // The editor is hidden until the script shows it.
         assert!(html.contains("<div id=\"org\" class=\"frame org\" hidden "));
         assert_eq!(html.matches("<table class=\"list\">").count(), 3);

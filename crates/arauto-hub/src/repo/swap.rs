@@ -913,7 +913,7 @@ pub struct SessionStart {
     pub hermes: Uuid,
     /// Its name, for the `session` message.
     pub name: HermesName,
-    /// Whether it can be woken.
+    /// Whether it may be woken by WhatsApp (the switch; notes do not depend on it).
     pub can_be_woken: bool,
 }
 

@@ -15,8 +15,9 @@
 //!
 //! **A notice is a pointer.** It carries who sent and how many, never the text or the thread.
 //! One pending notice per sender: what comes next adds to its count. It is judged again when
-//! it leaves: without the link, without its wake mark or with a recipient that may no longer
-//! be woken, it is discarded.
+//! it leaves: without the link, without its wake mark, or when either Hermes was removed, it
+//! is discarded. The switch "woken by WhatsApp" of the recipient is not consulted (decision
+//! 0045).
 
 use arauto_protocol::errors::RetryAfter;
 use arauto_protocol::limits::{
@@ -781,8 +782,8 @@ pub async fn send(
         return Ok(Sent::NoPeer);
     };
     // The two Hermes, locked in order: nothing else writes about this pair meanwhile.
-    let locked: Vec<(Uuid, String, bool, Option<i64>)> = sqlx::query_as(
-        "SELECT id, name, can_be_woken, deleted_at FROM hermes \
+    let locked: Vec<(Uuid, String, Option<i64>)> = sqlx::query_as(
+        "SELECT id, name, deleted_at FROM hermes \
          WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR NO KEY UPDATE",
     )
     .bind(organization.id())
@@ -792,13 +793,13 @@ pub async fn send(
     let other_row = locked.iter().find(|row| row.0 == other);
     let sender_there = locked
         .iter()
-        .any(|row| row.0 == new.from && row.3.is_none());
+        .any(|row| row.0 == new.from && row.2.is_none());
     let missing = if new.thread.is_some() {
         Sent::NoThread
     } else {
         Sent::NoPeer
     };
-    let Some((_, other_name, other_can_be_woken, None)) = other_row else {
+    let Some((_, other_name, None)) = other_row else {
         return Ok(missing);
     };
     if !sender_there {
@@ -839,7 +840,7 @@ pub async fn send(
             to: other,
         });
     }
-    let plan = if wake && *other_can_be_woken {
+    let plan = if wake {
         plan_notice(&mut tx, organization, new.from, other, now).await?
     } else {
         NoticePlan::None
@@ -1295,10 +1296,11 @@ pub enum NoticeTarget {
 /// Takes the notices of `hermes` that may leave now, each with a lease: until the lease ends
 /// the hub waits for the `notice_ack`. Before that it puts back the ones whose lease ended
 /// and expires the ones past their life. Each one is judged again. A notice of messages of a
-/// Hermes: without the link, without its wake mark, or with a Hermes that may no longer be
-/// woken, it is discarded. A notice of WhatsApp: without the verb "be woken" in that chat
-/// (`repo::wake`), with a number that is not connected, or with a Hermes that may no longer
-/// be woken, it is discarded.
+/// Hermes: without the link, without its wake mark, or when either Hermes was removed, it is
+/// discarded; the switch "woken by WhatsApp" is not consulted (decision 0045). A notice of
+/// WhatsApp: without the verb "be woken" in that chat (`repo::wake`), with a number that is
+/// not connected, or with a Hermes whose switch "woken by WhatsApp" went off, it is
+/// discarded.
 ///
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.
@@ -1335,9 +1337,11 @@ pub async fn lease(
     }
     let rows: Vec<(Uuid, i32, String, bool)> = sqlx::query_as(
         "SELECT n.id, n.count, f.name, \
-                (h.can_be_woken AND f.deleted_at IS NULL \
+                (f.organization_id = n.organization_id AND f.deleted_at IS NULL \
+                 AND h.deleted_at IS NULL \
                  AND EXISTS (SELECT 1 FROM peer_link l \
-                             WHERE l.from_hermes_id = n.from_hermes_id \
+                             WHERE l.organization_id = n.organization_id \
+                               AND l.from_hermes_id = n.from_hermes_id \
                                AND l.to_hermes_id = n.hermes_id AND l.wake)) \
          FROM notice n \
          JOIN hermes f ON f.id = n.from_hermes_id \

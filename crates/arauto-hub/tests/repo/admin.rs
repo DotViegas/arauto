@@ -1398,7 +1398,17 @@ async fn the_program_runs_the_commands_and_fails_when_nothing_was_done() {
         approve.out
     );
     let wake = run(None, &["admin", "wake", "vendas", "on"]).await;
-    assert!(wake.ok && wake.out.contains("can be woken"), "{}", wake.out);
+    assert!(
+        wake.ok
+            && wake
+                .out
+                .contains("Hermes vendas now can be woken by WhatsApp.")
+            && wake
+                .out
+                .contains("Notes from other Hermes do not depend on this"),
+        "{}",
+        wake.out
+    );
     let audit = run(None, &["admin", "audit", "--tail", "3"]).await;
     assert!(
         audit.ok && audit.out.contains("hermes.wake_changed"),

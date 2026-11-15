@@ -34,7 +34,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Connect Hermes", "连接 Hermes"),
     ("State", "状态"),
     ("Numbers", "号码"),
-    ("Can be woken", "可被唤醒"),
     ("Connector", "连接器"),
     ("Seen", "最近出现"),
     ("Actions", "操作"),
@@ -808,10 +807,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Kind: {kind}", "类型：{kind}"),
     ("Wakes {name}", "唤醒 {name}"),
-    (
-        "{name} cannot be woken now: this mark only applies once it can.",
-        "目前无法唤醒 {name}：此标记只有在可以唤醒时才生效。",
-    ),
     ("Create the way back", "创建返程链接"),
     ("Remove the way back", "移除返程链接"),
     ("Remove", "移除"),
@@ -826,10 +821,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Move right", "右移"),
     ("Change them in Accesses", "请在“访问权限”中更改"),
     ("No access to any number.", "没有任何号码的访问权限。"),
-    (
-        "Change it with the command {command}.",
-        "请用 {command} 命令更改。",
-    ),
     ("Link to", "链接到"),
     ("Add link", "添加链接"),
     ("Links of this Hermes", "此 Hermes 的链接"),
@@ -1207,5 +1198,16 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
         "在手机上：WhatsApp › 已关联的设备 › 关联设备 › 改为用手机号码关联，然后输入此代码：",
+    ),
+    // decision 0045
+    ("Woken by WhatsApp", "由 WhatsApp 唤醒"),
+    (
+        "With this mark, a note on this link wakes {name}, within the notice limits.",
+        "有此标记时，通过该链接发出的便条会在通知限额内唤醒 {name}。",
+    ),
+    ("This Hermes, on every number", "此 Hermes，所有号码"),
+    (
+        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        "没有它，任何号码上的 WhatsApp 消息都不会唤醒此 Hermes。其他 Hermes 发来的便条不依赖于它。",
     ),
 ];

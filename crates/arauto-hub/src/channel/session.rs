@@ -773,9 +773,11 @@ async fn peer_call(
 }
 
 /// `arauto_status`, answered by the hub without the engine. No secret: the name of the
-/// Hermes, whether it can be woken, its numbers (the alias, the state, the scope and the
-/// verbs; never the telephone or the session of the engine) and whether it has links with
-/// other Hermes.
+/// Hermes, what can wake it (`woken_by.notes`: a link with the wake mark reaches it;
+/// `woken_by.whatsapp`: the switch "woken by WhatsApp" is on and some access has the verb "be
+/// woken"; `can_be_woken` is true when either is), its numbers (the alias, the state, the
+/// scope and the verbs; never the telephone or the session of the engine) and whether it has
+/// links with other Hermes.
 async fn status(hub: &Hub, organization: ResolvedOrg, standing: &Standing) -> CallOutcome {
     let links = match repo::hermes::peer_links(hub.pool(), organization, standing.hermes).await {
         Ok(links) => links,
@@ -784,17 +786,23 @@ async fn status(hub: &Hub, organization: ResolvedOrg, standing: &Standing) -> Ca
             return refusal(ErrorCode::Ar205);
         }
     };
-    let numbers = match crate::whatsapp::numbers_of(hub, organization, standing.hermes).await {
-        Ok(numbers) => numbers,
-        Err(error) => {
-            tracing::error!(%error, "the numbers of a Hermes could not be read");
-            return refusal(ErrorCode::Ar205);
-        }
-    };
+    let (numbers, wake_verb) =
+        match crate::whatsapp::numbers_of(hub, organization, standing.hermes).await {
+            Ok(numbers) => numbers,
+            Err(error) => {
+                tracing::error!(%error, "the numbers of a Hermes could not be read");
+                return refusal(ErrorCode::Ar205);
+            }
+        };
+    let whatsapp_wakes = standing.can_be_woken && wake_verb;
     let content = json!({
         "connected": true,
         "hermes": standing.name.as_str(),
-        "can_be_woken": standing.can_be_woken,
+        "can_be_woken": links.wakes_in || whatsapp_wakes,
+        "woken_by": {
+            "notes": links.wakes_in,
+            "whatsapp": whatsapp_wakes,
+        },
         "numbers": numbers,
         "peers": {
             "enabled": links.outbound || links.inbound,

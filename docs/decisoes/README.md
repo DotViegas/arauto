@@ -48,3 +48,4 @@ prototype, or is **pending**.
 | 0042 | [The connection sentence and the instruction page](0042-frase-de-conexao-e-pagina-de-instrucoes.md) | proposal |
 | 0043 | [The org chart of the Hermes: levels, places and links on a map (stage A)](0043-organograma-e-niveis.md) | proposal |
 | 0044 | [Numbers in the panel, on the engine, with a placeholder for a native one](0044-numeros-no-painel-sobre-o-motor.md) | proposal |
+| 0045 | [The wake mark of a link is enough to wake by a note](0045-a-marca-da-ligacao-basta-para-acordar.md) | decided |

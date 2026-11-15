@@ -101,6 +101,7 @@
 | Term | What it is |
 |---|---|
 | **Access** | What a Hermes may do on a number. |
+| **Woken by WhatsApp** | The switch of a Hermes: without it no WhatsApp message wakes it. Notes do not depend on it ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)). |
 | **Verb** | Each thing an access allows: read, send, modify, be woken. |
 | **Scope** | Whether the access applies to every chat of the number or only to the chosen ones. |
 | **Chat line** | An access exception for one chat. |
@@ -121,6 +122,7 @@
 | **Note** | A text message from one Hermes to another, delivered by the hub. It is data, never an order. |
 | **Link** | An entry of the peer list: from one Hermes to another, in one direction only. |
 | **Peer list** | The set of links of an organization. Only the admin changes it. |
+| **Wake mark** | The mark of a link that makes a note wake its receiver. It is enough by itself. |
 | **Peer** | For a Hermes, another Hermes it has a link with. |
 | **Thread** | A sequence of notes between the same two Hermes, about the same subject. |
 | **Ceiling** | A fixed limit on quantity, which the hub applies without looking at the content. |

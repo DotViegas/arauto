@@ -34,7 +34,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Connect Hermes", "Hermes を接続"),
     ("State", "状態"),
     ("Numbers", "番号"),
-    ("Can be woken", "起動通知の可否"),
     ("Connector", "コネクター"),
     ("Seen", "最終確認"),
     ("Actions", "操作"),
@@ -865,10 +864,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Kind: {kind}", "種類: {kind}"),
     ("Wakes {name}", "{name} に起動通知"),
-    (
-        "{name} cannot be woken now: this mark only applies once it can.",
-        "{name} は現在起動通知を受けられません。この設定は、受けられるようになってから有効になります。",
-    ),
     ("Create the way back", "戻りのリンクを作成"),
     ("Remove the way back", "戻りのリンクを削除"),
     ("Remove", "削除"),
@@ -891,10 +886,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "No access to any number.",
         "どの番号にもアクセス権がありません。",
-    ),
-    (
-        "Change it with the command {command}.",
-        "{command} コマンドで変更してください。",
     ),
     ("Link to", "リンク先"),
     ("Add link", "リンクを追加"),
@@ -1294,5 +1285,19 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
         "電話で: WhatsApp › リンク済みのデバイス › デバイスをリンク › 電話番号でリンク の順に進み、次のコードを入力してください：",
+    ),
+    // decision 0045
+    ("Woken by WhatsApp", "WhatsApp による起動通知"),
+    (
+        "With this mark, a note on this link wakes {name}, within the notice limits.",
+        "この設定がある場合、このリンクで届いたメモは、通知の上限の範囲内で {name} に起動通知を送ります。",
+    ),
+    (
+        "This Hermes, on every number",
+        "この Hermes、すべての番号で",
+    ),
+    (
+        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        "これがないと、どの番号でも、WhatsApp のメッセージはこの Hermes に起動通知を送りません。ほかの Hermes からのメモはこの設定に左右されません。",
     ),
 ];

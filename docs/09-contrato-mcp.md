@@ -49,11 +49,12 @@ when it has a link in the peer list. In the hub, on 11/11/2026 (M1), the session
 |---|---|
 | `arauto_status` | Says whether Hermes is connected, which numbers it has access to and with which verbs, and whether the conversation between Hermes is enabled. No secret. |
 
-**The answer of `arauto_status`, in the hub on 11/11/2026.** The hub answers it by itself, without
+**The answer of `arauto_status`, in the hub on 11/11/2026; changed on 15/11/2026 ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)).** The hub answers it by itself, without
 the engine, and the test checks that it carries no secret:
 
 ```json
-{"connected": true, "hermes": "name-of-the-hermes", "can_be_woken": false, "numbers": [],
+{"connected": true, "hermes": "name-of-the-hermes", "can_be_woken": false,
+ "woken_by": {"notes": false, "whatsapp": false}, "numbers": [],
  "peers": {"enabled": false, "can_send": false, "can_receive": false}}
 ```
 
@@ -61,7 +62,9 @@ the engine, and the test checks that it carries no secret:
 |---|---|
 | `connected` | Always `true`: the answer only goes out through an open channel session. |
 | `hermes` | The name of the Hermes, in the restricted format. |
-| `can_be_woken` | Whether the admin allowed waking this Hermes. |
+| `can_be_woken` | Something the admin set up can wake this Hermes: `woken_by.notes` or `woken_by.whatsapp`. Until 15/11/2026 it was the switch alone. |
+| `woken_by.notes` | A link from a live Hermes to this one has the wake mark: a note on it wakes this Hermes, within the notice limits. |
+| `woken_by.whatsapp` | The switch "woken by WhatsApp" is on and some access of this Hermes has the verb "be woken"; whether a given chat wakes still depends on its line, the kind of chat and the state of the number. |
 | `numbers` | The numbers and the verbs. Empty until M3; the format of each item is a deliverable of M3. |
 | `peers.can_send` | There is a link from this Hermes to another. |
 | `peers.can_receive` | There is a link from another Hermes to this one. |

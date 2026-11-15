@@ -265,6 +265,7 @@ list of Hermes, with the path of the stages at the top: name, block, code, done.
   chat lines continue through the `access chat` of the command; the screen shows how many exist.
   The reason is that choosing a chat depends on the identifiers of the engine, not yet seen in a
   real engine.
+- **Changed on 15/11/2026 ([0045](0045-a-marca-da-ligacao-basta-para-acordar.md)):** the editor also holds the switch "Woken by WhatsApp" of the Hermes; when the form carries it and it changed, saving ends with the `admin wake` of the command, a third write after the two above.
 - **Revoking asks first.** The line of the Hermes leads to a window that says what revoking
   closes; only its form revokes, through the `revoke` of the command.
 - **The address that says "Saved" only reads:** it carries the Hermes and the number, and the page

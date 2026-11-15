@@ -503,7 +503,7 @@ fn put_count(hasher: &mut Sha256, count: usize) {
 impl Chart {
     /// The version of the chart: the SHA-256 of its levels, its Hermes with their places and
     /// roles, and its links, each part with its length in front, so that no two charts share a
-    /// digest by concatenation. The connection state, the numbers and "can be woken" are not
+    /// digest by concatenation. The connection state, the numbers and the WhatsApp switch are not
     /// in it: none of them is edited here.
     #[must_use]
     pub fn version(&self) -> ChartVersion {

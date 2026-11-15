@@ -415,3 +415,86 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
         );
     }
 }
+
+/// The switch "woken by WhatsApp" of a Hermes, as the database has it.
+async fn woken_by_whatsapp(world: &World, name: &str) -> bool {
+    sqlx::query_scalar("SELECT can_be_woken FROM hermes WHERE name = $1")
+        .bind(name)
+        .fetch_one(world.hub().pool())
+        .await
+        .unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_editor_sets_woken_by_whatsapp_through_the_function_of_the_command() {
+    let world = World::new().await;
+    let fixture = &world.fixture;
+    let browser = Browser::of(fixture);
+    let cookie = browser.signed_in(fixture).await;
+    world.add("balcao", &phone(4)).await;
+    let ana = fixture.hermes().await;
+    let edit = format!("/accesses/edit?hermes={ana}&number=balcao");
+    let form = |rest: &str| format!("hermes={ana}&number=balcao&{rest}");
+
+    // Reading shows the switch, off, with the marker, and changes nothing.
+    let editor = page(&browser, &cookie, &edit).await;
+    assert!(
+        editor.contains("name=\"whatsapp_wake\" value=\"on\">"),
+        "{editor}"
+    );
+    assert!(editor.contains("name=\"whatsapp_wake_shown\""));
+    assert!(!woken_by_whatsapp(&world, &ana).await);
+
+    // Without a session or with a bad origin, nothing changes.
+    let body = form("scope=all&read=on&whatsapp_wake_shown=1&whatsapp_wake=on");
+    let no_session = browser.post("/accesses/save", None, &body).await;
+    assert_eq!(no_session.status, 303);
+    let evil = http::post(
+        browser.panel,
+        "/accesses/save",
+        &[
+            ("Host", PANEL_HOST),
+            ("Cookie", cookie.as_str()),
+            ("Content-Type", "application/x-www-form-urlencoded"),
+            ("Origin", "http://evil.test"),
+        ],
+        body.as_bytes(),
+        PATIENCE,
+    )
+    .await
+    .unwrap();
+    assert_eq!(evil.status, 403);
+    assert!(!woken_by_whatsapp(&world, &ana).await);
+
+    // A form with the marker and the box on turns it on, by the function of the command.
+    let saved = browser.post("/accesses/save", Some(&cookie), &body).await;
+    assert_eq!(saved.status, 303, "{}", saved.text());
+    assert!(woken_by_whatsapp(&world, &ana).await);
+    let audit = rows(fixture, "audit").await.join("\n");
+    assert!(audit.contains("hermes.wake_changed"), "{audit}");
+    assert!(audit.contains("\"actor_note\":\"panel\""), "{audit}");
+    let editor = page(&browser, &cookie, &edit).await;
+    assert!(editor.contains("name=\"whatsapp_wake\" value=\"on\" checked>"));
+
+    // A form without the marker (an older page) never touches it.
+    let saved = browser
+        .post(
+            "/accesses/save",
+            Some(&cookie),
+            &form("scope=all&read=on&send=on"),
+        )
+        .await;
+    assert_eq!(saved.status, 303);
+    assert!(woken_by_whatsapp(&world, &ana).await);
+
+    // The marker and no box: off again.
+    let saved = browser
+        .post(
+            "/accesses/save",
+            Some(&cookie),
+            &form("scope=all&read=on&whatsapp_wake_shown=1"),
+        )
+        .await;
+    assert_eq!(saved.status, 303);
+    assert!(!woken_by_whatsapp(&world, &ana).await);
+}

@@ -71,11 +71,10 @@
     var maxLevels = parseInt(host.getAttribute('data-max-levels'), 10) || 12;
     var maxRole = parseInt(host.getAttribute('data-max-role'), 10) || 280;
     var maxX = parseInt(host.getAttribute('data-max-x'), 10) || 4000;
-    var wakeCommand = host.getAttribute('data-wake-command') || '';
     var accessesAddress = host.getAttribute('data-accesses') || '';
 
     var base = null;      // the stored chart as the hub wrote it
-    var info = {};        // by name of Hermes: what the hub says of it (state, numbers, can be woken)
+    var info = {};        // by name of Hermes: what the hub says of it (state, numbers, the WhatsApp switch)
     var S = null;         // the draft: what Publish would write
     var hist = [];        // snapshots of the draft, for Undo
     var echoed = false;   // a refused draft was loaded: it is the draft, and the page holds still
@@ -756,9 +755,7 @@
       label.appendChild(check);
       label.appendChild(node('span', '', say('wakes-name', { name: link.to })));
       pop.appendChild(label);
-      if (!(info[link.to] && info[link.to].woken)) {
-        pop.appendChild(node('span', 'hint', say('not-wakeable', { name: link.to })));
-      }
+      pop.appendChild(node('span', 'hint', say('wake-hint', { name: link.to })));
       var row = node('div', 'org-row');
       var back = linkOf(link.to, link.from) >= 0;
       row.appendChild(button(say(back ? 'way-back-remove' : 'way-back-create'), function () { wayBack(link.from, link.to); }));
@@ -806,15 +803,6 @@
       return select;
     }
 
-    function wakeSentence(name) {
-      var line = node('p', 'hint');
-      var parts = say('wake-command').split('{command}');
-      line.appendChild(document.createTextNode(parts[0]));
-      line.appendChild(node('code', '', wakeCommand.split('{name}').join(name)));
-      line.appendChild(document.createTextNode(parts.slice(1).join('{command}')));
-      return line;
-    }
-
     function drawDrawer(box, h) {
       var drawer = node('aside', 'org-drawer');
       drawer.setAttribute('aria-label', h.name);
@@ -839,8 +827,6 @@
       moves.appendChild(button(say('move-right'), function () { moveSide(h.name, MOVE_STEP); }));
       place.appendChild(moves);
       var facts = info[h.name] || { woken: false, numbers: [] };
-      place.appendChild(node('p', '', say('can-be-woken') + ': ' + say(facts.woken ? 'yes' : 'no')));
-      place.appendChild(wakeSentence(h.name));
       grid.appendChild(place);
       drawer.appendChild(grid);
 
@@ -849,6 +835,7 @@
       chips(numbers, { name: h.name, auto: false });
       drawer.appendChild(numbers.firstChild || numbers);
       if (!facts.numbers.length) drawer.appendChild(node('p', 'hint', say('no-access')));
+      if (facts.numbers.length) drawer.appendChild(node('p', 'hint', say('woken-by-whatsapp') + ': ' + say(facts.woken ? 'yes' : 'no')));
       var link = node('a', 'footer-link', say('change-in-accesses'));
       link.setAttribute('href', accessesAddress);
       drawer.appendChild(link);

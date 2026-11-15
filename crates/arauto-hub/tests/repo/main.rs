@@ -15,6 +15,7 @@ mod enrollment;
 mod hermes;
 mod org;
 mod org_rounds;
+mod peer_rounds;
 mod purge;
 mod role;
 mod rounds;

@@ -203,6 +203,9 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
     let role = format!("zq-role-canary-{suffix}");
     let level = format!("zq-level-{suffix}");
     let long_role = format!("{role} {}", BASE32_NOPAD.encode(b"padding"));
+    // The text of a note carries a canary of its own: it may only reach the reading of B.
+    getrandom::fill(&mut random).unwrap();
+    let note = format!("zq-note-{}", data_encoding::HEXLOWER.encode(&random));
 
     let fixture = Fixture::new(fixture::settings()).await;
     let cookie = signed_in(&fixture).await;
@@ -217,7 +220,6 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
             .iter()
             .map(|t| t.as_str().to_owned()),
     );
-    fixture.admin.wake(&b, true, fixture.now()).await.unwrap();
 
     // The page, and a publish that carries both words and a link that wakes.
     let page = get(&fixture, "/org", &cookie).await.text();
@@ -320,11 +322,7 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
     {
         let mut local = Vec::new();
         a_client
-            .send_call(
-                900,
-                "hermes_send_message",
-                json!({ "to": b, "text": "an ordinary message" }),
-            )
+            .send_call(900, "hermes_send_message", json!({ "to": b, "text": note }))
             .await
             .unwrap();
         loop {
@@ -369,11 +367,25 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
     .await;
     listen(&mut b_client, &mut heard, Duration::from_millis(1_500)).await;
     listen(&mut a_client, &mut heard, Duration::from_millis(500)).await;
+    // The link wakes, and B's switch was never turned on: B heard a notice of a note, and
+    // the notice carries no text.
+    let notices: Vec<&String> = heard
+        .iter()
+        .filter(|text| text.contains("\"kind\":\"peer\""))
+        .collect();
     assert!(
-        heard
+        notices
             .iter()
-            .any(|text| text.contains("\"kind\":\"peer\"") || text.contains("peer")),
-        "B got a notice or an answer to read: {heard:?}"
+            .any(|text| text.contains("\"kind\":\"peer\"")),
+        "B got a notice of a note: {heard:?}"
+    );
+    assert!(
+        notices.iter().all(|text| !text.contains(&note)),
+        "the text of a note is in a notice"
+    );
+    assert!(
+        heard.iter().any(|text| text.contains(&note)),
+        "B reads the note in the thread"
     );
     assert!(
         heard.len() > 10,
@@ -406,6 +418,12 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
     .await
     .unwrap();
     assert!(audit.contains("org_chart.published"), "the audit was read");
+    for text in [&log, &audit, &alerts] {
+        assert!(
+            !text.contains(&note),
+            "the text of a note is stored or logged"
+        );
+    }
     for planted in [&role, &level, &suffix] {
         assert!(!log.contains(planted.as_str()), "{planted} is in the log");
         assert!(

@@ -37,7 +37,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Connect Hermes", "Подключить Hermes"),
     ("State", "Состояние"),
     ("Numbers", "Номера"),
-    ("Can be woken", "Пробуждение"),
     ("Connector", "Коннектор"),
     ("Seen", "На связи"),
     ("Actions", "Действия"),
@@ -874,10 +873,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Kind: {kind}", "Тип: {kind}"),
     ("Wakes {name}", "Пробуждает {name}"),
-    (
-        "{name} cannot be woken now: this mark only applies once it can.",
-        "{name} сейчас нельзя пробудить: эта отметка действует только тогда, когда это возможно.",
-    ),
     ("Create the way back", "Создать обратный путь"),
     ("Remove the way back", "Удалить обратный путь"),
     ("Remove", "Удалить"),
@@ -894,10 +889,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "No access to any number.",
         "Нет доступа ни к одному номеру.",
-    ),
-    (
-        "Change it with the command {command}.",
-        "Измените командой {command}.",
     ),
     ("Link to", "Связать с"),
     ("Add link", "Добавить связь"),
@@ -1303,5 +1294,19 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
         "На телефоне: WhatsApp › Связанные устройства › Привязка устройства › Привязать по номеру телефона, и введите этот код:",
+    ),
+    // decision 0045
+    ("Woken by WhatsApp", "Пробуждается через WhatsApp"),
+    (
+        "With this mark, a note on this link wakes {name}, within the notice limits.",
+        "С этой отметкой заметка по этой связи пробуждает {name} в пределах лимитов уведомлений.",
+    ),
+    (
+        "This Hermes, on every number",
+        "Этот Hermes, на каждом номере",
+    ),
+    (
+        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
+        "без этого ни одно сообщение WhatsApp не пробуждает этот Hermes, ни на одном номере. Заметки от других Hermes от этого не зависят.",
     ),
 ];

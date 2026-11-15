@@ -580,3 +580,83 @@ async fn a_chat_under_a_hidden_identifier_never_escapes_a_line_of_the_admin() {
     assert_eq!(from_hidden("3EB0AC0002").await.unwrap(), 200);
     assert_eq!(pointer(&next_notice(&mut lined).await).1, hidden_chat);
 }
+
+#[tokio::test]
+async fn a_waiting_whatsapp_notice_is_discarded_when_the_switch_goes_off() {
+    let clock = Arc::new(ManualClock::new(SystemClock.now_ms()));
+    let world = World::with(|_| {}, clock.clone()).await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    let mut agent = wakeable(&world).await;
+    world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &agent, "balcao").await;
+    let chat = chat_of(101);
+    let emit = |id: &'static str| {
+        let received = message(&chat, id, now_s(), false, "hello");
+        world.fake.emit(session, "message.any", received)
+    };
+
+    assert_eq!(emit("3EB0FF0001").await.unwrap(), 200);
+    let first = next_notice(&mut agent).await;
+    acknowledge(&mut agent, &first, AckOutcome::Accepted).await;
+
+    // A second one waits its ten seconds; the switch goes off meanwhile (the verb stays):
+    // when it would leave, the switch is read again and the notice is discarded.
+    assert_eq!(emit("3EB0FF0002").await.unwrap(), 200);
+    world
+        .fixture
+        .admin
+        .wake(&agent.name, false, world.now())
+        .await
+        .unwrap();
+    clock.advance(11_000);
+    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+    let mut states: Vec<String> = notices(&world)
+        .await
+        .into_iter()
+        .map(|(_, state, _)| state)
+        .collect();
+    states.sort();
+    assert_eq!(states, ["confirmed", "discarded"]);
+}
+
+#[tokio::test]
+async fn the_switch_gates_whatsapp_and_never_notes() {
+    let world = World::new().await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    // Every verb on the number, the switch off, and a marked link from another agent.
+    let mut target = world.agent().await;
+    let mut sender = world.agent().await;
+    world.grant(&target.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &target, "balcao").await;
+    world
+        .fixture
+        .admin
+        .link_add(&sender.name, &target.name, true, false, world.now())
+        .await
+        .unwrap();
+
+    // A WhatsApp message wakes nobody: the switch is off.
+    let received = message(&chat_of(101), "3EB0FF1001", now_s(), false, "hello");
+    assert_eq!(
+        world
+            .fake
+            .emit(session, "message.any", received)
+            .await
+            .unwrap(),
+        200
+    );
+    assert_eq!(notices_while_quiet(&mut target).await, 0);
+    assert!(notices(&world).await.is_empty());
+
+    // A note wakes it: the mark of the link is enough.
+    ok(sender
+        .call(
+            "hermes_send_message",
+            json!({"to": target.name, "text": "wake up"}),
+        )
+        .await);
+    let notice = next_notice(&mut target).await;
+    assert!(matches!(notice.validate().unwrap(), Notice::Peer { .. }));
+}

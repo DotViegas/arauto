@@ -131,14 +131,16 @@ pub(crate) async fn grants_now(
 }
 
 /// The numbers of a Hermes as `arauto_status` shows them: the alias, the state, the scope and
-/// the verbs. Nothing else: no telephone, no session of the engine.
+/// the verbs. Nothing else: no telephone, no session of the engine. The flag says whether some
+/// access has the verb "be woken" (not for a swapped number).
 pub(crate) async fn numbers_of(
     hub: &Hub,
     organization: ResolvedOrg,
     hermes: Uuid,
-) -> Result<Vec<Value>, RepoError> {
+) -> Result<(Vec<Value>, bool), RepoError> {
     let accesses = repo::access::of_hermes(hub.pool(), organization, hermes).await?;
-    Ok(accesses
+    let wake_verb = accesses.iter().any(|access| access.anywhere(Verb::Wake));
+    let numbers = accesses
         .iter()
         .map(|access| {
             json!({
@@ -150,7 +152,8 @@ pub(crate) async fn numbers_of(
                 "can_start_chats": access.grant.can_start_chats,
             })
         })
-        .collect())
+        .collect();
+    Ok((numbers, wake_verb))
 }
 
 const fn verb_of(verb: WhatsappVerb) -> Verb {

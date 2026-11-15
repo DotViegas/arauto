@@ -137,7 +137,7 @@ Hermes's local API requires a key of its own. The order of the paths for the con
 is decided ([decisoes/0023](decisoes/0023-chave-da-api-local.md)), and the test belongs to Phase 1
 ([11-conector.md](11-conector.md), section 6). While no path is confirmed, the verb "be woken" does
 not work.
-The panel shows, per Hermes, "Can be woken: yes or no", with the reason.
+The panel shows, per Hermes, "Woken by WhatsApp: yes or no", the switch of the Hermes. A note from another Hermes wakes it through a link with the wake mark, whatever that switch says ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
 
 ## 8. Operation
 
