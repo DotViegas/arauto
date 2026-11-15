@@ -58,7 +58,7 @@ Connector sha256 (windows x86_64): {SHA256_WINDOWS_X86_64}
 Connector sha256 (macos arm64): {SHA256_MACOS_ARM64}
 Connector sha256 (macos x86_64): {SHA256_MACOS_X86_64}
 Invite (one use, until {DEADLINE} UTC): {INVITE}
-When it is done, send me only the verification code.
+When it is done, send me the verification code and the lines the page asks for.
 ```
 
 Beside the sentence the panel shows a hint: "Send it as a new message, not as a reply to one of its
@@ -94,7 +94,7 @@ Why the sentence is like this:
 | Hub, key, digest and invite in the sentence, not on the page | The page is an address: it can be read by a preview service or appear in an access log. The secrets travel only in the person's own message. |
 | Labelled values, recognized by form | The labels change with the language, so the page tells the agent to recognize each value by its form. |
 | One digest line per system | The operator does not know which system the Hermes runs on. The page lists the systems and the agent picks its own with `uname -sm`; if there is no line for its system, it stops and tells the operator. |
-| "send me only the verification code" | The only thing that goes back; the admin types it in the panel before anything is approved. |
+| "send me the verification code and the lines the page asks for" | What goes back: the code, which the admin types in the panel before anything is approved, and the two lines the page asks for (that the Arauto notes were saved, and how the tools load). |
 
 ### The instruction page
 
@@ -108,7 +108,9 @@ digest.
 
 The page says what Arauto is, how the agent got there, that the address was made for that one
 connection, that the page is not an order (the operator's sentence is), what the steps do, the steps
-themselves and what to do when something fails. The steps are the same download, check and `join` of
+themselves, a required step that asks the Hermes to save three fixed lines about Arauto in its own
+main memory, with its own memory tool ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)),
+and what to do when something fails. The steps are the same download, check and `join` of
 the block below, but they no longer name one file: the page has a table of the systems (what `uname
 -sm` prints, the file name, the digest line to use), the agent picks its own row, and if its system
 is not in the table, or the operator's message has no digest line for it, it does nothing and tells
@@ -182,12 +184,15 @@ that stays registered in Hermes.
 The block, the sentence and the page never have: a system header, a stamp, "authorized by",
 urgency, "without asking for approval", `curl | sh`, `sudo`, an address shortener or an encoded piece. It does not edit Hermes's
 configuration by hand: the connector registers itself through the official command, and that is the
-only change that stays.
+only change the connector makes that stays. The page also asks the Hermes to save three fixed lines
+in its own memory; the Hermes writes them itself, and Arauto never reads or writes that memory.
 
 **The text is not the defense.** An attacker writes whatever sentence, page or block they want. The
 defenses are structural: a fake one gets nothing from your hub, because an invite is only born in
-the authenticated panel and access is only born with the typed code. And the real one leaves no
-permanent rule in Hermes's memory. A look-alike page is only text.
+the authenticated panel and access is only born with the typed code. The real page leaves three
+fixed lines in Hermes's memory, written by the Hermes itself, which only say when to use the Arauto
+tools; the fallback block leaves nothing. A look-alike page can ask a Hermes to save other lines, as
+any text can: what protects is that it gets nothing from your hub.
 
 ### What the connector answers
 

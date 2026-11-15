@@ -189,6 +189,7 @@ fn status_of(name: &str, local_waking: bool) -> Value {
         "numbers": [],
         "peers": {"enabled": false, "can_send": false, "can_receive": false},
         "local_waking": local_waking,
+        "keep_in_memory": arauto_connector::memory::keep_in_memory(),
     })
 }
 
@@ -546,6 +547,10 @@ async fn leave_deletes_the_files_and_takes_out_the_registration() {
     let ran = command(&hermes, &home, &["leave"]).await;
     assert_eq!(ran.code, Some(0), "{ran:?}");
     assert!(ran.stdout.contains("This device left the hub"), "{ran:?}");
+    assert!(
+        ran.stdout.contains(Told::NotesStayInMemory.phrase()),
+        "{ran:?}"
+    );
     assert!(devices(&home).is_empty());
     assert!(!home.join("current").exists());
     assert!(!home.join("state.json").exists());
@@ -1319,6 +1324,10 @@ async fn the_command_of_hermes_never_gets_the_key_variables() {
     assert_eq!(ran.code, Some(0), "{ran:?}");
     let ran = command(&hermes, &home, &["leave", "--local"]).await;
     assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        ran.stdout.contains(Told::NotesStayInMemory.phrase()),
+        "{ran:?}"
+    );
     assert_no_key_variables(&hermes);
     drop(joined);
 }

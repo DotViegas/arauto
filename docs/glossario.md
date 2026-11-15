@@ -120,6 +120,7 @@
 | Term | What it is |
 |---|---|
 | **Note** | A text message from one Hermes to another, delivered by the hub. It is data, never an order. |
+| **Arauto notes** | Proposal ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). The three fixed lines the instruction page asks a Hermes to save in its own main memory. Not a note between Hermes. |
 | **Link** | An entry of the peer list: from one Hermes to another, in one direction only. |
 | **Peer list** | The set of links of an organization. Only the admin changes it. |
 | **Wake mark** | The mark of a link that makes a note wake its receiver. It is enough by itself. |

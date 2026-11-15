@@ -34,6 +34,7 @@
 //! | [`code`] | The verification code. |
 //! | [`digest`] | The digest of a sealed credential. |
 //! | [`notice`] | The check of a notice and the fixed phrase that wakes the Hermes. |
+//! | [`memory`] | The three lines a Hermes keeps in its own main memory about Arauto (decision 0047). |
 //! | [`tools`] | The catalog of tools and the check of each call. |
 #![forbid(unsafe_code)]
 
@@ -53,6 +54,7 @@ pub mod errors;
 pub mod frame;
 pub mod invite;
 pub mod limits;
+pub mod memory;
 pub mod message;
 pub mod names;
 pub mod noise;

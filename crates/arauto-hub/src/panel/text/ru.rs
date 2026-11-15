@@ -780,8 +780,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Приглашение (одноразовое, до {deadline} UTC):",
     ),
     (
-        "When it is done, send me only the verification code.",
-        "Когда всё будет готово, пришлите мне только проверочный код.",
+        "When it is done, send me the verification code and the lines the page asks for.",
+        "Когда всё будет готово, пришлите мне проверочный код и строки, которые просит страница.",
     ),
     (
         "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",

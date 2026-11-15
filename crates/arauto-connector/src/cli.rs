@@ -383,6 +383,7 @@ async fn leave(home: &Home, local: bool, hermes: &Hermes, settings: &Settings) -
             ..
         }) => {
             eprintln!("{}", Local::Unregister.phrase());
+            eprintln!("{}", Told::NotesStayInMemory.phrase());
             Exit::Unregister
         }
         Ok(Left::Done { .. }) if local => {
@@ -390,6 +391,7 @@ async fn leave(home: &Home, local: bool, hermes: &Hermes, settings: &Settings) -
                 "The files of this device were deleted and the MCP server arauto was removed \
                  from Hermes. The device still counts on the hub until the admin revokes it."
             );
+            println!("{}", Told::NotesStayInMemory.phrase());
             Exit::Done
         }
         Ok(Left::Done { .. }) => {
@@ -397,6 +399,7 @@ async fn leave(home: &Home, local: bool, hermes: &Hermes, settings: &Settings) -
                 "This device left the hub. Its files were deleted and the MCP server arauto \
                  was removed from Hermes."
             );
+            println!("{}", Told::NotesStayInMemory.phrase());
             Exit::Done
         }
         Err(said) => {

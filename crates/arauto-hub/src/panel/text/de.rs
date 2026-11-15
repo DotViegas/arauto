@@ -783,8 +783,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Einladung (einmalig, bis {deadline} UTC):",
     ),
     (
-        "When it is done, send me only the verification code.",
-        "Wenn Sie fertig sind, schicken Sie mir nur den Prüfcode.",
+        "When it is done, send me the verification code and the lines the page asks for.",
+        "Wenn Sie fertig sind, schicken Sie mir den Prüfcode und die Zeilen, die die Seite verlangt.",
     ),
     (
         "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",

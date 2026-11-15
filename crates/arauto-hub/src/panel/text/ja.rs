@@ -771,8 +771,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "招待（1回限り、{deadline} UTC まで）:",
     ),
     (
-        "When it is done, send me only the verification code.",
-        "完了したら、確認コードだけを私に送ってください。",
+        "When it is done, send me the verification code and the lines the page asks for.",
+        "完了したら、確認コードと、ページが求める行を私に送ってください。",
     ),
     (
         "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",

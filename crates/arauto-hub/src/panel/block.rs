@@ -93,7 +93,7 @@ pub fn sentence(
     let hub_key = tr(lang, k("Hub key:"));
     let last = tr(
         lang,
-        k("When it is done, send me only the verification code."),
+        k("When it is done, send me the verification code and the lines the page asks for."),
     );
     // One digest line per connector: the label names the system, then the digest.
     let digests: Vec<(String, &str)> = connectors

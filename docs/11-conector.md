@@ -26,7 +26,7 @@ that has not received a credential yet.
 | `mcp` | What Hermes starts. It speaks MCP over stdio with Hermes and keeps the channel with the hub. |
 | `status` | Hub, version, situation of the device, whether the admin allowed waking by WhatsApp. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. |
 | `register` | Proposal, 15/11/2026 ([decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). For a Hermes that is already connected: runs the same registration as `join` (section 4) and records in the folder of the device whether the entry has the reference to the key. It does not contact the hub, does not ask the leader anything, does not touch the identity, the credential or `current`, and does not restart Hermes. With no device in the folder it runs no Hermes command and says so. A running Hermes keeps the entry it loaded: the new one takes effect after Hermes restarts its gateway. After `register`, the operator restarts Hermes's gateway; until then the running connector keeps the old entry, and `status` says whether the key was received. |
-| `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. |
+| `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. It then prints a fixed line saying that the Arauto notes the Hermes may have saved in its memory stay there until the Hermes removes them (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). |
 | `leave --local` | Deletes the files and the registration without talking to the hub. It exists for when the hub no longer exists or changed its key. It is for a person to run: the device stays valid in the hub until it is revoked in the panel. |
 
 ### Cases of `join`
@@ -277,6 +277,8 @@ answer. `arauto_status` (the tool) carries one more field, `local_waking`, added
 connector of this Hermes received the key of the local API; when `false`, nothing wakes this Hermes
 whatever `can_be_woken` says ([09](09-contrato-mcp.md), [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)).
 
+`arauto_status` carries one more field, `keep_in_memory`, also added by the connector (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)): a reminder sentence followed by the three Arauto lines that a Hermes keeps in its own main memory. It is fixed text, added only to a successful answer, and it overwrites any value of the hub. The connector never reads or writes the memory or the files of Hermes (principle 7): the Hermes saves the lines with its own tool, and the connector cannot know whether it did.
+
 **A failed wake.** The connector answers the hub `failed`, and the hub puts the notice back to pending
 with waits of 5 s, 10 s, 20 s, up to 5 minutes, until it expires. The note itself is kept and
 readable. A Hermes without a key therefore keeps bouncing its notices every few minutes until they
@@ -301,6 +303,7 @@ Hermes version or system.
   source checks that no other read appears; it is a check of the text, not of the running program.
 - A newer entry is not used until the gateway restarts, and a copy started from a newer entry while
   an older leader lives does not wake: the leader decides.
+- The connector never reads or writes the memory of Hermes and cannot check whether the Hermes saved the three Arauto notes (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). `keep_in_memory` and the line printed by `leave` are reminders, not checks.
 - Hermes masks printed output by variable name; whether it hides `API_SERVER_KEY` in the lines the
   connector prints was not tried.
 
@@ -326,7 +329,7 @@ Hermes version or system.
 ## 8. Message catalog
 
 Every message is fixed text, with no accents, and says what happened and who solves it. None
-carries a command to run.
+carries a command to run. The text `keep_in_memory` of `arauto_status` is not a catalog message: it repeats the three approved lines, the third of which names a command (proposal, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)).
 
 | Code | When |
 |---|---|
@@ -358,6 +361,7 @@ carries a command to run.
 | AR-602 | Hermes's local API does not answer or refuses the key. |
 | Told lines | Fixed sentences that `join`, `register` and `status` print about waking (proposal, 15/11/2026; decision 0046). Wake needs the local API: "This Hermes can be woken only while its local API is on, which Hermes does when its own setting API_SERVER_KEY holds a key. The connector never sets it; the status command says whether the connector received it." Key not received: "No notice wakes this Hermes until its local API is on. Hermes turns it on when its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a key. The connector never sets it." After a restart: "If that setting already holds a key, Hermes hands it to the connector after it restarts its gateway." Reference refused: "This version of Hermes refused the reference to the key of its local API, so the entry was saved without it and no notice wakes this Hermes. Notes and tools still work." Running keeps the old entry: "A running Hermes keeps the entry it loaded: the new entry takes effect after Hermes restarts its gateway. The connector does not restart Hermes." Older entry: "The entry of the connector in Hermes was saved by an older connector and may have no reference to the key. The register command of the connector saves it again." Unchanged connection: "The connection did not change: the same device and the same credential." |
 | No device (`register`) | "There is no device in this folder. Nothing was registered in Hermes." Exit code 9, like the other local failures. |
+| Notes in memory (`leave`) | Proposal, 15/11/2026 ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). Printed by `leave` after a leave that deleted the files: "If this Hermes saved the three Arauto notes in its memory, they are still there: remove them with the memory tool of Hermes. The connector never reads or changes the memory of Hermes." |
 | AR-701 | The verb needed for this call is missing. |
 | AR-702 | Number unavailable: disconnected from WhatsApp or waiting for the admin's confirmation. |
 | AR-703 | Engine unavailable. |

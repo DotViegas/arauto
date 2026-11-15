@@ -33,6 +33,7 @@ mod leave;
 mod link;
 mod local;
 mod mcp;
+pub mod memory;
 mod register;
 mod relay;
 mod report;

@@ -274,12 +274,18 @@ fn initial_tools(home: &Home) -> Vec<ToolName> {
 /// connector adds what only it knows: whether it received the key of the local API of Hermes.
 /// When it did not, nothing wakes this Hermes whatever `can_be_woken` says. Any value the hub
 /// sent under this name is overwritten. The name avoids the word "key": Hermes masks output
-/// by variable name.
-fn with_local_waking(outcome: CallOutcome, can_wake: bool) -> CallOutcome {
+/// by variable name. The connector also adds the fixed reminder of the three Arauto notes
+/// (`crate::memory`); the hub never sends it (principle 6), and any hub value under its name
+/// is overwritten.
+fn with_connector_fields(outcome: CallOutcome, can_wake: bool) -> CallOutcome {
     match outcome {
         CallOutcome::Ok(payload) => {
             let mut map = payload.into_map();
             map.insert("local_waking".to_owned(), Value::from(can_wake));
+            map.insert(
+                crate::memory::FIELD.to_owned(),
+                Value::from(crate::memory::keep_in_memory()),
+            );
             CallOutcome::Ok(Payload::new(map))
         }
         refused @ CallOutcome::Refused { .. } => refused,
@@ -302,7 +308,7 @@ impl Shared {
             None => refused(*self.unavailable.borrow()),
         };
         if is_status {
-            with_local_waking(outcome, self.settings.waker.can_wake())
+            with_connector_fields(outcome, self.settings.waker.can_wake())
         } else {
             outcome
         }
@@ -1184,26 +1190,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn with_local_waking_overwrites_the_hub_value() {
+    fn with_connector_fields_overwrites_the_hub_values() {
         let hub = Payload::new(
-            json!({"can_be_woken": true, "local_waking": "from the hub"})
+            json!({"can_be_woken": true, "local_waking": "from the hub", "keep_in_memory": "from the hub"})
                 .as_object()
                 .cloned()
                 .unwrap(),
         );
         for can_wake in [true, false] {
             let CallOutcome::Ok(payload) =
-                with_local_waking(CallOutcome::Ok(hub.clone()), can_wake)
+                with_connector_fields(CallOutcome::Ok(hub.clone()), can_wake)
             else {
                 panic!("a success stays a success");
             };
             assert_eq!(payload.as_map()["local_waking"], json!(can_wake));
             assert_eq!(payload.as_map()["can_be_woken"], json!(true));
+            assert_eq!(
+                payload.as_map()["keep_in_memory"],
+                json!(crate::memory::keep_in_memory())
+            );
         }
         let refused = CallOutcome::Refused {
             code: ErrorCode::Ar203,
             retry_after: None,
         };
-        assert_eq!(with_local_waking(refused.clone(), true), refused);
+        assert_eq!(with_connector_fields(refused.clone(), true), refused);
     }
 }

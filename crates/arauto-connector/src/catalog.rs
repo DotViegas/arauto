@@ -124,7 +124,7 @@ impl Local {
 }
 
 /// What a command tells the operator when it succeeded but a thing is not as they may expect,
-/// about the key of the local API of Hermes. Fixed phrases, under the same rules as [`Local`].
+/// about the key of the local API of Hermes and about the lines kept in its memory. Fixed phrases, under the same rules as [`Local`].
 /// The connector never sets that key, never creates one and never restarts Hermes: these
 /// phrases say so, and say whose setting it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,6 +143,8 @@ pub enum Told {
     EntryOlder,
     /// The registration changed nothing in the connection.
     ConnectionUnchanged,
+    /// After `leave`: the Arauto notes the Hermes kept in its memory are still there.
+    NotesStayInMemory,
 }
 
 impl Told {
@@ -155,6 +157,7 @@ impl Told {
         Told::KeyAfterRestart,
         Told::EntryOlder,
         Told::ConnectionUnchanged,
+        Told::NotesStayInMemory,
     ];
 
     /// The fixed phrase.
@@ -191,6 +194,11 @@ impl Told {
             }
             Told::ConnectionUnchanged => {
                 "The connection did not change: the same device and the same credential."
+            }
+            Told::NotesStayInMemory => {
+                "If this Hermes saved the three Arauto notes in its memory, they are still there: \
+                 remove them with the memory tool of Hermes. The connector never reads or changes \
+                 the memory of Hermes."
             }
         }
     }

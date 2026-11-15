@@ -717,8 +717,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "邀请（仅限一次，有效期至 {deadline} UTC）：",
     ),
     (
-        "When it is done, send me only the verification code.",
-        "完成后，请只把验证码发给我。",
+        "When it is done, send me the verification code and the lines the page asks for.",
+        "完成后，请把验证码和页面要求的那几行发给我。",
     ),
     (
         "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",

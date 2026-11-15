@@ -856,7 +856,7 @@ async fn the_sentence_follows_the_language_of_the_panel() {
         "Chave do hub: arh1",
         "sha256 do conector (linux x86_64): ",
         "Convite (uso único, até ",
-        "Quando terminar, me envie só o código de verificação.",
+        "Quando terminar, me envie o código de verificação e as linhas que a página pedir.",
     ] {
         assert!(sentence.contains(label), "{label}: {sentence}");
     }

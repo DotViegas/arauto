@@ -269,6 +269,9 @@ async fn arauto_status_says_whether_this_connector_can_wake() {
     let without = status(&without_key).await;
     assert_eq!(with["local_waking"], json!(true));
     assert_eq!(without["local_waking"], json!(false));
+    let reminder = json!(arauto_connector::memory::keep_in_memory());
+    assert_eq!(with["keep_in_memory"], reminder);
+    assert_eq!(without["keep_in_memory"], reminder);
     // What the hub says is untouched, and the same for both.
     for field in ["can_be_woken", "woken_by"] {
         assert!(with.contains_key(field), "{with:?}");

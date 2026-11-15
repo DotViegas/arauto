@@ -774,8 +774,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Convite (uso único, até {deadline} UTC):",
     ),
     (
-        "When it is done, send me only the verification code.",
-        "Quando terminar, me envie só o código de verificação.",
+        "When it is done, send me the verification code and the lines the page asks for.",
+        "Quando terminar, me envie o código de verificação e as linhas que a página pedir.",
     ),
     // guide.rs, the message and its fallback
     (

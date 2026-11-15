@@ -99,6 +99,7 @@ All on the port of the connectors.
     reveals the name of the Hermes, the deadline and, by the switch from 200 to 404, roughly when
     the request ended. It does not reveal the invite. Whether a real Hermes accepts the page is
     pending ([05](05-modelo-de-ameacas.md)).
+  - **The memory step** (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). After the command, the page asks the agent to save three fixed lines with its own memory tool and to send a confirmation line with the verification code. The lines are compiled text shared with the connector (`arauto_protocol::memory::LINES`); the page gains no field. Not tried on a real Hermes.
 - In the hub, every other address, and every method other than `GET`, receives 404 (`GET /` on
   the internal port, too: tested). This holds for the port of the connectors and for the internal one. The
   panel port, when turned on, is a third one: its addresses do not exist on those two, nor theirs

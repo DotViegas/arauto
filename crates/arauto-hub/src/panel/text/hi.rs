@@ -741,8 +741,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "आमंत्रण (एक बार के लिए, {deadline} UTC तक):",
     ),
     (
-        "When it is done, send me only the verification code.",
-        "काम पूरा होने पर मुझे सिर्फ़ सत्यापन कोड भेजें।",
+        "When it is done, send me the verification code and the lines the page asks for.",
+        "काम पूरा होने पर मुझे सत्यापन कोड और वे पंक्तियाँ भेजें जो पेज माँगता है।",
     ),
     (
         "Send it as a new message, not as a reply to one of its notices. If it asks you to confirm, answer in your own words.",

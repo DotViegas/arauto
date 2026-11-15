@@ -70,6 +70,7 @@ the engine, and the test checks that it carries no secret:
 | `peers.can_receive` | There is a link from another Hermes to this one. |
 | `peers.enabled` | Either of the two. |
 | `local_waking` | Added by the **connector**, not by the hub (proposal, 15/11/2026, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)): `true` when the connector of this Hermes received the key of Hermes's local API. When `false`, nothing wakes this Hermes whatever `can_be_woken` says. It overwrites any value of the hub. The tool description does not change. |
+| `keep_in_memory` | Added by the **connector**, not by the hub (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)): one fixed text, a reminder sentence followed by the three Arauto lines, separated by line breaks. Only on a successful answer. It overwrites any value of the hub. The tool description does not change. The connector cannot know whether the lines are in the memory of Hermes. |
 
 Only the hub's answer is written. Without a channel session (pending request, channel down), the one
 that answers the tool is the connector, and that answer is not written yet.
