@@ -62,6 +62,8 @@ O Arauto parte do outro lado: **o que um agente não alcança, ele não vaza.**
 
 - **Um Hermes por setor, cada um com o seu acesso.** O agente que cuida do faturamento não guarda
   o que guarda o agente que atende os contatos. Cada um é configurado para o seu trabalho.
+- **Cada Hermes guarda só o que é do seu trabalho.** O contexto de cada um fica inteiro para a
+  função dele, sem dividir espaço com os assuntos dos outros setores.
 - **Eles conversam entre si, onde você permitiu.** Um Hermes manda um recado a outro pelo hub, só
   por uma ligação que você criou e só na direção que você marcou. Quem recebe julga o que fazer e
   compartilha somente o necessário.

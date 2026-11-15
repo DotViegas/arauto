@@ -25,10 +25,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "ほかのアラート: {n} 件。{command} ですべて確認できます。",
     ),
     ("Accesses", "アクセス権"),
-    (
-        "In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "このバージョンのパネルでは、Hermes の接続と失効、各番号のアクセス権の変更ができます。番号のペアリングとチャットの選択は、引き続きハブのサーバーで {command} コマンドを使って行います。",
-    ),
     ("none", "なし"),
     ("Your Hermes and their [numbers]", "Hermes とその[番号]"),
     (
@@ -808,5 +804,209 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
         "メッセージは Hermes にこのハブからコネクターをダウンロードするよう指示しますが、ダウンロード用フォルダーが空です。何も発行されていません。{name} の招待は、ハブのサーバーで {command} コマンドを使って発行してください。",
+    ),
+    ("Org chart", "組織図"),
+    ("Who talks to [whom]", "誰が[誰と]話すか"),
+    (
+        "Drag a Hermes to change its level. Pull the purple dot of a card to another card to create a link. Click an arrow or a card to adjust it.",
+        "Hermes をドラッグするとレベルを変更できます。カードの紫色の点を別のカードまで引くと、リンクを作成できます。矢印またはカードをクリックして調整します。",
+    ),
+    ("View", "表示"),
+    ("Map", "マップ"),
+    ("List", "リスト"),
+    ("+ Level", "+ レベル"),
+    ("Undo", "元に戻す"),
+    ("Publish", "公開"),
+    ("Draft: 1 change", "下書き: 1 件の変更"),
+    ("Draft: {n} changes", "下書き: {n} 件の変更"),
+    (
+        "From a higher level to a lower one: instruction",
+        "上位レベルから下位レベルへ: 指示",
+    ),
+    (
+        "From a lower level to a higher one: request",
+        "下位レベルから上位レベルへ: 依頼",
+    ),
+    ("Same level: note", "同じレベル: メモ"),
+    (
+        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
+        "このバージョンでは、レベル、役割、矢印の種類はここに表示されるだけです。どの Hermes にも伝えられず、メモは引き続きデータであり、命令ではありません。Hermes がほかの Hermes にメモを送れるのは、リンクがある場合だけです。",
+    ),
+    ("instruction", "指示"),
+    ("request", "依頼"),
+    ("note", "メモ"),
+    ("Name of level {n}", "レベル {n} の名前"),
+    ("Remove empty level", "空のレベルを削除"),
+    ("Move up", "上へ移動"),
+    ("Move down", "下へ移動"),
+    (
+        "A level name has 1 to 32 lowercase letters, digits, hyphens or underscores, starts with a letter or a digit, and is not a reserved word.",
+        "レベル名は、小文字の英字、数字、ハイフン、アンダースコアの 1〜32 文字で、英字または数字で始まり、予約語ではない必要があります。",
+    ),
+    (
+        "Another level already has this name.",
+        "ほかのレベルがすでにこの名前を使っています。",
+    ),
+    (
+        "The org chart has from 1 to {max} levels.",
+        "組織図のレベルは 1〜{max} 個です。",
+    ),
+    (
+        "Drag to another Hermes to create a link",
+        "ほかの Hermes までドラッグしてリンクを作成",
+    ),
+    ("{alias} · answers", "{alias} · 応答"),
+    ("{alias} · reads only", "{alias} · 読み取りのみ"),
+    ("no number", "番号なし"),
+    ("not placed yet", "未配置"),
+    (
+        "{name}, level {level}, {state}",
+        "{name}、レベル {level}、{state}",
+    ),
+    (
+        "Not placed yet: {names}. They are shown in the lowest level; publish to keep them there.",
+        "未配置: {names}。最下位のレベルに表示されています。そこに固定するには公開してください。",
+    ),
+    ("Kind: {kind}", "種類: {kind}"),
+    ("Wakes {name}", "{name} に起動通知"),
+    (
+        "{name} cannot be woken now: this mark only applies once it can.",
+        "{name} は現在起動通知を受けられません。この設定は、受けられるようになってから有効になります。",
+    ),
+    ("Create the way back", "戻りのリンクを作成"),
+    ("Remove the way back", "戻りのリンクを削除"),
+    ("Remove", "削除"),
+    (
+        "This link already exists.",
+        "このリンクはすでに存在します。",
+    ),
+    ("Role of this Hermes", "この Hermes の役割"),
+    (
+        "For your own reading: in this version no Hermes sees it. Up to 280 characters, in one line.",
+        "あなた自身が読むためのものです。このバージョンでは、どの Hermes にも表示されません。280 文字まで、1 行で入力してください。",
+    ),
+    ("Level", "レベル"),
+    ("Move left", "左へ移動"),
+    ("Move right", "右へ移動"),
+    (
+        "Change them in Accesses",
+        "アクセス権の画面で変更してください",
+    ),
+    (
+        "No access to any number.",
+        "どの番号にもアクセス権がありません。",
+    ),
+    (
+        "Change it with the command {command}.",
+        "{command} コマンドで変更してください。",
+    ),
+    ("Link to", "リンク先"),
+    ("Add link", "リンクを追加"),
+    ("Links of this Hermes", "この Hermes のリンク"),
+    ("Levels", "レベル"),
+    ("Links", "リンク"),
+    ("Role", "役割"),
+    ("From", "送信元"),
+    ("To", "送信先"),
+    ("Kind", "種類"),
+    ("Wakes", "起動通知"),
+    ("nobody", "なし"),
+    ("No link.", "リンクはありません。"),
+    ("Publish these changes?", "これらの変更を公開しますか?"),
+    (
+        "Links are security rules. They only apply after you publish.",
+        "リンクはセキュリティ上のルールです。公開した後にのみ有効になります。",
+    ),
+    (
+        "A link lets a request cross numbers: what reaches one Hermes on one number can become a note to the other, who acts on its own numbers.",
+        "リンクがあると、リクエストが番号をまたげるようになります。ある番号経由で一方の Hermes に届いた内容が、もう一方の Hermes へのメモになることがあり、その Hermes は自分の番号で動作します。",
+    ),
+    ("Back", "戻る"),
+    (
+        "New link: {from} → {to} ({kind})",
+        "新しいリンク: {from} → {to} ({kind})",
+    ),
+    (
+        "New link: {from} → {to} ({kind}), wakes {to}",
+        "新しいリンク: {from} → {to} ({kind})、{to} に起動通知",
+    ),
+    (
+        "Link {from} → {to}: now wakes {to}",
+        "リンク {from} → {to}: {to} への起動通知を開始",
+    ),
+    (
+        "Link {from} → {to}: no longer wakes {to}",
+        "リンク {from} → {to}: {to} への起動通知を停止",
+    ),
+    ("Link removed: {from} → {to}", "リンクを削除: {from} → {to}"),
+    (
+        "{name} changes level: {before} → {after}",
+        "{name} のレベルが変更されます: {before} → {after}",
+    ),
+    (
+        "{name} is placed in level {after}",
+        "{name} をレベル {after} に配置します",
+    ),
+    ("Role of {name} changed", "{name} の役割を変更しました"),
+    (
+        "Places on the map changed: {n}",
+        "マップ上の位置を変更: {n} 件",
+    ),
+    ("New level: {name}", "新しいレベル: {name}"),
+    (
+        "Level renamed: {before} → {after}",
+        "レベル名を変更: {before} → {after}",
+    ),
+    ("Level removed: {name}", "レベルを削除: {name}"),
+    ("Order of the levels: {names}", "レベルの順序: {names}"),
+    ("Published.", "公開しました。"),
+    (
+        "Someone changed the org chart while you were editing: another publish, a link changed by the command, or a Hermes added or removed. Nothing was published. Your draft is kept: check the changes and publish again.",
+        "編集中に、ほかの誰かが組織図を変更しました。別の公開、コマンドによるリンクの変更、または Hermes の追加か削除です。何も公開されていません。下書きは保持されています。変更内容を確認して、もう一度公開してください。",
+    ),
+    ("Nothing was published.", "何も公開されていません。"),
+    (
+        "Two levels have the same name.",
+        "同じ名前のレベルが 2 つあります。",
+    ),
+    (
+        "A role has at most 280 characters, in one line, without control or direction characters.",
+        "役割は 280 文字以内、1 行で、制御文字や方向文字を含めることはできません。",
+    ),
+    (
+        "A place on the map is out of range.",
+        "マップ上の位置が範囲外です。",
+    ),
+    (
+        "The draft names a Hermes or a level that does not exist, or leaves a Hermes out.",
+        "下書きに、存在しない Hermes やレベルが含まれているか、Hermes が欠けています。",
+    ),
+    (
+        "A link joins two different Hermes, once in each direction.",
+        "リンクは、異なる 2 つの Hermes を、それぞれの方向に 1 つずつ結びます。",
+    ),
+    (
+        "The draft could not be read.",
+        "下書きを読み取れませんでした。",
+    ),
+    (
+        "The draft is too large to publish.",
+        "下書きが大きすぎて公開できません。",
+    ),
+    (
+        "Something failed in the hub. Nothing was published. See the hub's log.",
+        "ハブで問題が発生しました。何も公開されていません。ハブのログを確認してください。",
+    ),
+    (
+        "Editing the org chart needs the script of the panel. Without it, this is the org chart as it is published.",
+        "組織図を編集するには、パネルのスクリプトが必要です。スクリプトがない場合は、公開されている状態の組織図が表示されます。",
+    ),
+    (
+        "No Hermes yet. Connect the first one in the Hermes tab.",
+        "Hermes はまだありません。最初の Hermes は Hermes タブで接続してください。",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
+        "このバージョンのパネルでは、Hermes の接続と失効、各番号のアクセス権の変更、組織図とそのリンクの編集ができます。番号のペアリングとチャットの選択は、引き続きハブのサーバーで {command} コマンドを使って行います。",
     ),
 ];

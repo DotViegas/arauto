@@ -32,7 +32,7 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use super::{Admin, RepoError, notify_hub};
-use crate::audit::{self, Action, Details, Event, TargetKind};
+use crate::audit::{self, Action, Details, Event, SecurityWrite, TargetKind};
 use crate::db::ResolvedOrg;
 use crate::mark::Mark;
 use crate::vault::{OrganizationKey, PeerMessageIds};
@@ -167,6 +167,41 @@ pub async fn link_set(
             return Ok(LinkSet::Missing(missing));
         }
     };
+    let outcome = set_locked(
+        &mut write,
+        organization,
+        admin,
+        (from, from_id),
+        (to, to_id),
+        wake,
+        now,
+    )
+    .await?;
+    if outcome == LinkSet::Unchanged {
+        write.rollback().await?;
+    } else {
+        write.commit().await?;
+    }
+    Ok(outcome)
+}
+
+/// The body of [`link_set`], for a caller that already holds the write and has locked the two
+/// Hermes, in the order of their identifiers: the admin command, and the publish of the org
+/// chart, which applies its links through this same code. It writes nothing when the link
+/// already is as asked ([`LinkSet::Unchanged`]).
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub(crate) async fn set_locked(
+    write: &mut SecurityWrite,
+    organization: ResolvedOrg,
+    admin: &Admin,
+    from: (&HermesName, Uuid),
+    to: (&HermesName, Uuid),
+    wake: bool,
+    now: i64,
+) -> Result<LinkSet, RepoError> {
+    let ((from, from_id), (to, to_id)) = (from, to);
     let before: Option<bool> = sqlx::query_scalar(
         "SELECT wake FROM peer_link \
          WHERE organization_id = $1 AND from_hermes_id = $2 AND to_hermes_id = $3 FOR UPDATE",
@@ -178,10 +213,7 @@ pub async fn link_set(
     .await?;
     let details = link_details(from, from_id, to, to_id).flag("wake", wake);
     let (action, details, outcome) = match before {
-        Some(old) if old == wake => {
-            write.rollback().await?;
-            return Ok(LinkSet::Unchanged);
-        }
+        Some(old) if old == wake => return Ok(LinkSet::Unchanged),
         Some(old) => {
             sqlx::query(
                 "UPDATE peer_link SET wake = $4, changed_at = $5 \
@@ -231,7 +263,6 @@ pub async fn link_set(
         .await?;
     notify_hub(write.connection(), organization, "hermes", from_id).await?;
     notify_hub(write.connection(), organization, "hermes", to_id).await?;
-    write.commit().await?;
     Ok(outcome)
 }
 
@@ -257,6 +288,37 @@ pub async fn link_remove(
             return Ok(LinkRemoved::Missing(missing));
         }
     };
+    let outcome = remove_locked(
+        &mut write,
+        organization,
+        admin,
+        (from, from_id),
+        (to, to_id),
+        now,
+    )
+    .await?;
+    if outcome == LinkRemoved::NoLink {
+        write.rollback().await?;
+    } else {
+        write.commit().await?;
+    }
+    Ok(outcome)
+}
+
+/// The body of [`link_remove`], for a caller that already holds the write and has locked the
+/// two Hermes. It writes nothing when there is no such link ([`LinkRemoved::NoLink`]).
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub(crate) async fn remove_locked(
+    write: &mut SecurityWrite,
+    organization: ResolvedOrg,
+    admin: &Admin,
+    from: (&HermesName, Uuid),
+    to: (&HermesName, Uuid),
+    now: i64,
+) -> Result<LinkRemoved, RepoError> {
+    let ((from, from_id), (to, to_id)) = (from, to);
     let wake: Option<bool> = sqlx::query_scalar(
         "DELETE FROM peer_link \
          WHERE organization_id = $1 AND from_hermes_id = $2 AND to_hermes_id = $3 \
@@ -268,7 +330,6 @@ pub async fn link_remove(
     .fetch_optional(write.connection())
     .await?;
     let Some(wake) = wake else {
-        write.rollback().await?;
         return Ok(LinkRemoved::NoLink);
     };
     discard_notices(write.connection(), organization, from_id, to_id, now).await?;
@@ -283,7 +344,6 @@ pub async fn link_remove(
         .await?;
     notify_hub(write.connection(), organization, "hermes", from_id).await?;
     notify_hub(write.connection(), organization, "hermes", to_id).await?;
-    write.commit().await?;
     Ok(LinkRemoved::Removed)
 }
 

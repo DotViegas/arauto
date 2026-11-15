@@ -249,6 +249,12 @@ pub async fn remove(
         now,
     )
     .await?;
+    // Its place and its role in the org chart go with it. The level stays, empty.
+    sqlx::query("DELETE FROM org_member WHERE organization_id = $1 AND hermes_id = $2")
+        .bind(organization.id())
+        .bind(locked.hermes.id)
+        .execute(write.connection())
+        .await?;
     let links: Vec<(Uuid, Uuid)> = sqlx::query_as(
         "DELETE FROM peer_link \
          WHERE organization_id = $1 AND (from_hermes_id = $2 OR to_hermes_id = $2) \

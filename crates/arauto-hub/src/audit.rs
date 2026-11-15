@@ -174,6 +174,13 @@ actions! {
     PanelSignedOut => "panel.signed_out", false;
     /// A passkey was registered for an admin, in a session of the panel.
     PanelPasskeyRegistered => "panel.passkey_registered", true;
+    /// A level of the org chart was added, renamed, moved or removed by a publish. It says
+    /// who can do nothing new: the chart is what the admin sees (stage A).
+    OrgLevelChanged => "org_level.changed", false;
+    /// A Hermes got a level, a place or a role in the org chart by a publish.
+    OrgMemberChanged => "org_member.changed", false;
+    /// The org chart was published: the counts of what it changed.
+    OrgChartPublished => "org_chart.published", false;
     /// The password of the database role of the hub was replaced by one the hub drew. The
     /// event says when; never the password, nor anything computed from it.
     DatabasePasswordReplaced => "database.password_replaced", true;
@@ -227,6 +234,8 @@ pub enum TargetKind {
     Number,
     /// An access of a Hermes to a number.
     Access,
+    /// A level of the org chart.
+    OrgLevel,
 }
 
 impl TargetKind {
@@ -244,6 +253,7 @@ impl TargetKind {
             TargetKind::Engine => "engine",
             TargetKind::Number => "number",
             TargetKind::Access => "access",
+            TargetKind::OrgLevel => "org_level",
         }
     }
 }

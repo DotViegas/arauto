@@ -46,3 +46,4 @@ prototype, or is **pending**.
 | 0040 | [The panel inside the hub: its own port, entry by passkey and the first screens](0040-painel-dentro-do-hub.md) | proposal |
 | 0041 | [The password of the database, drawn by the hub](0041-senha-do-banco-sorteada-pelo-hub.md) | proposal |
 | 0042 | [The connection sentence and the instruction page](0042-frase-de-conexao-e-pagina-de-instrucoes.md) | proposal |
+| 0043 | [The org chart of the Hermes: levels, places and links on a map (stage A)](0043-organograma-e-niveis.md) | proposal |

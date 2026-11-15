@@ -40,6 +40,7 @@
 //! | [`chat`] | The chats of a number, by their identifiers in the engine. |
 //! | [`engine_event`] | The inbox of events of the engine. |
 //! | [`access`] | The matrix of accesses: what each Hermes may do on each number and in each chat. |
+//! | [`org`] | The org chart of the Hermes: levels, places, roles, and Publish, which writes them with the links in one write. |
 //! | [`panel`] | The entry code and the sessions of the panel of the admin. |
 
 use arauto_protocol::message::DeclaredText;
@@ -67,6 +68,7 @@ pub mod enroll;
 pub mod hermes;
 pub mod invite;
 pub mod number;
+pub mod org;
 pub mod panel;
 pub mod peer;
 pub mod purge;

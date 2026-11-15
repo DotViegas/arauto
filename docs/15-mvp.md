@@ -39,6 +39,7 @@ are in [0031](decisoes/0031-banco-postgresql.md),
 | Conversation between Hermes ([13](13-conversa-entre-hermes.md)) | Observer, rooms and reading of the text by the admin |
 | Fake engine and WAHA adapter; read, send and modify | Message archive and search (reading depends on the engine being up) |
 | Access matrix, by number and by chat | Sending a file by address |
+| Org chart tab, stage A: levels, places, role text and links on a map, edited as a draft and published in one write ([decision 0043](decisoes/0043-organograma-e-niveis.md), proposal, tried only in a desktop Chrome without a window (15/11/2026)) | Notes that know the levels (stage B, pending) |
 | Notices and waking, with the fixed sentence | List of versions of the program, with revocation and signature |
 | Audit that only grows, and alerts read by command | Adjustable ceilings |
 | Send ceiling (20 per minute, per Hermes and per number) and note ceilings | Private authority in the connector's TLS |
@@ -156,6 +157,7 @@ that of [06-modelo-de-dados.md](06-modelo-de-dados.md), with the names in Englis
 | (new) link | `peer_link` | [13](13-conversa-entre-hermes.md) |
 | (new) thread, note | `peer_thread`, `peer_message` | The text of the note goes encrypted. |
 | (new) retention | `retention` | Retention period per table. |
+| (new) org chart: level, place | `org_level`, `org_member` | Migration 0017. [decision 0043](decisoes/0043-organograma-e-niveis.md). Read by nothing in the channel. |
 
 The `slot` of the device: `request` while it has not confirmed the first credential and the state is
 not final; `in_use` after the first confirmation, in active, suspended or quarantine; null in a
@@ -222,7 +224,7 @@ Rules that hold for the database:
     are: the installation, the organization, the hub key, the admins, creating and deleting Hermes,
     changing the "may be woken", invite used or cancelled, approving and denying, activating,
     quarantine, replacement, revocation, confirmed swap, the links of the peer list and the restored
-    mode. Not security events: invite issued, expired, refused or used
+    mode. Not security events: the three events of the org chart (`org_level.changed`, `org_member.changed`, `org_chart.published`; the link events inside a publish are the usual security ones), invite issued, expired, refused or used
     by another identity,
     repeated enrollment, wrong code, device expired by deadline, swap without "saved", the alerts of
     reuse and of a seal without explanation, connection taken over, note ceiling, unknown device

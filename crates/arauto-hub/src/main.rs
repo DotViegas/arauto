@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use arauto_hub::admin::render::{self, Report, access, link, whatsapp};
+use arauto_hub::admin::render::{self, Report, access, link, org, whatsapp};
 use arauto_hub::admin::whatsapp::{PairMethod, Removal};
 use arauto_hub::admin::{self, Session};
 use arauto_hub::channel::{self, ChannelSettings};
@@ -163,6 +163,11 @@ enum InstalledCommand {
         #[command(subcommand)]
         command: LinkCommand,
     },
+    /// The org chart of the Hermes: levels, places, roles and links, for the admin to read.
+    Org {
+        #[command(subcommand)]
+        command: OrgCommand,
+    },
     /// The panel of the admin, in the browser.
     Panel {
         #[command(subcommand)]
@@ -219,6 +224,21 @@ enum LinkCommand {
     },
     /// Lists the links.
     List,
+}
+
+#[derive(Debug, Subcommand)]
+enum OrgCommand {
+    /// Shows the levels with their Hermes, the links with their kind and the version a publish
+    /// starts from.
+    Show,
+    /// Publishes a draft (the JSON the panel sends) in one write, if the chart still is at VERSION.
+    Publish {
+        /// The file with the draft.
+        file: std::path::PathBuf,
+        /// The version the draft started from, as `admin org show` prints it.
+        #[arg(long)]
+        version: String,
+    },
 }
 
 /// The verbs given on the command line.
@@ -949,6 +969,28 @@ async fn run_installed(
             }
             LinkCommand::List => link::list(&session.link_list().await?),
         },
+        InstalledCommand::Org { command } => match command {
+            OrgCommand::Show => org::show(&session.org_chart().await?),
+            OrgCommand::Publish { file, version } => {
+                let base = arauto_hub::core::org::ChartVersion::parse_hex(version.trim())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("the version is 64 lowercase hexadecimal digits")
+                    })?;
+                let size = std::fs::metadata(&file)?.len();
+                anyhow::ensure!(
+                    size <= arauto_hub::core::org::PUBLISH_FORM_MAX as u64,
+                    "the draft is too large to publish"
+                );
+                let text = std::fs::read_to_string(&file)?;
+                match arauto_hub::core::org::Draft::parse(&text) {
+                    Ok(draft) => org::published(&session.org_publish(&draft, base, now).await?),
+                    Err(reason) => Report {
+                        text: format!("{reason} Nothing was published.\n"),
+                        done: false,
+                    },
+                }
+            }
+        },
         InstalledCommand::Panel {
             command: PanelCommand::Code,
         } => {
@@ -1116,6 +1158,8 @@ mod tests {
             "arauto-hub admin link remove vendas suporte",
             "arauto-hub admin link remove vendas suporte --both",
             "arauto-hub admin link list",
+            "arauto-hub admin org show",
+            "arauto-hub admin org publish draft.json --version 00",
             "arauto-hub admin panel code",
             "arauto-hub admin database rotate-password",
             "arauto-hub admin check",

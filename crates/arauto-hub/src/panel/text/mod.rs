@@ -353,7 +353,7 @@ mod tests {
     }
 
     /// The code of the panel that writes sentences, as text: this test reads it.
-    const SOURCES: [(&str, &str); 9] = [
+    const SOURCES: [(&str, &str); 10] = [
         ("view.rs", include_str!("../view.rs")),
         ("guide.rs", include_str!("../guide.rs")),
         ("editor.rs", include_str!("../editor.rs")),
@@ -363,6 +363,7 @@ mod tests {
         ("check.rs", include_str!("../../check.rs")),
         ("installation.rs", include_str!("../installation.rs")),
         ("block.rs", include_str!("../block.rs")),
+        ("org.rs", include_str!("../org.rs")),
     ];
 
     /// Every sentence the code marks with `k("...")`, outside the tests of each file.
@@ -491,12 +492,14 @@ mod tests {
                 );
             }
             // The word the brand colors keeps its brackets.
-            let title = tr(lang, "Your Hermes and their [numbers]");
-            let brackets = title.find('[').zip(title.find(']'));
-            assert!(
-                brackets.is_some_and(|(open, close)| open + 1 < close),
-                "{tag}: {title}"
-            );
+            for key in ["Your Hermes and their [numbers]", "Who talks to [whom]"] {
+                let title = tr(lang, key);
+                let brackets = title.find('[').zip(title.find(']'));
+                assert!(
+                    brackets.is_some_and(|(open, close)| open + 1 < close),
+                    "{tag}: {title}"
+                );
+            }
             // The four letters of the matrix are four, short and different.
             let letters: Vec<&str> = ["R", "S", "M", "W"]
                 .into_iter()
@@ -516,6 +519,13 @@ mod tests {
                 ("I recognize it", "I do not recognize it"),
                 ("Connect", "Reconnect"),
                 ("yes", "no"),
+                ("Publish", "Back"),
+                ("Create the way back", "Remove the way back"),
+                ("Move up", "Move down"),
+                ("Move left", "Move right"),
+                ("instruction", "request"),
+                ("request", "note"),
+                ("instruction", "note"),
                 (
                     "Every chat, including the ones that come later",
                     "Only chosen chats",

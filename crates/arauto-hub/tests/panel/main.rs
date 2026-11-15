@@ -26,6 +26,7 @@ mod database;
 mod entry;
 mod first_access;
 mod language;
+mod org;
 mod pages;
 mod passkey;
 mod screens;

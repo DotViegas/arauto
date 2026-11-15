@@ -199,6 +199,16 @@ pub(super) fn query_field(query: Option<&str>, field: &str) -> Option<Zeroizing<
 
 /// Reads a form sent by a page of the panel: small, and of the one type a form of a page has.
 pub(super) async fn form(headers: &HeaderMap, body: Incoming) -> Result<Form, FormError> {
+    form_up_to(headers, body, FORM_MAX).await
+}
+
+/// [`form`] with another ceiling: only the publish of the org chart reads more than a small
+/// form.
+pub(super) async fn form_up_to(
+    headers: &HeaderMap,
+    body: Incoming,
+    max: usize,
+) -> Result<Form, FormError> {
     let essence = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
@@ -212,10 +222,10 @@ pub(super) async fn form(headers: &HeaderMap, body: Incoming) -> Result<Form, Fo
         .get(header::CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<usize>().ok());
-    if declared.is_some_and(|declared| declared > FORM_MAX) {
+    if declared.is_some_and(|declared| declared > max) {
         return Err(FormError::TooLarge);
     }
-    let read = tokio::time::timeout(FORM_READ, Limited::new(body, FORM_MAX).collect()).await;
+    let read = tokio::time::timeout(FORM_READ, Limited::new(body, max).collect()).await;
     let bytes = match read {
         Ok(Ok(collected)) => Zeroizing::new(collected.to_bytes().to_vec()),
         Ok(Err(error)) if error.is::<http_body_util::LengthLimitError>() => {

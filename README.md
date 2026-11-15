@@ -61,6 +61,8 @@ Arauto starts from the other end: **what an agent cannot reach, it cannot leak.*
 
 - **One Hermes per team, each with its own access.** The agent that looks after billing does not
   hold what the agent that answers contacts holds. Each one is set up for its own work.
+- **Each Hermes keeps only what belongs to its work.** Its whole context is free for its own job,
+  without sharing room with the matters of the other teams.
 - **They talk to each other, where you allowed.** One Hermes sends a note to another through the
   hub, only on a link you created and only in the direction you marked. The one that receives it
   judges what to do, and shares only what is needed.

@@ -63,6 +63,8 @@ Arauto geht vom anderen Ende aus: **Was ein Agent nicht erreicht, kann er nicht 
 
 - **Ein Hermes pro Team, jeder mit eigenem Zugriff.** Der Agent, der die Abrechnung betreut, hat
   nicht, was der Agent hat, der den Kontakten antwortet. Jeder ist für seine Aufgabe eingerichtet.
+- **Jeder Hermes behält nur, was zu seiner Arbeit gehört.** Der Kontext jedes Einzelnen bleibt ganz
+  für seine Aufgabe frei, ohne sich den Platz mit den Themen der anderen Teams zu teilen.
 - **Sie sprechen miteinander, wo du es erlaubt hast.** Ein Hermes schickt über den Hub eine
   Nachricht an einen anderen, nur über eine Verknüpfung, die du angelegt hast, und nur in der
   Richtung, die du festgelegt hast. Der Empfänger entscheidet, was zu tun ist, und teilt nur, was

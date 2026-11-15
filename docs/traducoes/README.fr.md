@@ -64,6 +64,8 @@ Arauto part de l'autre bout : **ce qu'un agent ne peut pas atteindre, il ne peut
 - **Un Hermes par équipe, chacun avec son propre accès.** L'agent qui s'occupe de la facturation
   ne détient pas ce que détient l'agent qui répond aux contacts. Chacun est configuré pour son
   propre travail.
+- **Chaque Hermes ne garde que ce qui relève de son travail.** Le contexte de chacun reste entier
+  pour sa fonction, sans partager la place avec les sujets des autres équipes.
 - **Ils se parlent, là où vous l'avez permis.** Un Hermes envoie un message à un autre par le hub,
   uniquement par un lien que vous avez créé et uniquement dans le sens que vous avez indiqué. Celui
   qui le reçoit juge de ce qu'il faut faire, et ne partage que ce qui est nécessaire.

@@ -108,6 +108,7 @@ the reason. While the key of Hermes's local API is not resolved
 - Choosing which Hermes answers.
 - Answering by itself.
 - Holding a message for approval.
+- Giving any weight to the level of a Hermes or to the kind of a link: they decide nothing in the hub ([decision 0043](decisoes/0043-organograma-e-niveis.md), stage A, proposal).
 
 When two Hermes can send or be woken in the same chats, the panel **warns and does not
 prevent**.

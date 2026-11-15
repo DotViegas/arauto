@@ -143,6 +143,8 @@
     var ended = false;
 
     function swap(text) {
+      // The org chart sets this while the admin has a draft: nothing is swapped under it.
+      if (root.hasAttribute('data-hold')) return;
       var next = new DOMParser().parseFromString(text, 'text/html');
       if (next.querySelector('.modal') || !next.querySelector('[data-live]')) return;
       Array.prototype.forEach.call(document.querySelectorAll('[data-live]'), function (region) {
@@ -156,6 +158,7 @@
     }
 
     function ask() {
+      if (root.hasAttribute('data-hold')) return;
       if (ended || asking || document.hidden) return;
       asking = true;
       fetch(location.pathname + location.search, {

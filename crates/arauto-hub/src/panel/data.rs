@@ -84,7 +84,7 @@ fn stopped(line: &HermesLine) -> Option<&Device> {
 
 /// The label of a line of Hermes (`docs/10-maquinas-de-estado.md`, section 3), in the order
 /// the admin command decides it, with the one thing the command cannot know: the session.
-fn standing(line: &HermesLine, in_session: bool) -> (Tone, &'static str) {
+pub(super) fn standing(line: &HermesLine, in_session: bool) -> (Tone, &'static str) {
     let request = line.request.as_ref().map(|device| device.state);
     let in_use = line.in_use.as_ref().map(|device| device.state);
     if request == Some(DeviceState::Pending) {

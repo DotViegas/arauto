@@ -3,6 +3,8 @@
 **Status: proposal.** What each screen shows, what is done on it and how it looks empty or with an
 error.
 
+**Org chart, 14/11/2026** ([decision 0043](decisoes/0043-organograma-e-niveis.md), proposal): the hub has a fourth tab, T9, built and tried only in a desktop Chrome without a window (15/11/2026).
+
 **In the hub, on 13/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md), proposal):
 there are T1, T4 and T6, read-only, the alert banner, and T2 with T3, in a single guide, in a window
 over the list: name, block, code and done. In T1 each line has the buttons to connect, continue or
@@ -17,7 +19,7 @@ not built.
 ## Summary
 
 ```
-Menu:  Hermes · WhatsApps · Accesses · Audit · Settings
+Menu:  Hermes · WhatsApps · Accesses · Org chart · Audit · Settings
 
 T0 First access         create the first admin and point to the engine
 T1 Hermes               the list, with the state of each one
@@ -28,6 +30,7 @@ T5 Pair WhatsApp        pairing code or QR
 T6 Accesses             the Hermes x number matrix
 T7 Audit                what happened, with no message content
 T8 Admins               who has a login in the panel (in Settings)
+T9 Org chart            levels, places and links of the Hermes, on a map
 ```
 
 ## Rules that apply to all screens
@@ -285,3 +288,18 @@ It is in Settings.
   All ask for the passkey of whoever does it. The last admin cannot be removed.
 - **After the hub comes back from a backup,** the banner tells to check this list: an admin removed
   after the backup appears here again.
+
+## T9. Org chart
+
+**Proposal, built in the hub on 14/11/2026, tried only in a desktop Chrome without a window (15/11/2026).** Decision [0043](decisoes/0043-organograma-e-niveis.md). The menu has it after Accesses.
+
+- **Shows:** a map with one band per level, the top one first, and a card per Hermes (state dot, name, the numbers it has and whether it answers or only reads, "not placed yet" when it has no place). Arrows mark the links. Their kind comes from the levels: from a higher level to a lower one, instruction; lower to higher, request; same level, note. The kind is only shown here; it gives no permission. A list view shows the same data (levels, Hermes, links) and is the way for the keyboard: everything the map does is there. Only Hermes are on the chart.
+- **Actions (all on a draft):** add, rename, reorder and remove (when empty) levels, from 1 to 12; drag a Hermes to another level or place; draw a link by dragging from the card's handle to another card; click an arrow for its kind, the wake mark, the way back and removal; write a role text of up to 280 characters per Hermes, for the admin's own reading; undo.
+- **Publish:** shows a summary of the changes, with the warning that links are security rules and that a link crosses numbers, and writes everything in one go. Nothing is written before it. The links, with their wake mark, go through the same code as the command `admin link add|remove`.
+- **Stale:** if the chart changed meanwhile (another admin, a command, a Hermes created or removed), nothing is published, the page shows the fresh state and keeps the draft to apply again.
+- **Empty:** "No Hermes yet. Connect the first one in the Hermes tab." With no level, the draft starts with one level holding every Hermes.
+- **Without script:** three read-only lists (levels, Hermes, links) and a sentence saying that editing needs the script.
+- **Live refresh:** the tab refreshes the states like the others, but pauses while there is a draft.
+- **Narrow screens:** the view starts as a list; the map scrolls sideways.
+- **Does not do:** edit accesses to numbers (the card shows them and points to Accesses); edit "can be woken" (command only); put people on the chart; put a Hermes in two levels; tell any Hermes about levels, roles or kinds (stage B, pending). The command twin is `arauto-hub admin org show` and `org publish`.
+- **Not guaranteed:** the draft is lost if the panel session ends before Publish; Publish does not ask for the passkey again (the note on top of this file covers it).

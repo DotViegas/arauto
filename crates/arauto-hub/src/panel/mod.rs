@@ -10,6 +10,8 @@
 //! | `GET /installation` | the window that checks the installation ([`installation`]) |
 //! | `GET /whatsapps` | the numbers |
 //! | `GET /accesses` | the matrix of accesses |
+//! | `GET /org` | the org chart of the Hermes ([`org`]); `?published` after a publish |
+//! | `POST /org/publish` | publishes the whole wanted chart, links included, in one write ([`org`]) |
 //! | `GET /assets/{file}` | the sheet, the fonts and the script of the panel |
 //! | `POST /language` | the language the person chose, kept in a cookie ([`text`]) |
 //! | `/hermes/...` | the guide that connects a Hermes ([`connect`]) |
@@ -42,6 +44,7 @@ pub mod guide;
 mod html;
 mod http;
 pub mod installation;
+pub mod org;
 pub mod passkey;
 pub mod secret;
 pub mod text;
@@ -87,6 +90,11 @@ const ASSETS: &[(&str, &str, &[u8])] = &[
         "panel.js",
         "text/javascript; charset=utf-8",
         include_bytes!("assets/panel.js"),
+    ),
+    (
+        "org.js",
+        "text/javascript; charset=utf-8",
+        include_bytes!("assets/org.js"),
     ),
     (
         "poppins-400.woff2",
@@ -418,6 +426,8 @@ pub(crate) async fn route(
         (false, "/passkey/sign-in") => {
             passkey_sign_in(&hub, panel, peer, &parts.headers, body).await
         }
+        (true, "/org") => org::page(&hub, panel, &parts.headers, parts.uri.query()).await,
+        (false, "/org/publish") => org::publish(&hub, panel, &parts.headers, body).await,
         (true, "/installation") => {
             installation(&hub, panel, peer, &parts.headers, parts.uri.query()).await
         }
@@ -1103,6 +1113,100 @@ mod tests {
         );
     }
 
+    /// The sentences a source file marks with `k("...")`, outside its tests.
+    fn marked_sentences(source: &str) -> Vec<String> {
+        let code = source.split("#[cfg(test)]").next().unwrap();
+        let bytes = code.as_bytes();
+        let mut found = Vec::new();
+        let mut at = 0;
+        while let Some(offset) = code[at..].find("k(") {
+            let start = at + offset;
+            at = start + 2;
+            if start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_') {
+                continue;
+            }
+            let Some(literal) = code[at..].trim_start().strip_prefix('"') else {
+                continue;
+            };
+            let mut sentence = String::new();
+            let mut characters = literal.chars();
+            loop {
+                match characters.next().expect("a string of the code ends") {
+                    '"' => break,
+                    '\\' => sentence.push(characters.next().unwrap()),
+                    other => sentence.push(other),
+                }
+            }
+            found.push(sentence);
+        }
+        found
+    }
+
+    #[test]
+    fn the_script_of_the_org_chart_writes_no_markup_and_calls_nothing() {
+        let script = std::str::from_utf8(ASSETS[2].2).unwrap();
+        assert_eq!(ASSETS[2].0, "org.js");
+        assert_eq!(ASSETS[2].1, "text/javascript; charset=utf-8");
+        // No markup is written, no text is run, nothing is called, nothing is kept: the one thing
+        // the script sends is the form of the page.
+        for forbidden in [
+            "innerHTML",
+            "outerHTML",
+            "insertAdjacentHTML",
+            "createContextualFragment",
+            "setHTML",
+            "document.write",
+            "eval(",
+            "Function(",
+            "document.cookie",
+            "fetch(",
+            "XMLHttpRequest",
+            "WebSocket",
+            "sendBeacon",
+            "localStorage",
+            "sessionStorage",
+            "postMessage",
+            "import(",
+            "location",
+            "http://",
+            "https://",
+            "setAttribute('style'",
+            "cssText",
+        ] {
+            assert!(
+                !script.contains(forbidden),
+                "the script of the org chart has {forbidden}"
+            );
+        }
+        assert_eq!(
+            script
+                .matches("HTMLFormElement.prototype.submit.call(form)")
+                .count(),
+            1
+        );
+        // The two places that read JSON: the stored state, and the draft the hub refused.
+        assert_eq!(script.matches("JSON.parse(").count(), 2);
+        assert!(script.contains("JSON.parse(data.getAttribute('data-state'))"));
+        assert!(script.contains("JSON.parse(echo.getAttribute('data-draft'))"));
+        // The rule of a level name is the one of a Hermes name, and the page is held still while
+        // a draft exists.
+        assert!(script.contains("'^[a-z0-9][a-z0-9_-]{0,31}$'"));
+        assert!(script.contains("'data-hold'"));
+        // The script has no sentence of its own: none the page or the frame writes is in it.
+        let mut sentences = marked_sentences(include_str!("org.rs"));
+        sentences.extend(marked_sentences(include_str!("view.rs")));
+        assert!(sentences.len() > 80, "the sentences were read");
+        for sentence in sentences
+            .iter()
+            .filter(|sentence| sentence.contains(' ') && sentence.len() >= 15)
+        {
+            assert!(
+                !script.contains(sentence.as_str()),
+                "the script has a sentence of the page: {sentence}"
+            );
+        }
+    }
+
     #[test]
     fn the_files_of_the_panel_are_a_fixed_list() {
         let names: Vec<&str> = ASSETS.iter().map(|(name, _, _)| *name).collect();
@@ -1111,6 +1215,7 @@ mod tests {
             [
                 "panel.css",
                 "panel.js",
+                "org.js",
                 "poppins-400.woff2",
                 "poppins-600.woff2",
                 "poppins-800.woff2",
@@ -1190,7 +1295,9 @@ mod tests {
         assert!(script.contains(
             "fetch(form.getAttribute('data-start'), { method: 'POST', credentials: 'same-origin' })"
         ));
-        for (name, kind, bytes) in ASSETS.iter().skip(2) {
+        // Held while the admin edits the org chart: the refresh and the swap both stand still.
+        assert_eq!(script.matches("root.hasAttribute('data-hold')").count(), 2);
+        for (name, kind, bytes) in ASSETS.iter().skip(3) {
             assert_eq!(*kind, "font/woff2");
             assert!(bytes.starts_with(b"wOF2"), "{name}");
             assert!(

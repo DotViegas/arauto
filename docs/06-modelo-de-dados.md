@@ -8,6 +8,7 @@ bring the main ones, not all.
 ```
 organizacao
  ├── admin ── passkey, sessao_painel
+ ├── organograma: nivel, lugar               (org chart, proposal)
  ├── hermes ── aparelho ── conexao_canal
  │      │         └── convite
  │      └── acesso ── acesso_conversa
@@ -222,3 +223,24 @@ The alert types in the hub, on 11/11/2026:
 | `number_swapped` | The phone that paired a number is not the telephone the admin added: the accesses stay stopped until `admin number confirm` or `unpair` ([10](10-maquinas-de-estado.md), section 4). |
 
 **retencao**: the retention period of each table that has purge.
+
+## 11. The org chart (proposal, stage A, 14/11/2026)
+
+Decision [0043](decisoes/0043-organograma-e-niveis.md). Built in the hub; tried only in a desktop Chrome without a window (15/11/2026). Migration 0017 only adds the two tables and writes no row: on a database with data, every live Hermes is "not placed yet" and there is no level.
+
+**org_level**: `id`, `organization_id`, `position` (0 is the top, 0 to 11, no gap, unique per organization), `name` (the format and the reserved words of a Hermes name, unique per organization), `created_at`, `changed_at`.
+
+**org_member**: `hermes_id` (primary key: a Hermes is in one level only), `organization_id`, `level_id`, `map_x` (left edge of the card, 0 to 4000), `role` (for the admin's own reading; null or 1 to 280 characters, no control or direction character), `changed_at`. Two composite foreign keys keep a member from pointing to a level or a Hermes of another organization.
+
+| Limit | Value |
+|---|---|
+| Levels | 12 |
+| Role text | 280 characters |
+| Place on the map | 0 to 4000 |
+| Body of a publish | 1 MiB |
+
+The program's checks are the authority; the `CHECK`s repeat them as a second line (the control-character check beyond ASCII depends on the database locale).
+
+**Life cycle.** A new Hermes is not placed until the next publish. Removing a Hermes deletes its row (and its role text) in the same write that removes its links; the level stays, empty. The last Hermes leaving a level does not remove it: only a publish does. A publish needs at least one level and every live Hermes placed.
+
+**Not stored:** the kind of an arrow (instruction, request, note), the connection state and the number chips; they are computed when the page is read. **Read by no part of the channel:** only the panel, the admin commands and the Hermes removal touch these tables; no notice, tool answer or log carries a level name or a role text, and the audit holds neither.

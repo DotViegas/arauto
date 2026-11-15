@@ -125,6 +125,19 @@
 | **Thread** | A sequence of notes between the same two Hermes, about the same subject. |
 | **Ceiling** | A fixed limit on quantity, which the hub applies without looking at the content. |
 
+## The org chart
+
+All of these are a **proposal**, built in the hub on 14/11/2026 and tried only in a desktop Chrome without a window (15/11/2026) ([decision 0043](decisoes/0043-organograma-e-niveis.md)).
+
+| Term | What it is |
+|---|---|
+| **Org chart** | The panel tab that shows the Hermes in levels, with an arrow for each link. Only Hermes are on it. |
+| **Level** | A named row of the org chart, ordered from the top. A Hermes is in one level only. |
+| **Role** | A short text per Hermes, for the admin's own reading. No Hermes is told it. |
+| **Kind of a link** | Shown on the arrow, from the levels: instruction (to a lower level), request (to a higher one), note (same level). Only shown; it gives no permission. "Request" here is not a connection request. |
+| **Draft** | The changes made on the org chart that were not published yet. |
+| **Publish** | Writing the whole draft in one go, after a summary of the changes. |
+
 ## Sessions
 
 The word "session" always comes with its owner:
@@ -153,6 +166,7 @@ The word "session" always comes with its owner:
 | tenant, slot | Hermes, organization | They were names from the source service. |
 | device, for WhatsApp | linked device | A device is an installation of the connector. |
 | channel, for Telegram or e-mail | conversation platform | The channel is the connection from the connector to the hub. |
+| order, command, for a kind of link | instruction | Nothing here gives a Hermes authority over another. |
 | customer, client, meaning whoever uses the project | whoever installs, organization | The project is free. The technical sense ("unofficial client", "MCP client") still holds. |
 
 ## From Portuguese
@@ -173,4 +187,5 @@ The documents were written in Portuguese until 13/11/2026. The terms above repla
 | número · apelido · conversa · linha de conversa · escopo · verbo · matriz | number · alias · chat · chat line · scope · verb · matrix |
 | aviso · alerta · frase fixa · recado · ligação · par · fio | notice · alert · fixed sentence · note · link · peer · thread |
 | motor · painel · arquivo de mensagens · registro do sistema | engine · panel · message archive · system log |
+| organograma · nível · papel · rascunho · publicar · instrução · pedido (tipo de seta) | org chart · level · role · draft · publish · instruction · request (kind of arrow) |
 | serviço de origem · quem instala · meio de conversa | source service · whoever installs · conversation platform |

@@ -64,6 +64,8 @@ Arauto parte del otro extremo: **lo que un agente no alcanza, no lo puede filtra
 - **Un Hermes por equipo, cada uno con su propio acceso.** El agente que se ocupa de la facturación
   no tiene lo que tiene el agente que atiende a los contactos. Cada uno está configurado para su
   propio trabajo.
+- **Cada Hermes guarda solo lo que es de su trabajo.** El contexto de cada uno queda entero para su
+  función, sin compartir espacio con los asuntos de los otros equipos.
 - **Se comunican entre sí, donde tú lo permitiste.** Un Hermes envía un mensaje a otro por el hub,
   solo por un vínculo que tú creaste y solo en la dirección que marcaste. El que lo recibe decide
   qué hacer y comparte únicamente lo necesario.

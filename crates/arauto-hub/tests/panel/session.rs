@@ -12,7 +12,7 @@ use arauto_testkit::hub::support::{PANEL_HOST, PANEL_ORIGIN};
 
 use crate::{Browser, COOKIE, PATIENCE, REFUSED, audited, code, cookie_of, hub, rows};
 
-const PAGES: [&str; 3] = ["/", "/whatsapps", "/accesses"];
+const PAGES: [&str; 4] = ["/", "/whatsapps", "/accesses", "/org"];
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_page_is_only_shown_to_a_session() {
@@ -138,6 +138,10 @@ async fn every_answer_tells_the_browser_to_do_no_more_than_show_it() {
                 .text()
                 .matches("<script src=\"/assets/panel.js\"></script>")
                 .count()
+                + answer
+                    .text()
+                    .matches("<script src=\"/assets/org.js\"></script>")
+                    .count()
         );
     }
     assert_eq!(
@@ -145,7 +149,7 @@ async fn every_answer_tells_the_browser_to_do_no_more_than_show_it() {
             .iter()
             .map(|answer| answer.status)
             .collect::<Vec<_>>(),
-        [200, 303, 404, 200, 200, 421, 403, 200, 200, 200]
+        [200, 303, 404, 200, 200, 421, 403, 200, 200, 200, 200]
     );
 }
 

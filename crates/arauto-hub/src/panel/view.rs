@@ -28,8 +28,9 @@ pub enum Over {
 }
 
 /// The head of a page. Only a page with a guide, a passkey or live lists loads the script of
-/// the panel, and it loads it by its address: no page carries a script of its own.
-fn head(html: &mut Html, over: Over, live: bool) {
+/// the panel, and it loads it by its address: no page carries a script of its own. The org chart
+/// page loads a second file, `org.js`, and no other page does.
+fn head(html: &mut Html, over: Over, live: bool, org: bool) {
     let lang = html.lang();
     html.raw("<!doctype html><html lang=\"")
         .raw(lang.tag())
@@ -46,6 +47,9 @@ fn head(html: &mut Html, over: Over, live: bool) {
     }
     if over != Over::Nothing || live {
         html.raw("<script src=\"/assets/panel.js\"></script>");
+    }
+    if org {
+        html.raw("<script src=\"/assets/org.js\"></script>");
     }
     html.raw("</head><body>");
 }
@@ -117,6 +121,8 @@ pub enum Tab {
     Numbers,
     /// The matrix of accesses.
     Accesses,
+    /// The org chart of the Hermes.
+    Org,
 }
 
 /// What every page of a session shows around its own content.
@@ -401,6 +407,7 @@ pub fn sign_in(lang: Lang, first_access_pending: bool, refusal: Option<Said>) ->
             Over::Passkey
         },
         false,
+        false,
     );
     html.raw("<main class=\"entry\">").raw(LOGO);
     if first_access_pending {
@@ -486,7 +493,7 @@ pub fn sign_in(lang: Lang, first_access_pending: bool, refusal: Option<Said>) ->
 #[must_use]
 pub fn first_access(lang: Lang, origin: &str, refusal: Option<Said>) -> String {
     let mut html = Html::new(lang);
-    head(&mut html, Over::Passkey, false);
+    head(&mut html, Over::Passkey, false, false);
     html.raw("<main class=\"entry\">").raw(LOGO);
     stepper(&mut html, 1);
     html.raw("<h1>")
@@ -522,8 +529,8 @@ pub fn first_access(lang: Lang, origin: &str, refusal: Option<Said>) -> String {
     html.finish()
 }
 
-fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
-    head(html, over, true);
+pub(super) fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
+    head(html, over, true, tab == Tab::Org);
     html.raw(if over == Over::Nothing {
         "<div class=\"page\"><header class=\"top\">"
     } else {
@@ -592,6 +599,7 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
         (Tab::Hermes, "<a href=\"/\"", None),
         (Tab::Numbers, "<a href=\"/whatsapps\"", None),
         (Tab::Accesses, "<a href=\"/accesses\"", Some(k("Accesses"))),
+        (Tab::Org, "<a href=\"/org\"", Some(k("Org chart"))),
     ] {
         html.raw(address).raw(if this == tab {
             " aria-current=\"page\">"
@@ -605,14 +613,20 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
         };
         html.raw("</a>");
     }
-    html.raw("</nav><main id=\"live-main\" data-live>");
+    // The org chart is edited on the page: a live swap of its main would wipe the map, so its
+    // main is not a live region. Its stored state is a small region of its own (`org.rs`).
+    html.raw(if tab == Tab::Org {
+        "</nav><main id=\"org-main\">"
+    } else {
+        "</nav><main id=\"live-main\" data-live>"
+    });
 }
 
 /// Ends the page, up to where a window over it would go.
-fn close(html: &mut Html) {
+pub(super) fn close(html: &mut Html) {
     html.raw("</main><p class=\"footer\">")
         .fill(
-            k("In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server."),
+            k("In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server."),
             &[("command", Arg::Code("arauto-hub admin"))],
         )
         .raw("</p><p class=\"footer next\"><a class=\"footer-link\" href=\"/installation\">")

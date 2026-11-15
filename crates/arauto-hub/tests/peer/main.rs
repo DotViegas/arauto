@@ -12,4 +12,5 @@ mod admin;
 mod ceilings;
 mod messages;
 mod notices;
+mod org;
 mod tools;

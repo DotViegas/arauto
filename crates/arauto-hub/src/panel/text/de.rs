@@ -25,10 +25,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Weitere Warnmeldungen: {n}. Alle anzeigen mit {command}.",
     ),
     ("Accesses", "Zugriffe"),
-    (
-        "In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "In dieser Version verbindet und widerruft das Panel Hermes und ändert die Zugriffe jeder Nummer. Nummern koppeln und Chats auswählen erfolgt weiterhin mit dem Befehl {command} auf dem Server des Hubs.",
-    ),
     ("none", "keine"),
     (
         "Your Hermes and their [numbers]",
@@ -823,5 +819,212 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
         "Die Nachricht weist den Hermes an, den Connector von diesem Hub herunterzuladen, und der Download-Ordner ist leer. Es wurde nichts ausgestellt. Stellen Sie die Einladung für {name} mit dem Befehl {command} auf dem Server des Hubs aus.",
+    ),
+    ("Org chart", "Organigramm"),
+    ("Who talks to [whom]", "Wer spricht mit [wem]?"),
+    (
+        "Drag a Hermes to change its level. Pull the purple dot of a card to another card to create a link. Click an arrow or a card to adjust it.",
+        "Ziehen Sie einen Hermes, um seine Ebene zu ändern. Ziehen Sie den lila Punkt einer Karte auf eine andere Karte, um eine Verknüpfung zu erstellen. Klicken Sie auf einen Pfeil oder eine Karte, um sie anzupassen.",
+    ),
+    ("View", "Ansicht"),
+    ("Map", "Karte"),
+    ("List", "Liste"),
+    ("+ Level", "+ Ebene"),
+    ("Undo", "Rückgängig"),
+    ("Publish", "Veröffentlichen"),
+    ("Draft: 1 change", "Entwurf: 1 Änderung"),
+    ("Draft: {n} changes", "Entwurf: {n} Änderungen"),
+    (
+        "From a higher level to a lower one: instruction",
+        "Von einer höheren zu einer niedrigeren Ebene: Anweisung",
+    ),
+    (
+        "From a lower level to a higher one: request",
+        "Von einer niedrigeren zu einer höheren Ebene: Anfrage",
+    ),
+    ("Same level: note", "Gleiche Ebene: Notiz"),
+    (
+        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
+        "In dieser Version werden die Ebenen, die Rollen und die Pfeilarten nur hier angezeigt: Kein Hermes erfährt davon, und eine Notiz bleibt eine Angabe, nie eine Anordnung. Nur eine Verknüpfung erlaubt es einem Hermes, einem anderen eine Notiz zu schicken.",
+    ),
+    ("instruction", "Anweisung"),
+    ("request", "Anfrage"),
+    ("note", "Notiz"),
+    ("Name of level {n}", "Name der Ebene {n}"),
+    ("Remove empty level", "Leere Ebene entfernen"),
+    ("Move up", "Nach oben"),
+    ("Move down", "Nach unten"),
+    (
+        "A level name has 1 to 32 lowercase letters, digits, hyphens or underscores, starts with a letter or a digit, and is not a reserved word.",
+        "Ein Ebenenname hat 1 bis 32 Kleinbuchstaben, Ziffern, Bindestriche oder Unterstriche, beginnt mit einem Buchstaben oder einer Ziffer und ist kein reserviertes Wort.",
+    ),
+    (
+        "Another level already has this name.",
+        "Eine andere Ebene hat bereits diesen Namen.",
+    ),
+    (
+        "The org chart has from 1 to {max} levels.",
+        "Das Organigramm hat 1 bis {max} Ebenen.",
+    ),
+    (
+        "Drag to another Hermes to create a link",
+        "Auf einen anderen Hermes ziehen, um eine Verknüpfung zu erstellen",
+    ),
+    ("{alias} · answers", "{alias} · antwortet"),
+    ("{alias} · reads only", "{alias} · liest nur"),
+    ("no number", "keine Nummer"),
+    ("not placed yet", "noch ohne Platz"),
+    (
+        "{name}, level {level}, {state}",
+        "{name}, Ebene {level}, {state}",
+    ),
+    (
+        "Not placed yet: {names}. They are shown in the lowest level; publish to keep them there.",
+        "Noch ohne Platz: {names}. Sie werden in der untersten Ebene angezeigt; veröffentlichen Sie, damit sie dort bleiben.",
+    ),
+    ("Kind: {kind}", "Art: {kind}"),
+    ("Wakes {name}", "Weckt {name}"),
+    (
+        "{name} cannot be woken now: this mark only applies once it can.",
+        "{name} kann jetzt nicht geweckt werden: Diese Markierung gilt erst, wenn es möglich ist.",
+    ),
+    ("Create the way back", "Rückweg anlegen"),
+    ("Remove the way back", "Rückweg entfernen"),
+    ("Remove", "Entfernen"),
+    (
+        "This link already exists.",
+        "Diese Verknüpfung existiert bereits.",
+    ),
+    ("Role of this Hermes", "Rolle dieses Hermes"),
+    (
+        "For your own reading: in this version no Hermes sees it. Up to 280 characters, in one line.",
+        "Zu Ihrer eigenen Information: In dieser Version sieht kein Hermes sie. Bis zu 280 Zeichen, in einer Zeile.",
+    ),
+    ("Level", "Ebene"),
+    ("Move left", "Nach links verschieben"),
+    ("Move right", "Nach rechts verschieben"),
+    ("Change them in Accesses", "Ändern Sie sie unter Zugriffe"),
+    ("No access to any number.", "Kein Zugriff auf eine Nummer."),
+    (
+        "Change it with the command {command}.",
+        "Ändern Sie das mit dem Befehl {command}.",
+    ),
+    ("Link to", "Verknüpfen mit"),
+    ("Add link", "Verknüpfung hinzufügen"),
+    ("Links of this Hermes", "Verknüpfungen dieses Hermes"),
+    ("Levels", "Ebenen"),
+    ("Links", "Verknüpfungen"),
+    ("Role", "Rolle"),
+    ("From", "Von"),
+    ("To", "An"),
+    ("Kind", "Art"),
+    ("Wakes", "Weckt"),
+    ("nobody", "niemand"),
+    ("No link.", "Keine Verknüpfung."),
+    (
+        "Publish these changes?",
+        "Diese Änderungen veröffentlichen?",
+    ),
+    (
+        "Links are security rules. They only apply after you publish.",
+        "Verknüpfungen sind Sicherheitsregeln. Sie gelten erst nach dem Veröffentlichen.",
+    ),
+    (
+        "A link lets a request cross numbers: what reaches one Hermes on one number can become a note to the other, who acts on its own numbers.",
+        "Eine Verknüpfung lässt eine Anfrage über Nummern hinweg laufen: Was einen Hermes über eine Nummer erreicht, kann für den anderen zur Notiz werden, der über seine eigenen Nummern handelt.",
+    ),
+    ("Back", "Zurück"),
+    (
+        "New link: {from} → {to} ({kind})",
+        "Neue Verknüpfung: {from} → {to} ({kind})",
+    ),
+    (
+        "New link: {from} → {to} ({kind}), wakes {to}",
+        "Neue Verknüpfung: {from} → {to} ({kind}), weckt {to}",
+    ),
+    (
+        "Link {from} → {to}: now wakes {to}",
+        "Verknüpfung {from} → {to}: weckt jetzt {to}",
+    ),
+    (
+        "Link {from} → {to}: no longer wakes {to}",
+        "Verknüpfung {from} → {to}: weckt {to} nicht mehr",
+    ),
+    (
+        "Link removed: {from} → {to}",
+        "Verknüpfung entfernt: {from} → {to}",
+    ),
+    (
+        "{name} changes level: {before} → {after}",
+        "{name} wechselt die Ebene: {before} → {after}",
+    ),
+    (
+        "{name} is placed in level {after}",
+        "{name} kommt auf Ebene {after}",
+    ),
+    ("Role of {name} changed", "Rolle von {name} geändert"),
+    (
+        "Places on the map changed: {n}",
+        "Positionen auf der Karte geändert: {n}",
+    ),
+    ("New level: {name}", "Neue Ebene: {name}"),
+    (
+        "Level renamed: {before} → {after}",
+        "Ebene umbenannt: {before} → {after}",
+    ),
+    ("Level removed: {name}", "Ebene entfernt: {name}"),
+    (
+        "Order of the levels: {names}",
+        "Reihenfolge der Ebenen: {names}",
+    ),
+    ("Published.", "Veröffentlicht."),
+    (
+        "Someone changed the org chart while you were editing: another publish, a link changed by the command, or a Hermes added or removed. Nothing was published. Your draft is kept: check the changes and publish again.",
+        "Jemand hat das Organigramm geändert, während Sie bearbeiteten: eine andere Veröffentlichung, eine per Befehl geänderte Verknüpfung oder ein hinzugefügter oder entfernter Hermes. Nichts wurde veröffentlicht. Ihr Entwurf bleibt erhalten: Prüfen Sie die Änderungen und veröffentlichen Sie erneut.",
+    ),
+    ("Nothing was published.", "Nichts wurde veröffentlicht."),
+    (
+        "Two levels have the same name.",
+        "Zwei Ebenen haben denselben Namen.",
+    ),
+    (
+        "A role has at most 280 characters, in one line, without control or direction characters.",
+        "Eine Rolle hat höchstens 280 Zeichen, in einer Zeile, ohne Steuer- oder Richtungszeichen.",
+    ),
+    (
+        "A place on the map is out of range.",
+        "Eine Position auf der Karte liegt außerhalb des Bereichs.",
+    ),
+    (
+        "The draft names a Hermes or a level that does not exist, or leaves a Hermes out.",
+        "Der Entwurf nennt einen Hermes oder eine Ebene, die es nicht gibt, oder lässt einen Hermes aus.",
+    ),
+    (
+        "A link joins two different Hermes, once in each direction.",
+        "Eine Verknüpfung verbindet zwei verschiedene Hermes, einmal in jede Richtung.",
+    ),
+    (
+        "The draft could not be read.",
+        "Der Entwurf konnte nicht gelesen werden.",
+    ),
+    (
+        "The draft is too large to publish.",
+        "Der Entwurf ist zu groß zum Veröffentlichen.",
+    ),
+    (
+        "Something failed in the hub. Nothing was published. See the hub's log.",
+        "Im Hub ist etwas fehlgeschlagen. Nichts wurde veröffentlicht. Sehen Sie im Protokoll des Hubs nach.",
+    ),
+    (
+        "Editing the org chart needs the script of the panel. Without it, this is the org chart as it is published.",
+        "Zum Bearbeiten des Organigramms wird das Skript des Panels benötigt. Ohne es ist dies das Organigramm, wie es veröffentlicht ist.",
+    ),
+    (
+        "No Hermes yet. Connect the first one in the Hermes tab.",
+        "Noch kein Hermes. Verbinden Sie den ersten im Tab Hermes.",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
+        "In dieser Version verbindet und widerruft das Panel Hermes, ändert die Zugriffe jeder Nummer und bearbeitet das Organigramm mit seinen Verknüpfungen. Nummern koppeln und Chats auswählen erfolgt weiterhin mit dem Befehl {command} auf dem Server des Hubs.",
     ),
 ];

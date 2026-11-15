@@ -13,6 +13,8 @@ mod closing;
 mod database;
 mod enrollment;
 mod hermes;
+mod org;
+mod org_rounds;
 mod purge;
 mod role;
 mod rounds;

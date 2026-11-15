@@ -80,6 +80,10 @@ The one that checks the format when building the sentence is the connector
 - It reminds that a note is data. Instructing a Hermes to obey another makes the hub a path of
   command, which the project does not guarantee (section 9).
 
+### The org chart (proposal, stage A)
+
+[Decision 0043](decisoes/0043-organograma-e-niveis.md), built in the hub, tried only in a desktop Chrome without a window (15/11/2026). The admin can arrange the Hermes in levels on the panel's org chart, and the panel shows each link as an instruction (to a lower level), a request (to a higher one) or a note (same level). **Levels and kinds are for the admin's eyes**: no Hermes is told its level or a kind, and nothing here changes a note, a notice or a tool. Rules 1 to 7 above do not change. Publishing the chart changes the peer list through the same functions as the admin command, in one write. **Not guaranteed:** that a Hermes behaves by its level; in stage A it does not know it.
+
 ## 3. The path of a note
 
 ```
@@ -206,6 +210,7 @@ With that: A and B waking each other stop at 10 notices per hour in each directi
 | Link | One line per direction, with who created it and when it changed. |
 | Thread | The two Hermes, when it started and when it had the last note. |
 | Note | Sender, recipient, time, size, when it was read and the text **encrypted**. It is also the record of who talked to whom. |
+| Org chart | Level, place and role text of each Hermes, in tables of their own, read by nothing in the channel. Not security events; the audit has no role text and no level name. |
 | Audit | Only what changes who can do what: creating, changing and removing a link. And one event per link and per hour when a ceiling is exceeded. **Never one event per note, and never the text.** |
 
 **Cipher of the note.** XChaCha20-Poly1305, with a 24-byte nonce from the system generator. The key
@@ -248,6 +253,7 @@ They stay in the connector, with fixed name and description ([09-contrato-mcp.md
 It does not:
 
 - **It does not transmit an order.** There is no note "with authority".
+- **The level of a Hermes and the kind of a link give no authority** (stage A).
 - **It does not give a Hermes anything of the admin.** There is no note that changes access, list,
   invite or device.
 - **It does not choose who answers and does not answer by itself.**
@@ -287,3 +293,4 @@ Known limits:
 | Note signed by the identity of the sender device | It would give the end-to-end proof of limit 1. To be evaluated after the MVP. |
 | Admin command to read the text of the notes | Out of the MVP. If it comes in, it escapes every control character and records who read. |
 | The wording of the fixed sentence | Awaits approval. |
+| Stage B: notes that know the levels | Pending. It needs decision 0005 reopened by the maintainer and new fixed sentences he approves ([0043](decisoes/0043-organograma-e-niveis.md)). |

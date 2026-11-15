@@ -25,10 +25,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Ещё оповещений: {n}. Посмотреть все: {command}.",
     ),
     ("Accesses", "Доступы"),
-    (
-        "In this version the panel connects and revokes Hermes and changes the accesses of each number. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "В этой версии панель подключает и отзывает Hermes и меняет доступы к каждому номеру. Привязка номеров и выбор чатов пока выполняются командой {command} на сервере хаба.",
-    ),
     ("none", "нет"),
     (
         "Your Hermes and their [numbers]",
@@ -817,5 +813,206 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "The message tells the Hermes to download the connector from this hub, and the downloads folder is empty. Nothing was issued. Issue the invite of {name} with the {command} command, on the hub's server.",
         "Сообщение велит Hermes скачать коннектор с этого хаба, а папка загрузок пуста. Ничего не выпущено. Выпустите приглашение для {name} командой {command} на сервере хаба.",
+    ),
+    ("Org chart", "Оргсхема"),
+    ("Who talks to [whom]", "Кто говорит с [кем]?"),
+    (
+        "Drag a Hermes to change its level. Pull the purple dot of a card to another card to create a link. Click an arrow or a card to adjust it.",
+        "Перетащите Hermes, чтобы изменить уровень. Потяните фиолетовую точку карточки на другую карточку, чтобы создать связь. Нажмите на стрелку или на карточку, чтобы настроить.",
+    ),
+    ("View", "Вид"),
+    ("Map", "Карта"),
+    ("List", "Список"),
+    ("+ Level", "+ Уровень"),
+    ("Undo", "Отменить"),
+    ("Publish", "Опубликовать"),
+    ("Draft: 1 change", "Черновик: 1 изменение"),
+    ("Draft: {n} changes", "Черновик, изменений: {n}"),
+    (
+        "From a higher level to a lower one: instruction",
+        "Сверху вниз: инструкция",
+    ),
+    (
+        "From a lower level to a higher one: request",
+        "Снизу вверх: запрос",
+    ),
+    ("Same level: note", "Тот же уровень: заметка"),
+    (
+        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
+        "В этой версии уровни, роли и виды стрелок показываются только здесь: ни один Hermes о них не узнаёт, а заметка остаётся данными, а не приказом. Только связь позволяет одному Hermes отправить заметку другому.",
+    ),
+    ("instruction", "инструкция"),
+    ("request", "запрос"),
+    ("note", "заметка"),
+    ("Name of level {n}", "Имя уровня {n}"),
+    ("Remove empty level", "Удалить пустой уровень"),
+    ("Move up", "Вверх"),
+    ("Move down", "Вниз"),
+    (
+        "A level name has 1 to 32 lowercase letters, digits, hyphens or underscores, starts with a letter or a digit, and is not a reserved word.",
+        "Имя уровня — от 1 до 32 строчных букв, цифр, дефисов или подчёркиваний, начинается с буквы или цифры и не является зарезервированным словом.",
+    ),
+    (
+        "Another level already has this name.",
+        "Другой уровень уже имеет это имя.",
+    ),
+    (
+        "The org chart has from 1 to {max} levels.",
+        "В оргсхеме от 1 до {max} уровней.",
+    ),
+    (
+        "Drag to another Hermes to create a link",
+        "Перетащите на другой Hermes, чтобы создать связь",
+    ),
+    ("{alias} · answers", "{alias} · отвечает"),
+    ("{alias} · reads only", "{alias} · только чтение"),
+    ("no number", "нет номера"),
+    ("not placed yet", "ещё не размещён"),
+    (
+        "{name}, level {level}, {state}",
+        "{name}, уровень {level}, {state}",
+    ),
+    (
+        "Not placed yet: {names}. They are shown in the lowest level; publish to keep them there.",
+        "Ещё не размещены: {names}. Они показаны на самом нижнем уровне; опубликуйте, чтобы они там и остались.",
+    ),
+    ("Kind: {kind}", "Тип: {kind}"),
+    ("Wakes {name}", "Пробуждает {name}"),
+    (
+        "{name} cannot be woken now: this mark only applies once it can.",
+        "{name} сейчас нельзя пробудить: эта отметка действует только тогда, когда это возможно.",
+    ),
+    ("Create the way back", "Создать обратный путь"),
+    ("Remove the way back", "Удалить обратный путь"),
+    ("Remove", "Удалить"),
+    ("This link already exists.", "Такая связь уже есть."),
+    ("Role of this Hermes", "Роль этого Hermes"),
+    (
+        "For your own reading: in this version no Hermes sees it. Up to 280 characters, in one line.",
+        "Для вашего личного чтения: в этой версии ни один Hermes этого не видит. До 280 символов, в одной строке.",
+    ),
+    ("Level", "Уровень"),
+    ("Move left", "Влево"),
+    ("Move right", "Вправо"),
+    ("Change them in Accesses", "Измените на вкладке «Доступы»"),
+    (
+        "No access to any number.",
+        "Нет доступа ни к одному номеру.",
+    ),
+    (
+        "Change it with the command {command}.",
+        "Измените командой {command}.",
+    ),
+    ("Link to", "Связать с"),
+    ("Add link", "Добавить связь"),
+    ("Links of this Hermes", "Связи этого Hermes"),
+    ("Levels", "Уровни"),
+    ("Links", "Связи"),
+    ("Role", "Роль"),
+    ("From", "От"),
+    ("To", "Кому"),
+    ("Kind", "Тип"),
+    ("Wakes", "Пробуждает"),
+    ("nobody", "никто"),
+    ("No link.", "Связей нет."),
+    ("Publish these changes?", "Опубликовать эти изменения?"),
+    (
+        "Links are security rules. They only apply after you publish.",
+        "Связи — это правила безопасности. Они начинают действовать только после публикации.",
+    ),
+    (
+        "A link lets a request cross numbers: what reaches one Hermes on one number can become a note to the other, who acts on its own numbers.",
+        "Связь позволяет запросу проходить между номерами: то, что приходит одному Hermes по одному номеру, может стать заметкой для другого, который действует по своим номерам.",
+    ),
+    ("Back", "Назад"),
+    (
+        "New link: {from} → {to} ({kind})",
+        "Новая связь: {from} → {to} ({kind})",
+    ),
+    (
+        "New link: {from} → {to} ({kind}), wakes {to}",
+        "Новая связь: {from} → {to} ({kind}), пробуждает {to}",
+    ),
+    (
+        "Link {from} → {to}: now wakes {to}",
+        "Связь {from} → {to}: теперь пробуждает {to}",
+    ),
+    (
+        "Link {from} → {to}: no longer wakes {to}",
+        "Связь {from} → {to}: больше не пробуждает {to}",
+    ),
+    (
+        "Link removed: {from} → {to}",
+        "Связь удалена: {from} → {to}",
+    ),
+    (
+        "{name} changes level: {before} → {after}",
+        "{name} меняет уровень: {before} → {after}",
+    ),
+    (
+        "{name} is placed in level {after}",
+        "{name} размещается на уровне {after}",
+    ),
+    ("Role of {name} changed", "Роль {name} изменена"),
+    (
+        "Places on the map changed: {n}",
+        "Изменено положений на карте: {n}",
+    ),
+    ("New level: {name}", "Новый уровень: {name}"),
+    (
+        "Level renamed: {before} → {after}",
+        "Уровень переименован: {before} → {after}",
+    ),
+    ("Level removed: {name}", "Уровень удалён: {name}"),
+    ("Order of the levels: {names}", "Порядок уровней: {names}"),
+    ("Published.", "Опубликовано."),
+    (
+        "Someone changed the org chart while you were editing: another publish, a link changed by the command, or a Hermes added or removed. Nothing was published. Your draft is kept: check the changes and publish again.",
+        "Кто-то изменил оргсхему, пока вы её редактировали: другая публикация, связь, изменённая командой, или Hermes, добавленный или удалённый. Ничего не опубликовано. Ваш черновик сохранён: проверьте изменения и опубликуйте снова.",
+    ),
+    ("Nothing was published.", "Ничего не опубликовано."),
+    (
+        "Two levels have the same name.",
+        "У двух уровней одно и то же имя.",
+    ),
+    (
+        "A role has at most 280 characters, in one line, without control or direction characters.",
+        "Роль — не более 280 символов, в одной строке, без управляющих и направляющих символов.",
+    ),
+    (
+        "A place on the map is out of range.",
+        "Положение на карте вне допустимого диапазона.",
+    ),
+    (
+        "The draft names a Hermes or a level that does not exist, or leaves a Hermes out.",
+        "В черновике указан Hermes или уровень, которых нет, либо пропущен Hermes.",
+    ),
+    (
+        "A link joins two different Hermes, once in each direction.",
+        "Связь соединяет два разных Hermes, по одной в каждом направлении.",
+    ),
+    (
+        "The draft could not be read.",
+        "Черновик не удалось прочитать.",
+    ),
+    (
+        "The draft is too large to publish.",
+        "Черновик слишком большой для публикации.",
+    ),
+    (
+        "Something failed in the hub. Nothing was published. See the hub's log.",
+        "В хабе что-то пошло не так. Ничего не опубликовано. Посмотрите журнал хаба.",
+    ),
+    (
+        "Editing the org chart needs the script of the panel. Without it, this is the org chart as it is published.",
+        "Для редактирования оргсхемы нужен скрипт панели. Без него это оргсхема в том виде, в каком она опубликована.",
+    ),
+    (
+        "No Hermes yet. Connect the first one in the Hermes tab.",
+        "Пока нет ни одного Hermes. Подключите первый на вкладке Hermes.",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
+        "В этой версии панель подключает и отзывает Hermes, меняет доступы к каждому номеру и редактирует оргсхему с её связями. Привязка номеров и выбор чатов по-прежнему выполняются командой {command} на сервере хаба.",
     ),
 ];

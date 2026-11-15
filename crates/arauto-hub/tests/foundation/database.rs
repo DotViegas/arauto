@@ -585,3 +585,200 @@ async fn the_codes_and_the_passkeys_that_exist_are_carried_to_the_first_access_m
         assert_eq!(mark, (id == with_a_passkey).then_some(777), "{id}");
     }
 }
+
+/// The two tables of the org chart arrive in a database that has data: they are empty, every
+/// live Hermes is "not placed yet", the links are as they were, and the version of the chart is
+/// stable.
+#[tokio::test]
+async fn the_chart_tables_come_to_a_database_with_data() {
+    use arauto_hub::repo::org;
+
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 17)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+    assert!(!table_exists(&db.pool, "org_level").await);
+
+    let organization = uuid::Uuid::new_v4();
+    let admin = uuid::Uuid::new_v4();
+    let (one, two) = (uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
+    sqlx::query(
+        "INSERT INTO organization (id, name, state, key_enc, created_at) \
+         VALUES ($1, 'one', 'active', decode('00', 'hex'), 1)",
+    )
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO admin (id, organization_id, name, kind, created_at) \
+         VALUES ($1, $2, 'a', 'local', 1)",
+    )
+    .bind(admin)
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    for (id, name) in [(one, "ana"), (two, "bia")] {
+        sqlx::query(
+            "INSERT INTO hermes (id, organization_id, name, created_at) VALUES ($1, $2, $3, 1)",
+        )
+        .bind(id)
+        .bind(organization)
+        .bind(name)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query(
+        "INSERT INTO peer_link (organization_id, from_hermes_id, to_hermes_id, wake, created_by, \
+                                created_at, changed_at) VALUES ($1, $2, $3, TRUE, $4, 1, 1)",
+    )
+    .bind(organization)
+    .bind(one)
+    .bind(two)
+    .bind(admin)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+
+    for table in ["org_level", "org_member"] {
+        assert!(table_exists(&db.pool, table).await, "{table}");
+        let rows: i64 = sqlx::query_scalar(AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(rows, 0, "{table}");
+    }
+    let resolved = db::organizations_for_system_task(&db.pool, SystemTask::Deadlines)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|found| found.id() == organization)
+        .unwrap();
+    let chart = org::chart(&db.pool, resolved).await.unwrap();
+    assert!(chart.levels.is_empty());
+    let names: Vec<&str> = chart.members.iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["ana", "bia"]);
+    assert!(chart.members.iter().all(|member| member.place.is_none()));
+    assert_eq!(chart.links.len(), 1);
+    assert!(chart.links[0].wake);
+    assert_eq!(
+        org::chart(&db.pool, resolved).await.unwrap().version(),
+        chart.version()
+    );
+}
+
+/// The database refuses what the chart does not allow, whatever the program wrote.
+#[tokio::test]
+async fn the_database_refuses_what_the_chart_does_not_allow() {
+    let db = TestDb::shared().await;
+    let home = TestHome::new();
+    let ours = common::organization(&db.pool, &home).await;
+    let theirs = common::organization(&db.pool, &home).await;
+    let level = |organization: uuid::Uuid, position: i32, name: &'static str| {
+        let pool = db.pool.clone();
+        async move {
+            let id = uuid::Uuid::new_v4();
+            sqlx::query(
+                "INSERT INTO org_level (id, organization_id, position, name, created_at, changed_at) \
+                 VALUES ($1, $2, $3, $4, 1, 1)",
+            )
+            .bind(id)
+            .bind(organization)
+            .bind(position)
+            .bind(name)
+            .execute(&pool)
+            .await
+            .map(|_| id)
+        }
+    };
+    // A reserved name, a position out of range, a name that breaks the format.
+    for (position, name) in [
+        (0, "system"),
+        (0, "hermes"),
+        (12, "board"),
+        (0, "Board"),
+        (-1, "x"),
+    ] {
+        assert!(
+            level(ours.id(), position, name).await.is_err(),
+            "{position} {name}"
+        );
+    }
+    let board = level(ours.id(), 0, "board").await.unwrap();
+    // The same name or the same position twice in one organization: refused at the commit, here
+    // at once because each statement is its own transaction.
+    assert!(level(ours.id(), 1, "board").await.is_err());
+    assert!(level(ours.id(), 0, "floor").await.is_err());
+    // Another organization may have the same name and the same position.
+    let other = level(theirs.id(), 0, "board").await.unwrap();
+
+    let hermes = common::hermes(&db.pool, ours).await;
+    let member = |hermes: uuid::Uuid,
+                  organization: uuid::Uuid,
+                  level: uuid::Uuid,
+                  x: i32,
+                  role: Option<&'static str>| {
+        let pool = db.pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO org_member (hermes_id, organization_id, level_id, map_x, role, changed_at) \
+                 VALUES ($1, $2, $3, $4, $5, 1)",
+            )
+            .bind(hermes)
+            .bind(organization)
+            .bind(level)
+            .bind(x)
+            .bind(role)
+            .execute(&pool)
+            .await
+        }
+    };
+    // A level of another organization, a place out of range, a role with a control character, a
+    // direction character or a separator, or too long.
+    assert!(member(hermes, ours.id(), other, 10, None).await.is_err());
+    assert!(member(hermes, ours.id(), board, 4001, None).await.is_err());
+    assert!(member(hermes, ours.id(), board, -1, None).await.is_err());
+    for role in [
+        "a\u{7}b",
+        "a\nb",
+        "a\u{202e}b",
+        "a\u{2028}b",
+        "a\u{e0041}b",
+        "",
+    ] {
+        assert!(
+            member(hermes, ours.id(), board, 10, Some(role))
+                .await
+                .is_err(),
+            "{role:?}"
+        );
+    }
+    let long = "x".repeat(281);
+    let long: &'static str = Box::leak(long.into_boxed_str());
+    assert!(
+        member(hermes, ours.id(), board, 10, Some(long))
+            .await
+            .is_err()
+    );
+    // A Hermes of another organization.
+    let strange = common::hermes(&db.pool, theirs).await;
+    assert!(member(strange, ours.id(), board, 10, None).await.is_err());
+    // What is allowed goes in, and only once for one Hermes.
+    assert!(
+        member(hermes, ours.id(), board, 10, Some("keeps the books"))
+            .await
+            .is_ok()
+    );
+    assert!(member(hermes, ours.id(), board, 20, None).await.is_err());
+}

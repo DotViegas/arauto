@@ -534,3 +534,120 @@ fn the_scan_reads_signatures_the_way_they_are_written() {
     assert!(generic.parameters.contains("impl Fn(i64) -> i64"));
     assert!(!found.iter().find(|f| f.name == "pure").unwrap().is_async);
 }
+
+/// Only the panel and the admin command reach the org chart (rule S6 of
+/// `docs/decisoes/0043-organograma-e-niveis.md`): no part of the channel, of a notice or of a
+/// tool names its tables or its modules, so what the admin writes in a role or a level name
+/// cannot reach a Hermes.
+#[test]
+fn only_the_panel_and_the_admin_reach_the_org_chart() {
+    /// The files of `src` that may say the words, and why.
+    const MAY: &[&str] = &[
+        "core/org.rs",
+        "core/mod.rs",
+        "repo/org.rs",
+        // The one DELETE: a Hermes that goes takes its place and its role with it.
+        "repo/hermes.rs",
+        "repo/mod.rs",
+        "admin/org.rs",
+        "admin/mod.rs",
+        "admin/render.rs",
+        "admin/render/org.rs",
+        "main.rs",
+        "panel/org.rs",
+        "panel/mod.rs",
+        // The kind of target an event is about.
+        "audit.rs",
+    ];
+    const WORDS: &[&str] = &["org_member", "org_level", "repo::org", "core::org"];
+
+    /// A module called `org` brought in or named by a path, however it is spelled: `x::org`,
+    /// `org::f`, or `org` inside a `use` tree (`use x::{a, org};`, spread over lines or not).
+    /// Comment lines are not read.
+    fn imports_a_module_called_org(code: &str) -> bool {
+        let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+        let mut in_use = false;
+        for line in code.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            if trimmed.starts_with("use ") || trimmed.starts_with("pub use ") {
+                in_use = true;
+            }
+            let found = line.match_indices("org").any(|(at, _)| {
+                let before = line[..at].chars().next_back();
+                let after = line[at + 3..].chars().next();
+                if before.is_some_and(word) || after.is_some_and(word) {
+                    return false;
+                }
+                let head = line[..at].trim_end();
+                let tail = line[at + 3..].trim_start();
+                head.ends_with("::")
+                    || tail.starts_with("::")
+                    || (in_use && (head.ends_with('{') || head.ends_with(',') || head.is_empty()))
+            });
+            if in_use && line.contains(';') {
+                in_use = false;
+            }
+            if found {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn files(dir: &Path, found: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                files(&path, found);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                found.push(path);
+            }
+        }
+    }
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut all = Vec::new();
+    files(&src, &mut all);
+    assert!(all.len() > 40, "the sources were read: {}", all.len());
+    let mut named = Vec::new();
+    for file in &all {
+        let relative = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = std::fs::read_to_string(file).unwrap();
+        // Outside the tests of the file.
+        let code = text.split("#[cfg(test)]").next().unwrap();
+        if relative == "repo/hermes.rs" {
+            // The one DELETE and nothing else: the file reads no other part of the chart.
+            assert_eq!(
+                code.matches("org_member").count(),
+                1,
+                "repo/hermes.rs names org_member once, in its DELETE"
+            );
+            assert_eq!(code.matches("DELETE FROM org_member").count(), 1);
+            assert_eq!(code.matches("org_level").count(), 0);
+        }
+        if WORDS.iter().any(|word| code.contains(word)) || imports_a_module_called_org(code) {
+            named.push(relative);
+        }
+    }
+    for file in &named {
+        assert!(
+            MAY.contains(&file.as_str()),
+            "{file} names the org chart and may not"
+        );
+    }
+    // The control: the files that must name it do, so the scan reads what it is meant to.
+    for file in [
+        "repo/org.rs",
+        "panel/org.rs",
+        "admin/org.rs",
+        "repo/hermes.rs",
+    ] {
+        assert!(named.iter().any(|n| n == file), "{file} was not read");
+    }
+}
