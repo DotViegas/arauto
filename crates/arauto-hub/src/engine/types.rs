@@ -947,6 +947,13 @@ impl PairingQr {
     pub fn expose(&self) -> &str {
         &self.0
     }
+
+    /// A second copy, wiped when dropped like this one. There is no `Clone`: a copy of a
+    /// secret is made on purpose, by name.
+    #[must_use]
+    pub(crate) fn duplicate(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 /// The code a person types on the telephone to pair it: short-lived, shown once.
@@ -975,6 +982,12 @@ impl PairingCode {
     #[must_use]
     pub fn expose(&self) -> &str {
         &self.0
+    }
+
+    /// A second copy, wiped when dropped like this one.
+    #[must_use]
+    pub(crate) fn duplicate(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 

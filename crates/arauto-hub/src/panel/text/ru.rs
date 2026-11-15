@@ -63,10 +63,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "Номер"),
     ("Hermes with access", "Hermes с доступом"),
     ("Last message", "Последнее сообщение"),
-    (
-        "No number yet. Add one with {command}.",
-        "Пока нет ни одного номера. Добавьте номер командой {command}.",
-    ),
     ("command", "командный"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
@@ -1011,8 +1007,301 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "No Hermes yet. Connect the first one in the Hermes tab.",
         "Пока нет ни одного Hermes. Подключите первый на вкладке Hermes.",
     ),
+    ("Connect WhatsApp (WAHA)", "Подключить WhatsApp (WAHA)"),
     (
-        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "В этой версии панель подключает и отзывает Hermes, меняет доступы к каждому номеру и редактирует оргсхему с её связями. Привязка номеров и выбор чатов по-прежнему выполняются командой {command} на сервере хаба.",
+        "Connect WhatsApp (native · in test)",
+        "Подключить WhatsApp (нативный · тестируется)",
+    ),
+    (
+        "No number yet. Add the first one with the \"Connect WhatsApp (WAHA)\" button.",
+        "Пока нет ни одного номера. Добавьте первый кнопкой «Подключить WhatsApp (WAHA)».",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, pairs and manages WhatsApp numbers on WAHA, changes the accesses of each number and edits the org chart with its links. Choosing chats is still done with the {command} command, on the hub's server.",
+        "В этой версии панель подключает и отзывает Hermes, привязывает и ведёт номера WhatsApp через WAHA, меняет доступы каждого номера и редактирует оргсхему с её связями. Выбор чатов по-прежнему выполняется командой {command} на сервере хаба.",
+    ),
+    ("Pair", "Привязать"),
+    ("Pair again", "Привязать снова"),
+    ("Continue pairing", "Продолжить привязку"),
+    ("See the pairing", "Посмотреть привязку"),
+    ("Disconnect", "Отключить"),
+    ("Restart", "Перезапустить"),
+    ("Decide", "Решить"),
+    ("Number {alias}: {state}.", "Номер {alias}: {state}."),
+    (
+        "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+        "Хаб изменил номер {alias}, но WAHA не ответил: его сеанс там мог остаться прежним. Проверьте WAHA командой {command} на сервере хаба.",
+    ),
+    ("Method", "Способ"),
+    ("Phone", "Телефон"),
+    (
+        "How the panel and the Hermes call this number: lowercase letters, digits, hyphen and underscore, up to 32. An alias is never reused.",
+        "Так панель и Hermes называют этот номер: строчные буквы, цифры, дефис и подчёркивание, до 32 символов. Псевдоним никогда не используется повторно.",
+    ),
+    ("Number with the country code", "Номер с кодом страны"),
+    (
+        "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
+        "Например, +55 11 9XXXX-XXXX. Только цифры, пробелы, дефисы и скобки.",
+    ),
+    (
+        "It is the command channel of a Hermes",
+        "Это командный канал Hermes",
+    ),
+    (
+        "It shows as \"command\" in the list.",
+        "В списке он отображается как «командный».",
+    ),
+    ("Before the first number", "Перед первым номером"),
+    (
+        "The engine is an unofficial WhatsApp client. WhatsApp may block the number. Use numbers you can afford to lose.",
+        "Движок — это неофициальный клиент WhatsApp. WhatsApp может заблокировать номер. Используйте номера, потеря которых вам не критична.",
+    ),
+    (
+        "I understand and accept. The hub records this acceptance in the audit.",
+        "Я понимаю и принимаю. Хаб записывает это согласие в аудит.",
+    ),
+    (
+        "The number is paired through WAHA, the engine set on this hub.",
+        "Номер привязывается через WAHA, движок, заданный на этом хабе.",
+    ),
+    ("Add and pair", "Добавить и привязать"),
+    (
+        "WAHA has not answered the hub yet. You can add the number; pairing it needs WAHA to answer.",
+        "WAHA ещё не ответил хабу. Номер можно добавить; привязать его можно, только когда WAHA ответит.",
+    ),
+    (
+        "There is no WhatsApp engine on this hub yet. Set WAHA on the hub's server with {command}, then its key with {key_command}. The key is never typed in the panel.",
+        "На этом хабе ещё нет движка WhatsApp. Задайте WAHA на сервере хаба командой {command}, затем его ключ командой {key_command}. Ключ никогда не вводится в панели.",
+    ),
+    (
+        "The engine has no key yet. Set it on the hub's server with {command}. The key is never typed in the panel.",
+        "У движка ещё нет ключа. Задайте его на сервере хаба командой {command}. Ключ никогда не вводится в панели.",
+    ),
+    (
+        "The alias has from 1 to 32 characters.",
+        "Псевдоним — от 1 до 32 символов.",
+    ),
+    (
+        "The alias starts with a lowercase letter or a digit.",
+        "Псевдоним начинается со строчной буквы или цифры.",
+    ),
+    (
+        "That alias is reserved. Choose another.",
+        "Этот псевдоним зарезервирован. Выберите другой.",
+    ),
+    (
+        "That alias is taken, now or by a number that was removed, and an alias is never reused. Choose another.",
+        "Этот псевдоним занят — сейчас или номером, который был удалён. Псевдоним никогда не используется повторно. Выберите другой.",
+    ),
+    (
+        "Type the number with the country code: from 8 to 15 digits, like +55 11 9XXXX-XXXX.",
+        "Введите номер с кодом страны: от 8 до 15 цифр, например +55 11 9XXXX-XXXX.",
+    ),
+    (
+        "That number is already a WhatsApp of this hub.",
+        "Этот номер уже есть среди WhatsApp этого хаба.",
+    ),
+    (
+        "Read the sentence about the risk and mark that you accept it. Nothing was added.",
+        "Прочитайте фразу о риске и отметьте, что вы её принимаете. Ничего не добавлено.",
+    ),
+    ("Pair {alias}", "Привязать {alias}"),
+    (
+        "Have the phone of {phone} at hand, with WhatsApp open. The pairing lasts up to {minutes} minutes.",
+        "Держите под рукой телефон {phone} с открытым WhatsApp. Привязка длится до {minutes} мин.",
+    ),
+    (
+        "How will the phone pair?",
+        "Как будет привязываться телефон?",
+    ),
+    ("QR code", "QR-код"),
+    (
+        "scan it with the phone's camera, from inside WhatsApp",
+        "отсканируйте камерой телефона изнутри WhatsApp",
+    ),
+    ("Pairing code", "Код привязки"),
+    (
+        "type a code on the phone, for when it cannot scan this screen",
+        "введите код на телефоне, если он не может отсканировать этот экран",
+    ),
+    ("Start pairing", "Начать привязку"),
+    (
+        "WAHA has not created the session of this number yet. Starting the pairing tries again.",
+        "WAHA ещё не создал сеанс этого номера. При запуске привязки попытка повторится.",
+    ),
+    (
+        "Choose QR code or pairing code. Nothing was started.",
+        "Выберите QR-код или код привязки. Ничего не запущено.",
+    ),
+    (
+        "{n} numbers are being paired right now, the most at once. Wait for one to end, or cancel one.",
+        "Сейчас привязываются номера: {n}, это максимум одновременно. Дождитесь окончания одного или отмените один.",
+    ),
+    (
+        "This cannot be done while the number is in the state \"{state}\". Nothing was done.",
+        "Это нельзя сделать, пока номер в состоянии «{state}». Ничего не сделано.",
+    ),
+    ("Starting the pairing…", "Запуск привязки…"),
+    (
+        "QR code to scan with the phone",
+        "QR-код для сканирования телефоном",
+    ),
+    (
+        "The QR changes every few seconds: this window shows the current one.",
+        "QR-код меняется каждые несколько секунд: в этом окне показан текущий.",
+    ),
+    (
+        "The code works while this window counts down: {time} left. WhatsApp may end it sooner.",
+        "Код действует, пока в этом окне идёт отсчёт: осталось {time}. WhatsApp может завершить привязку раньше.",
+    ),
+    (
+        "Time left to scan: {time}.",
+        "Осталось времени на сканирование: {time}.",
+    ),
+    (
+        "This window refreshes by itself.",
+        "Это окно обновляется само.",
+    ),
+    ("Refresh now", "Обновить сейчас"),
+    ("Cancel the pairing", "Отменить привязку"),
+    (
+        "The QR is too long to draw here. Cancel, and pair with a pairing code instead.",
+        "QR-код слишком длинный, чтобы вывести его здесь. Отмените и привяжите по коду привязки.",
+    ),
+    ("Paired: {phone}.", "Привязан: {phone}."),
+    (
+        "The number {alias} is connected. Give a Hermes access to it in the Accesses tab.",
+        "Номер {alias} подключён. Дайте Hermes доступ к нему на вкладке «Доступы».",
+    ),
+    (
+        "Nothing was scanned or typed in time. The number is not paired; pair it again with the phone at hand.",
+        "Ни скан, ни ввод кода не были сделаны вовремя. Номер не привязан; привяжите его снова, когда телефон будет под рукой.",
+    ),
+    (
+        "WAHA reported a failure of the session. The number is not paired. Try again; if it fails again, check WAHA.",
+        "WAHA сообщил о сбое сеанса. Номер не привязан. Попробуйте снова; если сбой повторится, проверьте WAHA.",
+    ),
+    (
+        "The pairing was cancelled. The number is not paired.",
+        "Привязка отменена. Номер не привязан.",
+    ),
+    (
+        "This number is being paired in another window. Only that window shows the QR or the code.",
+        "Этот номер привязывается в другом окне. Только то окно показывает QR-код или код.",
+    ),
+    ("Cancel that pairing", "Отменить ту привязку"),
+    (
+        "This pairing is no longer running in the hub: it ended, or the hub restarted. The number is in the state \"{state}\".",
+        "Эта привязка больше не выполняется на хабе: она завершилась или хаб перезапустился. Номер в состоянии «{state}».",
+    ),
+    (
+        "The hub could not reach WAHA. Check that it is running and on the hub's network.",
+        "Хаб не смог связаться с WAHA. Проверьте, запущен ли он и находится ли в сети хаба.",
+    ),
+    (
+        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
+        "WAHA отклонил ключ, который есть у хаба. Задайте правильный ключ на сервере хаба командой {command}.",
+    ),
+    (
+        "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
+        "WAHA ответил ошибкой или не уложился в срок. Попробуйте снова через минуту; {command} на сервере хаба расскажет подробнее.",
+    ),
+    (
+        "WhatsApp is limiting this number. Try again later.",
+        "WhatsApp ограничивает этот номер. Попробуйте позже.",
+    ),
+    (
+        "WAHA refused the request. See the hub's log.",
+        "WAHA отклонил запрос. Посмотрите журнал хаба.",
+    ),
+    (
+        "Something failed in the hub. See the hub's log and check the number in the list.",
+        "В хабе что-то пошло не так. Посмотрите журнал хаба и проверьте номер в списке.",
+    ),
+    (
+        "{alias}: another phone paired",
+        "{alias}: привязан другой телефон",
+    ),
+    (
+        "The phone that paired belongs to a number different from the one given.",
+        "Привязанный телефон относится к номеру, отличному от указанного.",
+    ),
+    (
+        "Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped.",
+        "Пока вы не решили, номер в состоянии «Номер подменён», а его доступы остановлены.",
+    ),
+    ("Keep this one", "Оставить этот"),
+    (
+        "Undoing takes WAHA out of that phone's WhatsApp (it leaves its linked devices) and erases the history WAHA keeps of this number.",
+        "Отмена привязки удаляет WAHA из WhatsApp этого телефона (он выходит из связанных устройств) и стирает историю, которую WAHA хранит по этому номеру.",
+    ),
+    (
+        "I understand that WAHA erases its history of this number.",
+        "Я понимаю, что WAHA стирает свою историю по этому номеру.",
+    ),
+    (
+        "Mark that you understand what undoing erases. Nothing was done.",
+        "Отметьте, что вы понимаете, что стирает отмена. Ничего не сделано.",
+    ),
+    (
+        "The phone that paired is already another number of this hub. Undo this pairing, or remove the other number first.",
+        "Привязанный телефон уже является другим номером этого хаба. Отмените эту привязку или сначала удалите другой номер.",
+    ),
+    ("Disconnect {alias}", "Отключить {alias}"),
+    (
+        "Disconnecting stops the session of this number in WAHA. It does not take WAHA out of WhatsApp, and WAHA keeps its history. While it is disconnected, no Hermes reads or sends through it. To use it again, pair it again.",
+        "Отключение останавливает сеанс этого номера в WAHA. WAHA не удаляется из WhatsApp, и WAHA сохраняет свою историю. Пока номер отключён, ни один Hermes не читает и не отправляет через него. Чтобы снова использовать, привяжите его заново.",
+    ),
+    (
+        "Type the alias {alias} to confirm.",
+        "Введите псевдоним {alias} для подтверждения.",
+    ),
+    (
+        "The alias typed does not match. Nothing was done.",
+        "Введённый псевдоним не совпадает. Ничего не сделано.",
+    ),
+    ("Remove {alias}", "Удалить {alias}"),
+    (
+        "Removing ends every access to this number now. Its alias is never used again.",
+        "Удаление сразу прекращает все доступы к этому номеру. Его псевдоним больше никогда не используется.",
+    ),
+    (
+        "What happens to its session in WAHA",
+        "Что будет с его сеансом в WAHA",
+    ),
+    (
+        "Stop it and keep it in WAHA, with the history WAHA keeps",
+        "Остановить и оставить в WAHA, с историей, которую хранит WAHA",
+    ),
+    (
+        "Take WAHA out of WhatsApp and delete it: WAHA erases the history it keeps",
+        "Вывести WAHA из WhatsApp и удалить: WAHA стирает историю, которую хранит",
+    ),
+    (
+        "Arauto has no message archive yet: the history is only what WAHA keeps.",
+        "В Arauto пока нет архива сообщений: история — это только то, что хранит WAHA.",
+    ),
+    (
+        "Choose what happens to its session in WAHA. Nothing was done.",
+        "Выберите, что будет с его сеансом в WAHA. Ничего не сделано.",
+    ),
+    ("In test", "Тестируется"),
+    (
+        "A WhatsApp engine built into Arauto is being studied. It is not part of this version, and this window does nothing.",
+        "Движок WhatsApp, встроенный в Arauto, сейчас изучается. Он не входит в эту версию, и это окно ничего не делает.",
+    ),
+    (
+        "For now, numbers are paired through WAHA, with the \"Connect WhatsApp (WAHA)\" button.",
+        "Пока что номера привязываются через WAHA, кнопкой «Подключить WhatsApp (WAHA)».",
+    ),
+    ("Open the WAHA window", "Открыть окно WAHA"),
+    ("Try again", "Попробовать снова"),
+    (
+        "Scan with the phone: WhatsApp › Linked devices › Link a device.",
+        "Отсканируйте телефоном: WhatsApp › Связанные устройства › Привязка устройства.",
+    ),
+    (
+        "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
+        "На телефоне: WhatsApp › Связанные устройства › Привязка устройства › Привязать по номеру телефона, и введите этот код:",
     ),
 ];

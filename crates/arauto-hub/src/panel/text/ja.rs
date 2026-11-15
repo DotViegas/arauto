@@ -60,10 +60,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "番号"),
     ("Hermes with access", "アクセス権のある Hermes"),
     ("Last message", "最後のメッセージ"),
-    (
-        "No number yet. Add one with {command}.",
-        "番号はまだありません。{command} で追加してください。",
-    ),
     ("command", "コマンド"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
@@ -1005,8 +1001,298 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "No Hermes yet. Connect the first one in the Hermes tab.",
         "Hermes はまだありません。最初の Hermes は Hermes タブで接続してください。",
     ),
+    ("Connect WhatsApp (WAHA)", "WhatsApp を接続 (WAHA)"),
     (
-        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "このバージョンのパネルでは、Hermes の接続と失効、各番号のアクセス権の変更、組織図とそのリンクの編集ができます。番号のペアリングとチャットの選択は、引き続きハブのサーバーで {command} コマンドを使って行います。",
+        "Connect WhatsApp (native · in test)",
+        "WhatsApp を接続 (ネイティブ · テスト中)",
+    ),
+    (
+        "No number yet. Add the first one with the \"Connect WhatsApp (WAHA)\" button.",
+        "番号はまだありません。最初の番号は「WhatsApp を接続 (WAHA)」ボタンで追加してください。",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, pairs and manages WhatsApp numbers on WAHA, changes the accesses of each number and edits the org chart with its links. Choosing chats is still done with the {command} command, on the hub's server.",
+        "このバージョンでは、パネルから Hermes の接続と失効、WAHA 上の WhatsApp 番号のペアリングと管理、各番号のアクセス権の変更、リンク付きの組織図の編集ができます。チャットの選択は、引き続きハブのサーバーで {command} コマンドを使って行います。",
+    ),
+    ("Pair", "ペアリング"),
+    ("Pair again", "再ペアリング"),
+    ("Continue pairing", "ペアリングを続ける"),
+    ("See the pairing", "ペアリングを表示"),
+    ("Disconnect", "切断"),
+    ("Restart", "再起動"),
+    ("Decide", "対応を選ぶ"),
+    ("Number {alias}: {state}.", "番号 {alias}: {state}。"),
+    (
+        "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+        "ハブは番号 {alias} を変更しましたが、WAHA から応答がありませんでした。WAHA 側のセッションは元のままかもしれません。ハブのサーバーで {command} を実行して WAHA を確認してください。",
+    ),
+    ("Method", "方法"),
+    ("Phone", "電話"),
+    (
+        "How the panel and the Hermes call this number: lowercase letters, digits, hyphen and underscore, up to 32. An alias is never reused.",
+        "パネルと Hermes がこの番号を呼ぶ名前です。英小文字、数字、ハイフン、アンダースコアで最大 32 文字。別名は再利用されません。",
+    ),
+    ("Number with the country code", "国番号付きの番号"),
+    (
+        "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
+        "例: +55 11 9XXXX-XXXX。数字、スペース、ハイフン、かっこのみ使えます。",
+    ),
+    (
+        "It is the command channel of a Hermes",
+        "Hermes のコマンドチャネルです",
+    ),
+    (
+        "It shows as \"command\" in the list.",
+        "一覧では「コマンド」と表示されます。",
+    ),
+    ("Before the first number", "最初の番号の前に"),
+    (
+        "The engine is an unofficial WhatsApp client. WhatsApp may block the number. Use numbers you can afford to lose.",
+        "エンジンは WhatsApp の非公式クライアントです。WhatsApp が番号をブロックすることがあります。失っても困らない番号を使ってください。",
+    ),
+    (
+        "I understand and accept. The hub records this acceptance in the audit.",
+        "理解し、同意します。ハブはこの同意を監査に記録します。",
+    ),
+    (
+        "The number is paired through WAHA, the engine set on this hub.",
+        "番号は、このハブに設定されたエンジンである WAHA でペアリングします。",
+    ),
+    ("Add and pair", "追加してペアリング"),
+    (
+        "WAHA has not answered the hub yet. You can add the number; pairing it needs WAHA to answer.",
+        "WAHA はまだハブに応答していません。番号は追加できますが、ペアリングには WAHA の応答が必要です。",
+    ),
+    (
+        "There is no WhatsApp engine on this hub yet. Set WAHA on the hub's server with {command}, then its key with {key_command}. The key is never typed in the panel.",
+        "このハブにはまだ WhatsApp エンジンがありません。ハブのサーバーで {command} を使って WAHA を設定し、続けて {key_command} でそのキーを設定してください。キーをパネルに入力することはありません。",
+    ),
+    (
+        "The engine has no key yet. Set it on the hub's server with {command}. The key is never typed in the panel.",
+        "エンジンにはまだキーがありません。ハブのサーバーで {command} を使って設定してください。キーをパネルに入力することはありません。",
+    ),
+    (
+        "The alias has from 1 to 32 characters.",
+        "別名は 1 文字から 32 文字です。",
+    ),
+    (
+        "The alias starts with a lowercase letter or a digit.",
+        "別名は英小文字または数字で始めてください。",
+    ),
+    (
+        "That alias is reserved. Choose another.",
+        "その別名は予約されています。別の別名を選んでください。",
+    ),
+    (
+        "That alias is taken, now or by a number that was removed, and an alias is never reused. Choose another.",
+        "その別名は、現在使用中か、削除された番号が使っていたもので、別名は再利用されません。別の別名を選んでください。",
+    ),
+    (
+        "Type the number with the country code: from 8 to 15 digits, like +55 11 9XXXX-XXXX.",
+        "国番号付きで番号を入力してください。8 桁から 15 桁で、例: +55 11 9XXXX-XXXX。",
+    ),
+    (
+        "That number is already a WhatsApp of this hub.",
+        "その番号はすでにこのハブの WhatsApp です。",
+    ),
+    (
+        "Read the sentence about the risk and mark that you accept it. Nothing was added.",
+        "リスクに関する文を読み、同意にチェックを入れてください。何も追加されていません。",
+    ),
+    ("Pair {alias}", "{alias} をペアリング"),
+    (
+        "Have the phone of {phone} at hand, with WhatsApp open. The pairing lasts up to {minutes} minutes.",
+        "{phone} の電話を手元に用意し、WhatsApp を開いてください。ペアリングは最大 {minutes} 分間です。",
+    ),
+    (
+        "How will the phone pair?",
+        "電話をどの方法でペアリングしますか?",
+    ),
+    ("QR code", "QR コード"),
+    (
+        "scan it with the phone's camera, from inside WhatsApp",
+        "電話のカメラで、WhatsApp の中からスキャンします",
+    ),
+    ("Pairing code", "ペアリングコード"),
+    (
+        "type a code on the phone, for when it cannot scan this screen",
+        "電話にコードを入力します。この画面をスキャンできない場合に使います",
+    ),
+    ("Start pairing", "ペアリングを開始"),
+    (
+        "WAHA has not created the session of this number yet. Starting the pairing tries again.",
+        "WAHA はまだこの番号のセッションを作成していません。ペアリングを開始すると再試行します。",
+    ),
+    (
+        "Choose QR code or pairing code. Nothing was started.",
+        "QR コードかペアリングコードを選んでください。何も開始されていません。",
+    ),
+    (
+        "{n} numbers are being paired right now, the most at once. Wait for one to end, or cancel one.",
+        "現在 {n} 件の番号をペアリング中で、これが同時の上限です。どれかが終わるのを待つか、1 件をキャンセルしてください。",
+    ),
+    (
+        "This cannot be done while the number is in the state \"{state}\". Nothing was done.",
+        "番号が「{state}」の状態では、これはできません。何も実行されていません。",
+    ),
+    ("Starting the pairing…", "ペアリングを開始しています…"),
+    (
+        "QR code to scan with the phone",
+        "電話でスキャンする QR コード",
+    ),
+    (
+        "The QR changes every few seconds: this window shows the current one.",
+        "QR は数秒ごとに変わります。このウィンドウには現在のものが表示されます。",
+    ),
+    (
+        "The code works while this window counts down: {time} left. WhatsApp may end it sooner.",
+        "このウィンドウがカウントダウンしている間、コードは有効です。残り {time}。WhatsApp がそれより早く無効にすることもあります。",
+    ),
+    ("Time left to scan: {time}.", "スキャンの残り時間: {time}。"),
+    (
+        "This window refreshes by itself.",
+        "このウィンドウは自動で更新されます。",
+    ),
+    ("Refresh now", "今すぐ更新"),
+    ("Cancel the pairing", "ペアリングをキャンセル"),
+    (
+        "The QR is too long to draw here. Cancel, and pair with a pairing code instead.",
+        "QR が長すぎてここでは描画できません。キャンセルして、ペアリングコードでペアリングしてください。",
+    ),
+    ("Paired: {phone}.", "ペアリング完了: {phone}。"),
+    (
+        "The number {alias} is connected. Give a Hermes access to it in the Accesses tab.",
+        "番号 {alias} は接続されました。アクセス権タブで Hermes にこの番号へのアクセス権を与えてください。",
+    ),
+    (
+        "Nothing was scanned or typed in time. The number is not paired; pair it again with the phone at hand.",
+        "時間内にスキャンも入力もされませんでした。番号はペアリングされていません。電話を手元に用意して、もう一度ペアリングしてください。",
+    ),
+    (
+        "WAHA reported a failure of the session. The number is not paired. Try again; if it fails again, check WAHA.",
+        "WAHA がセッションの失敗を報告しました。番号はペアリングされていません。もう一度試し、再び失敗する場合は WAHA を確認してください。",
+    ),
+    (
+        "The pairing was cancelled. The number is not paired.",
+        "ペアリングはキャンセルされました。番号はペアリングされていません。",
+    ),
+    (
+        "This number is being paired in another window. Only that window shows the QR or the code.",
+        "この番号は別のウィンドウでペアリング中です。QR やコードを表示できるのはそのウィンドウだけです。",
+    ),
+    ("Cancel that pairing", "そのペアリングをキャンセル"),
+    (
+        "This pairing is no longer running in the hub: it ended, or the hub restarted. The number is in the state \"{state}\".",
+        "このペアリングはもうハブで実行されていません。終了したか、ハブが再起動しました。番号の状態は「{state}」です。",
+    ),
+    (
+        "The hub could not reach WAHA. Check that it is running and on the hub's network.",
+        "ハブは WAHA に接続できませんでした。WAHA が動作していて、ハブのネットワーク上にあるか確認してください。",
+    ),
+    (
+        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
+        "WAHA はハブが持っているキーを拒否しました。ハブのサーバーで {command} を使って正しいキーを設定してください。",
+    ),
+    (
+        "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
+        "WAHA がエラーを返したか、時間内に応答しませんでした。しばらくしてからもう一度試してください。詳細はハブのサーバーで {command} を実行すると分かります。",
+    ),
+    (
+        "WhatsApp is limiting this number. Try again later.",
+        "WhatsApp がこの番号を制限しています。しばらくしてからもう一度試してください。",
+    ),
+    (
+        "WAHA refused the request. See the hub's log.",
+        "WAHA がリクエストを拒否しました。ハブのログを確認してください。",
+    ),
+    (
+        "Something failed in the hub. See the hub's log and check the number in the list.",
+        "ハブで何かが失敗しました。ハブのログを確認し、一覧で番号を確認してください。",
+    ),
+    (
+        "{alias}: another phone paired",
+        "{alias}: 別の電話がペアリングされました",
+    ),
+    (
+        "The phone that paired belongs to a number different from the one given.",
+        "ペアリングされた電話は、指定された番号とは別の番号のものです。",
+    ),
+    (
+        "Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped.",
+        "決定するまで、番号は「番号の相違」の状態のままで、その番号へのアクセス権は停止したままです。",
+    ),
+    ("Keep this one", "これを維持"),
+    (
+        "Undoing takes WAHA out of that phone's WhatsApp (it leaves its linked devices) and erases the history WAHA keeps of this number.",
+        "取り消すと、WAHA はその電話の WhatsApp から外れ（リンク済みのデバイスから消えます）、WAHA が保持しているこの番号の履歴は消去されます。",
+    ),
+    (
+        "I understand that WAHA erases its history of this number.",
+        "WAHA がこの番号の履歴を消去することを理解しました。",
+    ),
+    (
+        "Mark that you understand what undoing erases. Nothing was done.",
+        "取り消しで何が消去されるかを理解したことにチェックを入れてください。何も実行されていません。",
+    ),
+    (
+        "The phone that paired is already another number of this hub. Undo this pairing, or remove the other number first.",
+        "ペアリングされた電話は、すでにこのハブの別の番号です。このペアリングを取り消すか、先にもう一方の番号を削除してください。",
+    ),
+    ("Disconnect {alias}", "{alias} を切断"),
+    (
+        "Disconnecting stops the session of this number in WAHA. It does not take WAHA out of WhatsApp, and WAHA keeps its history. While it is disconnected, no Hermes reads or sends through it. To use it again, pair it again.",
+        "切断すると、WAHA でのこの番号のセッションが停止します。WAHA が WhatsApp から外れることはなく、WAHA は履歴を保持します。切断中は、どの Hermes もこの番号で読み取りも送信もできません。再び使うには、もう一度ペアリングしてください。",
+    ),
+    (
+        "Type the alias {alias} to confirm.",
+        "確認のため、別名 {alias} を入力してください。",
+    ),
+    (
+        "The alias typed does not match. Nothing was done.",
+        "入力した別名が一致しません。何も実行されていません。",
+    ),
+    ("Remove {alias}", "{alias} を削除"),
+    (
+        "Removing ends every access to this number now. Its alias is never used again.",
+        "削除すると、この番号へのすべてのアクセス権が今すぐ終了します。その別名は二度と使われません。",
+    ),
+    (
+        "What happens to its session in WAHA",
+        "WAHA でのこの番号のセッションをどうするか",
+    ),
+    (
+        "Stop it and keep it in WAHA, with the history WAHA keeps",
+        "停止して WAHA に残す（WAHA が保持する履歴もそのまま）",
+    ),
+    (
+        "Take WAHA out of WhatsApp and delete it: WAHA erases the history it keeps",
+        "WAHA を WhatsApp から外して削除する：WAHA が保持する履歴は消去されます",
+    ),
+    (
+        "Arauto has no message archive yet: the history is only what WAHA keeps.",
+        "Arauto にはまだメッセージのアーカイブがありません。履歴は WAHA が保持するものだけです。",
+    ),
+    (
+        "Choose what happens to its session in WAHA. Nothing was done.",
+        "WAHA でのこの番号のセッションをどうするか選んでください。何も実行されていません。",
+    ),
+    ("In test", "テスト中"),
+    (
+        "A WhatsApp engine built into Arauto is being studied. It is not part of this version, and this window does nothing.",
+        "Arauto に組み込む WhatsApp エンジンを検討中です。このバージョンには含まれておらず、このウィンドウは何も実行しません。",
+    ),
+    (
+        "For now, numbers are paired through WAHA, with the \"Connect WhatsApp (WAHA)\" button.",
+        "当面は、「WhatsApp を接続 (WAHA)」ボタンから WAHA で番号をペアリングします。",
+    ),
+    ("Open the WAHA window", "WAHA のウィンドウを開く"),
+    ("Try again", "もう一度試す"),
+    (
+        "Scan with the phone: WhatsApp › Linked devices › Link a device.",
+        "電話でスキャンしてください: WhatsApp › リンク済みのデバイス › デバイスをリンク。",
+    ),
+    (
+        "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
+        "電話で: WhatsApp › リンク済みのデバイス › デバイスをリンク › 電話番号でリンク の順に進み、次のコードを入力してください：",
     ),
 ];

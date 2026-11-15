@@ -47,3 +47,4 @@ prototype, or is **pending**.
 | 0041 | [The password of the database, drawn by the hub](0041-senha-do-banco-sorteada-pelo-hub.md) | proposal |
 | 0042 | [The connection sentence and the instruction page](0042-frase-de-conexao-e-pagina-de-instrucoes.md) | proposal |
 | 0043 | [The org chart of the Hermes: levels, places and links on a map (stage A)](0043-organograma-e-niveis.md) | proposal |
+| 0044 | [Numbers in the panel, on the engine, with a placeholder for a native one](0044-numeros-no-painel-sobre-o-motor.md) | proposal |

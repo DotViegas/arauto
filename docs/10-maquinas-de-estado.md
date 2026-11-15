@@ -112,7 +112,7 @@ The label of the device expired by inactivity is not written yet
 | unpaired, disconnected | **pairing** | The admin asks for the pairing code or the QR. |
 | pairing | **connected** | The phone confirmed, and the paired number is the expected one. |
 | pairing | **number swapped** | The phone confirmed, but the paired number is another one. |
-| pairing | **unpaired** | The pairing code or the QR expired unused. |
+| pairing | **unpaired** | The pairing code or the QR expired unused, or the admin cancelled it in the panel. |
 | connected | **reconnecting** | The engine lost the connection with WhatsApp. |
 | reconnecting | **connected** | The connection came back. |
 | connected, reconnecting | **disconnected** | Someone removed the linked device, on the phone, or the admin disconnected through the panel. |
@@ -123,6 +123,7 @@ The label of the device expired by inactivity is not written yet
 | any | **removed** | The admin removes the number. |
 
 - In **number swapped** the accesses stay stopped until the admin decides.
+- The end of the pairing of one number never ends the pairing of another: each end names its number and its deadline (proposal, decision 0044).
 - **Unknown state** is not a state of the number: it is what the screen shows when the engine does
   not answer.
 - The hub checks the configuration of each engine session at startup and every 5 minutes. If it

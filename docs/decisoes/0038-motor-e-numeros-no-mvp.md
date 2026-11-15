@@ -68,7 +68,7 @@ in the author's public documentation and not yet checked against a real engine.
   send ceiling of the hub; the two situations ask the same thing of Hermes (to wait).
 - **The pairing QR** is drawn in the terminal of the hub's machine by an encoder written in the
   project (`admin/qr.rs`), with no new dependency. The QR and the code appear once and are neither
-  kept nor logged.
+  kept nor logged. Since 15/11/2026 also drawn by the panel, as SVG ([0044](0044-numeros-no-painel-sobre-o-motor.md)).
 
 ## Consequences
 

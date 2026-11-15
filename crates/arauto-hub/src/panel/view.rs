@@ -25,6 +25,9 @@ pub enum Over {
         /// Every how many seconds the page asks the hub again, when it waits for something.
         refresh: Option<u32>,
     },
+    /// The window of a pairing that is still running: it loads the script that renews the QR
+    /// and, without script, reloads itself.
+    Pairing,
 }
 
 /// The head of a page. Only a page with a guide, a passkey or live lists loads the script of
@@ -45,8 +48,14 @@ fn head(html: &mut Html, over: Over, live: bool, org: bool) {
             .number(usize::try_from(seconds).unwrap_or(usize::MAX))
             .raw("\">");
     }
+    if over == Over::Pairing {
+        html.raw("<noscript><meta http-equiv=\"refresh\" content=\"3\"></noscript>");
+    }
     if over != Over::Nothing || live {
         html.raw("<script src=\"/assets/panel.js\"></script>");
+    }
+    if over == Over::Pairing {
+        html.raw("<script src=\"/assets/pair.js\"></script>");
     }
     if org {
         html.raw("<script src=\"/assets/org.js\"></script>");
@@ -212,6 +221,29 @@ pub struct NumberRow {
     pub hermes: Vec<String>,
     /// When its last message came, in words. Never what it said.
     pub last_message: String,
+    /// What the admin can do from its line, by its state.
+    pub actions: Vec<LineAction>,
+}
+
+/// What the line of a number offers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LineAction {
+    /// Pair it: opens the window of the method.
+    Pair,
+    /// Pair it again.
+    PairAgain,
+    /// Back to the pairing this panel session started: the identifier of its run.
+    Continue(String),
+    /// A pairing another panel session started.
+    SeePairing,
+    /// Disconnect it from the hub.
+    Disconnect,
+    /// Start its failed session again.
+    Restart,
+    /// Another phone paired: keep it or undo.
+    Decide,
+    /// Remove it.
+    Remove,
 }
 
 /// The engine, as the page of the numbers says it.
@@ -230,6 +262,8 @@ pub struct NumbersPage {
     pub rows: Vec<NumberRow>,
     /// The engine, when there is one.
     pub engine: Option<EngineLine>,
+    /// What a write just did, above the table.
+    pub said: Option<String>,
 }
 
 /// What a Hermes may do on a number.
@@ -626,7 +660,7 @@ pub(super) fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
 pub(super) fn close(html: &mut Html) {
     html.raw("</main><p class=\"footer\">")
         .fill(
-            k("In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server."),
+            k("In this version the panel connects and revokes Hermes, pairs and manages WhatsApp numbers on WAHA, changes the accesses of each number and edits the org chart with its links. Choosing chats is still done with the {command} command, on the hub's server."),
             &[("command", Arg::Code("arauto-hub admin"))],
         )
         .raw("</p><p class=\"footer next\"><a class=\"footer-link\" href=\"/installation\">")
@@ -764,8 +798,56 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
 #[must_use]
 pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     let mut html = Html::new(frame.lang);
-    open(&mut html, frame, Tab::Numbers, Over::Nothing);
-    html.raw("<div class=\"heading\"><h1>WhatsApps</h1><p class=\"counters\">");
+    numbers_into(&mut html, frame, page, Over::Nothing);
+    html.raw(TAIL);
+    html.finish()
+}
+
+/// One button of the line of a number: a link, or a form that posts the alias.
+fn line_action(html: &mut Html, alias: &str, action: &LineAction) {
+    let link = |html: &mut Html, class: &'static str, path: &'static str, label: &'static str| {
+        html.raw("<a class=\"")
+            .raw(class)
+            .raw("\" href=\"")
+            .raw(path)
+            .raw("?alias=")
+            .text(alias)
+            .raw("\">")
+            .t(label)
+            .raw("</a>");
+    };
+    match action {
+        LineAction::Pair => link(html, "button", "/whatsapps/pair", k("Pair")),
+        LineAction::PairAgain => link(html, "button", "/whatsapps/pair", k("Pair again")),
+        LineAction::Continue(run) => {
+            html.raw("<a class=\"button\" href=\"/whatsapps/pair/wait?alias=")
+                .text(alias)
+                .raw("&amp;run=")
+                .text(run)
+                .raw("\">")
+                .t(k("Continue pairing"))
+                .raw("</a>");
+        }
+        LineAction::SeePairing => {
+            link(html, "button", "/whatsapps/pair/wait", k("See the pairing"))
+        }
+        LineAction::Disconnect => link(html, "button", "/whatsapps/disconnect", k("Disconnect")),
+        LineAction::Decide => link(html, "button", "/whatsapps/decide", k("Decide")),
+        LineAction::Remove => link(html, "button danger", "/whatsapps/remove", k("Remove")),
+        LineAction::Restart => {
+            html.raw("<form method=\"post\" action=\"/whatsapps/restart\"><input type=\"hidden\" name=\"alias\" value=\"")
+                .text(alias)
+                .raw("\"><button class=\"button\" type=\"submit\">")
+                .t(k("Restart"))
+                .raw("</button></form>");
+        }
+    }
+}
+
+/// Writes the page of the numbers up to where a window over it would go.
+pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, over: Over) {
+    open(html, frame, Tab::Numbers, over);
+    html.raw("<div class=\"heading\"><div><h1>WhatsApps</h1><p class=\"counters\">");
     match &page.engine {
         Some(engine) => {
             html.raw("<span class=\"")
@@ -782,7 +864,17 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
             );
         }
     }
-    html.raw("</p></div><div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">")
+    html.raw("</p></div><div class=\"heading-buttons\"><a class=\"button primary\" href=\"/whatsapps/add\">")
+        .t(k("Connect WhatsApp (WAHA)"))
+        .raw("</a><a class=\"button trial\" href=\"/whatsapps/native\">")
+        .t(k("Connect WhatsApp (native · in test)"))
+        .raw("</a></div></div>");
+    if let Some(said) = &page.said {
+        html.raw("<p class=\"status\" role=\"status\">")
+            .text(said)
+            .raw("</p>");
+    }
+    html.raw("<div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">")
         .t(k("Alias"))
         .raw("</th><th scope=\"col\">")
         .t(k("Number"))
@@ -792,16 +884,14 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
         .t(k("Hermes with access"))
         .raw("</th><th scope=\"col\">")
         .t(k("Last message"))
-        .raw("</th></tr></thead><tbody>");
+        .raw("</th><th scope=\"col\"><span class=\"sr-only\">")
+        .t(k("Actions"))
+        .raw("</span></th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"empty\"><td colspan=\"5\">")
-            .fill(
-                k("No number yet. Add one with {command}."),
-                &[(
-                    "command",
-                    Arg::Code("arauto-hub admin number add ALIAS PHONE"),
-                )],
-            )
+        html.raw("<tr class=\"empty\"><td colspan=\"6\">")
+            .t(k(
+                "No number yet. Add the first one with the \"Connect WhatsApp (WAHA)\" button.",
+            ))
             .raw("</td></tr>");
     }
     for row in &page.rows {
@@ -819,19 +909,21 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
             None => html.raw("—"),
         };
         html.raw("</td><td>");
-        state(&mut html, row.tone, row.state);
+        state(html, row.tone, row.state);
         html.raw("</td><td class=\"second-line\">");
-        names(&mut html, &row.hermes);
+        names(html, &row.hermes);
         html.raw("</td><td class=\"wide-only num\">")
             .text(&row.last_message)
-            .raw("</td></tr>");
+            .raw("</td><td class=\"actions-cell\"><div class=\"actions\">");
+        for action in &row.actions {
+            line_action(html, &row.alias, action);
+        }
+        html.raw("</div></td></tr>");
     }
     html.raw("</tbody></table></div><p class=\"note\">")
         .t(k("The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone."))
         .raw("</p>");
-    close(&mut html);
-    html.raw(TAIL);
-    html.finish()
+    close(html);
 }
 
 /// The page of the accesses: the matrix. Each cell leads to the editor of that access.
@@ -1013,11 +1105,17 @@ mod tests {
                 command: true,
                 hermes: vec![HOSTILE.to_owned()],
                 last_message: HOSTILE.to_owned(),
+                actions: vec![
+                    LineAction::Continue(HOSTILE.to_owned()),
+                    LineAction::Restart,
+                    LineAction::Remove,
+                ],
             }],
             engine: Some(EngineLine {
                 tone: Tone::Wait,
                 text: HOSTILE.to_owned(),
             }),
+            said: Some(HOSTILE.to_owned()),
         };
         clean(&numbers(&frame, &numbers_page));
 

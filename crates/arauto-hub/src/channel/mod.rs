@@ -272,6 +272,12 @@ impl Hub {
         self.clock.now_ms()
     }
 
+    /// The clock of the hub, to hand to what runs on its own task.
+    #[must_use]
+    pub(crate) fn clock(&self) -> Arc<dyn Clock> {
+        Arc::clone(&self.clock)
+    }
+
     /// Deadlines, queues and ceilings.
     #[must_use]
     pub fn settings(&self) -> &ChannelSettings {

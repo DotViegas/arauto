@@ -15,8 +15,8 @@ use super::text::{self, Lang, k};
 
 use super::guide::{Ended, Facts, LastUse, Screen};
 use super::view::{
-    AccessPage, AccessRow, Cell, EngineLine, Frame, HermesPage, HermesRow, Notice, NumberRow,
-    NumbersPage, RowAction, Tone,
+    AccessPage, AccessRow, Cell, EngineLine, Frame, HermesPage, HermesRow, LineAction, Notice,
+    NumberRow, NumbersPage, RowAction, Tone,
 };
 use crate::admin::render;
 use crate::channel::Hub;
@@ -406,7 +406,7 @@ pub(super) async fn guide(
     }))
 }
 
-fn number_state(state: NumberState) -> (Tone, &'static str) {
+pub(super) fn number_state(state: NumberState) -> (Tone, &'static str) {
     match state {
         NumberState::Unpaired => (Tone::Idle, k("Not paired")),
         NumberState::Pairing => (Tone::Wait, k("Pairing")),
@@ -444,11 +444,56 @@ async fn phones(
         .collect()
 }
 
-/// The page of the numbers.
+/// The telephone of one number as the list shows it (`+digits`), when the key of the
+/// organization opens it.
+pub(super) async fn phone_of(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    number: &repo::number::Number,
+) -> Option<String> {
+    let key = hub.organization_key(organization).await.ok()?;
+    let phone = number.phone(&key).ok()?;
+    Some(format!("+{}", phone.digits()))
+}
+
+/// What the line of a number offers: by its state, and for a pairing, by who runs it.
+fn line_actions(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    session: Uuid,
+    number: &repo::number::Number,
+) -> Vec<LineAction> {
+    let mut actions = match number.state {
+        NumberState::Unpaired => vec![LineAction::Pair],
+        NumberState::Pairing => {
+            let run = hub
+                .panel()
+                .and_then(|panel| panel.pairings.of(organization, number.id))
+                .filter(|run| run.live());
+            match run {
+                Some(run) if run.session == session => {
+                    vec![LineAction::Continue(run.id.to_string())]
+                }
+                Some(_) => vec![LineAction::SeePairing],
+                None => vec![LineAction::PairAgain],
+            }
+        }
+        NumberState::Connected | NumberState::Reconnecting => vec![LineAction::Disconnect],
+        NumberState::Disconnected => vec![LineAction::PairAgain],
+        NumberState::NumberSwapped => vec![LineAction::Decide],
+        NumberState::Failed => vec![LineAction::Restart],
+        NumberState::Removed => return Vec::new(),
+    };
+    actions.push(LineAction::Remove);
+    actions
+}
+
+/// The page of the numbers, for the panel session `session`.
 pub(super) async fn numbers(
     hub: &Hub,
     organization: ResolvedOrg,
     lang: Lang,
+    session: Uuid,
 ) -> Result<NumbersPage, RepoError> {
     let numbers = repo::number::list(hub.pool(), organization, false).await?;
     let accesses = repo::access::list(hub.pool(), organization, None).await?;
@@ -504,10 +549,15 @@ pub(super) async fn numbers(
                     .map(|access| access.hermes.as_str().to_owned())
                     .collect(),
                 last_message: ago(lang, now, number.last_message_at),
+                actions: line_actions(hub, organization, session, number),
             }
         })
         .collect();
-    Ok(NumbersPage { rows, engine })
+    Ok(NumbersPage {
+        rows,
+        engine,
+        said: None,
+    })
 }
 
 /// What a cell of the matrix says: the verbs that reach some chat, and which chats.

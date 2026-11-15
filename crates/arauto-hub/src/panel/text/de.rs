@@ -63,10 +63,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "Nummer"),
     ("Hermes with access", "Hermes mit Zugriff"),
     ("Last message", "Letzte Nachricht"),
-    (
-        "No number yet. Add one with {command}.",
-        "Noch keine Nummer. Fügen Sie eine mit {command} hinzu.",
-    ),
     ("command", "Befehl"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
@@ -1023,8 +1019,298 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "No Hermes yet. Connect the first one in the Hermes tab.",
         "Noch kein Hermes. Verbinden Sie den ersten im Tab Hermes.",
     ),
+    ("Connect WhatsApp (WAHA)", "WhatsApp verbinden (WAHA)"),
     (
-        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "In dieser Version verbindet und widerruft das Panel Hermes, ändert die Zugriffe jeder Nummer und bearbeitet das Organigramm mit seinen Verknüpfungen. Nummern koppeln und Chats auswählen erfolgt weiterhin mit dem Befehl {command} auf dem Server des Hubs.",
+        "Connect WhatsApp (native · in test)",
+        "WhatsApp verbinden (nativ · im Test)",
+    ),
+    (
+        "No number yet. Add the first one with the \"Connect WhatsApp (WAHA)\" button.",
+        "Noch keine Nummer. Fügen Sie die erste mit der Schaltfläche „WhatsApp verbinden (WAHA)“ hinzu.",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, pairs and manages WhatsApp numbers on WAHA, changes the accesses of each number and edits the org chart with its links. Choosing chats is still done with the {command} command, on the hub's server.",
+        "In dieser Version verbindet und widerruft das Panel Hermes, koppelt und verwaltet WhatsApp-Nummern über WAHA, ändert die Zugriffe jeder Nummer und bearbeitet das Organigramm mit seinen Verknüpfungen. Das Auswählen von Chats erfolgt weiterhin mit dem Befehl {command} auf dem Server des Hubs.",
+    ),
+    ("Pair", "Koppeln"),
+    ("Pair again", "Erneut koppeln"),
+    ("Continue pairing", "Kopplung fortsetzen"),
+    ("See the pairing", "Kopplung anzeigen"),
+    ("Disconnect", "Trennen"),
+    ("Restart", "Neu starten"),
+    ("Decide", "Entscheiden"),
+    ("Number {alias}: {state}.", "Nummer {alias}: {state}."),
+    (
+        "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+        "Der Hub hat die Nummer {alias} geändert, aber WAHA hat nicht geantwortet: Die Sitzung der Nummer dort ist möglicherweise noch wie vorher. Prüfen Sie WAHA mit {command} auf dem Server des Hubs.",
+    ),
+    ("Method", "Methode"),
+    ("Phone", "Telefon"),
+    (
+        "How the panel and the Hermes call this number: lowercase letters, digits, hyphen and underscore, up to 32. An alias is never reused.",
+        "So nennen das Panel und die Hermes diese Nummer: Kleinbuchstaben, Ziffern, Bindestrich und Unterstrich, bis zu 32. Ein Alias wird nie wiederverwendet.",
+    ),
+    ("Number with the country code", "Nummer mit Ländervorwahl"),
+    (
+        "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
+        "Zum Beispiel +55 11 9XXXX-XXXX. Nur Ziffern, Leerzeichen, Bindestriche und Klammern.",
+    ),
+    (
+        "It is the command channel of a Hermes",
+        "Er ist der Befehlskanal eines Hermes",
+    ),
+    (
+        "It shows as \"command\" in the list.",
+        "In der Liste erscheint er als „Befehl“.",
+    ),
+    ("Before the first number", "Vor der ersten Nummer"),
+    (
+        "The engine is an unofficial WhatsApp client. WhatsApp may block the number. Use numbers you can afford to lose.",
+        "Die Engine ist ein inoffizieller WhatsApp-Client. WhatsApp kann die Nummer sperren. Verwenden Sie Nummern, deren Verlust Sie verschmerzen können.",
+    ),
+    (
+        "I understand and accept. The hub records this acceptance in the audit.",
+        "Ich verstehe und akzeptiere. Der Hub protokolliert diese Zustimmung im Audit.",
+    ),
+    (
+        "The number is paired through WAHA, the engine set on this hub.",
+        "Die Nummer wird über WAHA gekoppelt, die auf diesem Hub eingestellte Engine.",
+    ),
+    ("Add and pair", "Hinzufügen und koppeln"),
+    (
+        "WAHA has not answered the hub yet. You can add the number; pairing it needs WAHA to answer.",
+        "WAHA hat dem Hub noch nicht geantwortet. Sie können die Nummer hinzufügen; zum Koppeln muss WAHA antworten.",
+    ),
+    (
+        "There is no WhatsApp engine on this hub yet. Set WAHA on the hub's server with {command}, then its key with {key_command}. The key is never typed in the panel.",
+        "Auf diesem Hub gibt es noch keine WhatsApp-Engine. Richten Sie WAHA auf dem Server des Hubs mit {command} ein, danach den Schlüssel mit {key_command}. Der Schlüssel wird nie im Panel eingetippt.",
+    ),
+    (
+        "The engine has no key yet. Set it on the hub's server with {command}. The key is never typed in the panel.",
+        "Die Engine hat noch keinen Schlüssel. Legen Sie ihn auf dem Server des Hubs mit {command} fest. Der Schlüssel wird nie im Panel eingetippt.",
+    ),
+    (
+        "The alias has from 1 to 32 characters.",
+        "Der Alias hat 1 bis 32 Zeichen.",
+    ),
+    (
+        "The alias starts with a lowercase letter or a digit.",
+        "Der Alias beginnt mit einem Kleinbuchstaben oder einer Ziffer.",
+    ),
+    (
+        "That alias is reserved. Choose another.",
+        "Dieser Alias ist reserviert. Wählen Sie einen anderen.",
+    ),
+    (
+        "That alias is taken, now or by a number that was removed, and an alias is never reused. Choose another.",
+        "Dieser Alias ist vergeben, jetzt oder durch eine entfernte Nummer, und ein Alias wird nie wiederverwendet. Wählen Sie einen anderen.",
+    ),
+    (
+        "Type the number with the country code: from 8 to 15 digits, like +55 11 9XXXX-XXXX.",
+        "Geben Sie die Nummer mit Ländervorwahl ein: 8 bis 15 Ziffern, zum Beispiel +55 11 9XXXX-XXXX.",
+    ),
+    (
+        "That number is already a WhatsApp of this hub.",
+        "Diese Nummer ist bereits ein WhatsApp dieses Hubs.",
+    ),
+    (
+        "Read the sentence about the risk and mark that you accept it. Nothing was added.",
+        "Lesen Sie den Satz zum Risiko und markieren Sie, dass Sie ihn akzeptieren. Es wurde nichts hinzugefügt.",
+    ),
+    ("Pair {alias}", "{alias} koppeln"),
+    (
+        "Have the phone of {phone} at hand, with WhatsApp open. The pairing lasts up to {minutes} minutes.",
+        "Halten Sie das Telefon von {phone} bereit, mit geöffnetem WhatsApp. Die Kopplung dauert bis zu {minutes} Minuten.",
+    ),
+    (
+        "How will the phone pair?",
+        "Wie soll das Telefon gekoppelt werden?",
+    ),
+    ("QR code", "QR-Code"),
+    (
+        "scan it with the phone's camera, from inside WhatsApp",
+        "mit der Kamera des Telefons scannen, aus WhatsApp heraus",
+    ),
+    ("Pairing code", "Kopplungscode"),
+    (
+        "type a code on the phone, for when it cannot scan this screen",
+        "einen Code auf dem Telefon eingeben, falls es diesen Bildschirm nicht scannen kann",
+    ),
+    ("Start pairing", "Kopplung starten"),
+    (
+        "WAHA has not created the session of this number yet. Starting the pairing tries again.",
+        "WAHA hat die Sitzung dieser Nummer noch nicht angelegt. Beim Starten der Kopplung wird es erneut versucht.",
+    ),
+    (
+        "Choose QR code or pairing code. Nothing was started.",
+        "Wählen Sie QR-Code oder Kopplungscode. Es wurde nichts gestartet.",
+    ),
+    (
+        "{n} numbers are being paired right now, the most at once. Wait for one to end, or cancel one.",
+        "{n} Nummern werden gerade gekoppelt, das Maximum gleichzeitig. Warten Sie, bis eine fertig ist, oder brechen Sie eine ab.",
+    ),
+    (
+        "This cannot be done while the number is in the state \"{state}\". Nothing was done.",
+        "Das ist nicht möglich, solange die Nummer im Status „{state}“ ist. Es wurde nichts getan.",
+    ),
+    ("Starting the pairing…", "Kopplung wird gestartet…"),
+    (
+        "QR code to scan with the phone",
+        "QR-Code zum Scannen mit dem Telefon",
+    ),
+    (
+        "The QR changes every few seconds: this window shows the current one.",
+        "Der QR-Code ändert sich alle paar Sekunden: Dieses Fenster zeigt den aktuellen.",
+    ),
+    (
+        "The code works while this window counts down: {time} left. WhatsApp may end it sooner.",
+        "Der Code gilt, solange dieses Fenster herunterzählt: noch {time}. WhatsApp kann ihn früher beenden.",
+    ),
+    ("Time left to scan: {time}.", "Zeit zum Scannen: {time}."),
+    (
+        "This window refreshes by itself.",
+        "Dieses Fenster aktualisiert sich von selbst.",
+    ),
+    ("Refresh now", "Jetzt aktualisieren"),
+    ("Cancel the pairing", "Kopplung abbrechen"),
+    (
+        "The QR is too long to draw here. Cancel, and pair with a pairing code instead.",
+        "Der QR-Code ist zu lang, um ihn hier darzustellen. Brechen Sie ab und koppeln Sie mit einem Kopplungscode.",
+    ),
+    ("Paired: {phone}.", "Gekoppelt: {phone}."),
+    (
+        "The number {alias} is connected. Give a Hermes access to it in the Accesses tab.",
+        "Die Nummer {alias} ist verbunden. Geben Sie einem Hermes im Tab Zugriffe Zugang dazu.",
+    ),
+    (
+        "Nothing was scanned or typed in time. The number is not paired; pair it again with the phone at hand.",
+        "Es wurde nichts rechtzeitig gescannt oder eingegeben. Die Nummer ist nicht gekoppelt; koppeln Sie sie mit dem Telefon zur Hand erneut.",
+    ),
+    (
+        "WAHA reported a failure of the session. The number is not paired. Try again; if it fails again, check WAHA.",
+        "WAHA hat einen Fehler der Sitzung gemeldet. Die Nummer ist nicht gekoppelt. Versuchen Sie es erneut; schlägt es wieder fehl, prüfen Sie WAHA.",
+    ),
+    (
+        "The pairing was cancelled. The number is not paired.",
+        "Die Kopplung wurde abgebrochen. Die Nummer ist nicht gekoppelt.",
+    ),
+    (
+        "This number is being paired in another window. Only that window shows the QR or the code.",
+        "Diese Nummer wird in einem anderen Fenster gekoppelt. Nur jenes Fenster zeigt den QR-Code oder den Code.",
+    ),
+    ("Cancel that pairing", "Diese Kopplung abbrechen"),
+    (
+        "This pairing is no longer running in the hub: it ended, or the hub restarted. The number is in the state \"{state}\".",
+        "Diese Kopplung läuft auf dem Hub nicht mehr: Sie ist beendet, oder der Hub wurde neu gestartet. Die Nummer ist im Status „{state}“.",
+    ),
+    (
+        "The hub could not reach WAHA. Check that it is running and on the hub's network.",
+        "Der Hub konnte WAHA nicht erreichen. Prüfen Sie, ob er läuft und im Netz des Hubs ist.",
+    ),
+    (
+        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
+        "WAHA hat den Schlüssel abgelehnt, den der Hub hat. Legen Sie den richtigen Schlüssel auf dem Server des Hubs mit {command} fest.",
+    ),
+    (
+        "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
+        "WAHA hat mit einem Fehler geantwortet oder zu spät. Versuchen Sie es gleich noch einmal; {command} auf dem Server des Hubs gibt mehr Auskunft.",
+    ),
+    (
+        "WhatsApp is limiting this number. Try again later.",
+        "WhatsApp begrenzt diese Nummer. Versuchen Sie es später noch einmal.",
+    ),
+    (
+        "WAHA refused the request. See the hub's log.",
+        "WAHA hat die Anfrage abgelehnt. Sehen Sie im Log des Hubs nach.",
+    ),
+    (
+        "Something failed in the hub. See the hub's log and check the number in the list.",
+        "Im Hub ist etwas fehlgeschlagen. Sehen Sie im Log des Hubs nach und prüfen Sie die Nummer in der Liste.",
+    ),
+    (
+        "{alias}: another phone paired",
+        "{alias}: ein anderes Telefon wurde gekoppelt",
+    ),
+    (
+        "The phone that paired belongs to a number different from the one given.",
+        "Das gekoppelte Telefon gehört zu einer anderen Nummer als der angegebenen.",
+    ),
+    (
+        "Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped.",
+        "Bis Sie entscheiden, ist die Nummer im Status „Nummer vertauscht“, und ihre Zugriffe bleiben gestoppt.",
+    ),
+    ("Keep this one", "Diese behalten"),
+    (
+        "Undoing takes WAHA out of that phone's WhatsApp (it leaves its linked devices) and erases the history WAHA keeps of this number.",
+        "Rückgängig machen entfernt WAHA aus dem WhatsApp dieses Telefons (es verlässt dessen verknüpfte Geräte) und löscht den Verlauf, den WAHA zu dieser Nummer speichert.",
+    ),
+    (
+        "I understand that WAHA erases its history of this number.",
+        "Ich verstehe, dass WAHA den Verlauf zu dieser Nummer löscht.",
+    ),
+    (
+        "Mark that you understand what undoing erases. Nothing was done.",
+        "Markieren Sie, dass Sie verstehen, was Rückgängig machen löscht. Es wurde nichts getan.",
+    ),
+    (
+        "The phone that paired is already another number of this hub. Undo this pairing, or remove the other number first.",
+        "Das gekoppelte Telefon ist bereits eine andere Nummer dieses Hubs. Machen Sie diese Kopplung rückgängig oder entfernen Sie zuerst die andere Nummer.",
+    ),
+    ("Disconnect {alias}", "{alias} trennen"),
+    (
+        "Disconnecting stops the session of this number in WAHA. It does not take WAHA out of WhatsApp, and WAHA keeps its history. While it is disconnected, no Hermes reads or sends through it. To use it again, pair it again.",
+        "Trennen beendet die Sitzung dieser Nummer in WAHA. Dabei wird WAHA nicht aus WhatsApp entfernt, und WAHA behält seinen Verlauf. Solange sie getrennt ist, liest und sendet darüber kein Hermes. Um sie wieder zu nutzen, koppeln Sie sie erneut.",
+    ),
+    (
+        "Type the alias {alias} to confirm.",
+        "Geben Sie zur Bestätigung den Alias {alias} ein.",
+    ),
+    (
+        "The alias typed does not match. Nothing was done.",
+        "Der eingegebene Alias stimmt nicht überein. Es wurde nichts getan.",
+    ),
+    ("Remove {alias}", "{alias} entfernen"),
+    (
+        "Removing ends every access to this number now. Its alias is never used again.",
+        "Entfernen beendet jetzt alle Zugriffe auf diese Nummer. Ihr Alias wird nie wieder verwendet.",
+    ),
+    (
+        "What happens to its session in WAHA",
+        "Was mit ihrer Sitzung in WAHA geschieht",
+    ),
+    (
+        "Stop it and keep it in WAHA, with the history WAHA keeps",
+        "Anhalten und in WAHA behalten, mit dem Verlauf, den WAHA speichert",
+    ),
+    (
+        "Take WAHA out of WhatsApp and delete it: WAHA erases the history it keeps",
+        "WAHA aus WhatsApp entfernen und löschen: WAHA löscht den Verlauf, den es speichert",
+    ),
+    (
+        "Arauto has no message archive yet: the history is only what WAHA keeps.",
+        "Arauto hat noch kein Nachrichtenarchiv: Der Verlauf besteht nur aus dem, was WAHA speichert.",
+    ),
+    (
+        "Choose what happens to its session in WAHA. Nothing was done.",
+        "Wählen Sie, was mit ihrer Sitzung in WAHA geschieht. Es wurde nichts getan.",
+    ),
+    ("In test", "Im Test"),
+    (
+        "A WhatsApp engine built into Arauto is being studied. It is not part of this version, and this window does nothing.",
+        "Eine in Arauto eingebaute Engine für WhatsApp wird gerade untersucht. Sie ist nicht Teil dieser Version, und dieses Fenster tut nichts.",
+    ),
+    (
+        "For now, numbers are paired through WAHA, with the \"Connect WhatsApp (WAHA)\" button.",
+        "Vorerst werden Nummern über WAHA gekoppelt, mit der Schaltfläche „WhatsApp verbinden (WAHA)“.",
+    ),
+    ("Open the WAHA window", "Das WAHA-Fenster öffnen"),
+    ("Try again", "Erneut versuchen"),
+    (
+        "Scan with the phone: WhatsApp › Linked devices › Link a device.",
+        "Mit dem Telefon scannen: WhatsApp › Verknüpfte Geräte › Gerät verknüpfen.",
+    ),
+    (
+        "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
+        "Auf dem Telefon: WhatsApp › Verknüpfte Geräte › Gerät verknüpfen › Stattdessen mit Telefonnummer verknüpfen, und geben Sie diesen Code ein:",
     ),
 ];

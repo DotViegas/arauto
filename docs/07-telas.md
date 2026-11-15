@@ -5,6 +5,8 @@ error.
 
 **Org chart, 14/11/2026** ([decision 0043](decisoes/0043-organograma-e-niveis.md), proposal): the hub has a fourth tab, T9, built and tried only in a desktop Chrome without a window (15/11/2026).
 
+**Numbers in the panel, 15/11/2026** ([decision 0044](decisoes/0044-numeros-no-painel-sobre-o-motor.md), proposal): T4 has two buttons, "Connect WhatsApp (WAHA)" and "Connect WhatsApp (native · in test)" (the second only opens a window with a fixed text and does nothing), the actions on each line, and each action opens a window over the list. T5 is built as described below. It was written and covered by automatic tests against a fake engine only: **it was not tried in a real browser, nor from the panel against a real WAHA.** Where this note and the rest of the page differ about T4 and T5, this note wins. Disconnect and Remove ask for the alias typed and **not** the passkey again, because no step that asks for it exists (see the note on the session below and decision 0040, pending decision 2).
+
 **In the hub, on 13/11/2026** ([decision 0040](decisoes/0040-painel-dentro-do-hub.md), proposal):
 there are T1, T4 and T6, read-only, the alert banner, and T2 with T3, in a single guide, in a window
 over the list: name, block, code and done. In T1 each line has the buttons to connect, continue or
@@ -213,13 +215,30 @@ Type the verification code Hermes answered in the command channel:
 ## T4. WhatsApps
 
 - **Shows:** one line per number: alias, paired number, state, whether it is "command", Hermes with
-  access, time of the last message received (no content).
-- **Actions:** Add; Pair again; Restart the engine session; Disconnect from WhatsApp; Mark
-  as "command"; Remove (asks the destination of the message archive: keep for 30 days or
-  erase now). Disconnect and Remove ask for the alias typed, besides the passkey.
+  access, time of the last message received (no content), and an Actions column (built on
+  15/11/2026; the other columns are as before).
+- **Buttons of the tab:** "Connect WhatsApp (WAHA)" opens T5. "Connect WhatsApp (native · in test)"
+  opens a window that says, in fixed text, that an engine built into Arauto is only being studied
+  and is not part of this version, and that for now numbers connect through WAHA. It has no form
+  and does nothing. A built-in engine is **not decided** (decision 0044).
+- **Actions on each line, by state** (built; a button that the state does not allow is not shown):
+  Pair or Pair again (unpaired, disconnected, or pairing with no run in the hub); Continue pairing;
+  Restart the engine session (failed); Disconnect from WhatsApp (connected, reconnecting); Decide
+  (number swapped); Remove (any state). "Mark as command" is offered **only when the number is
+  added**; changing it afterwards is not built, because no function does it.
+- **Disconnect and Remove ask for the alias typed, and not the passkey again.** The passkey on every
+  action (decision 0019) is not built (decision 0040, pending decision 2). The alias typed, the
+  `POST` with the panel's `Origin` and the full panel session are the strictest check that needs no
+  new mechanism. Remove also needs one choice, with none preselected: keep the history in the
+  engine, or erase it there. The message archive is not built.
 - **First number:** acceptance recorded in the audit: "The engine is an unofficial WhatsApp
-  client. WhatsApp may block the number. Use numbers you can afford to lose."
-- **Errors:** "Engine unavailable: the hub has not talked to the engine since HH:MM. The Hermes stay
+  client. WhatsApp may block the number. Use numbers you can afford to lose." In the panel it is
+  asked only for the first number the organization ever had (removed ones count) and is recorded
+  as `risk_accepted` on `number.added`. The command does not ask for it.
+- **Errors:** the window says plainly when no engine is set (and points to `arauto-hub admin
+  engine ...`: the engine key is a long-lived secret and is never typed on a screen), when the
+  engine has no key, does not answer, refuses the key or answers something unexpected. The
+  sentences below are older design text: "Engine unavailable: the hub has not talked to the engine since HH:MM. The Hermes stay
   connected and read what is already in the message archive; they do not send or receive new
   messages."; "Disconnected: the linked device was removed on the phone"; "This number sends, but
   the hub is not receiving its messages",
@@ -227,12 +246,30 @@ Type the verification code Hermes answered in the command channel:
 
 ## T5. Pair WhatsApp
 
-- **Step 1:** alias and number with country code.
-- **Step 2:** pairing code (with the path on the phone and the validity) or QR (which renews
-  itself).
-- **Step 3:** "Paired: +00 00 00000-0000." If the paired number is another one: "The phone that
-  paired belongs to a number different from the one given. Keep this one | Undo." While the admin
-  does not decide, the state is "number swapped" and the accesses stay stopped.
+Built in the hub on 15/11/2026, in windows over the list (decision 0044, proposal).
+
+- **Step 1:** alias and number with country code, and the box "command". For the first number the
+  organization ever had, also the acceptance sentence of T4, which must be ticked.
+- **Step 2:** the choice of QR or pairing code.
+- **Step 3:** the QR, drawn by the hub as an image in the page, which renews itself in the window,
+  or the pairing code with the path on the phone and the time left (the hub's deadline, 3 minutes;
+  the validity on WhatsApp's side is not known). Then "Paired: +00 00 00000-0000." If the paired
+  number is another one: "The phone that paired belongs to a number different from the one given.
+  Keep this one | Undo." Undo needs a checkbox that confirms erasing the engine session's history.
+  While the admin does not decide, the state is "number swapped" and the accesses stay stopped.
+- **Cancel the pairing** stops the engine session and puts the number back to unpaired. **Closing
+  the window does not cancel**: the pairing runs until its deadline, and the line offers "Continue
+  pairing" to the session that started it. Another panel session sees that a pairing is running
+  but never its QR or code.
+- **Ceilings:** one pairing per number and three at a time per organization.
+- **The QR and the code** are short-lived secrets: shown only in the panel, to the full panel
+  session that started the pairing, in answers that are not cached, never logged, never audited and
+  never written to the database. The hub drops them when the pairing ends.
+- **Without script** the window reloads itself every 3 seconds and each reload carries the current
+  QR; the countdown moves only on a reload. With script, each QR value travels once per window.
+- **Not guaranteed:** see decision 0044. In short, nothing was tried in a real browser or against a
+  real WAHA; after a hub restart a running pairing is lost and the row stays "pairing" for up to
+  about 8 minutes; a stolen panel session can pair, keep, disconnect and remove numbers.
 
 ## T6. Accesses
 
@@ -275,7 +312,7 @@ R read · S send · M modify · W be woken
   removed; tool call; denial for lack of a verb; notice confirmed, expired and
   discarded; engine configuration corrected by the hub; hub restored from a backup; device
   suspended; unknown device with a valid seal.
-- **Never contains:** message content, invite, credential, QR, pairing code.
+- **Never contains:** message content, invite, credential, QR, pairing code. The end of a pairing (expired, failed or cancelled) is not audited, as today in the command; the start of a pairing is, and so is the add of a number.
 - **Actions:** filter, open the detail, export (asks for the passkey). There is no edit or delete.
 
 ## T8. Admins

@@ -353,7 +353,7 @@ mod tests {
     }
 
     /// The code of the panel that writes sentences, as text: this test reads it.
-    const SOURCES: [(&str, &str); 10] = [
+    const SOURCES: [(&str, &str); 12] = [
         ("view.rs", include_str!("../view.rs")),
         ("guide.rs", include_str!("../guide.rs")),
         ("editor.rs", include_str!("../editor.rs")),
@@ -364,6 +364,8 @@ mod tests {
         ("installation.rs", include_str!("../installation.rs")),
         ("block.rs", include_str!("../block.rs")),
         ("org.rs", include_str!("../org.rs")),
+        ("numbers.rs", include_str!("../numbers.rs")),
+        ("pairing.rs", include_str!("../pairing.rs")),
     ];
 
     /// Every sentence the code marks with `k("...")`, outside the tests of each file.
@@ -523,6 +525,17 @@ mod tests {
                 ("Create the way back", "Remove the way back"),
                 ("Move up", "Move down"),
                 ("Move left", "Move right"),
+                (
+                    "Connect WhatsApp (WAHA)",
+                    "Connect WhatsApp (native · in test)",
+                ),
+                ("Keep this one", "Undo"),
+                ("Disconnect", "Cancel"),
+                ("Remove", "Cancel"),
+                ("Start pairing", "Cancel"),
+                ("Add and pair", "Cancel"),
+                ("Cancel the pairing", "Refresh now"),
+                ("QR code", "Pairing code"),
                 ("instruction", "request"),
                 ("request", "note"),
                 ("instruction", "note"),

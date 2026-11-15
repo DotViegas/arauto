@@ -154,6 +154,7 @@ The word "session" always comes with its owner:
 |---|---|
 | **Source service** | The private program the project was born from. It linked Hermes agents to WhatsApp by manual configuration. |
 | **WAHA** | The third-party program used today as the engine. It is an unofficial WhatsApp client. |
+| **Built-in engine** | An engine inside Arauto. **Not decided.** The panel only has a button that says so ([decision 0044](decisoes/0044-numeros-no-painel-sobre-o-motor.md)). |
 | **Noise** | A well-known family of handshakes for encrypted channels. |
 
 ## Words we do not use
@@ -162,7 +163,7 @@ The word "session" always comes with its owner:
 |---|---|---|
 | ticket, token, Hermes key | sealed credential | "Ticket" was once confused with the invite. |
 | connection link | invite, connection sentence, block | The invite is not an address: it goes as an argument of the connector. |
-| pair a Hermes | connect a Hermes | Pairing is for numbers. |
+| pair a Hermes | connect a Hermes | Pairing is for numbers. The two buttons of the WhatsApps tab, "Connect WhatsApp (WAHA)" and "Connect WhatsApp (native · in test)", keep "connect" for numbers by the maintainer's request (15/11/2026); every step inside says "pair". |
 | tenant, slot | Hermes, organization | They were names from the source service. |
 | device, for WhatsApp | linked device | A device is an installation of the connector. |
 | channel, for Telegram or e-mail | conversation platform | The channel is the connection from the connector to the hub. |

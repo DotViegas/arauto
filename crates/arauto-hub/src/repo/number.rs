@@ -168,6 +168,7 @@ pub async fn add(
     alias: &NumberAlias,
     phone: &Phone,
     command: bool,
+    risk_accepted: bool,
     now: i64,
 ) -> Result<AddOutcome, RepoError> {
     let mut write = audit::begin_security(pool, mark).await?;
@@ -236,11 +237,18 @@ pub async fn add(
             &Event::new(Action::NumberAdded, admin.actor())
                 .in_organization(organization)
                 .about(TargetKind::Number, id)
-                .with(
-                    Details::new()
+                .with({
+                    let details = Details::new()
                         .alias("alias", alias)
-                        .flag("command", command),
-                ),
+                        .flag("command", command);
+                    // Only the panel records the acceptance, and only when it was given: a
+                    // row written by the command stays as it always was.
+                    if risk_accepted {
+                        details.flag("risk_accepted", true)
+                    } else {
+                        details
+                    }
+                }),
         )
         .await?;
     notify_hub(write.connection(), organization, "number", id).await?;
@@ -576,6 +584,31 @@ pub async fn expire_pairings(
     .bind(now)
     .fetch_all(pool)
     .await?)
+}
+
+/// Ends the pairing of ONE number: back to unpaired, only when it is still the pairing that
+/// ends at `until`. Another number's pairing, and a newer pairing of the same number, are
+/// not touched. Writes no audit row, like [`expire_pairings`]. Returns whether a row changed.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn end_pairing(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    number: Uuid,
+    until: i64,
+    now: i64,
+) -> Result<bool, RepoError> {
+    let done = sqlx::query(
+        "UPDATE number SET state = 'unpaired', state_since = $4, pairing_until = NULL          WHERE organization_id = $1 AND id = $2 AND state = 'pairing' AND pairing_until = $3",
+    )
+    .bind(organization.id())
+    .bind(number)
+    .bind(until)
+    .bind(now)
+    .execute(pool)
+    .await?;
+    Ok(done.rows_affected() > 0)
 }
 
 /// Records that the configuration `digest` was applied to the session of `number`.

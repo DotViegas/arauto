@@ -327,3 +327,142 @@ async fn removing_ends_the_number_keeps_or_erases_its_session_and_never_frees_th
     let actions: Vec<String> = world.audit().await.into_iter().map(|(a, _)| a).collect();
     assert_eq!(actions.iter().filter(|a| *a == "number.removed").count(), 2);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_pairing_that_ends_unpairs_only_its_own_number() {
+    // The end of a pairing used to unpair every number whose deadline was earlier than its
+    // own (`expire_pairings(until + 1)`): B, started first, lost its pairing when A failed.
+    let world = World::new().await;
+    world.add("bee", &phone(30)).await;
+    world.add("ay", &phone(31)).await;
+    let bee = world.number("bee").await;
+    let ay = world.number("ay").await;
+    let mut settings = world.hub().engines().settings().clone();
+    settings.pairing_ms = 8_000;
+    let pair = |alias: &'static str| {
+        world.fixture.admin.number_pair(
+            &world.vault,
+            alias,
+            PairMethod::Qr,
+            &settings,
+            &SystemClock,
+            |_| {},
+        )
+    };
+    let controller = async {
+        tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+        world.fake.set_status(ay.session.as_str(), "FAILED");
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        assert_eq!(
+            world.state("ay").await,
+            NumberState::Unpaired,
+            "the failed one is unpaired"
+        );
+        assert_eq!(
+            world.state("bee").await,
+            NumberState::Pairing,
+            "the failure of one pairing did not end the pairing of another"
+        );
+        world.fake.pairs_as(bee.session.as_str(), &phone(30));
+    };
+    let later = async {
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        pair("ay").await
+    };
+    let (first, second, ()) = tokio::join!(pair("bee"), later, controller);
+    assert_eq!(first.unwrap(), PairOutcome::Connected);
+    assert_eq!(second.unwrap(), PairOutcome::Failed);
+    assert_eq!(world.state("bee").await, NumberState::Connected);
+}
+
+#[tokio::test]
+async fn an_engine_error_during_a_pairing_puts_the_number_back() {
+    let world = World::new().await;
+    world.add("vendas", &phone(32)).await;
+    let number = world.number("vendas").await;
+    world
+        .fake
+        .fail("auth/qr", arauto_testkit::engine::Fault::ServerError);
+    let settings = world.hub().engines().settings().clone();
+    let result = world
+        .fixture
+        .admin
+        .number_pair(
+            &world.vault,
+            "vendas",
+            PairMethod::Qr,
+            &settings,
+            &SystemClock,
+            |_| {},
+        )
+        .await;
+    assert!(
+        matches!(result, Err(AdminError::Engine(_))),
+        "the error is returned: {result:?}"
+    );
+    assert_eq!(world.state("vendas").await, NumberState::Unpaired);
+    assert_eq!(
+        world.fake.status(number.session.as_str()).as_deref(),
+        Some("STOPPED"),
+        "the engine session was stopped"
+    );
+}
+
+#[tokio::test]
+async fn a_pairing_stopped_from_outside_is_cancelled_and_the_number_goes_back() {
+    let world = World::new().await;
+    world.add("vendas", &phone(33)).await;
+    let number = world.number("vendas").await;
+    let settings = world.hub().engines().settings().clone();
+    let outcome = world
+        .fixture
+        .admin
+        .number_pair_stoppable(
+            &world.vault,
+            "vendas",
+            PairMethod::Qr,
+            &settings,
+            &SystemClock,
+            |_| {},
+            tokio::time::sleep(std::time::Duration::from_millis(400)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome, PairOutcome::Cancelled);
+    assert_eq!(world.state("vendas").await, NumberState::Unpaired);
+    assert_eq!(
+        world.fake.status(number.session.as_str()).as_deref(),
+        Some("STOPPED")
+    );
+}
+
+#[tokio::test]
+async fn the_command_adds_with_no_acceptance_and_the_panel_function_records_it_when_given() {
+    let world = World::new().await;
+    world.add("first", &phone(34)).await;
+    let accepted = world
+        .fixture
+        .admin
+        .number_add_accepting(&world.vault, "second", &phone(35), true, true, world.now())
+        .await
+        .unwrap();
+    assert!(accepted.number.command);
+    let details: Vec<String> = sqlx::query_scalar(
+        "SELECT details::text FROM audit WHERE action = 'number.added' ORDER BY seq",
+    )
+    .fetch_all(world.hub().pool())
+    .await
+    .unwrap();
+    assert_eq!(details.len(), 2);
+    assert!(
+        !details[0].contains("risk_accepted"),
+        "the command row is as it always was: {}",
+        details[0]
+    );
+    assert!(
+        details[1].contains("\"risk_accepted\": true")
+            || details[1].contains("\"risk_accepted\":true"),
+        "{}",
+        details[1]
+    );
+}

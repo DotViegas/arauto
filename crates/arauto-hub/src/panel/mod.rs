@@ -44,7 +44,9 @@ pub mod guide;
 mod html;
 mod http;
 pub mod installation;
+mod numbers;
 pub mod org;
+mod pairing;
 pub mod passkey;
 pub mod secret;
 pub mod text;
@@ -95,6 +97,11 @@ const ASSETS: &[(&str, &str, &[u8])] = &[
         "org.js",
         "text/javascript; charset=utf-8",
         include_bytes!("assets/org.js"),
+    ),
+    (
+        "pair.js",
+        "text/javascript; charset=utf-8",
+        include_bytes!("assets/pair.js"),
     ),
     (
         "poppins-400.woff2",
@@ -148,6 +155,8 @@ pub struct PanelState {
     /// The passkey ceremonies of this panel, for its own address. `None` when a browser
     /// would refuse a passkey at that address.
     relying: Option<RelyingParty>,
+    /// The pairings of WhatsApp numbers this panel runs, in memory only ([`pairing`]).
+    pub(crate) pairings: pairing::Pairings,
 }
 
 impl PanelState {
@@ -176,6 +185,7 @@ impl PanelState {
                 .map(|(_, file)| file.clone())
                 .collect(),
             relying: RelyingParty::new(&url.origin()).ok(),
+            pairings: pairing::Pairings::default(),
         }
     }
 
@@ -433,6 +443,9 @@ pub(crate) async fn route(
         }
         (true, "/" | "/whatsapps" | "/accesses") => {
             page(&hub, panel, &parts.headers, path, parts.uri.query()).await
+        }
+        (_, path) if path.starts_with("/whatsapps/") => {
+            numbers::answer(&hub, panel, &parts, body).await
         }
         (_, path) if path == "/hermes/revoke" || path.starts_with("/accesses/") => {
             editor::answer(&hub, panel, &parts, body).await
@@ -955,8 +968,8 @@ async fn page(
     path: &str,
     query: Option<&str>,
 ) -> Result<Response<Body>, RepoError> {
-    let organization = match any_session_of(hub, panel, headers).await? {
-        Some((organization, session)) if session.full => organization,
+    let (organization, session) = match any_session_of(hub, panel, headers).await? {
+        Some((organization, session)) if session.full => (organization, session),
         // A session opened by a code is sent to the one page it reaches.
         Some(_) => return Ok(http::see_other("/first-access")),
         None => return Ok(http::see_other("/sign-in")),
@@ -964,7 +977,12 @@ async fn page(
     let lang = lang_of(headers);
     let frame = data::frame(hub, organization, lang).await?;
     let html = match path {
-        "/whatsapps" => view::numbers(&frame, &data::numbers(hub, organization, lang).await?),
+        "/whatsapps" => {
+            let mut numbers = data::numbers(hub, organization, lang, session.id).await?;
+            // After a write, the address names the number: the page says what it is now.
+            numbers.said = numbers::said(hub, organization, lang, query).await?;
+            view::numbers(&frame, &numbers)
+        }
         "/accesses" => {
             let mut accesses = data::accesses(hub, organization, lang).await?;
             // After a save, the address names the access: the page says what it is now.
@@ -1208,6 +1226,67 @@ mod tests {
     }
 
     #[test]
+    fn the_script_of_the_pairing_window_writes_no_markup_and_calls_only_the_window() {
+        let script = std::str::from_utf8(ASSETS[3].2).unwrap();
+        assert_eq!(ASSETS[3].0, "pair.js");
+        assert_eq!(ASSETS[3].1, "text/javascript; charset=utf-8");
+        // It moves the nodes of the hub in; it writes no markup, runs no text, reads no
+        // cookie, keeps nothing and calls nothing but the address of the window it is on.
+        for forbidden in [
+            "innerHTML",
+            "outerHTML",
+            "insertAdjacentHTML",
+            "createContextualFragment",
+            "setHTML",
+            "document.write",
+            "eval(",
+            "Function(",
+            "document.cookie",
+            "XMLHttpRequest",
+            "WebSocket",
+            "sendBeacon",
+            "localStorage",
+            "sessionStorage",
+            "postMessage",
+            "import(",
+            "http://",
+            "https://",
+            "setAttribute('style'",
+            "cssText",
+        ] {
+            assert!(
+                !script.contains(forbidden),
+                "the script of the pairing window has {forbidden}"
+            );
+        }
+        assert_eq!(script.matches("fetch(").count(), 1);
+        assert_eq!(script.matches("replaceWith(").count(), 1);
+        assert_eq!(script.matches("importNode(").count(), 1);
+        assert_eq!(script.matches("location.reload()").count(), 1);
+        assert!(script.contains("redirect: 'manual'"));
+        assert!(script.contains("cache: 'no-store'"));
+        assert!(
+            script
+                .to_lowercase()
+                .contains(&format!("'{REFRESH_HEADER}': '1'")),
+            "the script and the hub name the refresh header differently"
+        );
+        // The script has no sentence of its own: none the page writes is in it.
+        let mut sentences = marked_sentences(include_str!("numbers.rs"));
+        sentences.extend(marked_sentences(include_str!("view.rs")));
+        assert!(sentences.len() > 100, "the sentences were read");
+        for sentence in sentences
+            .iter()
+            .filter(|sentence| sentence.contains(' ') && sentence.len() >= 15)
+        {
+            assert!(
+                !script.contains(sentence.as_str()),
+                "the script has a sentence of the page: {sentence}"
+            );
+        }
+    }
+
+    #[test]
     fn the_files_of_the_panel_are_a_fixed_list() {
         let names: Vec<&str> = ASSETS.iter().map(|(name, _, _)| *name).collect();
         assert_eq!(
@@ -1216,6 +1295,7 @@ mod tests {
                 "panel.css",
                 "panel.js",
                 "org.js",
+                "pair.js",
                 "poppins-400.woff2",
                 "poppins-600.woff2",
                 "poppins-800.woff2",
@@ -1297,7 +1377,7 @@ mod tests {
         ));
         // Held while the admin edits the org chart: the refresh and the swap both stand still.
         assert_eq!(script.matches("root.hasAttribute('data-hold')").count(), 2);
-        for (name, kind, bytes) in ASSETS.iter().skip(3) {
+        for (name, kind, bytes) in ASSETS.iter().skip(4) {
             assert_eq!(*kind, "font/woff2");
             assert!(bytes.starts_with(b"wOF2"), "{name}");
             assert!(

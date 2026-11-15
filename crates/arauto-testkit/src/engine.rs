@@ -117,6 +117,10 @@ struct State {
     edited: Vec<(String, String, Value)>,
     deleted: Vec<(String, String)>,
     counter: u64,
+    /// The value the QR of a session serves, instead of the counted one.
+    qr_values: BTreeMap<String, String>,
+    /// The code every pairing code request serves, instead of the fixed one.
+    pairing_code: Option<String>,
 }
 
 /// The fake engine, running on 127.0.0.1.
@@ -274,6 +278,19 @@ impl FakeEngine {
         if let Some(found) = lock(&self.state).sessions.get_mut(session) {
             found.pairs_as = Some(phone.to_owned());
         }
+    }
+
+    /// The value the QR of `session` serves from now on, whatever it is: for tests of hostile
+    /// text.
+    pub fn set_qr_value(&self, session: &str, value: &str) {
+        lock(&self.state)
+            .qr_values
+            .insert(session.to_owned(), value.to_owned());
+    }
+
+    /// The code the engine serves from now on to every request of a pairing code.
+    pub fn set_pairing_code(&self, code: &str) {
+        lock(&self.state).pairing_code = Some(code.to_owned());
     }
 
     /// Connects a session with the account of `phone` at once.
@@ -820,7 +837,9 @@ fn route(
             if found.pairs_as.is_some() {
                 found.pair_pending = true;
             }
-            ok(json!({"value": format!("2@fake-qr-value-{},{}", found.qr_served, session)}))
+            let served = format!("2@fake-qr-value-{},{}", found.qr_served, session);
+            let value = state.qr_values.get(*session).cloned().unwrap_or(served);
+            ok(json!({"value": value}))
         }
         ["api", session, "auth", "request-code"] if post => {
             let Some(found) = state.sessions.get_mut(*session) else {
@@ -832,7 +851,11 @@ fn route(
             if found.pairs_as.is_some() {
                 found.pair_pending = true;
             }
-            ok(json!({"code": "ABCD-EFGH"}))
+            let code = state
+                .pairing_code
+                .clone()
+                .unwrap_or_else(|| "ABCD-EFGH".to_owned());
+            ok(json!({"code": code}))
         }
         ["api", session, "chats", "overview"] if get => {
             let Some(found) = state.sessions.get(*session) else {

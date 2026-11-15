@@ -531,6 +531,14 @@ pub struct ResolvedOrg {
 }
 
 impl ResolvedOrg {
+    /// An organization that was not resolved from the database: for the unit tests of what
+    /// is keyed by organization. Written with `all(test, ...)` so that the scan that reads
+    /// the code above the first plain test marker still reads what follows.
+    #[cfg(all(test, not(doc)))]
+    pub(crate) const fn for_tests(id: Uuid) -> Self {
+        Self { id }
+    }
+
     /// The identifier, to bind in a query.
     #[must_use]
     pub const fn id(&self) -> Uuid {

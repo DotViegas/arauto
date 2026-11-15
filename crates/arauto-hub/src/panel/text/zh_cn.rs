@@ -60,10 +60,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "号码"),
     ("Hermes with access", "有访问权限的 Hermes"),
     ("Last message", "最后一条消息"),
-    (
-        "No number yet. Add one with {command}.",
-        "还没有号码。用 {command} 添加。",
-    ),
     ("command", "指令"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
@@ -927,8 +923,289 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "No Hermes yet. Connect the first one in the Hermes tab.",
         "还没有 Hermes。请在 Hermes 标签页中连接第一个。",
     ),
+    ("Connect WhatsApp (WAHA)", "连接 WhatsApp (WAHA)"),
     (
-        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "在此版本中，面板可以连接和撤销 Hermes、更改每个号码的访问权限，并编辑组织架构图及其链接。配对号码和选择会话仍需在 hub 的服务器上用 {command} 命令完成。",
+        "Connect WhatsApp (native · in test)",
+        "连接 WhatsApp (原生 · 测试中)",
+    ),
+    (
+        "No number yet. Add the first one with the \"Connect WhatsApp (WAHA)\" button.",
+        "还没有号码。用“连接 WhatsApp (WAHA)”按钮添加第一个号码。",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, pairs and manages WhatsApp numbers on WAHA, changes the accesses of each number and edits the org chart with its links. Choosing chats is still done with the {command} command, on the hub's server.",
+        "在此版本中，面板可以连接和撤销 Hermes，在 WAHA 上配对和管理 WhatsApp 号码，更改每个号码的访问权限，并编辑带链接的组织架构图。选择聊天仍需在 hub 服务器上用 {command} 命令完成。",
+    ),
+    ("Pair", "配对"),
+    ("Pair again", "重新配对"),
+    ("Continue pairing", "继续配对"),
+    ("See the pairing", "查看配对"),
+    ("Disconnect", "断开连接"),
+    ("Restart", "重启"),
+    ("Decide", "处理"),
+    ("Number {alias}: {state}.", "号码 {alias}：{state}。"),
+    (
+        "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+        "hub 已更改号码 {alias}，但 WAHA 没有响应：它在 WAHA 中的会话可能仍是原样。请在 hub 服务器上用 {command} 检查 WAHA。",
+    ),
+    ("Method", "方式"),
+    ("Phone", "手机"),
+    (
+        "How the panel and the Hermes call this number: lowercase letters, digits, hyphen and underscore, up to 32. An alias is never reused.",
+        "面板和 Hermes 用来称呼此号码的名称：小写字母、数字、连字符和下划线，最多 32 个字符。别名绝不会被重复使用。",
+    ),
+    ("Number with the country code", "带国家代码的号码"),
+    (
+        "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
+        "例如 +55 11 9XXXX-XXXX。只能包含数字、空格、连字符和括号。",
+    ),
+    (
+        "It is the command channel of a Hermes",
+        "它是某个 Hermes 的指令通道",
+    ),
+    (
+        "It shows as \"command\" in the list.",
+        "它在列表中显示为“指令”。",
+    ),
+    ("Before the first number", "添加第一个号码之前"),
+    (
+        "The engine is an unofficial WhatsApp client. WhatsApp may block the number. Use numbers you can afford to lose.",
+        "引擎是非官方的 WhatsApp 客户端。WhatsApp 可能会封禁该号码。请使用您可以承受损失的号码。",
+    ),
+    (
+        "I understand and accept. The hub records this acceptance in the audit.",
+        "我已了解并接受。hub 会在审计中记录这次接受。",
+    ),
+    (
+        "The number is paired through WAHA, the engine set on this hub.",
+        "号码通过 WAHA 配对，WAHA 是此 hub 上设置的引擎。",
+    ),
+    ("Add and pair", "添加并配对"),
+    (
+        "WAHA has not answered the hub yet. You can add the number; pairing it needs WAHA to answer.",
+        "WAHA 还没有响应过 hub。您可以添加号码；配对则需要 WAHA 有响应。",
+    ),
+    (
+        "There is no WhatsApp engine on this hub yet. Set WAHA on the hub's server with {command}, then its key with {key_command}. The key is never typed in the panel.",
+        "此 hub 上还没有 WhatsApp 引擎。请在 hub 服务器上用 {command} 设置 WAHA，再用 {key_command} 设置它的密钥。密钥绝不会在面板中输入。",
+    ),
+    (
+        "The engine has no key yet. Set it on the hub's server with {command}. The key is never typed in the panel.",
+        "引擎还没有密钥。请在 hub 服务器上用 {command} 设置。密钥绝不会在面板中输入。",
+    ),
+    (
+        "The alias has from 1 to 32 characters.",
+        "别名长度为 1 到 32 个字符。",
+    ),
+    (
+        "The alias starts with a lowercase letter or a digit.",
+        "别名以小写字母或数字开头。",
+    ),
+    (
+        "That alias is reserved. Choose another.",
+        "该别名是保留的。请选择另一个。",
+    ),
+    (
+        "That alias is taken, now or by a number that was removed, and an alias is never reused. Choose another.",
+        "该别名正在使用，或曾被已移除的号码使用，而别名绝不会被重复使用。请选择另一个。",
+    ),
+    (
+        "Type the number with the country code: from 8 to 15 digits, like +55 11 9XXXX-XXXX.",
+        "请输入带国家代码的号码：8 到 15 位数字，例如 +55 11 9XXXX-XXXX。",
+    ),
+    (
+        "That number is already a WhatsApp of this hub.",
+        "该号码已经是此 hub 的一个 WhatsApp。",
+    ),
+    (
+        "Read the sentence about the risk and mark that you accept it. Nothing was added.",
+        "请阅读有关风险的说明，并勾选表示您接受。没有添加任何内容。",
+    ),
+    ("Pair {alias}", "配对 {alias}"),
+    (
+        "Have the phone of {phone} at hand, with WhatsApp open. The pairing lasts up to {minutes} minutes.",
+        "请准备好 {phone} 的手机，并打开 WhatsApp。配对最长持续 {minutes} 分钟。",
+    ),
+    ("How will the phone pair?", "手机要如何配对？"),
+    ("QR code", "二维码"),
+    (
+        "scan it with the phone's camera, from inside WhatsApp",
+        "在 WhatsApp 里用手机摄像头扫描",
+    ),
+    ("Pairing code", "配对码"),
+    (
+        "type a code on the phone, for when it cannot scan this screen",
+        "在手机上输入一个代码，适用于手机无法扫描此屏幕的情况",
+    ),
+    ("Start pairing", "开始配对"),
+    (
+        "WAHA has not created the session of this number yet. Starting the pairing tries again.",
+        "WAHA 还没有创建此号码的会话。开始配对会再试一次。",
+    ),
+    (
+        "Choose QR code or pairing code. Nothing was started.",
+        "请选择二维码或配对码。没有开始任何操作。",
+    ),
+    (
+        "{n} numbers are being paired right now, the most at once. Wait for one to end, or cancel one.",
+        "现在有 {n} 个号码正在配对，已达同时配对的上限。请等待其中一个结束，或取消一个。",
+    ),
+    (
+        "This cannot be done while the number is in the state \"{state}\". Nothing was done.",
+        "号码处于“{state}”状态时无法执行此操作。没有执行任何操作。",
+    ),
+    ("Starting the pairing…", "正在开始配对…"),
+    ("QR code to scan with the phone", "用手机扫描的二维码"),
+    (
+        "The QR changes every few seconds: this window shows the current one.",
+        "二维码每隔几秒就会变化：此窗口显示的是当前的二维码。",
+    ),
+    (
+        "The code works while this window counts down: {time} left. WhatsApp may end it sooner.",
+        "此窗口倒计时期间代码有效：剩余 {time}。WhatsApp 也可能提前让它失效。",
+    ),
+    ("Time left to scan: {time}.", "扫描剩余时间：{time}。"),
+    ("This window refreshes by itself.", "此窗口会自动刷新。"),
+    ("Refresh now", "立即刷新"),
+    ("Cancel the pairing", "取消配对"),
+    (
+        "The QR is too long to draw here. Cancel, and pair with a pairing code instead.",
+        "二维码太长，无法在此绘制。请取消，改用配对码进行配对。",
+    ),
+    ("Paired: {phone}.", "已配对：{phone}。"),
+    (
+        "The number {alias} is connected. Give a Hermes access to it in the Accesses tab.",
+        "号码 {alias} 已连接。请在“访问权限”标签页中让某个 Hermes 访问它。",
+    ),
+    (
+        "Nothing was scanned or typed in time. The number is not paired; pair it again with the phone at hand.",
+        "在规定时间内没有扫描或输入任何内容。号码未配对；请准备好手机后重新配对。",
+    ),
+    (
+        "WAHA reported a failure of the session. The number is not paired. Try again; if it fails again, check WAHA.",
+        "WAHA 报告会话失败。号码未配对。请重试；如果再次失败，请检查 WAHA。",
+    ),
+    (
+        "The pairing was cancelled. The number is not paired.",
+        "配对已取消。号码未配对。",
+    ),
+    (
+        "This number is being paired in another window. Only that window shows the QR or the code.",
+        "此号码正在另一个窗口中配对。只有那个窗口会显示二维码或代码。",
+    ),
+    ("Cancel that pairing", "取消那次配对"),
+    (
+        "This pairing is no longer running in the hub: it ended, or the hub restarted. The number is in the state \"{state}\".",
+        "此配对已不在 hub 中运行：它已结束，或 hub 已重启。号码处于“{state}”状态。",
+    ),
+    (
+        "The hub could not reach WAHA. Check that it is running and on the hub's network.",
+        "hub 无法连接到 WAHA。请检查它是否正在运行，并且位于 hub 的网络中。",
+    ),
+    (
+        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
+        "WAHA 拒绝了 hub 持有的密钥。请在 hub 服务器上用 {command} 设置正确的密钥。",
+    ),
+    (
+        "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
+        "WAHA 返回了错误，或没有及时响应。请稍后重试；在 hub 服务器上运行 {command} 可以了解更多。",
+    ),
+    (
+        "WhatsApp is limiting this number. Try again later.",
+        "WhatsApp 正在限制此号码。请稍后重试。",
+    ),
+    (
+        "WAHA refused the request. See the hub's log.",
+        "WAHA 拒绝了该请求。请查看 hub 的日志。",
+    ),
+    (
+        "Something failed in the hub. See the hub's log and check the number in the list.",
+        "hub 出现故障。请查看 hub 的日志，并在列表中检查该号码。",
+    ),
+    (
+        "{alias}: another phone paired",
+        "{alias}：另一部手机完成了配对",
+    ),
+    (
+        "The phone that paired belongs to a number different from the one given.",
+        "完成配对的手机属于与所填号码不同的号码。",
+    ),
+    (
+        "Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped.",
+        "在您处理之前，号码保持“号码不符”状态，其访问权限保持停止。",
+    ),
+    ("Keep this one", "保留此项"),
+    (
+        "Undoing takes WAHA out of that phone's WhatsApp (it leaves its linked devices) and erases the history WAHA keeps of this number.",
+        "撤销会让 WAHA 退出该手机的 WhatsApp（它会从已关联的设备中消失），并清除 WAHA 保存的此号码的历史记录。",
+    ),
+    (
+        "I understand that WAHA erases its history of this number.",
+        "我了解 WAHA 会清除它保存的此号码的历史记录。",
+    ),
+    (
+        "Mark that you understand what undoing erases. Nothing was done.",
+        "请勾选表示您了解撤销会清除什么。没有执行任何操作。",
+    ),
+    (
+        "The phone that paired is already another number of this hub. Undo this pairing, or remove the other number first.",
+        "完成配对的手机已经是此 hub 的另一个号码。请撤销这次配对，或先移除另一个号码。",
+    ),
+    ("Disconnect {alias}", "断开 {alias}"),
+    (
+        "Disconnecting stops the session of this number in WAHA. It does not take WAHA out of WhatsApp, and WAHA keeps its history. While it is disconnected, no Hermes reads or sends through it. To use it again, pair it again.",
+        "断开连接会停止 WAHA 中此号码的会话。这不会让 WAHA 退出 WhatsApp，WAHA 仍会保留历史记录。断开期间，没有任何 Hermes 能通过它读取或发送。若要再次使用，请重新配对。",
+    ),
+    (
+        "Type the alias {alias} to confirm.",
+        "请输入别名 {alias} 以确认。",
+    ),
+    (
+        "The alias typed does not match. Nothing was done.",
+        "输入的别名不匹配。没有执行任何操作。",
+    ),
+    ("Remove {alias}", "移除 {alias}"),
+    (
+        "Removing ends every access to this number now. Its alias is never used again.",
+        "移除会立即结束对此号码的所有访问。它的别名绝不会再被使用。",
+    ),
+    (
+        "What happens to its session in WAHA",
+        "它在 WAHA 中的会话将如何处理",
+    ),
+    (
+        "Stop it and keep it in WAHA, with the history WAHA keeps",
+        "停止它并保留在 WAHA 中，连同 WAHA 保存的历史记录",
+    ),
+    (
+        "Take WAHA out of WhatsApp and delete it: WAHA erases the history it keeps",
+        "让 WAHA 退出 WhatsApp 并删除它：WAHA 会清除它保存的历史记录",
+    ),
+    (
+        "Arauto has no message archive yet: the history is only what WAHA keeps.",
+        "Arauto 还没有消息存档：历史记录只有 WAHA 保存的那部分。",
+    ),
+    (
+        "Choose what happens to its session in WAHA. Nothing was done.",
+        "请选择它在 WAHA 中的会话将如何处理。没有执行任何操作。",
+    ),
+    ("In test", "测试中"),
+    (
+        "A WhatsApp engine built into Arauto is being studied. It is not part of this version, and this window does nothing.",
+        "正在研究内置于 Arauto 的 WhatsApp 引擎。它不属于此版本，此窗口不执行任何操作。",
+    ),
+    (
+        "For now, numbers are paired through WAHA, with the \"Connect WhatsApp (WAHA)\" button.",
+        "目前，号码通过 WAHA 配对，使用“连接 WhatsApp (WAHA)”按钮。",
+    ),
+    ("Open the WAHA window", "打开 WAHA 窗口"),
+    ("Try again", "重试"),
+    (
+        "Scan with the phone: WhatsApp › Linked devices › Link a device.",
+        "用手机扫描：WhatsApp › 已关联的设备 › 关联设备。",
+    ),
+    (
+        "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
+        "在手机上：WhatsApp › 已关联的设备 › 关联设备 › 改为用手机号码关联，然后输入此代码：",
     ),
 ];

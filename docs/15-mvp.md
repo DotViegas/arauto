@@ -23,16 +23,16 @@ are in [0031](decisoes/0031-banco-postgresql.md),
 | Question | Answer |
 |---|---|
 | What does the MVP do? | It connects Hermes to the hub, lets a Hermes send a note to another and use WhatsApp numbers, and wakes Hermes when something arrives. |
-| How is it administered? | By a command on the hub's server. The panel started on 12/11/2026: read-only screens and, since 13/11/2026, the guide to connect Hermes, the editing of accesses and the revoke ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). Pairing numbers and the passkey come later. |
+| How is it administered? | By a command on the hub's server. The panel started on 12/11/2026: read-only screens and, since 13/11/2026, the guide to connect Hermes, the editing of accesses and the revoke ([decision 0040](decisoes/0040-painel-dentro-do-hub.md)). Since 15/11/2026 numbers are added, paired, restarted, disconnected and removed from the panel too, on WAHA ([decision 0044](decisoes/0044-numeros-no-painel-sobre-o-motor.md), proposal; not tried in a real browser, nor from the panel against a real engine). The passkey comes later. |
 | Where does it run in development? | Directly through `cargo`, with a local PostgreSQL. No container. |
 | Where does it run in production? | In a container, on Linux, with PostgreSQL, through a compose file. |
-| What is left out? | The passkey, pairing numbers through the panel, the message archive, the signing of versions and the shielded mode. |
+| What is left out? | The passkey, the message archive, the signing of versions and the shielded mode. |
 
 ## 1. What goes in and what does not
 
 | Goes in | Does not go in, and is left for later |
 |---|---|
-| Invite, enrollment, typed code, approval | The passkey and pairing numbers through the panel ([07-telas.md](07-telas.md)). The read-only screens went in on 12/11/2026; the guide to connect Hermes, the editing of accesses and the revoke, on 13/11/2026. |
+| Invite, enrollment, typed code, approval | The passkey ([07-telas.md](07-telas.md)). Pairing numbers through the panel went in as a proposal on 15/11/2026 (decision 0044). The read-only screens went in on 12/11/2026; the guide to connect Hermes, the editing of accesses and the revoke, on 13/11/2026. |
 | Noise channel, swap of the credential, quarantine, revoke, reconnect, leave | Warning to the admin outside the panel ([decision 0025](decisoes/0025-aviso-por-fora-do-painel.md)) |
 | Restored mode ([04](04-seguranca-conexao.md), C11), with the mark outside the database | The open point of C11 (the issue date of the seal) |
 | Single leader and relays | Shielded mode |
@@ -80,8 +80,8 @@ Accesses), the alert banner and, since 13/11/2026, the guide to connect Hermes: 
 connection sentence, with the block as the fallback; not tried on a real Hermes), typed code and
 approval, through the same functions as `hermes add`, `invite`, `approve` and `deny`. On
 the same day the editing of the access of a Hermes on a number (the `access grant`, the `wake-wait`
-and the `access remove`) and the `revoke` went in. Pairing numbers and choosing the chats of an
-access remain only through the command. The panel session acts while it lasts: the passkey is asked
+and the `access remove`) and the `revoke` went in. Choosing the chats of an
+access remains only through the command. Pairing numbers went in on 15/11/2026 (decision 0044, proposal): the add, the pairing by QR or code, the restart, the disconnect and the remove, in windows over the list of numbers, through the same functions as the command. Disconnect and Remove ask for the alias typed, not the passkey. It was covered by automatic tests against a fake engine only: no real browser, and no real WAHA from the panel. The panel session acts while it lasts: the passkey is asked
 at the entry and not again on each action (decision 0040, proposal; asking again on every action, as
 decision 0019 says, is not built). The panel is meant to stay open to the internet behind its
 passkey, on an address of its own (proposal: no server has run it yet). It was tested only by the

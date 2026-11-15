@@ -185,6 +185,9 @@ pub fn paired(alias: &str, outcome: &PairOutcome) -> Report {
         PairOutcome::Failed => Report::not_done(format!(
             "The engine reported a failure of the session: number {alias} is unpaired again.\n"
         )),
+        PairOutcome::Cancelled => Report::not_done(format!(
+            "The pairing was cancelled: number {alias} is unpaired again.\n"
+        )),
     }
 }
 

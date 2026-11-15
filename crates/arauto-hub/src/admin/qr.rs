@@ -9,6 +9,8 @@
 
 use std::fmt::Write as _;
 
+use zeroize::Zeroize;
+
 /// The error correction codewords per block, level M, by version (index 0 unused).
 const ECC_PER_BLOCK: [usize; 41] = [
     0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28,
@@ -36,6 +38,22 @@ pub struct QrCode {
     size: usize,
     modules: Vec<bool>,
     function: Vec<bool>,
+}
+
+impl QrCode {
+    /// Wipes the modules: what a QR draws is a short-lived secret. The code is empty and
+    /// draws nothing afterwards.
+    fn wipe(&mut self) {
+        self.modules.zeroize();
+        self.function.zeroize();
+        self.size = 0;
+    }
+}
+
+impl Drop for QrCode {
+    fn drop(&mut self) {
+        self.wipe();
+    }
 }
 
 fn raw_data_modules(version: usize) -> usize {
@@ -158,7 +176,10 @@ impl QrCode {
             }
             data.push(*pad);
         }
-        let codewords = Self::with_ecc(version, &data);
+        let mut codewords = Self::with_ecc(version, &data);
+        // The buffers of the value are wiped as soon as the codewords are made.
+        bits.zeroize();
+        data.zeroize();
         let size = version * 4 + 17;
         let mut code = Self {
             version,
@@ -168,6 +189,7 @@ impl QrCode {
         };
         code.draw_function_patterns();
         code.draw_codewords(&codewords);
+        codewords.zeroize();
         let mut best = (u32::MAX, 0u8);
         for mask in 0..8u8 {
             code.apply_mask(mask);
@@ -549,6 +571,19 @@ mod tests {
         (0..length)
             .map(|k| read(4 + count_bits + k * 8, 8) as u8)
             .collect()
+    }
+
+    #[test]
+    fn a_dropped_qr_code_is_wiped() {
+        let mut code = QrCode::encode(b"a short-lived secret").unwrap();
+        assert!(code.modules.iter().any(|dark| *dark));
+        code.wipe();
+        assert!(code.modules.is_empty() && code.function.is_empty());
+        assert_eq!(code.size(), 0);
+        assert!(
+            !code.dark(0, 0),
+            "a wiped code draws nothing and never panics"
+        );
     }
 
     #[test]

@@ -60,10 +60,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "नंबर"),
     ("Hermes with access", "पहुँच वाले Hermes"),
     ("Last message", "आखिरी संदेश"),
-    (
-        "No number yet. Add one with {command}.",
-        "अभी कोई नंबर नहीं है। {command} से एक जोड़ें।",
-    ),
     ("command", "कमांड"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
@@ -960,8 +956,292 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "No Hermes yet. Connect the first one in the Hermes tab.",
         "अभी कोई Hermes नहीं है। पहला Hermes, Hermes टैब में कनेक्ट करें।",
     ),
+    ("Connect WhatsApp (WAHA)", "WhatsApp कनेक्ट करें (WAHA)"),
     (
-        "In this version the panel connects and revokes Hermes, changes the accesses of each number and edits the org chart with its links. Pairing numbers and choosing chats are still done with the {command} command, on the hub's server.",
-        "इस संस्करण में पैनल Hermes को कनेक्ट और निरस्त करता है, हर नंबर की पहुँच बदलता है और संगठन चार्ट को उसके लिंक के साथ संपादित करता है। नंबर पेयर करना और चैट चुनना अभी भी हब के सर्वर पर {command} कमांड से होता है।",
+        "Connect WhatsApp (native · in test)",
+        "WhatsApp कनेक्ट करें (नेटिव · परीक्षण में)",
+    ),
+    (
+        "No number yet. Add the first one with the \"Connect WhatsApp (WAHA)\" button.",
+        "अभी कोई नंबर नहीं है। पहला नंबर \"WhatsApp कनेक्ट करें (WAHA)\" बटन से जोड़ें।",
+    ),
+    (
+        "In this version the panel connects and revokes Hermes, pairs and manages WhatsApp numbers on WAHA, changes the accesses of each number and edits the org chart with its links. Choosing chats is still done with the {command} command, on the hub's server.",
+        "इस संस्करण में पैनल Hermes को कनेक्ट और निरस्त करता है, WAHA पर WhatsApp नंबर पेयर और प्रबंधित करता है, हर नंबर की पहुँच बदलता है और लिंक के साथ ऑर्ग चार्ट संपादित करता है। चैट चुनना अभी भी {command} कमांड से होता है, हब के सर्वर पर।",
+    ),
+    ("Pair", "पेयर करें"),
+    ("Pair again", "फिर से पेयर करें"),
+    ("Continue pairing", "पेयरिंग जारी रखें"),
+    ("See the pairing", "पेयरिंग देखें"),
+    ("Disconnect", "डिस्कनेक्ट करें"),
+    ("Restart", "रीस्टार्ट करें"),
+    ("Decide", "तय करें"),
+    ("Number {alias}: {state}.", "नंबर {alias}: {state}।"),
+    (
+        "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+        "हब ने नंबर {alias} बदल दिया, लेकिन WAHA ने जवाब नहीं दिया: वहाँ उसका सेशन शायद पहले जैसा ही हो। हब के सर्वर पर {command} से WAHA जाँचें।",
+    ),
+    ("Method", "तरीका"),
+    ("Phone", "फ़ोन"),
+    (
+        "How the panel and the Hermes call this number: lowercase letters, digits, hyphen and underscore, up to 32. An alias is never reused.",
+        "पैनल और Hermes इस नंबर को किस नाम से बुलाते हैं: छोटे अक्षर, अंक, हाइफ़न और अंडरस्कोर, अधिकतम 32। उपनाम कभी दोबारा इस्तेमाल नहीं होता।",
+    ),
+    ("Number with the country code", "देश कोड के साथ नंबर"),
+    (
+        "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
+        "जैसे +55 11 9XXXX-XXXX। केवल अंक, स्पेस, हाइफ़न और कोष्ठक।",
+    ),
+    (
+        "It is the command channel of a Hermes",
+        "यह किसी Hermes का कमांड चैनल है",
+    ),
+    (
+        "It shows as \"command\" in the list.",
+        "सूची में यह \"कमांड\" के रूप में दिखता है।",
+    ),
+    ("Before the first number", "पहले नंबर से पहले"),
+    (
+        "The engine is an unofficial WhatsApp client. WhatsApp may block the number. Use numbers you can afford to lose.",
+        "इंजन WhatsApp का अनौपचारिक क्लाइंट है। WhatsApp नंबर को ब्लॉक कर सकता है। ऐसे नंबर इस्तेमाल करें जिन्हें खोना आपको मंज़ूर हो।",
+    ),
+    (
+        "I understand and accept. The hub records this acceptance in the audit.",
+        "मैं समझता/समझती हूँ और स्वीकार करता/करती हूँ। हब यह स्वीकृति ऑडिट में दर्ज करता है।",
+    ),
+    (
+        "The number is paired through WAHA, the engine set on this hub.",
+        "नंबर WAHA से पेयर होता है, जो इस हब पर सेट इंजन है।",
+    ),
+    ("Add and pair", "नंबर जोड़ें और पेयर करें"),
+    (
+        "WAHA has not answered the hub yet. You can add the number; pairing it needs WAHA to answer.",
+        "WAHA ने अभी तक हब को जवाब नहीं दिया है। आप नंबर जोड़ सकते हैं; उसे पेयर करने के लिए WAHA का जवाब देना ज़रूरी है।",
+    ),
+    (
+        "There is no WhatsApp engine on this hub yet. Set WAHA on the hub's server with {command}, then its key with {key_command}. The key is never typed in the panel.",
+        "इस हब पर अभी कोई WhatsApp इंजन नहीं है। हब के सर्वर पर {command} से WAHA सेट करें, फिर {key_command} से उसकी कुंजी। कुंजी पैनल में कभी नहीं लिखी जाती।",
+    ),
+    (
+        "The engine has no key yet. Set it on the hub's server with {command}. The key is never typed in the panel.",
+        "इंजन की अभी कोई कुंजी नहीं है। हब के सर्वर पर इसे {command} से सेट करें। कुंजी पैनल में कभी नहीं लिखी जाती।",
+    ),
+    (
+        "The alias has from 1 to 32 characters.",
+        "उपनाम 1 से 32 वर्णों का होता है।",
+    ),
+    (
+        "The alias starts with a lowercase letter or a digit.",
+        "उपनाम किसी छोटे अक्षर या अंक से शुरू होता है।",
+    ),
+    (
+        "That alias is reserved. Choose another.",
+        "यह उपनाम आरक्षित है। दूसरा चुनें।",
+    ),
+    (
+        "That alias is taken, now or by a number that was removed, and an alias is never reused. Choose another.",
+        "यह उपनाम अभी इस्तेमाल में है, या किसी हटाए गए नंबर का था, और उपनाम कभी दोबारा इस्तेमाल नहीं होता। दूसरा चुनें।",
+    ),
+    (
+        "Type the number with the country code: from 8 to 15 digits, like +55 11 9XXXX-XXXX.",
+        "नंबर देश कोड के साथ लिखें: 8 से 15 अंक, जैसे +55 11 9XXXX-XXXX।",
+    ),
+    (
+        "That number is already a WhatsApp of this hub.",
+        "यह नंबर पहले से इस हब का WhatsApp है।",
+    ),
+    (
+        "Read the sentence about the risk and mark that you accept it. Nothing was added.",
+        "जोखिम वाला वाक्य पढ़ें और चिह्नित करें कि आप उसे स्वीकार करते हैं। कुछ भी नहीं जोड़ा गया।",
+    ),
+    ("Pair {alias}", "{alias} को पेयर करें"),
+    (
+        "Have the phone of {phone} at hand, with WhatsApp open. The pairing lasts up to {minutes} minutes.",
+        "{phone} का फ़ोन हाथ में रखें, WhatsApp खुला हुआ। पेयरिंग अधिकतम {minutes} मिनट चलती है।",
+    ),
+    ("How will the phone pair?", "फ़ोन कैसे पेयर होगा?"),
+    ("QR code", "QR कोड"),
+    (
+        "scan it with the phone's camera, from inside WhatsApp",
+        "फ़ोन के कैमरे से, WhatsApp के अंदर से स्कैन करें",
+    ),
+    ("Pairing code", "पेयरिंग कोड"),
+    (
+        "type a code on the phone, for when it cannot scan this screen",
+        "फ़ोन पर एक कोड लिखें, जब वह इस स्क्रीन को स्कैन न कर सके",
+    ),
+    ("Start pairing", "पेयरिंग शुरू करें"),
+    (
+        "WAHA has not created the session of this number yet. Starting the pairing tries again.",
+        "WAHA ने अभी तक इस नंबर का सेशन नहीं बनाया है। पेयरिंग शुरू करने पर वह फिर कोशिश करता है।",
+    ),
+    (
+        "Choose QR code or pairing code. Nothing was started.",
+        "QR कोड या पेयरिंग कोड चुनें। कुछ भी शुरू नहीं हुआ।",
+    ),
+    (
+        "{n} numbers are being paired right now, the most at once. Wait for one to end, or cancel one.",
+        "अभी {n} नंबर पेयर हो रहे हैं, जो एक साथ अधिकतम है। किसी एक के खत्म होने की प्रतीक्षा करें, या एक को रद्द करें।",
+    ),
+    (
+        "This cannot be done while the number is in the state \"{state}\". Nothing was done.",
+        "नंबर जब \"{state}\" स्थिति में है, तब यह नहीं किया जा सकता। कुछ भी नहीं किया गया।",
+    ),
+    ("Starting the pairing…", "पेयरिंग शुरू हो रही है…"),
+    (
+        "QR code to scan with the phone",
+        "फ़ोन से स्कैन करने के लिए QR कोड",
+    ),
+    (
+        "The QR changes every few seconds: this window shows the current one.",
+        "QR हर कुछ सेकंड में बदलता है: यह विंडो मौजूदा QR दिखाती है।",
+    ),
+    (
+        "The code works while this window counts down: {time} left. WhatsApp may end it sooner.",
+        "कोड तब तक चलता है जब तक यह विंडो गिनती करती है: {time} बाकी। WhatsApp उसे पहले भी खत्म कर सकता है।",
+    ),
+    ("Time left to scan: {time}.", "स्कैन के लिए बचा समय: {time}।"),
+    (
+        "This window refreshes by itself.",
+        "यह विंडो अपने आप ताज़ा होती है।",
+    ),
+    ("Refresh now", "अभी ताज़ा करें"),
+    ("Cancel the pairing", "पेयरिंग रद्द करें"),
+    (
+        "The QR is too long to draw here. Cancel, and pair with a pairing code instead.",
+        "QR यहाँ बनाने के लिए बहुत लंबा है। रद्द करें, और इसके बजाय पेयरिंग कोड से पेयर करें।",
+    ),
+    ("Paired: {phone}.", "पेयर हो गया: {phone}।"),
+    (
+        "The number {alias} is connected. Give a Hermes access to it in the Accesses tab.",
+        "नंबर {alias} कनेक्टेड है। पहुँच टैब में किसी Hermes को इसकी पहुँच दें।",
+    ),
+    (
+        "Nothing was scanned or typed in time. The number is not paired; pair it again with the phone at hand.",
+        "समय पर कुछ भी स्कैन या टाइप नहीं हुआ। नंबर पेयर नहीं है; फ़ोन हाथ में रखकर फिर से पेयर करें।",
+    ),
+    (
+        "WAHA reported a failure of the session. The number is not paired. Try again; if it fails again, check WAHA.",
+        "WAHA ने सेशन की विफलता बताई। नंबर पेयर नहीं है। फिर कोशिश करें; दोबारा विफल हो तो WAHA जाँचें।",
+    ),
+    (
+        "The pairing was cancelled. The number is not paired.",
+        "पेयरिंग रद्द कर दी गई। नंबर पेयर नहीं है।",
+    ),
+    (
+        "This number is being paired in another window. Only that window shows the QR or the code.",
+        "यह नंबर किसी दूसरी विंडो में पेयर हो रहा है। केवल वही विंडो QR या कोड दिखाती है।",
+    ),
+    ("Cancel that pairing", "वह पेयरिंग रद्द करें"),
+    (
+        "This pairing is no longer running in the hub: it ended, or the hub restarted. The number is in the state \"{state}\".",
+        "यह पेयरिंग अब हब में नहीं चल रही: वह खत्म हो गई, या हब रीस्टार्ट हुआ। नंबर \"{state}\" स्थिति में है।",
+    ),
+    (
+        "The hub could not reach WAHA. Check that it is running and on the hub's network.",
+        "हब WAHA तक नहीं पहुँच सका। जाँचें कि वह चल रहा है और हब के नेटवर्क पर है।",
+    ),
+    (
+        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
+        "WAHA ने हब की कुंजी अस्वीकार कर दी। हब के सर्वर पर {command} से सही कुंजी सेट करें।",
+    ),
+    (
+        "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
+        "WAHA ने त्रुटि के साथ जवाब दिया, या समय पर नहीं दिया। थोड़ी देर में फिर कोशिश करें; हब के सर्वर पर {command} और बताता है।",
+    ),
+    (
+        "WhatsApp is limiting this number. Try again later.",
+        "WhatsApp इस नंबर को सीमित कर रहा है। बाद में फिर कोशिश करें।",
+    ),
+    (
+        "WAHA refused the request. See the hub's log.",
+        "WAHA ने अनुरोध अस्वीकार कर दिया। हब का लॉग देखें।",
+    ),
+    (
+        "Something failed in the hub. See the hub's log and check the number in the list.",
+        "हब में कुछ विफल हो गया। हब का लॉग देखें और सूची में नंबर जाँचें।",
+    ),
+    ("{alias}: another phone paired", "{alias}: दूसरा फ़ोन पेयर हुआ"),
+    (
+        "The phone that paired belongs to a number different from the one given.",
+        "जो फ़ोन पेयर हुआ, वह दिए गए नंबर से अलग नंबर का है।",
+    ),
+    (
+        "Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped.",
+        "आपके तय करने तक नंबर \"नंबर बदला हुआ\" स्थिति में रहता है और उसकी पहुँच रुकी रहती है।",
+    ),
+    ("Keep this one", "इसे रखें"),
+    (
+        "Undoing takes WAHA out of that phone's WhatsApp (it leaves its linked devices) and erases the history WAHA keeps of this number.",
+        "पूर्ववत करने पर WAHA उस फ़ोन के WhatsApp से बाहर हो जाता है (लिंक किए गए डिवाइस से हट जाता है) और WAHA इस नंबर का जो इतिहास रखता है, वह मिट जाता है।",
+    ),
+    (
+        "I understand that WAHA erases its history of this number.",
+        "मैं समझता/समझती हूँ कि WAHA इस नंबर का अपना इतिहास मिटा देता है।",
+    ),
+    (
+        "Mark that you understand what undoing erases. Nothing was done.",
+        "चिह्नित करें कि आप समझते हैं कि पूर्ववत करने पर क्या मिटता है। कुछ भी नहीं किया गया।",
+    ),
+    (
+        "The phone that paired is already another number of this hub. Undo this pairing, or remove the other number first.",
+        "जो फ़ोन पेयर हुआ, वह पहले से इस हब का दूसरा नंबर है। इस पेयरिंग को पूर्ववत करें, या पहले दूसरा नंबर हटाएँ।",
+    ),
+    ("Disconnect {alias}", "{alias} को डिस्कनेक्ट करें"),
+    (
+        "Disconnecting stops the session of this number in WAHA. It does not take WAHA out of WhatsApp, and WAHA keeps its history. While it is disconnected, no Hermes reads or sends through it. To use it again, pair it again.",
+        "डिस्कनेक्ट करने से WAHA में इस नंबर का सेशन रुक जाता है। इससे WAHA WhatsApp से बाहर नहीं होता, और WAHA इतिहास रखता है। डिस्कनेक्ट रहने तक कोई Hermes इसके ज़रिए न पढ़ता है, न भेजता है। इसे फिर इस्तेमाल करने के लिए फिर से पेयर करें।",
+    ),
+    (
+        "Type the alias {alias} to confirm.",
+        "पुष्टि के लिए उपनाम {alias} लिखें।",
+    ),
+    (
+        "The alias typed does not match. Nothing was done.",
+        "लिखा गया उपनाम मेल नहीं खाता। कुछ भी नहीं किया गया।",
+    ),
+    ("Remove {alias}", "{alias} को हटाएँ"),
+    (
+        "Removing ends every access to this number now. Its alias is never used again.",
+        "हटाने से इस नंबर की हर पहुँच अभी खत्म हो जाती है। इसका उपनाम दोबारा कभी इस्तेमाल नहीं होता।",
+    ),
+    (
+        "What happens to its session in WAHA",
+        "WAHA में इसके सेशन का क्या होगा",
+    ),
+    (
+        "Stop it and keep it in WAHA, with the history WAHA keeps",
+        "इसे रोकें और WAHA में रहने दें, उस इतिहास के साथ जो WAHA रखता है",
+    ),
+    (
+        "Take WAHA out of WhatsApp and delete it: WAHA erases the history it keeps",
+        "WAHA को WhatsApp से बाहर करें और इसे मिटा दें: WAHA अपना रखा इतिहास मिटा देता है",
+    ),
+    (
+        "Arauto has no message archive yet: the history is only what WAHA keeps.",
+        "Arauto के पास अभी संदेशों का संग्रह नहीं है: इतिहास केवल वही है जो WAHA रखता है।",
+    ),
+    (
+        "Choose what happens to its session in WAHA. Nothing was done.",
+        "चुनें कि WAHA में इसके सेशन का क्या होगा। कुछ भी नहीं किया गया।",
+    ),
+    ("In test", "परीक्षण में"),
+    (
+        "A WhatsApp engine built into Arauto is being studied. It is not part of this version, and this window does nothing.",
+        "Arauto में बना एक WhatsApp इंजन अध्ययन में है। वह इस संस्करण का हिस्सा नहीं है, और यह विंडो कुछ नहीं करती।",
+    ),
+    (
+        "For now, numbers are paired through WAHA, with the \"Connect WhatsApp (WAHA)\" button.",
+        "अभी के लिए, नंबर \"WhatsApp कनेक्ट करें (WAHA)\" बटन से WAHA के ज़रिए पेयर होते हैं।",
+    ),
+    ("Open the WAHA window", "WAHA की विंडो खोलें"),
+    ("Try again", "फिर कोशिश करें"),
+    (
+        "Scan with the phone: WhatsApp › Linked devices › Link a device.",
+        "फ़ोन से स्कैन करें: WhatsApp › लिंक किए गए डिवाइस › डिवाइस लिंक करें।",
+    ),
+    (
+        "On the phone: WhatsApp › Linked devices › Link a device › Link with phone number instead, and type this code:",
+        "फ़ोन पर: WhatsApp › लिंक किए गए डिवाइस › डिवाइस लिंक करें › इसके बजाय फ़ोन नंबर से लिंक करें, और यह कोड लिखें:",
     ),
 ];

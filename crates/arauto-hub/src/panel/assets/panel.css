@@ -543,3 +543,17 @@ code { font-family: var(--f-mono); }
   .org-pop { width: calc(100% - 16px); left: 8px !important; }
   .org-drawer { padding: 12px; }
 }
+
+/* the numbers: the two buttons of the heading, the one that is only being tried, the QR of a
+   pairing and the code that goes with it */
+.heading-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.button.trial { border-style: dashed; color: var(--text); background: none; }
+.button.trial:hover { color: var(--strong); }
+.tag.trial { border: 1px dashed var(--border); border-radius: 6px; padding: 1px 8px; font-weight: 400; }
+.qr { display: block; width: min(100%, 18rem); height: auto; margin: 0 auto; border-radius: 8px; }
+.pair-code { font-family: var(--f-mono); font-size: 28px; letter-spacing: .14em; color: var(--strong); text-align: center; margin: 8px 0; }
+.modal-body #pair-state:empty { display: none; }
+@media (max-width: 640px) {
+  .heading-buttons { width: 100%; }
+  .heading-buttons .button { flex: 1 1 100%; min-height: 44px; }
+}

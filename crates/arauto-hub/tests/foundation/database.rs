@@ -667,7 +667,9 @@ async fn the_chart_tables_come_to_a_database_with_data() {
         .unwrap();
     let chart = org::chart(&db.pool, resolved).await.unwrap();
     assert!(chart.levels.is_empty());
-    let names: Vec<&str> = chart.members.iter().map(|m| m.name.as_str()).collect();
+    // The members come in the order of their ids, which are drawn: compare without the order.
+    let mut names: Vec<&str> = chart.members.iter().map(|m| m.name.as_str()).collect();
+    names.sort_unstable();
     assert_eq!(names, ["ana", "bia"]);
     assert!(chart.members.iter().all(|member| member.place.is_none()));
     assert_eq!(chart.links.len(), 1);

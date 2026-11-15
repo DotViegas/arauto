@@ -16,6 +16,7 @@
 //! they find. A translation never reaches a page as markup.
 
 use super::text::{Lang, Piece, pieces, tr};
+use crate::admin::qr::QrCode;
 
 /// What goes in the place of a `{placeholder}` of a sentence.
 #[derive(Debug, Clone, Copy)]
@@ -134,6 +135,41 @@ impl Html {
         self
     }
 
+    /// A QR code, drawn as an inline SVG: one segment per horizontal run of dark modules, on a
+    /// white square with a quiet zone of four modules. Only digits and the letters `M`, `h`,
+    /// `v`, `z` and `-` are written for the modules: no value of the engine reaches the markup
+    /// as text, and the drawing has no `style` and no script. `label` is a sentence of the
+    /// screens, said to whoever cannot see it.
+    pub fn qr(&mut self, code: &QrCode, label: &'static str) -> &mut Self {
+        let size = code.size();
+        let side = size + 8;
+        self.out.push_str(&format!(
+            "<svg class=\"qr\" viewBox=\"0 0 {side} {side}\" role=\"img\" aria-label=\""
+        ));
+        escape_into(&mut self.out, tr(self.lang, label));
+        self.out.push_str(&format!(
+            "\" shape-rendering=\"crispEdges\"><rect width=\"{side}\" height=\"{side}\" fill=\"#fff\"/><path fill=\"#000\" d=\""
+        ));
+        for y in 0..size {
+            let mut x = 0;
+            while x < size {
+                if code.dark(x, y) {
+                    let start = x;
+                    while x < size && code.dark(x, y) {
+                        x += 1;
+                    }
+                    let run = x - start;
+                    self.out
+                        .push_str(&format!("M{} {}h{run}v1h-{run}z", start + 4, y + 4));
+                } else {
+                    x += 1;
+                }
+            }
+        }
+        self.out.push_str("\"/></svg>");
+        self
+    }
+
     /// A number.
     pub fn number(&mut self, value: usize) -> &mut Self {
         self.out.push_str(&value.to_string());
@@ -216,6 +252,46 @@ mod tests {
             "portaria, bloco B · ção"
         );
         assert_eq!(escaped("two\nlines\tand a tab"), "two\nlines\tand a tab");
+    }
+
+    #[test]
+    fn the_qr_markup_has_only_numbers_and_path_letters() {
+        let code = QrCode::encode(b"\"><script>alert(1)</script>").unwrap();
+        let mut html = Html::new(Lang::En);
+        html.qr(
+            &code,
+            crate::panel::text::k("QR code to scan with the phone"),
+        );
+        let out = html.finish();
+        assert!(!out.contains("style=") && !out.contains("<script"), "{out}");
+        let d = out.split("d=\"").nth(1).unwrap().split('"').next().unwrap();
+        assert!(
+            d.bytes()
+                .all(|b| b.is_ascii_digit() || b" Mhvz-".contains(&b)),
+            "{d}"
+        );
+        assert!(out.starts_with("<svg class=\"qr\" viewBox=\"0 0 "));
+        // Every dark module is in a segment: the number of unit squares equals the dark ones.
+        let squares: usize = d
+            .split('M')
+            .filter(|segment| !segment.is_empty())
+            .map(|segment| {
+                segment
+                    .split('h')
+                    .nth(1)
+                    .unwrap()
+                    .split('v')
+                    .next()
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap()
+            })
+            .sum();
+        let dark = (0..code.size())
+            .flat_map(|y| (0..code.size()).map(move |x| (x, y)))
+            .filter(|(x, y)| code.dark(*x, *y))
+            .count();
+        assert_eq!(squares, dark);
     }
 
     #[test]

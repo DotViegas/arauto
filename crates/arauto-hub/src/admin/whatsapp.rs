@@ -8,11 +8,13 @@
 //! the hub and never shown either: the hub gives it to the engine itself. The QR and the code
 //! of a pairing are shown once on the terminal and never stored.
 
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
 use arauto_protocol::clock::Clock;
 use arauto_protocol::names::NumberAlias;
+use zeroize::Zeroizing;
 
 use super::{AdminError, Session};
 use crate::core::number::{NumberState, Trigger};
@@ -47,7 +49,7 @@ pub enum Shown<'a> {
 }
 
 /// How a pairing ended.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PairOutcome {
     /// The expected telephone is connected.
     Connected,
@@ -57,6 +59,16 @@ pub enum PairOutcome {
     Expired,
     /// The engine reported a failure of the session.
     Failed,
+    /// The admin cancelled it from the panel: the number is unpaired again. The command
+    /// never produces this one.
+    Cancelled,
+}
+
+/// How the loop of a pairing left: with the row already settled by what it observed, or
+/// needing the number put back to unpaired.
+enum Left {
+    Settled(PairOutcome),
+    Unpair(PairOutcome),
 }
 
 /// What `admin number add` did.
@@ -272,6 +284,24 @@ impl Session {
         command: bool,
         now: i64,
     ) -> Result<Added, AdminError> {
+        self.number_add_accepting(vault, alias_text, phone, command, false, now)
+            .await
+    }
+
+    /// [`Self::number_add`], and the audit row also says whether the admin accepted the risk
+    /// of the engine at this number (the panel asks it for the first number).
+    ///
+    /// # Errors
+    /// The same as [`Self::number_add`].
+    pub async fn number_add_accepting(
+        &self,
+        vault: &Vault,
+        alias_text: &str,
+        phone: &str,
+        command: bool,
+        risk_accepted: bool,
+        now: i64,
+    ) -> Result<Added, AdminError> {
         let alias = alias(alias_text)?;
         let phone = Phone::parse(phone).map_err(|_| AdminError::InvalidPhone)?;
         let key = repo::device::organization_key(&self.pool, self.organization, vault).await?;
@@ -284,6 +314,7 @@ impl Session {
             &alias,
             &phone,
             command,
+            risk_accepted,
             now,
         )
         .await?;
@@ -353,7 +384,38 @@ impl Session {
         method: PairMethod,
         settings: &EngineSettings,
         clock: &dyn Clock,
+        show: impl FnMut(Shown<'_>),
+    ) -> Result<PairOutcome, AdminError> {
+        self.number_pair_stoppable(
+            vault,
+            alias_text,
+            method,
+            settings,
+            clock,
+            show,
+            std::future::pending(),
+        )
+        .await
+    }
+
+    /// [`Self::number_pair`] that also ends when `stop` completes: the pairing is then
+    /// [`PairOutcome::Cancelled`]. However it ends other than connecting, the engine session
+    /// is stopped and THIS number goes back to unpaired (and only this one, and only while it
+    /// is still this pairing): an error of the engine after the number moved to pairing does
+    /// not leave it there.
+    ///
+    /// # Errors
+    /// The same as [`Self::number_pair`].
+    #[allow(clippy::too_many_arguments)]
+    pub async fn number_pair_stoppable(
+        &self,
+        vault: &Vault,
+        alias_text: &str,
+        method: PairMethod,
+        settings: &EngineSettings,
+        clock: &dyn Clock,
         mut show: impl FnMut(Shown<'_>),
+        stop: impl Future<Output = ()> + Send,
     ) -> Result<PairOutcome, AdminError> {
         let alias = known_alias(alias_text)?;
         let engine = self.engine(vault).await?;
@@ -372,11 +434,68 @@ impl Session {
             )
             .await?,
         )?;
+        let mut stop = std::pin::pin!(stop);
+        let left = self
+            .pair_loop(
+                vault, &engine, &number, &alias, method, settings, clock, until, &mut show,
+                &mut stop,
+            )
+            .await;
+        match left {
+            Ok(Left::Settled(outcome)) => Ok(outcome),
+            Ok(Left::Unpair(outcome)) => {
+                self.end_pairing_of(&engine, &number, until, clock).await?;
+                Ok(outcome)
+            }
+            Err(error) => {
+                // The error is what the caller needs to hear: a failure to put the row back
+                // is left to the supervision, which expires it after its deadline.
+                let _ = self.end_pairing_of(&engine, &number, until, clock).await;
+                Err(error)
+            }
+        }
+    }
+
+    /// The one end of a pairing that did not connect: the engine session stops and the number
+    /// goes back to unpaired, if it is still the pairing that ends at `until`.
+    async fn end_pairing_of(
+        &self,
+        engine: &LoadedEngine,
+        number: &Number,
+        until: i64,
+        clock: &dyn Clock,
+    ) -> Result<(), AdminError> {
+        let _ = engine.client.stop(&number.session).await;
+        repo::number::end_pairing(
+            &self.pool,
+            self.organization,
+            number.id,
+            until,
+            clock.now_ms(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn pair_loop(
+        &self,
+        vault: &Vault,
+        engine: &LoadedEngine,
+        number: &Number,
+        alias: &NumberAlias,
+        method: PairMethod,
+        settings: &EngineSettings,
+        clock: &dyn Clock,
+        until: i64,
+        show: &mut impl FnMut(Shown<'_>),
+        stop: &mut (impl Future<Output = ()> + Unpin),
+    ) -> Result<Left, AdminError> {
         let key = repo::device::organization_key(&self.pool, self.organization, vault).await?;
         let phone = number.phone(&key)?;
-        self.ensure(&engine, &number, now).await?;
+        self.ensure(engine, number, clock.now_ms()).await?;
         engine.client.start(&number.session).await?;
-        let mut last_qr: Option<String> = None;
+        let mut last_qr: Option<Zeroizing<String>> = None;
         let mut code_shown = false;
         while clock.now_ms() <= until {
             let info = engine.client.session(&number.session).await?;
@@ -404,34 +523,31 @@ impl Session {
                     // does not name its telephone yet is asked again.
                     let state = match change {
                         Some((_, to)) => to,
-                        None => repo::number::by_alias(&self.pool, self.organization, &alias)
+                        None => repo::number::by_alias(&self.pool, self.organization, alias)
                             .await?
                             .map_or(NumberState::Pairing, |number| number.state),
                     };
                     match state {
-                        NumberState::Connected => return Ok(PairOutcome::Connected),
-                        NumberState::NumberSwapped => return Ok(PairOutcome::Swapped),
-                        NumberState::Unpaired => return Ok(PairOutcome::Expired),
-                        NumberState::Failed => return Ok(PairOutcome::Failed),
+                        NumberState::Connected => {
+                            return Ok(Left::Settled(PairOutcome::Connected));
+                        }
+                        NumberState::NumberSwapped => {
+                            return Ok(Left::Settled(PairOutcome::Swapped));
+                        }
+                        NumberState::Unpaired => {
+                            return Ok(Left::Settled(PairOutcome::Expired));
+                        }
+                        NumberState::Failed => return Ok(Left::Settled(PairOutcome::Failed)),
                         _ => {}
                     }
                 }
-                Some(EngineStatus::Failed) => {
-                    let _ = engine.client.stop(&number.session).await;
-                    repo::number::expire_pairings(
-                        &self.pool,
-                        self.organization,
-                        until.saturating_add(1),
-                    )
-                    .await?;
-                    return Ok(PairOutcome::Failed);
-                }
+                Some(EngineStatus::Failed) => return Ok(Left::Unpair(PairOutcome::Failed)),
                 Some(EngineStatus::ScanQrCode) => match method {
                     PairMethod::Qr => {
                         let qr = engine.client.pairing_qr(&number.session).await?;
-                        if last_qr.as_deref() != Some(qr.expose()) {
+                        if last_qr.as_deref().map(String::as_str) != Some(qr.expose()) {
                             show(Shown::Qr(&qr));
-                            last_qr = Some(qr.expose().to_owned());
+                            last_qr = Some(Zeroizing::new(qr.expose().to_owned()));
                         }
                     }
                     PairMethod::Code if !code_shown => {
@@ -443,15 +559,14 @@ impl Session {
                 },
                 _ => {}
             }
-            tokio::time::sleep(Duration::from_millis(
-                u64::try_from(settings.pairing_poll_ms).unwrap_or(0),
-            ))
-            .await;
+            let poll = Duration::from_millis(u64::try_from(settings.pairing_poll_ms).unwrap_or(0));
+            tokio::select! {
+                biased;
+                () = &mut *stop => return Ok(Left::Unpair(PairOutcome::Cancelled)),
+                () = tokio::time::sleep(poll) => {}
+            }
         }
-        let _ = engine.client.stop(&number.session).await;
-        repo::number::expire_pairings(&self.pool, self.organization, until.saturating_add(1))
-            .await?;
-        Ok(PairOutcome::Expired)
+        Ok(Left::Unpair(PairOutcome::Expired))
     }
 
     async fn number_change(
