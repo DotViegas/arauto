@@ -49,3 +49,4 @@ prototype, or is **pending**.
 | 0043 | [The org chart of the Hermes: levels, places and links on a map (stage A)](0043-organograma-e-niveis.md) | proposal |
 | 0044 | [Numbers in the panel, on the engine, with a placeholder for a native one](0044-numeros-no-painel-sobre-o-motor.md) | proposal |
 | 0045 | [The wake mark of a link is enough to wake by a note](0045-a-marca-da-ligacao-basta-para-acordar.md) | decided |
+| 0046 | [The key through the entry, and a Hermes without a key](0046-chave-pela-entrada-e-hermes-sem-chave.md) | proposal |

@@ -8,6 +8,8 @@
 arauto-connector join     asks the hub for a connection and registers itself in Hermes
 arauto-connector mcp      the tool server that Hermes starts
 arauto-connector status   shows the situation, with no secret
+arauto-connector register saves the entry in Hermes again, with the reference to the key of
+                          its local API (for a Hermes connected before 15/11/2026)
 arauto-connector leave    asks the hub for its own closing and cleans the folder
                           (leave --local: cleans without the hub; it is for a person)
 ```
@@ -23,6 +25,7 @@ that has not received a credential yet.
 | `join HUB KEY INVITE` | Creates the folder of the request with a new identity and does the enrollment with the hub of that key. If the hub accepts, it copies itself to the fixed path `~/.arauto/arauto-connector` (through a temporary file and a rename, because the old program may be running), registers the tool server in Hermes and shows the verification code. It ends in seconds. With `--no-register`, for development, it skips the registration. |
 | `mcp` | What Hermes starts. It speaks MCP over stdio with Hermes and keeps the channel with the hub. |
 | `status` | Hub, version, situation of the device, whether the admin allowed waking by WhatsApp. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. |
+| `register` | Proposal, 15/11/2026 ([decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). For a Hermes that is already connected: runs the same registration as `join` (section 4) and records in the folder of the device whether the entry has the reference to the key. It does not contact the hub, does not ask the leader anything, does not touch the identity, the credential or `current`, and does not restart Hermes. With no device in the folder it runs no Hermes command and says so. A running Hermes keeps the entry it loaded: the new one takes effect after Hermes restarts its gateway. After `register`, the operator restarts Hermes's gateway; until then the running connector keeps the old entry, and `status` says whether the key was received. |
 | `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. |
 | `leave --local` | Deletes the files and the registration without talking to the hub. It exists for when the hub no longer exists or changed its key. It is for a person to run: the device stays valid in the hub until it is revoked in the panel. |
 
@@ -31,7 +34,8 @@ that has not received a credential yet.
 | Situation | What happens |
 |---|---|
 | Same invite again, request still pending | It is the same request, with the same identity: the connector recognizes the invite by the digest kept in the folder of the request. The verification code is another one, and the most recent is the valid one. The hub accepts up to five enrollments per request. |
-| Same invite again, request already approved | The hub answers AR-104. Nothing changes: the connector only redoes the registration in Hermes, if it is missing. |
+| Same invite again, request already approved | The hub answers AR-104. Nothing changes: the connector only redoes the registration in Hermes, if it is missing or if the record says the entry has no reference to the key of the local API (see the next row). |
+| Re-registration (proposal, 15/11/2026) | The record in the folder says whether the entry was saved with the reference to the key (section 2). A rejoin or an AR-104 whose record says "with the reference" runs no Hermes command. One that says "without" or says nothing (a connector from before 15/11/2026) saves the entry again over the old one. |
 | Same invite again, request denied or expired | The hub answers AR-301, AR-302 or AR-303. The connector discards the folder of that request only if it has no `credential.seal` yet; if it has one, it discards nothing and shows the error. |
 | The hub refuses the invite (AR-101, AR-102) | It discards the folder it has just created for this request. Nothing else changes on the machine. |
 | New invite, with an old request with no credential sitting in the folder | It discards the old request and creates another, with a new identity. |
@@ -42,8 +46,11 @@ that has not received a credential yet.
 At the end, `join` tells the running leader, through the local socket, that there is a new request.
 If the program was swapped for a new version, it asks the leader to exit, so that Hermes starts it
 again already in the new version. This depends on a proof: Hermes restarts a tool server that
-exits ([12-roteiro.md](12-roteiro.md), Phase 1). If it does not restart it, the alternative is for
-the leader to swap itself for the new program, without closing the connection with Hermes.
+exits ([12-roteiro.md](12-roteiro.md), Phase 1). **Result of 15/11/2026, one Hermes (v0.22.5,
+Docker, Linux): a running gateway did not start a killed connector again in 15 minutes**
+([hermes-fatos.md](../referencia/hermes-fatos.md), K5), so with a single copy the connector stays
+gone until the gateway restarts. This is left for a decision. The alternative is for the leader to
+swap itself for the new program, without closing the connection with Hermes.
 
 ### Cases of `leave`
 
@@ -74,7 +81,10 @@ the server of tools it starts another (checked on 14/11/2026, `referencia/hermes
       identity.key            SECRET: the identity of the device
       credential.seal         SECRET: the most recent credential received from the hub
       hub.json                address and public key of the hub, digest of the invite of the
-                              request, local situation
+                              request, local situation, and (proposal, 15/11/2026) whether the
+                              entry in Hermes was saved with the reference to the key of its
+                              local API (`key_reference`: true, false, or absent when an older
+                              connector saved it)
   state.json                  last notices handled and the tool list of the last session
   lock                        lock file of the leader
   channel.sock                local socket between the copies of the connector
@@ -134,8 +144,13 @@ The format of the messages on the local socket is in
 The connector registers itself through the official Hermes command:
 
 ```
-hermes mcp add arauto --command ~/.arauto/arauto-connector --args mcp
+hermes mcp add arauto --command ~/.arauto/arauto-connector --env ARAUTO_HERMES_API_KEY=${API_SERVER_KEY} --args mcp --home ~/.arauto
 ```
+
+(The line above is the shape of the command, written with the shell's `$`. The connector builds it
+as separate arguments, with no shell, so the reference reaches Hermes as the literal text
+`ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}`. That text is a fixed constant of the connector; nothing
+from the hub, the invite or the command line enters it. It is not a secret.)
 
 What the connector does (proposal until a trial on a real Hermes passes; the behavior of
 Hermes below was checked on v0.22.5 on 14/11/2026, in
@@ -168,16 +183,45 @@ Hermes below was checked on v0.22.5 on 14/11/2026, in
 
 Not guaranteed: another version of Hermes may ask other questions, or print the list in another
 format; the check depends on that format. In either case the registration fails (AR-601) and the
-connector does not report one it could not see. The time limit of each run of the command is 30
-seconds.
+connector does not report one it could not see. The time limit of each run of the command is 90
+seconds (the first run in a data folder Hermes never used took 47 s on 14/11/2026).
 
-- The entry contains no secret, and it is the only change that stays in the configuration of Hermes.
+**The reference to the key (proposal, 15/11/2026; [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)).**
+- The command is tried first with `--env ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}` (`--args` stays the
+  last option). Hermes resolves the reference at spawn from its own secret scope and hands the value
+  to the connector (observed on Hermes Agent v0.22.5, Docker install, Linux, 15/11/2026:
+  [hermes-fatos.md](../referencia/hermes-fatos.md), K2 and K3).
+- **Fallback.** If `hermes mcp add` exits with a non-zero code on that first try (a version that does
+  not know `--env` rejects the option before asking anything), the connector runs it again without
+  the option, the connection goes on, and `join` and `status` say that the entry has no reference and
+  that no notice wakes this Hermes. A failure of another kind (list, time limit, program not found,
+  disabled row) is not retried. Not covered: a Hermes that accepts `--env` and silently ignores it;
+  then the entry line of `status` claims a reference that does nothing, and the key line, which asks
+  the running connector, says "not received".
+- **Environment of the Hermes command.** The connector gives the `hermes` command the environment of
+  the terminal that runs it, minus `API_SERVER_KEY` and `ARAUTO_HERMES_API_KEY`. The command needs its
+  own folders and `PATH`, so the rest is kept. Removing those two names means that, even if a launcher
+  re-parsed its arguments through a shell, `${API_SERVER_KEY}` could expand to empty and not to the
+  key. An empty value reaches the connector as no key.
+- **A changed entry takes effect after the gateway restarts.** A running gateway did not apply an
+  edited entry, nor restart a connector whose process died (observed in 15 minutes, K5). A new name
+  registered from inside a session was picked up within a second. The connector does not restart
+  Hermes; the `register` command therefore does not ask the leader to end.
+- **Known limit of the connect-by-message path.** One Hermes refused the connect message, citing a
+  local skill line that points to its `manage_connections` tool, which cannot add a local stdio
+  server; the same command run by the operator in a terminal connected it (K9).
+- Not proved: Windows (the `hermes.exe` launcher handing its command line to Python unchanged),
+  macOS, v0.23 and other versions of Hermes; the Docker shim `/opt/hermes/bin/hermes` passing an
+  argument that contains `${...}` unchanged. Nothing in the connector depends on a shell, but only a
+  trial on each system shows the saved entry.
+
+- The entry contains no secret (the reference `${API_SERVER_KEY}` names a variable and is not its value), and it is the only change that stays in the configuration of Hermes.
 - Hermes checks every tool server entry when saving and when starting, and refuses the ones that
   look like an attack. The connector follows the format Hermes accepts: one program with one
   argument, with no command interpreter. The project does not try to get around that check.
 - If Hermes asks for human approval to run the block or the steps of the instruction page, the one who approves is the operator. The
   flow works with or without that request.
-- Hermes starts the connector by itself, in under a minute, without restarting.
+- Hermes starts the connector by itself, in under a minute, without restarting, when the name is new. An entry that changes, or a connector that dies, waits for the gateway to restart (see above).
 
 ## 5. Startup and shutdown
 
@@ -198,19 +242,67 @@ hour, adding up the kinds, so that a faulty hub does not trigger runs without st
 building the sentence it checks the format of each field of the notice
 ([14](14-protocolo-do-canal.md), section 5.3).
 
-**The key of the local API.** Hermes's API requires a key, which stays in Hermes's secrets file.
-The connector, as a child process, does not receive it from the environment. There are three paths,
-and the order is decided ([decisoes/0023](decisoes/0023-chave-da-api-local.md)): the first is tried;
-if the test of Phase 1 shows that it does not work, the second applies; with no key, the third is
-left.
+**The key of the local API.** Hermes's API requires a key, which Hermes keeps in its own setting
+`API_SERVER_KEY`. The API listens only when that setting holds a key of at least 16 characters
+(observed, K1). The connector, as a child process, does not inherit Hermes's environment. There were
+three paths ([decisoes/0023](decisoes/0023-chave-da-api-local.md)); state on 15/11/2026:
 
-| Path | Pros and cons |
+| Path | State |
 |---|---|
-| The server entry references Hermes's variable | Hermes itself hands the key to the child. Nothing is copied. It depends on Hermes accepting the reference in that field. |
-| The connector reads the key from Hermes's secrets file | It always works. An outside program reading that file needs to be told to whoever installs. |
-| No key, no waking | Hermes uses the tools when asked and is never woken. The connector's `status` says "Key of the local API of Hermes: not configured". |
+| The server entry references Hermes's variable | **Observed on one Hermes** (Hermes Agent v0.22.5, Docker install, Linux, 15/11/2026): the entry carries `ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}`, Hermes hands the resolved value to the connector, and a note on a link with the wake mark woke that Hermes without a person talking to it (K2 to K4). This is what `join` and `register` save (section 4). **Not checked** on Windows, macOS, v0.23 or other versions. |
+| The connector reads the key from Hermes's secrets file | **Not built** and not needed for now. |
+| No key, no waking | **Option A** (proposal, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)): see below. |
 
-Address, body of the call and the use of the API's repetition identifier are deliverables of Phase 1.
+**A Hermes without a local API key (Option A, proposal).** The connector still connects. At `join`,
+at `register` and in `status` it says plainly that this Hermes cannot be woken until its local API is
+on, names Hermes's own setting `API_SERVER_KEY` and says that it is set in the configuration of
+Hermes (when the entry carries the reference; otherwise it says that the reference was refused). **The connector never writes into Hermes's secrets file, never creates a key for Hermes and
+never restarts Hermes.** (Option B, doing those things, was asked for by the maintainer on 15/11/2026 and is not built.) At `join` the connector cannot
+know whether the setting holds a key, because it never reads Hermes's files, so its line is
+conditional; `status` is the authority.
+
+`status` asks the **leader** over the local socket and never reads its own environment for this line.
+The leader sends `waking`: whether the running connector received the key, and the last wake
+outcome. It prints:
+
+| Line | Values |
+|---|---|
+| `Entry in Hermes` | saved with a reference to `API_SERVER_KEY`; saved without a reference to the key (this version of Hermes refused it); saved by an older connector, perhaps without a reference; not saved by this connector. |
+| `Key of the local API of Hermes` | received by the running connector; not received by the running connector (no notice wakes this Hermes); unknown (the running connector is of an older version, or no connector started by Hermes is running). |
+| `Last wake` | accepted by the local API of Hermes; refused by the local API of Hermes; the local API of Hermes did not answer; none since the connector started. |
+
+The line no longer depends on the state of the channel. After a refusal or no answer the connector
+also prints the AR-602 phrase, and logs a warning that carries neither the key nor the body of the
+answer. `arauto_status` (the tool) carries one more field, `local_waking`, added by the connector: the
+connector of this Hermes received the key of the local API; when `false`, nothing wakes this Hermes
+whatever `can_be_woken` says ([09](09-contrato-mcp.md), [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)).
+
+**A failed wake.** The connector answers the hub `failed`, and the hub puts the notice back to pending
+with waits of 5 s, 10 s, 20 s, up to 5 minutes, until it expires. The note itself is kept and
+readable. A Hermes without a key therefore keeps bouncing its notices every few minutes until they
+expire (seen on the sender side on 15/11/2026, K4); the hub does not change.
+
+**The call to the API.** Observed on one Hermes (v0.22.5, 15/11/2026): the call with the fixed
+sentence was accepted, and the log of that Hermes shows an inbound run on its API server (K4).
+Not separately checked: the use of the API's repetition identifier, an API on another address or
+port than `127.0.0.1:8642` (not followed; only `ARAUTO_HERMES_API_URL` set by hand), and any other
+Hermes version or system.
+
+**Not guaranteed.**
+- Only one Hermes was observed. The reference, the resolution of `${VAR}` and the wake on Windows,
+  macOS and other versions are unproved.
+- The key now sits in the initial environment of every connector copy. On Linux, any process of the
+  same user, including the LLM's terminal, can read `/proc/PID/environ` without the approval Hermes
+  asks before reading its secrets file. Hermes already does the same for the provider keys it
+  injects (K6). Whether this is acceptable under the security principles is for the maintainer.
+- The connector reads only its own variables (`ARAUTO_HOME`, `ARAUTO_HERMES_BIN`,
+  `ARAUTO_HERMES_API_URL`, `ARAUTO_HERMES_API_KEY`, and the system location variables for the
+  default folder and for the place of Hermes), and the key only in the `mcp` process. A test of the
+  source checks that no other read appears; it is a check of the text, not of the running program.
+- A newer entry is not used until the gateway restarts, and a copy started from a newer entry while
+  an older leader lives does not wake: the leader decides.
+- Hermes masks printed output by variable name; whether it hides `API_SERVER_KEY` in the lines the
+  connector prints was not tried.
 
 ## 7. Versions and distribution
 
@@ -264,6 +356,8 @@ carries a command to run.
 | AR-507 | Device expired by inactivity. The admin needs to reconnect this Hermes. |
 | AR-601 | The registration in Hermes failed or was refused. The request still stands; run the command again. |
 | AR-602 | Hermes's local API does not answer or refuses the key. |
+| Told lines | Fixed sentences that `join`, `register` and `status` print about waking (proposal, 15/11/2026; decision 0046). Wake needs the local API: "This Hermes can be woken only while its local API is on, which Hermes does when its own setting API_SERVER_KEY holds a key. The connector never sets it; the status command says whether the connector received it." Key not received: "No notice wakes this Hermes until its local API is on. Hermes turns it on when its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a key. The connector never sets it." After a restart: "If that setting already holds a key, Hermes hands it to the connector after it restarts its gateway." Reference refused: "This version of Hermes refused the reference to the key of its local API, so the entry was saved without it and no notice wakes this Hermes. Notes and tools still work." Running keeps the old entry: "A running Hermes keeps the entry it loaded: the new entry takes effect after Hermes restarts its gateway. The connector does not restart Hermes." Older entry: "The entry of the connector in Hermes was saved by an older connector and may have no reference to the key. The register command of the connector saves it again." Unchanged connection: "The connection did not change: the same device and the same credential." |
+| No device (`register`) | "There is no device in this folder. Nothing was registered in Hermes." Exit code 9, like the other local failures. |
 | AR-701 | The verb needed for this call is missing. |
 | AR-702 | Number unavailable: disconnected from WhatsApp or waiting for the admin's confirmation. |
 | AR-703 | Engine unavailable. |

@@ -22,8 +22,12 @@
 //! `docs/decisoes/0023`). Without the key there is no waking. The address must be of this
 //! machine: the key never leaves it. The call is `POST` with the key as a bearer credential,
 //! the identifier of the notice as the idempotency key, and the phrase as the input of the
-//! run. The exact shape of the body is still to be proven against a real Hermes
-//! (`referencia/hermes-fatos.md`): it lives in [`request`], alone.
+//! run. The shape of the request was observed on one real Hermes (v0.22.5, 15/11/2026,
+//! `referencia/hermes-fatos.md`, K4); it lives in [`request`], alone.
+//!
+//! **What is remembered and shown.** The last outcome of a call to the local API (accepted,
+//! refused, no answer) is kept in memory and shown by `status`, and a refusal or a silence is
+//! logged with its status number only: never the key, the request or the body of the answer.
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
@@ -160,8 +164,36 @@ fn request(target: &WakeTarget, id: Uuid, phrase: &str) -> Vec<u8> {
     .into_bytes()
 }
 
-/// Whether the local API accepted the run: an answer with a status from 200 to 299.
-async fn call(target: &WakeTarget, id: Uuid, phrase: &str) -> bool {
+/// How the last call to the local API of Hermes ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LastWake {
+    /// The local API accepted the run.
+    Accepted,
+    /// It answered with a status that is not a success.
+    Refused,
+    /// It did not answer in time, or not in a way that can be read.
+    NoAnswer,
+}
+
+/// What this connector can say of its waking, without any secret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Waking {
+    /// Whether the connector received the key of the local API of Hermes.
+    pub key_received: bool,
+    /// How the last call to the local API ended, since the connector started.
+    pub last: Option<LastWake>,
+}
+
+/// What a call to the local API got.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Called {
+    Accepted,
+    Refused(u16),
+    NoAnswer,
+}
+
+/// Calls the local API: an answer with a status from 200 to 299 is an acceptance.
+async fn call(target: &WakeTarget, id: Uuid, phrase: &str) -> Called {
     let exchange = async {
         let mut stream = TcpStream::connect(target.address).await.ok()?;
         stream.write_all(&request(target, id, phrase)).await.ok()?;
@@ -177,12 +209,13 @@ async fn call(target: &WakeTarget, id: Uuid, phrase: &str) -> bool {
         let line = answer.split(|byte| *byte == b'\n').next()?;
         let status = std::str::from_utf8(line).ok()?.split(' ').nth(1)?;
         let status: u16 = status.trim().parse().ok()?;
-        Some((200..300).contains(&status))
+        Some(status)
     };
-    matches!(
-        tokio::time::timeout(API_PATIENCE, exchange).await,
-        Ok(Some(true))
-    )
+    match tokio::time::timeout(API_PATIENCE, exchange).await {
+        Ok(Some(status)) if (200..300).contains(&status) => Called::Accepted,
+        Ok(Some(status)) => Called::Refused(status),
+        Ok(None) | Err(_) => Called::NoAnswer,
+    }
 }
 
 /// The times of the last wake-ups.
@@ -223,6 +256,10 @@ struct Memory {
     /// The identifiers handled, the oldest first. `None` until the file was read.
     handled: Option<VecDeque<Uuid>>,
     windows: Windows,
+    /// How the last call to the local API ended.
+    last: Option<LastWake>,
+    /// Whether the absence of the key was already logged by this process.
+    told_no_key: bool,
 }
 
 /// Wakes the Hermes of this connector.
@@ -248,6 +285,15 @@ impl Waker {
         self.target.is_some()
     }
 
+    /// What this waker can say of itself: whether it has the key, and the last outcome.
+    #[must_use]
+    pub fn waking(&self) -> Waking {
+        Waking {
+            key_received: self.target.is_some(),
+            last: self.memory().last,
+        }
+    }
+
     fn memory(&self) -> std::sync::MutexGuard<'_, Memory> {
         // Plain values: a panic elsewhere leaves them usable.
         self.memory.lock().unwrap_or_else(PoisonError::into_inner)
@@ -269,13 +315,37 @@ impl Waker {
             }
         }
         let Some(target) = &self.target else {
+            let first = !std::mem::replace(&mut self.memory().told_no_key, true);
+            if first {
+                tracing::warn!(
+                    "a notice came and this Hermes cannot be woken: the connector did not receive \
+                     the key of the local API"
+                );
+            }
             return AckOutcome::Failed;
         };
         if !self.memory().windows.take(Instant::now()) {
             return AckOutcome::Throttled;
         }
-        if !call(target, id, &phrase(&checked)).await {
-            return AckOutcome::Failed;
+        let called = call(target, id, &phrase(&checked)).await;
+        self.memory().last = Some(match called {
+            Called::Accepted => LastWake::Accepted,
+            Called::Refused(_) => LastWake::Refused,
+            Called::NoAnswer => LastWake::NoAnswer,
+        });
+        match called {
+            Called::Accepted => {}
+            Called::Refused(status) => {
+                tracing::warn!(
+                    status,
+                    "a wake was refused by the local API of Hermes (AR-602)"
+                );
+                return AckOutcome::Failed;
+            }
+            Called::NoAnswer => {
+                tracing::warn!("the local API of Hermes did not answer a wake (AR-602)");
+                return AckOutcome::Failed;
+            }
         }
         let kept: Vec<Uuid> = {
             let mut memory = self.memory();

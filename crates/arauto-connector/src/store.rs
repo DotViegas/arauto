@@ -208,6 +208,9 @@ pub(crate) struct HubRecord {
     pub(crate) situation: Situation,
     /// Whether `join` registered the connector in Hermes for this request.
     pub(crate) registered: bool,
+    /// Whether the entry saved in Hermes carries the reference to the key of its local API:
+    /// `None` when it was saved by an older connector or by hand.
+    pub(crate) key_reference: Option<bool>,
 }
 
 impl HubRecord {
@@ -222,7 +225,7 @@ impl HubRecord {
             Situation::Ended(code) => Value::from(code.as_str()),
             Situation::Pending | Situation::Active => Value::Null,
         };
-        json!({
+        let mut record = json!({
             "v": FORMAT_VERSION,
             "hub": self.address.url(),
             "hub_key": self.key.to_text(),
@@ -231,7 +234,11 @@ impl HubRecord {
             "situation": self.situation.name(),
             "code": code,
             "registered": self.registered,
-        })
+        });
+        if let (Some(reference), Some(object)) = (self.key_reference, record.as_object_mut()) {
+            object.insert("key_reference".to_owned(), Value::from(reference));
+        }
+        record
     }
 
     fn from_json(bytes: &[u8]) -> Option<Self> {
@@ -256,6 +263,12 @@ impl HubRecord {
             _ => return None,
         };
         let registered = object.get("registered")?.as_bool()?;
+        // Absent or null: saved by an older connector, or by hand. Any other type is damage.
+        let key_reference = match object.get("key_reference") {
+            None | Some(Value::Null) => None,
+            Some(Value::Bool(reference)) => Some(*reference),
+            Some(_) => return None,
+        };
         Some(Self {
             address,
             key,
@@ -263,6 +276,7 @@ impl HubRecord {
             created_at,
             situation,
             registered,
+            key_reference,
         })
     }
 }
@@ -391,6 +405,7 @@ pub(crate) fn create_request(
             created_at: now,
             situation: Situation::Pending,
             registered: false,
+            key_reference: None,
         })
     })();
     if let Err(error) = written {
@@ -835,6 +850,39 @@ mod tests {
         let credential = SealedCredential::from_slice(&[9u8; 80]).unwrap();
         dir.write_credential(&credential).unwrap();
         assert_eq!(dir.credential().unwrap(), Some(credential));
+    }
+
+    #[test]
+    fn hub_json_keeps_the_key_reference() {
+        let (_dir, home) = home();
+        let dir = create_request(
+            &home,
+            &address(),
+            &key(),
+            InviteDigest::from_bytes([3u8; 32]),
+            5,
+        )
+        .unwrap();
+        let mut record = dir.record().unwrap();
+        assert_eq!(record.key_reference, None);
+        // None is not written at all: an older connector reads the file as it always did.
+        let raw = std::fs::read_to_string(dir.file(HUB_FILE)).unwrap();
+        assert!(!raw.contains("key_reference"), "{raw}");
+        for value in [Some(true), Some(false), None] {
+            record.key_reference = value;
+            dir.write_record(&record).unwrap();
+            assert_eq!(dir.record().unwrap().key_reference, value);
+        }
+        // Any other type is a damaged file.
+        record.key_reference = Some(true);
+        dir.write_record(&record).unwrap();
+        let raw = std::fs::read_to_string(dir.file(HUB_FILE)).unwrap();
+        std::fs::write(
+            dir.file(HUB_FILE),
+            raw.replace("\"key_reference\":true", "\"key_reference\":\"x\""),
+        )
+        .unwrap();
+        assert!(dir.record().is_err());
     }
 
     /// A damaged file is an error that says so, and nothing is deleted.

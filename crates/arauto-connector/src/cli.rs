@@ -4,12 +4,17 @@
 //! arauto-connector join HUB KEY INVITE [--no-register]   the request to connect
 //! arauto-connector mcp                                   the server of tools Hermes starts
 //! arauto-connector status                                the situation, without any secret
+//! arauto-connector register                              saves the entry in Hermes again
 //! arauto-connector leave [--local]                       the request to leave, and the cleaning
 //! ```
 //!
 //! Every command takes `--home FOLDER` (or `ARAUTO_HOME`; `~/.arauto` by default).
-//! `ARAUTO_HERMES_BIN` names the command of Hermes, `hermes` by default. No other variable is
-//! read, and there is no other command.
+//! `ARAUTO_HERMES_BIN` names the command of Hermes, `hermes` by default. Only `mcp` reads
+//! `ARAUTO_HERMES_API_URL` and `ARAUTO_HERMES_API_KEY`, which Hermes gives it through the entry
+//! (the key as a reference to its own setting, resolved by Hermes). The system location
+//! variables of the user (`HOME`, `USERPROFILE`, `LOCALAPPDATA`) are read to find the default
+//! folder and the place of Hermes. No other variable is read, and there is no other command.
+//! `tests/environment.rs` holds the exact list of the places in the source that read one.
 //!
 //! What a command says is a fixed phrase, with the code of the catalog when there is one; a
 //! wrong argument is answered with the usage, never with the argument itself, which may be the
@@ -33,10 +38,11 @@ use arauto_protocol::errors::ErrorCode;
 use clap::{Parser, Subcommand};
 use zeroize::Zeroizing;
 
+use crate::catalog::Told;
 use crate::catalog::{Local, Said};
-use crate::hermes::Hermes;
+use crate::hermes::{Hermes, Registration};
 use crate::home::Home;
-use crate::join::{JoinArgs, Joined};
+use crate::join::{Entry, JoinArgs, Joined};
 use crate::leave::Left;
 use crate::runtime::Connector;
 use crate::settings::Settings;
@@ -143,6 +149,9 @@ enum Command {
     Mcp,
     /// Shows the situation, without any secret.
     Status,
+    /// Saves the entry of the connector in Hermes again, with the reference to the key of its
+    /// local API, without touching the connection.
+    Register,
     /// Asks the hub to close this device, then deletes its files and the registration.
     Leave {
         /// Deletes the files and the registration without the hub. For a person, when the hub
@@ -153,22 +162,21 @@ enum Command {
 }
 
 /// What a wrong command line gets: the usage, and nothing it was given.
-const USAGE: &str = "Usage: arauto-connector [--home FOLDER] <join HUB KEY INVITE [--no-register] | mcp | status | leave [--local]>";
+const USAGE: &str = "Usage: arauto-connector [--home FOLDER] <join HUB KEY INVITE [--no-register] | mcp | status | register | leave [--local]>";
 
 /// Runs the command line `arguments`, with `hermes` the value of `ARAUTO_HERMES_BIN`, and
 /// returns the exit code.
 pub async fn run(arguments: Vec<OsString>, hermes: Option<OsString>) -> Exit {
-    run_waking(arguments, hermes, None, None).await
+    run_waking(arguments, hermes, || (None, None)).await
 }
 
-/// [`run`], with the values of [`crate::wake::URL_VARIABLE`] and
-/// [`crate::wake::KEY_VARIABLE`]: where the local API of Hermes is, and its key. Only the
-/// command `mcp` uses them.
+/// [`run`], with `waking` giving the values of [`crate::wake::URL_VARIABLE`] and
+/// [`crate::wake::KEY_VARIABLE`]: where the local API of Hermes is, and its key. It is called
+/// only by the command `mcp`: no other command reads the key.
 pub async fn run_waking(
     arguments: Vec<OsString>,
     hermes: Option<OsString>,
-    api_url: Option<OsString>,
-    api_key: Option<OsString>,
+    waking: impl FnOnce() -> (Option<OsString>, Option<OsString>),
 ) -> Exit {
     let cli = match Cli::try_parse_from(arguments) {
         Ok(cli) => cli,
@@ -214,6 +222,7 @@ pub async fn run_waking(
             join(&home, args, &hermes, &settings).await
         }
         Command::Mcp => {
+            let (api_url, api_key) = waking();
             let url = api_url.as_deref().and_then(std::ffi::OsStr::to_str);
             let key = api_key.as_deref().and_then(std::ffi::OsStr::to_str);
             init_log();
@@ -245,7 +254,86 @@ pub async fn run_waking(
             print!("{}", crate::report::render(&report));
             Exit::Done
         }
+        Command::Register => register(&home, &hermes, &settings).await,
         Command::Leave { local } => leave(&home, local, &hermes, &settings).await,
+    }
+}
+
+/// What the entry in Hermes is, and what to expect of waking, in the words of the catalog.
+fn print_entry(entry: Entry, approved: bool) {
+    let until = if approved {
+        ""
+    } else {
+        " (no WhatsApp tools until the approval)"
+    };
+    match entry {
+        Entry::NotAsked => {
+            println!("MCP server \"arauto\" not registered in Hermes, as asked.");
+        }
+        Entry::Kept => {
+            println!(
+                "MCP server \"arauto\" already saved in this Hermes, with a reference to the \
+                 key of its local API."
+            );
+            println!("{}", Told::WakingNeedsLocalApi.phrase());
+        }
+        Entry::Saved {
+            registration,
+            replaced,
+        } => {
+            match registration {
+                Registration::WithKeyReference => println!(
+                    "MCP server \"arauto\" registered in this Hermes, with a reference to the \
+                     key of its local API{until}."
+                ),
+                Registration::WithoutKeyReference => println!(
+                    "MCP server \"arauto\" registered in this Hermes without a reference to the \
+                     key of its local API{until}."
+                ),
+            }
+            if replaced {
+                println!("{}", Told::RunningKeepsOldEntry.phrase());
+            }
+            match registration {
+                Registration::WithKeyReference => {
+                    println!("{}", Told::WakingNeedsLocalApi.phrase());
+                }
+                Registration::WithoutKeyReference => {
+                    println!("{}", Told::ReferenceRefused.phrase());
+                }
+            }
+        }
+    }
+}
+
+async fn register(home: &Home, hermes: &Hermes, settings: &Settings) -> Exit {
+    match crate::register::register(home, hermes, settings).await {
+        Ok(registration) => {
+            println!("Arauto connector {}", env!("CARGO_PKG_VERSION"));
+            match registration {
+                Registration::WithKeyReference => println!(
+                    "MCP server \"arauto\" saved again in this Hermes, with a reference to the \
+                     key of its local API."
+                ),
+                Registration::WithoutKeyReference => {
+                    println!(
+                        "MCP server \"arauto\" saved again in this Hermes, without a reference \
+                         to the key of its local API."
+                    );
+                    println!("{}", Told::ReferenceRefused.phrase());
+                }
+            }
+            println!("{}", Told::ConnectionUnchanged.phrase());
+            println!("{}", Told::RunningKeepsOldEntry.phrase());
+            if registration == Registration::WithKeyReference {
+                println!("{}", Told::WakingNeedsLocalApi.phrase());
+            }
+            Exit::Done
+        }
+        Err(said) => {
+            eprintln!("{said}");
+            Exit::of(said)
+        }
     }
 }
 
@@ -255,18 +343,11 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
             code,
             minutes,
             replaces,
-            registered,
+            entry,
         }) => {
             println!("Arauto connector {}", env!("CARGO_PKG_VERSION"));
             println!("Connection request sent to the hub.");
-            if registered {
-                println!(
-                    "MCP server \"arauto\" registered in this Hermes (no WhatsApp tools until \
-                     the approval)."
-                );
-            } else {
-                println!("MCP server \"arauto\" not registered in Hermes, as asked.");
-            }
+            print_entry(entry, false);
             println!("VERIFICATION CODE: {code}");
             println!(
                 "The admin types this code on the hub within {minutes} minute(s) of the first \
@@ -277,8 +358,11 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
             }
             Exit::Done
         }
-        Ok(Joined::AlreadyApproved { .. }) => {
+        Ok(Joined::AlreadyApproved { entry }) => {
             println!("{}", ErrorCode::Ar104.phrase(None));
+            if matches!(entry, Entry::Saved { .. }) {
+                print_entry(entry, true);
+            }
             Exit::Done
         }
         Err(said) => {
@@ -409,10 +493,11 @@ mod tests {
         assert_eq!(Exit::of(Said::code(ErrorCode::Ar505)), Exit::LeavePending);
         assert_eq!(Exit::of(Said::Local(Local::PlainNotLocal)), Exit::Usage);
         assert_eq!(Exit::of(Said::Local(Local::Busy)), Exit::Local);
+        assert_eq!(Exit::of(Said::Local(Local::NothingToRegister)), Exit::Local);
     }
 
     #[test]
-    fn the_command_line_has_the_four_commands() {
+    fn the_command_line_has_the_five_commands() {
         let parse = |line: &[&str]| Cli::try_parse_from(line.iter().map(OsString::from));
         assert!(matches!(
             parse(&["arauto-connector", "join", "h", "k", "i", "--no-register"])
@@ -435,6 +520,13 @@ mod tests {
                 .command,
             Command::Status
         ));
+        assert!(matches!(
+            parse(&["arauto-connector", "register", "--home", "x"])
+                .unwrap()
+                .command,
+            Command::Register
+        ));
+        assert!(parse(&["arauto-connector", "register", "x"]).is_err());
         assert!(matches!(
             parse(&["arauto-connector", "leave", "--local"])
                 .unwrap()

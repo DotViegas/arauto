@@ -168,6 +168,7 @@ impl Connector {
             request: None,
             tools: self.tools(),
             leftovers: 0,
+            waking: None,
         })
     }
 

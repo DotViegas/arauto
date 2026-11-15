@@ -4,7 +4,9 @@
 //! leader with the copies that forward to it.
 
 use arauto_connector::testing::Event;
-use arauto_connector::{ChannelStatus, Connector, DeviceStatus, Hermes, JoinArgs, Joined, Role};
+use arauto_connector::{
+    ChannelStatus, Connector, DeviceStatus, Entry, Hermes, JoinArgs, Joined, Registration, Role,
+};
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::noise::PublicKey;
 use arauto_testkit::hub::fixture::{Fixture, settings};
@@ -437,7 +439,15 @@ async fn a_late_registration_with_a_new_program_asks_the_leader_to_end() {
         support::now(),
     )
     .await;
-    assert_eq!(joined, Ok(Joined::AlreadyApproved { registered: true }));
+    assert_eq!(
+        joined,
+        Ok(Joined::AlreadyApproved {
+            entry: Entry::Saved {
+                registration: Registration::WithKeyReference,
+                replaced: false
+            }
+        })
+    );
     assert_eq!(registrations.all().len(), 1);
     assert_eq!(
         std::fs::read(folder.home.program()).unwrap(),

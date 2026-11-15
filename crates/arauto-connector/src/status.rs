@@ -6,6 +6,7 @@ use arauto_protocol::tools::ToolName;
 use serde_json::{Map, Value, json};
 
 use crate::catalog::Said;
+use crate::wake::{LastWake, Waking};
 
 /// What this copy of the connector is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,6 +99,35 @@ pub struct Status {
     pub tools: Vec<ToolName>,
     /// Other folders, waiting for the hub to confirm their closing.
     pub leftovers: usize,
+    /// Whether this connector holds the key of the local API of Hermes and how its last wake
+    /// ended; `None` when the leader is of a version that does not say it. Never the key.
+    pub waking: Option<Waking>,
+}
+
+fn waking_json(waking: &Waking) -> Value {
+    let last = waking.last.map(|last| match last {
+        LastWake::Accepted => "accepted",
+        LastWake::Refused => "refused",
+        LastWake::NoAnswer => "no_answer",
+    });
+    json!({"key_received": waking.key_received, "last": last})
+}
+
+/// Out of form is `None`: the rest of the status is still read.
+fn waking_from(value: Option<&Value>) -> Option<Waking> {
+    let object = value?.as_object()?;
+    let key_received = object.get("key_received")?.as_bool()?;
+    let last = match object.get("last")? {
+        Value::Null => None,
+        Value::String(text) => Some(match text.as_str() {
+            "accepted" => LastWake::Accepted,
+            "refused" => LastWake::Refused,
+            "no_answer" => LastWake::NoAnswer,
+            _ => return None,
+        }),
+        _ => return None,
+    };
+    Some(Waking { key_received, last })
 }
 
 fn channel_json(channel: &ChannelStatus) -> Value {
@@ -192,6 +222,7 @@ impl Status {
             "request": device_json(self.request.as_ref()),
             "tools": tools,
             "leftovers": self.leftovers,
+            "waking": self.waking.as_ref().map(waking_json),
         })
     }
 
@@ -224,6 +255,7 @@ impl Status {
                 .and_then(Value::as_u64)
                 .and_then(|count| usize::try_from(count).ok())
                 .unwrap_or(0),
+            waking: waking_from(object.get("waking")),
         })
     }
 }
@@ -253,8 +285,36 @@ mod tests {
             }),
             tools: vec![ToolName::parse("arauto_status").unwrap()],
             leftovers: 2,
+            waking: Some(Waking {
+                key_received: true,
+                last: Some(LastWake::Refused),
+            }),
         };
-        assert_eq!(Status::from_json(&status.to_json()), Some(status));
+        assert_eq!(Status::from_json(&status.to_json()), Some(status.clone()));
         assert_eq!(Status::from_json(&json!({"role": "x"})), None);
+
+        // An older leader does not say it; a field out of form is not shown, and the rest is
+        // still read.
+        let mut older = status.to_json();
+        older.as_object_mut().unwrap().remove("waking");
+        assert_eq!(Status::from_json(&older).unwrap().waking, None);
+        for bad in [
+            json!("yes"),
+            json!({"key_received": "yes", "last": null}),
+            json!({"key_received": true, "last": "weird"}),
+            json!({"key_received": true}),
+        ] {
+            let mut broken = status.to_json();
+            broken["waking"] = bad;
+            let read = Status::from_json(&broken).unwrap();
+            assert_eq!(read.waking, None);
+            assert_eq!(read.leftovers, 2);
+        }
+        let mut none = status;
+        none.waking = Some(Waking {
+            key_received: false,
+            last: None,
+        });
+        assert_eq!(Status::from_json(&none.to_json()), Some(none));
     }
 }

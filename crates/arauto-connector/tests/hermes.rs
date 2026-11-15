@@ -15,6 +15,11 @@
 //!   on it; a refused registration is AR-601, and the same `join` again registers.
 //! - **The canary:** the output and the standard error of every process and the files: no
 //!   secret, and the code only in the output of the `join` that shows it.
+//! - **The key of the local API:** the entry carries the reference to the setting of Hermes, the
+//!   fake Hermes resolves it from its own secrets when it starts a copy, `status` and
+//!   `arauto_status` say what the running connector holds, an older Hermes without `--env` is
+//!   connected all the same, `register` saves the entry again without touching the connection,
+//!   and the command of Hermes never gets the two variables of the key.
 //!
 //! A binary of its own: it runs processes and waits for them in seconds. Only a few tests run
 //! at once, so that a busy machine does not stretch what they measure. They need
@@ -31,6 +36,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arauto_connector::SERVER_NAME;
+use arauto_connector::catalog::{Local, Told};
 use arauto_hub::repo::approval::ApproveOutcome;
 use arauto_protocol::clock::{Clock, ManualClock, SystemClock};
 use arauto_protocol::errors::ErrorCode;
@@ -171,8 +177,10 @@ async fn in_session(fixture: &Fixture, identity: &PublicKey) {
     .await;
 }
 
-/// What the hub answers to `arauto_status` for the Hermes `name`, before the second milestone.
-fn status_of(name: &str) -> Value {
+/// What `arauto_status` answers for the Hermes `name`, before the second milestone: the answer of
+/// the hub, and `local_waking`, which the connector adds: whether it received the key of the
+/// local API of Hermes.
+fn status_of(name: &str, local_waking: bool) -> Value {
     json!({
         "connected": true,
         "hermes": name,
@@ -180,16 +188,25 @@ fn status_of(name: &str) -> Value {
         "woken_by": {"notes": false, "whatsapp": false},
         "numbers": [],
         "peers": {"enabled": false, "can_send": false, "can_receive": false},
+        "local_waking": local_waking,
     })
 }
 
-/// Calls `arauto_status` through `copy` until the hub answers it: a copy that just started, or
-/// one whose leader just changed, gets AR-203 for a moment.
+/// [`served_with`], for a Hermes that has no key of the local API.
 async fn served(copy: &mut McpCopy, name: &str) -> Value {
+    served_with(copy, name, false).await
+}
+
+/// Calls `arauto_status` through `copy` until the hub answers it: a copy that just started, or
+/// one whose leader just changed, gets AR-203 for a moment. `local_waking` is what the connector
+/// is expected to say about the key.
+async fn served_with(copy: &mut McpCopy, name: &str, local_waking: bool) -> Value {
     let until = tokio::time::Instant::now() + PATIENCE;
     loop {
         let result = copy.call("arauto_status", json!({})).await;
-        if result["isError"] == false && result["structuredContent"] == status_of(name) {
+        if result["isError"] == false
+            && result["structuredContent"] == status_of(name, local_waking)
+        {
             return result;
         }
         assert!(
@@ -285,6 +302,8 @@ async fn the_block_reaches_three_copies_and_each_one_answers() {
         "arauto".to_owned(),
         "--command".to_owned(),
         fixed.display().to_string(),
+        "--env".to_owned(),
+        "ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}".to_owned(),
         "--args".to_owned(),
     ];
     expected.extend(args.iter().cloned());
@@ -297,7 +316,11 @@ async fn the_block_reaches_three_copies_and_each_one_answers() {
         hermes.registered(SERVER_NAME),
         Some(Registered {
             command: fixed.clone(),
-            args
+            args,
+            env: std::collections::BTreeMap::from([(
+                "ARAUTO_HERMES_API_KEY".to_owned(),
+                "${API_SERVER_KEY}".to_owned()
+            )]),
         })
     );
     assert_eq!(
@@ -684,9 +707,10 @@ async fn a_refused_registration_is_ar601_and_the_same_join_registers_again() {
     assert_eq!(ran.code, Some(7), "{ran:?}");
     assert!(ran.stderr.starts_with("AR-601: "), "{ran:?}");
     assert!(!ran.stdout.contains("VERIFICATION CODE"), "{ran:?}");
-    // The request stays: the folder, and Hermes was asked.
+    // The request stays: the folder, and Hermes was asked twice, with the reference and without
+    // it (a refusal is how an older Hermes answers an option it does not know).
     assert_eq!(devices(&home).len(), 1);
-    assert_eq!(hermes.calls().len(), 1);
+    assert_eq!(hermes.calls().len(), 2);
     assert_eq!(hermes.registered(SERVER_NAME), None);
 
     hermes.refuse(false);
@@ -722,6 +746,27 @@ async fn the_canary_end_to_end() {
     let mut outputs: Vec<(String, String)> = Vec::new();
     let mut files: Vec<(String, String)> = Vec::new();
 
+    // The key of the local API in every place it could leak from: the secrets of Hermes, what its
+    // secret source injects into every server, and the terminal of the operator.
+    let canaries: Vec<String> = [
+        "secret-scope",
+        "provider",
+        "terminal-key",
+        "terminal-ref",
+        "other",
+    ]
+    .iter()
+    .map(|label| format!("CANARY-{label}-0123456789abcdef0123456789abcdef0123456789"))
+    .collect();
+    hermes.set_secret("API_SERVER_KEY", &canaries[0]);
+    hermes.inject("PROVIDER_API_KEY", &canaries[1]);
+    hermes.set_terminal_env("API_SERVER_KEY", &canaries[2]);
+    hermes.set_terminal_env("ARAUTO_HERMES_API_KEY", &canaries[3]);
+    hermes.set_terminal_env("OTHER_SECRET", &canaries[4]);
+    for (at, canary) in canaries.iter().enumerate() {
+        secrets.add_text(&format!("canary {at}"), canary);
+    }
+
     let name = fixture.hermes().await;
     let unknown = Invite::generate().unwrap();
     secrets.add("refused invite", &invite_bytes(&unknown));
@@ -752,7 +797,7 @@ async fn the_canary_end_to_end() {
     let mut copies = started(&hermes, 3).await;
     in_session(&fixture, &identity).await;
     for copy in &mut copies {
-        served(copy, &name).await;
+        served_with(copy, &name, true).await;
         copy.tools().await;
     }
     let credential = device_file(&home, &device, "credential.seal");
@@ -792,7 +837,7 @@ async fn the_canary_end_to_end() {
     .await;
     secrets.add("credential 3", &std::fs::read(&credential).unwrap());
     for copy in &mut copies {
-        served(copy, &name).await;
+        served_with(copy, &name, true).await;
     }
     let ran = command(&hermes, &home, &["status"]).await;
     outputs.push((
@@ -834,6 +879,7 @@ async fn the_canary_end_to_end() {
     for record in [
         arauto_testkit::hermes::registry::CALLS_FILE,
         arauto_testkit::hermes::registry::SERVERS_FILE,
+        arauto_testkit::hermes::registry::ENVIRONMENT_FILE,
     ] {
         let text = std::fs::read_to_string(hermes.folder().join(record)).unwrap_or_default();
         files.push((record.to_owned(), text));
@@ -860,4 +906,419 @@ async fn the_canary_end_to_end() {
         }
     }
     assert!(found.is_empty(), "secrets found:\n{}", found.join("\n"));
+    // The entry holds the reference, never a value, and the command of Hermes never had the
+    // variables of the key in its environment, whatever the terminal had.
+    assert_eq!(
+        hermes.registered(SERVER_NAME).map(|entry| entry.env),
+        None,
+        "removed by leave"
+    );
+    assert_no_key_variables(&hermes);
+}
+
+/// No call of the command of Hermes had `API_SERVER_KEY` or `ARAUTO_HERMES_API_KEY` in its
+/// environment.
+fn assert_no_key_variables(hermes: &FakeHermes) {
+    let environments = hermes.command_environments();
+    assert!(!environments.is_empty());
+    for names in &environments {
+        for name in names {
+            let upper = name.to_ascii_uppercase();
+            assert!(
+                upper != "API_SERVER_KEY" && upper != "ARAUTO_HERMES_API_KEY",
+                "{name} reached the command of Hermes: {names:?}"
+            );
+        }
+    }
+}
+
+fn hub_json(home: &Path, device: &str) -> Value {
+    serde_json::from_slice(&std::fs::read(device_file(home, device, "hub.json")).unwrap()).unwrap()
+}
+
+fn key_canary() -> String {
+    "CANARY-the-key-of-the-local-api-9f8e7d6c5b4a39281706f5e4d3c2b1a0".to_owned()
+}
+
+/// Whether `text` holds a line (not a part of one).
+fn has_line(text: &str, line: &str) -> bool {
+    text.lines().any(|found| found == line)
+}
+
+const REFERENCED: &str = "Entry in Hermes: saved with a reference to API_SERVER_KEY";
+const RECEIVED: &str = "Key of the local API of Hermes: received by the running connector";
+const NOT_RECEIVED: &str = "Key of the local API of Hermes: not received by the running connector (no notice wakes this Hermes)";
+
+/// The entry carries the reference, Hermes resolves it from its own secrets when it starts a
+/// copy, and `status` (run without the variable) and `arauto_status` say that the running
+/// connector holds the key.
+#[tokio::test(flavor = "multi_thread")]
+async fn join_registers_with_the_reference_and_the_copies_get_the_key() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    let key = key_canary();
+    hermes.set_secret("API_SERVER_KEY", &key);
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let joined = joined(&fixture, &hermes, &home).await;
+
+    // What Hermes saved is the reference, literally; the value is not in the entry.
+    let entry = hermes.registered(SERVER_NAME).unwrap();
+    assert_eq!(
+        entry.env,
+        std::collections::BTreeMap::from([(
+            "ARAUTO_HERMES_API_KEY".to_owned(),
+            "${API_SERVER_KEY}".to_owned()
+        )])
+    );
+    let device = only_device(&home);
+    assert_eq!(hub_json(&home, &device)["key_reference"], json!(true));
+    // Only `mcp add` and `mcp list` ran, and the environment of the command had no key variable.
+    assert!(hermes.calls().iter().all(|call| call[0] == "mcp"));
+    assert_no_key_variables(&hermes);
+
+    let mut copies = started(&hermes, 2).await;
+    let identity = public(&home, &device);
+    in_session(&fixture, &identity).await;
+    for copy in &mut copies {
+        served_with(copy, &joined.name, true).await;
+    }
+    // `status` runs in a terminal that does not have the variable: it says what the leader holds.
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(has_line(&ran.stdout, REFERENCED), "{ran:?}");
+    assert!(has_line(&ran.stdout, RECEIVED), "{ran:?}");
+    assert!(
+        has_line(&ran.stdout, "Last wake: none since the connector started"),
+        "{ran:?}"
+    );
+    assert!(!ran.stdout.contains("not configured"), "{ran:?}");
+    let mut secrets = Secrets::default();
+    secrets.add_text("key", &key);
+    let shown = format!("{}\n{}", ran.stdout, ran.stderr);
+    assert!(secrets.leaks(&shown, false).is_empty(), "{ran:?}");
+    close_all(copies).await;
+}
+
+/// A Hermes whose local API is off still connects. The connector says what to look for, in
+/// Hermes's own words, and `status` tells what the running connector holds, which is not what
+/// the terminal of `status` holds.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_hermes_without_its_key_is_connected_and_told() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        ran.stdout.contains(Told::WakingNeedsLocalApi.phrase()),
+        "{ran:?}"
+    );
+    assert!(ran.stdout.contains("API_SERVER_KEY"), "{ran:?}");
+    assert!(ran.stdout.contains("VERIFICATION CODE"), "{ran:?}");
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+
+    // The secrets of this Hermes are empty: the reference is left out, as Hermes does.
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &only_device(&home))).await;
+    served_with(&mut copies[0], &name, false).await;
+
+    // `status` run by an operator who has the variable in the terminal: the line is about the
+    // running connector, so it still says "not received", and the canary is nowhere.
+    let key = key_canary();
+    hermes.set_terminal_env("ARAUTO_HERMES_API_KEY", &key);
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(has_line(&ran.stdout, REFERENCED), "{ran:?}");
+    assert!(has_line(&ran.stdout, NOT_RECEIVED), "{ran:?}");
+    assert!(
+        ran.stdout.contains(Told::KeyNotReceived.phrase()),
+        "{ran:?}"
+    );
+    assert!(
+        ran.stdout.contains(Told::KeyAfterRestart.phrase()),
+        "{ran:?}"
+    );
+    let mut secrets = Secrets::default();
+    secrets.add_text("key", &key);
+    let shown = format!("{}\n{}", ran.stdout, ran.stderr);
+    assert!(secrets.leaks(&shown, false).is_empty(), "{ran:?}");
+    for (file, text) in files_of(&home) {
+        assert!(secrets.leaks(&text, false).is_empty(), "{file}");
+    }
+    close_all(copies).await;
+}
+
+/// A Hermes that does not know `--env` (its `add` exits 2 before any question) is connected
+/// without the reference, and says so.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_old_hermes_without_env_is_connected_without_the_reference() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.without_env_option(true);
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        ran.stdout.contains(Told::ReferenceRefused.phrase()),
+        "{ran:?}"
+    );
+    assert!(
+        ran.stdout
+            .contains("registered in this Hermes without a reference to the key"),
+        "{ran:?}"
+    );
+    assert!(
+        !ran.stdout.contains(Told::WakingNeedsLocalApi.phrase()),
+        "{ran:?}"
+    );
+    let calls = hermes.calls();
+    assert_eq!(calls.len(), 3, "{calls:?}");
+    assert!(calls[0].contains(&"--env".to_owned()));
+    assert!(!calls[1].contains(&"--env".to_owned()));
+    assert!(hermes.registered(SERVER_NAME).unwrap().env.is_empty());
+    let device = only_device(&home);
+    assert_eq!(hub_json(&home, &device)["key_reference"], json!(false));
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &device)).await;
+    served_with(&mut copies[0], &name, false).await;
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert!(
+        has_line(
+            &ran.stdout,
+            "Entry in Hermes: saved without a reference to the key (this version of Hermes refused it)"
+        ),
+        "{ran:?}"
+    );
+    assert!(has_line(&ran.stdout, NOT_RECEIVED), "{ran:?}");
+    assert!(
+        ran.stdout.contains(Told::ReferenceRefused.phrase()),
+        "{ran:?}"
+    );
+    close_all(copies).await;
+}
+
+/// `register` saves the entry again and changes nothing of the connection: the same device,
+/// the same credential, the same leader. A running copy keeps what it loaded; a copy started
+/// after it (once the running one is gone) receives the key.
+#[tokio::test(flavor = "multi_thread")]
+async fn register_saves_the_entry_again_without_touching_the_connection() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.without_env_option(true);
+    hermes.set_secret("API_SERVER_KEY", &key_canary());
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let joined = joined(&fixture, &hermes, &home).await;
+    let device = only_device(&home);
+    let identity = public(&home, &device);
+    assert_eq!(hub_json(&home, &device)["key_reference"], json!(false));
+
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &identity).await;
+    served_with(&mut copies[0], &joined.name, false).await;
+    let before = (
+        std::fs::read(device_file(&home, &device, "identity.key")).unwrap(),
+        std::fs::read(device_file(&home, &device, "credential.seal")).unwrap(),
+        std::fs::read(home.join("current")).unwrap(),
+    );
+    let leader = leader_process(&home).await;
+    let state_before = fixture.state_of_key(&identity).await;
+
+    hermes.without_env_option(false);
+    let ran = command(&hermes, &home, &["register"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        has_line(
+            &ran.stdout,
+            "MCP server \"arauto\" saved again in this Hermes, with a reference to the key of its local API."
+        ),
+        "{ran:?}"
+    );
+    for told in [
+        Told::ConnectionUnchanged,
+        Told::RunningKeepsOldEntry,
+        Told::WakingNeedsLocalApi,
+    ] {
+        assert!(ran.stdout.contains(told.phrase()), "{ran:?}");
+    }
+    assert!(ran.stderr.is_empty(), "{ran:?}");
+    assert_eq!(
+        hermes.registered(SERVER_NAME).unwrap().env,
+        std::collections::BTreeMap::from([(
+            "ARAUTO_HERMES_API_KEY".to_owned(),
+            "${API_SERVER_KEY}".to_owned()
+        )])
+    );
+    assert_eq!(hub_json(&home, &device)["key_reference"], json!(true));
+    assert_eq!(hub_json(&home, &device)["registered"], json!(true));
+
+    // The connection is untouched: the same files, the same device, the same leader and the
+    // same state on the hub; the running copy still serves, with what it loaded.
+    let after = (
+        std::fs::read(device_file(&home, &device, "identity.key")).unwrap(),
+        std::fs::read(device_file(&home, &device, "credential.seal")).unwrap(),
+        std::fs::read(home.join("current")).unwrap(),
+    );
+    assert_eq!(before, after);
+    assert_eq!(devices(&home), std::slice::from_ref(&device));
+    assert_eq!(leader_process(&home).await, leader);
+    assert_eq!(fixture.state_of_key(&identity).await, state_before);
+    assert_eq!(fixture.links_of(&identity), 1);
+    served_with(&mut copies[0], &joined.name, false).await;
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert!(has_line(&ran.stdout, REFERENCED), "{ran:?}");
+    assert!(has_line(&ran.stdout, NOT_RECEIVED), "{ran:?}");
+
+    // Hermes restarts its gateway: the running copy ends, and a copy started afterwards has the
+    // new entry and receives the key.
+    close_all(copies).await;
+    eventually("the channel closes", Duration::from_secs(5), || async {
+        fixture.links_of(&identity) == 0
+    })
+    .await;
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &identity).await;
+    served_with(&mut copies[0], &joined.name, true).await;
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert!(has_line(&ran.stdout, RECEIVED), "{ran:?}");
+
+    // The connector only ran `mcp add`, `mcp list` and `mcp remove`: it never touched the
+    // secrets, and the environment of the command had no variable of the key.
+    assert!(hermes.calls().iter().all(|call| call[0] == "mcp"));
+    assert_no_key_variables(&hermes);
+    close_all(copies).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn register_with_no_device_runs_nothing() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let hermes = fake_hermes();
+    let folder = Folder::new();
+    let ran = command(&hermes, &folder.home, &["register"]).await;
+    assert_eq!(ran.code, Some(9), "{ran:?}");
+    assert!(ran.stdout.is_empty(), "{ran:?}");
+    assert_eq!(
+        ran.stderr.trim_end(),
+        Local::NothingToRegister.phrase(),
+        "{ran:?}"
+    );
+    assert!(hermes.calls().is_empty());
+    // A folder that exists with nothing in it: the same.
+    std::fs::create_dir_all(folder.home.join("devices")).unwrap();
+    let ran = command(&hermes, &folder.home, &["register"]).await;
+    assert_eq!(ran.code, Some(9), "{ran:?}");
+    assert_eq!(
+        ran.stderr.trim_end(),
+        Local::NothingToRegister.phrase(),
+        "{ran:?}"
+    );
+    assert!(hermes.calls().is_empty());
+}
+
+/// A rejoin leaves the entry alone when it has the reference, and saves it again when it does
+/// not.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_rejoin_registers_again_only_when_the_entry_lacks_the_reference() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    for lacking in [false, true] {
+        let hermes = fake_hermes();
+        hermes.without_env_option(lacking);
+        let folder = Folder::new();
+        let home = folder.home.clone();
+        let joined = joined(&fixture, &hermes, &home).await;
+        let mut copies = started(&hermes, 1).await;
+        let identity = public(&home, &only_device(&home));
+        in_session(&fixture, &identity).await;
+        served_with(&mut copies[0], &joined.name, false).await;
+        let adds = |hermes: &FakeHermes| {
+            hermes
+                .calls()
+                .iter()
+                .filter(|call| call.get(1).is_some_and(|word| word == "add"))
+                .count()
+        };
+        let before = adds(&hermes);
+        assert_eq!(before, if lacking { 2 } else { 1 });
+
+        hermes.without_env_option(false);
+        let invite = fixture.invite(&joined.name).await;
+        let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+        assert_eq!(ran.code, Some(0), "{lacking}: {ran:?}");
+        if lacking {
+            assert_eq!(adds(&hermes), before + 1, "saved again");
+            assert!(
+                ran.stdout.contains(Told::RunningKeepsOldEntry.phrase()),
+                "{ran:?}"
+            );
+            assert!(
+                ran.stdout
+                    .contains("registered in this Hermes, with a reference"),
+                "{ran:?}"
+            );
+            assert_eq!(
+                hermes.registered(SERVER_NAME).unwrap().env.len(),
+                1,
+                "the reference is there now"
+            );
+        } else {
+            assert_eq!(adds(&hermes), before, "no second add");
+            assert!(
+                ran.stdout.contains("already saved in this Hermes"),
+                "{ran:?}"
+            );
+            assert!(
+                !ran.stdout.contains(Told::RunningKeepsOldEntry.phrase()),
+                "{ran:?}"
+            );
+        }
+        close_all(copies).await;
+    }
+}
+
+/// Whatever the terminal of the operator has, the command of Hermes does not get the two
+/// variables of the key; the rest of the environment passes, because Hermes needs to find its
+/// own folder.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_command_of_hermes_never_gets_the_key_variables() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.set_terminal_env("API_SERVER_KEY", "CANARY-terminal-a-0123456789abcdef");
+    hermes.set_terminal_env(
+        "ARAUTO_HERMES_API_KEY",
+        "CANARY-terminal-b-0123456789abcdef",
+    );
+    hermes.set_terminal_env("OTHER_VARIABLE", "not a secret");
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let joined = joined(&fixture, &hermes, &home).await;
+    assert_no_key_variables(&hermes);
+    assert!(
+        hermes
+            .command_environments()
+            .iter()
+            .all(|names| names.iter().any(|name| name == "OTHER_VARIABLE")),
+        "the rest of the environment passes"
+    );
+    // Also `leave` (which runs `mcp remove`) and `register`.
+    let ran = command(&hermes, &home, &["register"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    let ran = command(&hermes, &home, &["leave", "--local"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert_no_key_variables(&hermes);
+    drop(joined);
 }

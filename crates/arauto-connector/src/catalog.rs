@@ -37,6 +37,8 @@ pub enum Local {
     Unregister,
     /// There is no device in the folder.
     NoDevice,
+    /// There is no device in the folder to register in Hermes.
+    NothingToRegister,
     /// The generator of the system failed.
     Random,
     /// Anything else that went wrong on this machine.
@@ -57,6 +59,7 @@ impl Local {
         Local::HermesNotFound,
         Local::Unregister,
         Local::NoDevice,
+        Local::NothingToRegister,
         Local::Random,
         Local::Internal,
     ];
@@ -105,6 +108,9 @@ impl Local {
                  Hermes failed. The operator must remove it from Hermes."
             }
             Local::NoDevice => "There is no device in this folder. There is nothing to leave.",
+            Local::NothingToRegister => {
+                "There is no device in this folder. Nothing was registered in Hermes."
+            }
             Local::Random => {
                 "The random generator of the system failed. Nothing was changed. The operator \
                  must check this machine."
@@ -112,6 +118,79 @@ impl Local {
             Local::Internal => {
                 "The connector failed unexpectedly on this machine. The operator must check the \
                  log of the connector."
+            }
+        }
+    }
+}
+
+/// What a command tells the operator when it succeeded but a thing is not as they may expect,
+/// about the key of the local API of Hermes. Fixed phrases, under the same rules as [`Local`].
+/// The connector never sets that key, never creates one and never restarts Hermes: these
+/// phrases say so, and say whose setting it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Told {
+    /// The connector is registered, but waking needs the local API of Hermes to be on.
+    WakingNeedsLocalApi,
+    /// This version of Hermes refused the reference, so the entry has none.
+    ReferenceRefused,
+    /// A running Hermes keeps the entry it loaded.
+    RunningKeepsOldEntry,
+    /// The running connector did not receive the key.
+    KeyNotReceived,
+    /// What to expect when the setting already holds a key.
+    KeyAfterRestart,
+    /// The entry was saved by an older connector.
+    EntryOlder,
+    /// The registration changed nothing in the connection.
+    ConnectionUnchanged,
+}
+
+impl Told {
+    /// Every phrase.
+    pub const ALL: &'static [Told] = &[
+        Told::WakingNeedsLocalApi,
+        Told::ReferenceRefused,
+        Told::RunningKeepsOldEntry,
+        Told::KeyNotReceived,
+        Told::KeyAfterRestart,
+        Told::EntryOlder,
+        Told::ConnectionUnchanged,
+    ];
+
+    /// The fixed phrase.
+    #[must_use]
+    pub const fn phrase(self) -> &'static str {
+        match self {
+            Told::WakingNeedsLocalApi => {
+                "This Hermes can be woken only while its local API is on, which Hermes does when \
+                 its own setting API_SERVER_KEY holds a key. The connector never sets it; the \
+                 status command says whether the connector received it."
+            }
+            Told::ReferenceRefused => {
+                "This version of Hermes refused the reference to the key of its local API, so the \
+                 entry was saved without it and no notice wakes this Hermes. Notes and tools \
+                 still work."
+            }
+            Told::RunningKeepsOldEntry => {
+                "A running Hermes keeps the entry it loaded: the new entry takes effect after \
+                 Hermes restarts its gateway. The connector does not restart Hermes."
+            }
+            Told::KeyNotReceived => {
+                "No notice wakes this Hermes until its local API is on. Hermes turns it on when \
+                 its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a \
+                 key. The connector never sets it."
+            }
+            Told::KeyAfterRestart => {
+                "If that setting already holds a key, Hermes hands it to the connector after it \
+                 restarts its gateway."
+            }
+            Told::EntryOlder => {
+                "The entry of the connector in Hermes was saved by an older connector and may \
+                 have no reference to the key. The register command of the connector saves it \
+                 again."
+            }
+            Told::ConnectionUnchanged => {
+                "The connection did not change: the same device and the same credential."
             }
         }
     }
@@ -150,10 +229,9 @@ impl fmt::Display for Said {
 mod tests {
     use super::*;
 
-    /// The local phrases follow the rules of the catalog: ASCII, one line, a whole sentence,
-    /// and nothing an LLM could take as a command to run.
-    #[test]
-    fn local_phrases_follow_the_rules_of_the_catalog() {
+    /// The rules of the catalog: ASCII, one line, a whole sentence, and nothing an LLM could
+    /// take as a command to run.
+    fn check_rules(phrases: &[&str]) {
         let forbidden = [
             "`",
             "$",
@@ -173,8 +251,7 @@ mod tests {
             "\\",
             "/",
         ];
-        for local in Local::ALL {
-            let phrase = local.phrase();
+        for phrase in phrases {
             assert!(phrase.is_ascii(), "{phrase}");
             assert!(
                 phrase.bytes().all(|b| b == b' ' || b.is_ascii_graphic()),
@@ -187,9 +264,29 @@ mod tests {
                 assert!(!phrase.contains(piece), "{piece:?} in: {phrase}");
             }
         }
-        let distinct: std::collections::HashSet<&str> =
-            Local::ALL.iter().map(|local| local.phrase()).collect();
-        assert_eq!(distinct.len(), Local::ALL.len());
+    }
+
+    #[test]
+    fn local_phrases_follow_the_rules_of_the_catalog() {
+        let phrases: Vec<&str> = Local::ALL.iter().map(|local| local.phrase()).collect();
+        check_rules(&phrases);
+    }
+
+    #[test]
+    fn told_phrases_follow_the_rules_and_name_the_setting_of_hermes() {
+        let told: Vec<&str> = Told::ALL.iter().map(|told| told.phrase()).collect();
+        check_rules(&told);
+        // Distinct across both lists.
+        let mut all: Vec<&str> = Local::ALL.iter().map(|local| local.phrase()).collect();
+        all.extend(&told);
+        let distinct: std::collections::HashSet<&str> = all.iter().copied().collect();
+        assert_eq!(distinct.len(), all.len());
+        // The two that tell the operator what to look for name Hermes's own setting, and say
+        // that the connector never sets it.
+        for phrase in [Told::WakingNeedsLocalApi, Told::KeyNotReceived].map(Told::phrase) {
+            assert!(phrase.contains("API_SERVER_KEY"), "{phrase}");
+            assert!(phrase.contains("never sets it"), "{phrase}");
+        }
     }
 
     #[test]

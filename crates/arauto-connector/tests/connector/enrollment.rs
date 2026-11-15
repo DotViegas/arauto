@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use arauto_connector::catalog::{Local, Said};
 use arauto_connector::testing::Event;
-use arauto_connector::{ChannelStatus, Connector, DeviceStatus, Joined, Role};
+use arauto_connector::{ChannelStatus, Connector, DeviceStatus, Entry, Joined, Registration, Role};
 use arauto_protocol::clock::{ManualClock, SystemClock};
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::invite::Invite;
@@ -34,12 +34,19 @@ async fn a_connector_enters_with_the_invite_and_the_code_and_reaches_the_session
         code,
         minutes,
         replaces,
-        registered,
+        entry,
     }) = joined
     else {
         panic!("{joined:?}");
     };
-    assert!(!replaces && registered);
+    assert!(!replaces);
+    assert_eq!(
+        entry,
+        Entry::Saved {
+            registration: Registration::WithKeyReference,
+            replaced: false
+        }
+    );
     assert!((1..=10).contains(&minutes), "{minutes}");
     // The official command of Hermes, with the folder, which is not the default one.
     let program = folder.home.program();
@@ -51,6 +58,8 @@ async fn a_connector_enters_with_the_invite_and_the_code_and_reaches_the_session
             "arauto".to_owned(),
             "--command".to_owned(),
             program.to_string_lossy().into_owned(),
+            "--env".to_owned(),
+            "ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}".to_owned(),
             "--args".to_owned(),
             "mcp".to_owned(),
             "--home".to_owned(),
@@ -151,7 +160,8 @@ async fn the_same_invite_again_finds_the_request_where_it_is() {
     approve(&fixture, &name, &code.to_string()).await;
     let calls = registrations.all().len();
     let approved = join(&fixture, &folder, &invite, &s).await;
-    assert_eq!(approved, Ok(Joined::AlreadyApproved { registered: true }));
+    // The entry has the reference to the key: it is kept, and no command of Hermes runs.
+    assert_eq!(approved, Ok(Joined::AlreadyApproved { entry: Entry::Kept }));
     assert_eq!(folder.only_device(), device);
     // Registered already: the registration is not made again.
     assert_eq!(registrations.all().len(), calls);
@@ -318,7 +328,10 @@ async fn a_registration_that_fails_is_ar601_and_the_same_join_registers_again() 
         matches!(
             again,
             Ok(Joined::Enrolled {
-                registered: true,
+                entry: Entry::Saved {
+                    registration: Registration::WithKeyReference,
+                    replaced: false
+                },
                 replaces: true,
                 ..
             })
@@ -326,7 +339,9 @@ async fn a_registration_that_fails_is_ar601_and_the_same_join_registers_again() 
         "{again:?}"
     );
     assert_eq!(folder.only_device(), device);
-    assert_eq!(registrations.all().len(), 2);
+    // The refused join asked twice (with the reference, and without it, which is how an older
+    // Hermes is told apart from a refusal), and the one that worked once.
+    assert_eq!(registrations.all().len(), 3);
 }
 
 /// AR-105: a device of another hub, by another key or another address. Nothing changes.

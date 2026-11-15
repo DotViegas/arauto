@@ -16,10 +16,10 @@ Marking: **[code]** read in the installed code; **[observed]** seen in a running
 | The MCP client speaks stdio, HTTP and SSE. There is no websocket as a transport. | [code] `tools/mcp_tool.py` |
 | There is OAuth for MCP servers, including the device flow (RFC 8628), started only by `hermes mcp login`. | [code] `tools/mcp_oauth_device.py` |
 | Official command: `hermes mcp add NAME --command PROGRAM --args ...` or `--url ADDRESS --auth oauth\|header`. Also `remove`, `list`, `test`. | [observed] help of the command; it is **not** non-interactive: see "Registering a stdio server" below. |
-| The list of servers is reconciled by itself, in less than a minute, without restarting. | [observed] |
+| The list of servers is reconciled by itself, in less than a minute, without restarting, for a **new name**. A changed entry, or a server whose process died, is not applied by a running gateway until it restarts (K5). | [observed] 09/11/2026; [observed] 15/11/2026 |
 | An MCP server appears on all of Hermes's conversation platforms, unless configured per platform. | [observed] |
 | Every server entry is checked on saving and on starting. One that uses a command interpreter with a network call or with a sign of data being sent out is refused. | [code] `hermes_cli/mcp_security.py` |
-| The stdio server receives a **filtered** environment: the user's folder, the program path, temporary folders and the variables of the entry itself. It does not inherit Hermes's environment. | [code] `_build_safe_env`; [observed] on a server in use |
+| The stdio server receives a **filtered** environment: the user's folder, the program path, temporary folders and the variables of the entry itself. It does not inherit Hermes's environment. Since 15/11/2026: a value in the entry's `env` of the form `${VAR}` is resolved from Hermes's own secret scope (K3), and the variables that Hermes's secret source injects for every stdio child are also present (K6). | [code] `_build_safe_env`; [observed] on a server in use |
 | On shutting down, Hermes closes the server's input, waits 2 seconds, asks for termination and only then forces it. A supervisor shuts the servers down if Hermes dies. | [code] MCP SDK and `tools/mcp_death_supervisor.py` |
 | The stdio server lives as long as the Hermes process that started it lives. | [observed] 10 days without a restart |
 | There is handling for the notice that the list of tools changed. | [code] `tools/mcp_tool_health.py` |
@@ -70,11 +70,11 @@ These are the assumptions about Hermes:
 |---|---|
 | The registration of the connector through the official command passes the check of entries. Not proved: the trial of 14/11/2026 (below) registered an entry, but **interactively**, and the check of entries is still to be seen. | Without this there is no quick mode. |
 | How many Hermes processes start the server when panel and scheduled routines are active. | It defines the work of the leader. |
-| The server entry accepts a reference to a Hermes variable in the environment field. | It is the cleanest path to the key of the local API. |
+| ~~The server entry accepts a reference to a Hermes variable in the environment field.~~ Observed on 15/11/2026, one Hermes (K2, K3). Not checked on Windows, macOS or other versions. | It is the cleanest path to the key of the local API. |
 | Whether the block triggers the terminal's approval request or not. | The flow works in both cases; the screen needs to say what to expect. |
 | Hermes keeps procedures in memory or as a skill from what it executes. | The block asks it not to keep them. |
-| Address, body and repetition identifier of the call to the local API. | It is through it that Hermes is woken. |
-| Hermes restarts a tool server that exits. | It is how the connector changes version on a reconnect. |
+| ~~Address, body and repetition identifier of the call to the local API.~~ A wake by the fixed sentence was accepted and answered on 15/11/2026, one Hermes (K4). The use of the repetition identifier was not separately checked. | It is through it that Hermes is woken. |
+| Hermes restarts a tool server that exits. Observed on 15/11/2026: a running gateway did **not** restart a killed connector in 15 minutes (K5). | It is how the connector changes version on a reconnect. |
 | The behavior of version 0.23.0 on each line of this file. | 0.23 opens more tools by default. |
 
 ## First real connection attempt (14/11/2026)
@@ -194,3 +194,26 @@ separate user folder (the configuration in use was not touched).**
 
 Still not checked: a real agent on Windows following the page by itself; whether that Hermes
 loads the new entry without `/reload-mcp`; anything at all on a Mac.
+
+## The key of the local API through the entry (15/11/2026)
+
+**Checked on 15/11/2026, on Hermes Agent v0.22.5, Docker install, Linux, by hand on one Hermes.**
+Marking as at the top. Used by
+[decision 0046](../docs/decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md).
+
+| | Fact |
+|---|---|
+| K1 | [observed] [code] Hermes's local API listens (`127.0.0.1:8642` by default) only when its variable `API_SERVER_KEY` holds a usable secret, at least 16 characters; otherwise the adapter does not start. `gateway/config_env.py`, `gateway/config.py`. |
+| K2 | [observed] `hermes mcp add NAME --command PATH --env 'KEY=${VAR}' --args ...` accepts `--env` (`KEY=VALUE`, several allowed; `--args` must be the last option) and saves the entry with an `env:` map holding the literal reference. |
+| K3 | [observed] [code] At spawn Hermes resolves `${VAR}` (and `${env:VAR}`) in the entry's `env` from its own secret scope and hands the resolved value to the stdio child. With the entry env `ARAUTO_HERMES_API_KEY: ${API_SERVER_KEY}` the connector process had `ARAUTO_HERMES_API_KEY` with 64 characters, not the literal. A reference to an unset or empty variable is treated as absent: the child does not get the variable at all. `tools/mcp_tool_config.py` `_interpolate_env_vars`, `_build_safe_env`. |
+| K4 | [observed] With that in place, a note sent on a link with the wake mark woke the Hermes: the hub's notice was confirmed at the first attempt in the same second, the log of that Hermes shows an inbound run on its API server with the fixed sentence, and the Hermes read the note and answered it within 8 seconds, with no person talking to it. The sender, which had no key, got a notice that stayed pending after 3 attempts. |
+| K5 | [observed] A **running** gateway does not reload an MCP server whose entry changed, nor restart one whose process died: the edited entry was not applied, the killed connector was not started again in 15 minutes, and `hermes mcp remove` followed by `hermes mcp add` did not bring it back either. It came back, with the new env, only after the gateway was restarted (Hermes says a new session or `/reload-mcp` loads it into sessions). The first registration of a new name, made from inside a session, was picked up within a second. |
+| K6 | [observed] The child also receives variables that Hermes's secret source injects for every stdio child (one provider API key was seen in the connector's environment, by name). The connector must never read, log or forward any variable other than its own. |
+| K7 | [observed] `arauto-connector status` run by hand reported "not configured" for the key of the local API, after the change. **Cause not established:** at that date `status` asked the leader over the local socket and did not read its own environment; the leader may have been the copy started from the old entry (K5). |
+| K8 | [observed] In that install the home of the connector was given with `--home` (the args of the entry are `mcp --home PATH`), and `hermes mcp add` asks questions on the terminal which the connector already answers ([11](../docs/11-conector.md), section 4). |
+| K9 | [observed] One Hermes whose model refused the connect message cited a local skill line ("use manage_connections ...; never edit mcp_servers manually"). `manage_connections` is a built-in tool of v0.22.5 for catalog apps and cannot add a local stdio server. The same command run in a terminal by the operator connected it. **Known limit of the connect-by-message path.** |
+
+Not checked: Windows (the launcher `hermes.exe` handing its command line to Python unchanged),
+macOS, v0.23 and other versions; the handling of `$` in arguments by the shim
+`/opt/hermes/bin/hermes`; an API on another port; whether Hermes's masking of the terminal
+output hides the name `API_SERVER_KEY` in printed lines.

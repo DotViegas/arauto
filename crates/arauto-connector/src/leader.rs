@@ -270,6 +270,22 @@ fn initial_tools(home: &Home) -> Vec<ToolName> {
     }
 }
 
+/// `arauto_status` is answered by the hub, which knows only what the admin allowed. The
+/// connector adds what only it knows: whether it received the key of the local API of Hermes.
+/// When it did not, nothing wakes this Hermes whatever `can_be_woken` says. Any value the hub
+/// sent under this name is overwritten. The name avoids the word "key": Hermes masks output
+/// by variable name.
+fn with_local_waking(outcome: CallOutcome, can_wake: bool) -> CallOutcome {
+    match outcome {
+        CallOutcome::Ok(payload) => {
+            let mut map = payload.into_map();
+            map.insert("local_waking".to_owned(), Value::from(can_wake));
+            CallOutcome::Ok(Payload::new(map))
+        }
+        refused @ CallOutcome::Refused { .. } => refused,
+    }
+}
+
 fn always() -> Vec<ToolName> {
     ToolName::parse(ARAUTO_STATUS)
         .map(|tool| vec![tool])
@@ -280,9 +296,15 @@ impl Shared {
     /// A call, through the session of the device in use.
     pub(crate) async fn call(&self, tool: ToolName, args: Payload) -> CallOutcome {
         let live = self.live.borrow().clone();
-        match live {
+        let is_status = tool.as_str() == ARAUTO_STATUS;
+        let outcome = match live {
             Some(live) => live.calls.call(tool, args).await,
             None => refused(*self.unavailable.borrow()),
+        };
+        if is_status {
+            with_local_waking(outcome, self.settings.waker.can_wake())
+        } else {
+            outcome
         }
     }
 
@@ -296,6 +318,7 @@ impl Shared {
             request: view.request,
             tools: self.tools.borrow().clone(),
             leftovers: view.leftovers,
+            waking: Some(self.settings.waker.waking()),
         }
     }
 
@@ -1152,4 +1175,35 @@ fn leave_answer(id: Option<u64>, report: Option<&LeaveReport>) -> Value {
         object.insert("done".to_owned(), Value::Bool(report.done));
     }
     answer
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn with_local_waking_overwrites_the_hub_value() {
+        let hub = Payload::new(
+            json!({"can_be_woken": true, "local_waking": "from the hub"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        );
+        for can_wake in [true, false] {
+            let CallOutcome::Ok(payload) =
+                with_local_waking(CallOutcome::Ok(hub.clone()), can_wake)
+            else {
+                panic!("a success stays a success");
+            };
+            assert_eq!(payload.as_map()["local_waking"], json!(can_wake));
+            assert_eq!(payload.as_map()["can_be_woken"], json!(true));
+        }
+        let refused = CallOutcome::Refused {
+            code: ErrorCode::Ar203,
+            retry_after: None,
+        };
+        assert_eq!(with_local_waking(refused.clone(), true), refused);
+    }
 }

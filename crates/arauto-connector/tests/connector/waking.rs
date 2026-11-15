@@ -249,3 +249,104 @@ async fn without_the_key_of_the_local_api_nobody_is_woken_and_the_tools_go_on() 
     };
     assert_eq!(listed.as_map()["threads"][0]["unread"], 1);
 }
+
+/// The hub knows only what the admin allowed. The connector adds what only it knows.
+#[tokio::test(flavor = "multi_thread")]
+async fn arauto_status_says_whether_this_connector_can_wake() {
+    let fixture = Fixture::new(hub_settings()).await;
+    let api = FakeApi::start().await;
+    let target = WakeTarget::new(&api.url, KEY).unwrap();
+    let (_sender, _a, _woken, with_key, _folder) = pair(&fixture, Some(target)).await;
+    let (_other, _a, _woken, without_key, _folder) = pair(&fixture, None).await;
+
+    async fn status(connector: &Connector) -> Map<String, Value> {
+        let CallOutcome::Ok(content) = connector.call("arauto_status", Map::new()).await else {
+            panic!("arauto_status is refused");
+        };
+        content.into_map()
+    }
+    let with = status(&with_key).await;
+    let without = status(&without_key).await;
+    assert_eq!(with["local_waking"], json!(true));
+    assert_eq!(without["local_waking"], json!(false));
+    // What the hub says is untouched, and the same for both.
+    for field in ["can_be_woken", "woken_by"] {
+        assert!(with.contains_key(field), "{with:?}");
+        assert_eq!(with[field], without[field], "{field}");
+    }
+    // No secret: the key is in neither.
+    assert!(!Value::Object(with).to_string().contains(KEY));
+}
+
+/// The leader's status carries whether it holds the key and how its last wake ended, never
+/// the key itself.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_leader_status_carries_its_waking() {
+    use arauto_connector::wake::{LastWake, Waking};
+
+    let fixture = Fixture::new(hub_settings()).await;
+    let api = FakeApi::start().await;
+    api.status.store(500, Ordering::SeqCst);
+    let target = WakeTarget::new(&api.url, KEY).unwrap();
+    let (_sender, a, woken, with_key, _folder) = pair(&fixture, Some(target)).await;
+    let (_other, _a2, _woken2, without_key, _folder2) = pair(&fixture, None).await;
+
+    assert_eq!(
+        with_key.status().await.waking,
+        Some(Waking {
+            key_received: true,
+            last: None
+        })
+    );
+    assert_eq!(
+        without_key.status().await.waking,
+        Some(Waking {
+            key_received: false,
+            last: None
+        })
+    );
+
+    send(&a, &woken, "wake up").await;
+    eventually("the refusal is remembered", PATIENCE, || async {
+        with_key
+            .status()
+            .await
+            .waking
+            .and_then(|waking| waking.last)
+            == Some(LastWake::Refused)
+    })
+    .await;
+    api.status.store(202, Ordering::SeqCst);
+    eventually(
+        "the acceptance is remembered",
+        Duration::from_secs(30),
+        || async {
+            with_key
+                .status()
+                .await
+                .waking
+                .and_then(|waking| waking.last)
+                == Some(LastWake::Accepted)
+        },
+    )
+    .await;
+}
+
+/// A key that is there but a local API that is not: the last wake says it did not answer.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_local_api_that_does_not_answer_is_remembered() {
+    use arauto_connector::wake::LastWake;
+
+    let fixture = Fixture::new(hub_settings()).await;
+    let closed = {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        format!("http://{}/v1/runs", listener.local_addr().unwrap())
+    };
+    let target = WakeTarget::new(&closed, KEY).unwrap();
+    let (_sender, a, woken, b, _folder) = pair(&fixture, Some(target)).await;
+    send(&a, &woken, "wake up").await;
+    eventually("the silence is remembered", PATIENCE, || async {
+        b.status().await.waking.and_then(|waking| waking.last) == Some(LastWake::NoAnswer)
+    })
+    .await;
+}

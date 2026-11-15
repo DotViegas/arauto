@@ -15,3 +15,9 @@ The paths are tried in this order. First, the entry of the tool server reference
 - The test of the first path belongs to Phase 1 of the [roadmap](../12-roteiro.md). The verb "be woken" depends on it (Phase 5).
 - If the second path holds, the text of the block comes to say that the connector reads that file.
 - On either path, the key never goes to the hub and never appears on screen.
+
+## Note of 15/11/2026
+
+The first path (the entry references Hermes's variable) was tried by hand on **one** Hermes: Hermes Agent v0.22.5, Docker install, Linux. It worked: Hermes resolved `${API_SERVER_KEY}` in the entry's environment, the connector received the key, and a note woke that Hermes ([referencia/hermes-fatos.md](../../referencia/hermes-fatos.md), K1 to K4). The second path is **not needed for now and not built**.
+
+**Not proved:** Windows, macOS, v0.23 and other versions of Hermes; the shim `/opt/hermes/bin/hermes` passing an argument with `${...}` unchanged. **New exposure:** the key now sits in the initial environment of each connector copy. For the Hermes without a key and for the rest of this change, see [0046](0046-chave-pela-entrada-e-hermes-sem-chave.md). This decision stays as decided.

@@ -4,12 +4,12 @@
 //! | Situation | What happens |
 //! |---|---|
 //! | The same invite again, request pending | The same folder and identity, recognized by the digest of the invite. A new code, which replaces the previous one. |
-//! | The same invite again, request approved | AR-104 from the hub. Nothing changes; the registration in Hermes is made if it is missing. |
+//! | The same invite again, request approved | AR-104 from the hub. Nothing changes; the registration in Hermes is made if it is missing or lacks the reference to the key. |
 //! | The same invite again, request denied or expired | AR-301, AR-302 or AR-303. The folder of that request is discarded only if it has no `credential.seal`. |
 //! | The hub refuses the invite (AR-101, AR-102) | The folder created for this request is discarded. Nothing else changes. |
 //! | A new invite, with an old request without credential in the folder | The old request is discarded and a new one is created, with a new identity. |
 //! | The enrollment worked and the registration in Hermes failed | AR-601 (when the program of Hermes was not found, with a sentence of its own that says where to look). The request stays open on the hub; running it again tries the registration again. |
-//! | A device of the same hub is in the folder | A reconnection: the device in use goes on until the new one has its first credential confirmed. |
+//! | A device of the same hub is in the folder | A reconnection: the device in use goes on until the new one has its first credential confirmed. The entry in Hermes is saved again only when it lacks the reference to the key of the local API (`hub.json` says so); an entry that has it is left as it is. |
 //! | A device of another hub is in the folder | AR-105. The same address with another key is another hub. |
 //!
 //! Once the hub accepted, the program copies itself to its fixed path (a temporary file and a
@@ -32,11 +32,11 @@ use zeroize::Zeroizing;
 use crate::address::{AddressError, HubAddress};
 use crate::ask;
 use crate::catalog::{Local, Said};
-use crate::hermes::Hermes;
+use crate::hermes::{Hermes, Registration};
 use crate::home::Home;
 use crate::settings::Settings;
 use crate::short::{self, Enrolled};
-use crate::store::{self, Current, DeviceDir, DevicesLockError};
+use crate::store::{self, Current, DeviceDir, DevicesLockError, HubRecord};
 
 /// What `join` receives.
 pub struct JoinArgs {
@@ -60,6 +60,23 @@ impl std::fmt::Debug for JoinArgs {
     }
 }
 
+/// What `join` did about the entry of the connector in Hermes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Entry {
+    /// It was not asked for (`--no-register`).
+    NotAsked,
+    /// The entry was already there with the reference to the key: no command of Hermes ran.
+    Kept,
+    /// The entry was saved by this run.
+    Saved {
+        /// With the reference to the key of the local API, or without it.
+        registration: Registration,
+        /// Whether it replaced an entry this connector had saved before: a running Hermes
+        /// keeps the old one until it restarts its gateway.
+        replaced: bool,
+    },
+}
+
 /// How `join` ended when it did not fail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Joined {
@@ -71,14 +88,19 @@ pub enum Joined {
         minutes: u32,
         /// Whether it replaces the code of an earlier enrollment of the same request.
         replaces: bool,
-        /// Whether the connector is registered in Hermes now.
-        registered: bool,
+        /// What was done about the entry in Hermes.
+        entry: Entry,
     },
     /// The request was already approved: nothing to do (AR-104).
     AlreadyApproved {
-        /// Whether the connector is registered in Hermes now.
-        registered: bool,
+        /// What was done about the entry in Hermes.
+        entry: Entry,
     },
+}
+
+/// Whether the entry that `record` describes is saved with the reference to the key.
+fn up_to_date(record: &HubRecord) -> bool {
+    record.registered && record.key_reference == Some(true)
 }
 
 /// Runs `join`.
@@ -173,12 +195,9 @@ async fn locked(
     }
     let current = layout.current().map(|folder| folder.id().clone());
     // The device in use is already registered in Hermes, under the fixed path of the program:
-    // a reconnection registers nothing again. Registering twice would be refused by Hermes or
-    // would replace the entry, with whatever was added to it by hand.
-    let already_registered = layout
-        .current()
-        .and_then(|folder| folder.record())
-        .is_some_and(|record| record.registered);
+    // a reconnection registers nothing again when that entry has the reference to the key.
+    // Saving it again would replace the entry, with whatever was added to it by hand.
+    let current_record = layout.current().and_then(|folder| folder.record()).cloned();
     // A device of another hub: only after leaving it (C10).
     let other_hub = layout.folders.iter().any(|folder| {
         let counts = folder.has_credential || Some(folder.id()) == current.as_ref();
@@ -227,6 +246,12 @@ async fn locked(
             (dir, true)
         }
     };
+    // What is known about the entry in Hermes before this run: the device in use, and the
+    // folder of this request.
+    let prior: Vec<HubRecord> = [current_record, dir.record().ok()]
+        .into_iter()
+        .flatten()
+        .collect();
     let identity = dir.identity().map_err(|_| Said::Local(Local::Damaged))?;
     let enrolled = short::enroll(address, key, &identity, invite, settings).await;
     drop(identity);
@@ -237,43 +262,55 @@ async fn locked(
             enrollment,
         } => {
             let changed = install_program(program, &home.program()).await?;
-            let registered = if register && already_registered {
-                mark_registered(&dir).await;
-                true
-            } else if register {
-                hermes
+            let entry = if !register {
+                Entry::NotAsked
+            } else if prior.iter().any(up_to_date) {
+                mark_registered(&dir, true).await;
+                Entry::Kept
+            } else {
+                let registration = hermes
                     .add(home, settings)
                     .await
                     .map_err(|error| error.said())?;
-                mark_registered(&dir).await;
-                true
-            } else {
-                false
+                mark_registered(&dir, registration == Registration::WithKeyReference).await;
+                Entry::Saved {
+                    registration,
+                    replaced: prior.iter().any(|record| record.registered),
+                }
             };
             Ok((
                 Joined::Enrolled {
                     code,
                     minutes: confirm_within.get().div_ceil(60),
                     replaces: enrollment.get() > 1,
-                    registered,
+                    entry,
                 },
                 changed,
             ))
         }
         Enrolled::Refused(ErrorCode::Ar104) => {
-            // Nothing changes: only the registration, when it is missing, and with it the
-            // program it names.
-            let registered = dir.record().is_ok_and(|record| record.registered);
-            if !register || registered {
-                return Ok((Joined::AlreadyApproved { registered }, false));
+            // Nothing changes: only the registration, when it is missing or lacks the
+            // reference to the key, and with it the program it names.
+            let record = dir.record().ok();
+            if !register {
+                let entry = Entry::NotAsked;
+                return Ok((Joined::AlreadyApproved { entry }, false));
+            }
+            if record.as_ref().is_some_and(up_to_date) {
+                let entry = Entry::Kept;
+                return Ok((Joined::AlreadyApproved { entry }, false));
             }
             let changed = install_program(program, &home.program()).await?;
-            hermes
+            let registration = hermes
                 .add(home, settings)
                 .await
                 .map_err(|error| error.said())?;
-            mark_registered(&dir).await;
-            Ok((Joined::AlreadyApproved { registered: true }, changed))
+            mark_registered(&dir, registration == Registration::WithKeyReference).await;
+            let entry = Entry::Saved {
+                registration,
+                replaced: record.is_some_and(|record| record.registered),
+            };
+            Ok((Joined::AlreadyApproved { entry }, changed))
         }
         Enrolled::Refused(
             code @ (ErrorCode::Ar101
@@ -311,14 +348,21 @@ async fn discard(home: &Home, dir: &DeviceDir) {
     let _ = tokio::task::spawn_blocking(move || store::discard_request(&home, &id)).await;
 }
 
-async fn mark_registered(dir: &DeviceDir) {
+/// Writes down in `hub.json` that the entry is saved, and whether it has the reference.
+pub(crate) async fn mark_registered(dir: &DeviceDir, key_reference: bool) {
     let dir = dir.clone();
-    let _ = tokio::task::spawn_blocking(move || {
-        let mut record = dir.record()?;
-        record.registered = true;
-        dir.write_record(&record)
-    })
-    .await;
+    let _ = tokio::task::spawn_blocking(move || mark_registered_now(&dir, key_reference)).await;
+}
+
+/// [`mark_registered`], for code that already runs on a blocking thread.
+pub(crate) fn mark_registered_now(
+    dir: &DeviceDir,
+    key_reference: bool,
+) -> Result<(), store::StoreError> {
+    let mut record = dir.record()?;
+    record.registered = true;
+    record.key_reference = Some(key_reference);
+    dir.write_record(&record)
 }
 
 /// SHA-256 of a file, or `None` when it cannot be read.

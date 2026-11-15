@@ -512,7 +512,9 @@ copy of the files in a third of them.
 
 - **The proofs "in Hermes".** The registration by the official command, how many copies of the
   connector it starts, whether it updates the tool list when it changes, and the key and the format
-  of the local API depend on a real Hermes. Until then the connector follows what is in
+  of the local API depend on a real Hermes. (Since 15/11/2026 the key and the call to the local API
+  are observed on **one** Hermes, v0.22.5, Docker install, Linux; other versions and systems are not:
+  [hermes-fatos](../referencia/hermes-fatos.md), K1 to K5.) Until then the connector follows what is in
   [hermes-fatos](../referencia/hermes-fatos.md), and "being woken" is only taken as working against
   the fake Hermes.
 - **The Linux path.** While development is only on Windows, the Linux-specific code is checked by

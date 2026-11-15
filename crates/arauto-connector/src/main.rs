@@ -1,4 +1,4 @@
-//! `arauto-connector`: `join`, `mcp`, `status` and `leave` (`docs/11-conector.md`, section 1).
+//! `arauto-connector`: `join`, `mcp`, `status`, `register` and `leave` (`docs/11-conector.md`, section 1).
 #![forbid(unsafe_code)]
 
 use std::process::ExitCode;
@@ -18,11 +18,14 @@ fn main() -> ExitCode {
     };
     let arguments: Vec<std::ffi::OsString> = std::env::args_os().collect();
     let hermes = std::env::var_os("ARAUTO_HERMES_BIN");
-    let api_url = std::env::var_os(arauto_connector::wake::URL_VARIABLE);
-    let api_key = std::env::var_os(arauto_connector::wake::KEY_VARIABLE);
-    let exit = runtime.block_on(arauto_connector::cli::run_waking(
-        arguments, hermes, api_url, api_key,
-    ));
+    // The key is read only by the command that uses it, and by no other.
+    let waking = || {
+        (
+            std::env::var_os(arauto_connector::wake::URL_VARIABLE),
+            std::env::var_os(arauto_connector::wake::KEY_VARIABLE),
+        )
+    };
+    let exit = runtime.block_on(arauto_connector::cli::run_waking(arguments, hermes, waking));
     runtime.shutdown_timeout(BLOCKING_PATIENCE);
     ExitCode::from(exit.code())
 }

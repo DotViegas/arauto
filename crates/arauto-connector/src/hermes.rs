@@ -37,6 +37,20 @@
 //!   prints on `add` and `remove` is not read.
 //! - Not guaranteed: another version of Hermes may ask other questions or print the list in
 //!   another format; then `add` fails (AR-601) instead of reporting a registration it cannot see.
+//! - **The key of the local API, by reference.** The entry carries
+//!   `--env ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}` ([`KEY_REFERENCE`]). The reference is not a
+//!   secret: it is a fixed text of this program, which no input of any kind can change. Hermes
+//!   resolves it from its own secret scope when it starts the connector (observed on v0.22.5,
+//!   Docker, Linux, 15/11/2026, `referencia/hermes-fatos.md`). The connector never reads,
+//!   writes or creates anything in the secrets of Hermes, and never restarts Hermes. An `add`
+//!   that rejects `--env` with a non-zero exit is tried again without it
+//!   ([`Registration::WithoutKeyReference`]): the connection never fails for lack of the
+//!   option. An `add` that silently ignores `--env` cannot be seen from here; `status` then
+//!   says the key was not received.
+//! - **The environment of the command of Hermes** is the one of the terminal that runs the
+//!   connector, minus `API_SERVER_KEY` and `ARAUTO_HERMES_API_KEY`: no layer between the
+//!   connector and Hermes (a shim that re-parses its arguments through a shell, say) can turn
+//!   the reference into the key. The rest stays, because Hermes needs to find its own folder.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -49,6 +63,16 @@ use crate::settings::{Settings, duration};
 
 /// The name of the server of tools in Hermes.
 pub const SERVER_NAME: &str = "arauto";
+
+/// The setting of Hermes that holds the key of its local API (observed on v0.22.5).
+pub const HERMES_KEY_VARIABLE: &str = "API_SERVER_KEY";
+
+/// The reference the entry carries so that Hermes hands its key to the connector. Fixed text,
+/// not a secret: `${` and `}` are literal characters of the constant.
+pub(crate) const KEY_REFERENCE: &str = "ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}";
+
+/// The variables the command of Hermes never receives from this program.
+const WITHHELD: &[&str] = &[crate::wake::KEY_VARIABLE, HERMES_KEY_VARIABLE];
 
 /// The program run when `ARAUTO_HERMES_BIN` is not set.
 pub const DEFAULT_PROGRAM: &str = "hermes";
@@ -129,6 +153,23 @@ pub(crate) enum Listed {
     Disabled,
 }
 
+/// What was saved by `add`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Registration {
+    /// The entry carries the reference to the key of the local API of Hermes.
+    WithKeyReference,
+    /// This Hermes refused the option, so the entry was saved without the reference.
+    WithoutKeyReference,
+}
+
+/// How one try of `add` ended.
+enum Once {
+    Saved,
+    /// The `add` run itself exited with a code that is not 0.
+    AddExitedNonZero,
+    Failed(HermesError),
+}
+
 /// How a run of the program ended.
 struct Ran {
     success: bool,
@@ -149,35 +190,62 @@ impl Hermes {
         }
     }
 
-    /// `hermes mcp add arauto --command PROGRAM --args mcp --home HOME`, answered, and then
-    /// checked in `hermes mcp list`.
-    pub(crate) async fn add(&self, home: &Home, settings: &Settings) -> Result<(), HermesError> {
-        let arguments = add_arguments(&home.program(), Some(home.root()))?;
+    /// `hermes mcp add arauto --command PROGRAM --env REFERENCE --args mcp --home HOME`,
+    /// answered, and then checked in `hermes mcp list`. When this Hermes rejects the option
+    /// (the `add` exits with a code that is not 0), the same without the reference.
+    pub(crate) async fn add(
+        &self,
+        home: &Home,
+        settings: &Settings,
+    ) -> Result<Registration, HermesError> {
+        match self.add_once(home, settings, true).await {
+            Once::Saved => return Ok(Registration::WithKeyReference),
+            Once::Failed(error) => return Err(error),
+            Once::AddExitedNonZero => {}
+        }
+        match self.add_once(home, settings, false).await {
+            Once::Saved => Ok(Registration::WithoutKeyReference),
+            Once::AddExitedNonZero => Err(HermesError::Refused),
+            Once::Failed(error) => Err(error),
+        }
+    }
+
+    async fn add_once(&self, home: &Home, settings: &Settings, reference: bool) -> Once {
+        let arguments = match add_arguments(&home.program(), Some(home.root()), reference) {
+            Ok(arguments) => arguments,
+            Err(error) => return Once::Failed(error),
+        };
         #[cfg(feature = "testing")]
         if let Some(answer) = &settings.testing.hermes {
             return if answer(&arguments) {
-                Ok(())
+                Once::Saved
             } else {
-                Err(HermesError::Refused)
+                Once::AddExitedNonZero
             };
         }
-        let added = self.run(&arguments, settings, Some(ANSWERS), false).await?;
+        let added = match self.run(&arguments, settings, Some(ANSWERS), false).await {
+            Ok(added) => added,
+            Err(error) => return Once::Failed(error),
+        };
         if !added.success {
-            return Err(HermesError::Refused);
+            return Once::AddExitedNonZero;
         }
-        let listed = self.run(&list_arguments(), settings, None, true).await?;
+        let listed = match self.run(&list_arguments(), settings, None, true).await {
+            Ok(listed) => listed,
+            Err(error) => return Once::Failed(error),
+        };
         if !listed.success {
-            return Err(HermesError::Refused);
+            return Once::Failed(HermesError::Refused);
         }
         match registration_in(&listed.captured) {
-            Listed::Enabled => Ok(()),
+            Listed::Enabled => Once::Saved,
             Listed::Disabled => {
                 // Best effort: a disabled entry is no registration, and it would be asked
                 // about again ("overwrite?") by the next try.
                 let _ = self.remove(settings).await;
-                Err(HermesError::Disabled)
+                Once::Failed(HermesError::Disabled)
             }
-            Listed::Missing => Err(HermesError::NotSaved),
+            Listed::Missing => Once::Failed(HermesError::NotSaved),
         }
     }
 
@@ -301,6 +369,9 @@ async fn run_first(
             })
             .stderr(Stdio::null())
             .kill_on_drop(true);
+        for name in WITHHELD {
+            command.env_remove(name);
+        }
         match command.spawn() {
             Ok(started) => {
                 child = Some(started);
@@ -387,16 +458,22 @@ fn path_argument(path: &Path) -> Result<OsString, HermesError> {
     Ok(OsString::from(text))
 }
 
-/// The arguments of the registration.
+/// The arguments of the registration, with the reference to the key or without it.
 pub(crate) fn add_arguments(
     program: &Path,
     home: Option<&Path>,
+    reference: bool,
 ) -> Result<Vec<OsString>, HermesError> {
     let mut arguments: Vec<OsString> = ["mcp", "add", SERVER_NAME, "--command"]
         .into_iter()
         .map(OsString::from)
         .collect();
     arguments.push(path_argument(program)?);
+    if reference {
+        // `--args` must stay the last option.
+        arguments.push(OsString::from("--env"));
+        arguments.push(OsString::from(KEY_REFERENCE));
+    }
     arguments.push(OsString::from("--args"));
     arguments.push(OsString::from("mcp"));
     if let Some(home) = home {
@@ -442,9 +519,20 @@ mod tests {
     }
 
     #[test]
+    fn the_key_reference_is_fixed() {
+        assert_eq!(
+            KEY_REFERENCE,
+            format!("{}=${{{}}}", crate::wake::KEY_VARIABLE, HERMES_KEY_VARIABLE)
+        );
+        assert_eq!(KEY_REFERENCE, "ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}");
+        assert_eq!(WITHHELD, ["ARAUTO_HERMES_API_KEY", "API_SERVER_KEY"]);
+    }
+
+    #[test]
     fn the_registration_is_the_official_command() {
         let program = absolute("arauto-connector");
-        let arguments = add_arguments(&program, None).unwrap();
+        // Without the reference: exactly the list from before the reference existed.
+        let arguments = add_arguments(&program, None, false).unwrap();
         let expected: Vec<OsString> = vec![
             "mcp".into(),
             "add".into(),
@@ -456,11 +544,27 @@ mod tests {
         ];
         assert_eq!(arguments, expected);
         let home = absolute("another-home");
-        let arguments = add_arguments(&program, Some(&home)).unwrap();
+        let arguments = add_arguments(&program, Some(&home), false).unwrap();
         assert_eq!(
             &arguments[7..],
-            &[OsString::from("--home"), home.into_os_string()]
+            &[OsString::from("--home"), home.clone().into_os_string()]
         );
+        // With it: `--env` and its value are two items, and `--args` stays last.
+        let arguments = add_arguments(&program, Some(&home), true).unwrap();
+        let expected: Vec<OsString> = vec![
+            "mcp".into(),
+            "add".into(),
+            "arauto".into(),
+            "--command".into(),
+            program.clone().into_os_string(),
+            "--env".into(),
+            "ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}".into(),
+            "--args".into(),
+            "mcp".into(),
+            "--home".into(),
+            home.into_os_string(),
+        ];
+        assert_eq!(arguments, expected);
         assert_eq!(
             remove_arguments(),
             vec![
@@ -479,19 +583,19 @@ mod tests {
     #[test]
     fn a_path_that_could_inject_is_refused() {
         assert!(matches!(
-            add_arguments(Path::new("relative"), None),
+            add_arguments(Path::new("relative"), None, true),
             Err(HermesError::Path)
         ));
         assert!(matches!(
-            add_arguments(&absolute("x\nmcp add evil"), None),
+            add_arguments(&absolute("x\nmcp add evil"), None, true),
             Err(HermesError::Path)
         ));
         assert!(matches!(
-            add_arguments(&absolute("ok"), Some(&absolute("a\u{7}b"))),
+            add_arguments(&absolute("ok"), Some(&absolute("a\u{7}b")), true),
             Err(HermesError::Path)
         ));
         assert!(matches!(
-            add_arguments(&absolute("ok"), Some(Path::new("-x"))),
+            add_arguments(&absolute("ok"), Some(Path::new("-x")), false),
             Err(HermesError::Path)
         ));
     }
@@ -701,7 +805,10 @@ mod tests {
         // It saves, and what it read is exactly the two answers, then the end of the input.
         let fake = fake();
         let hermes = hermes_of(&fake);
-        hermes.add(&home, &settings).await.unwrap();
+        assert_eq!(
+            hermes.add(&home, &settings).await.unwrap(),
+            Registration::WithKeyReference
+        );
         assert!(fake.registered(SERVER_NAME).is_some());
         let read = std::fs::read(fake.folder().join(registry::INPUT_FILE)).unwrap();
         assert_eq!(read, b"y\ny\n");
@@ -736,12 +843,122 @@ mod tests {
         );
 
         // The command refuses (exit code not 0): it is a failure, and the list is not asked.
+        // It is tried twice, with the reference and without it, because a refusal is how an
+        // older Hermes answers an option it does not know.
         let refusing = self::fake();
         refusing.refuse(true);
         assert!(matches!(
             hermes_of(&refusing).add(&home, &settings).await,
             Err(HermesError::Refused)
         ));
-        assert_eq!(refusing.calls().len(), 1);
+        assert_eq!(refusing.calls().len(), 2);
+    }
+
+    /// The reference reaches the entry literally: nothing between the connector and the command
+    /// of Hermes expands it. On Windows this proves the quoting of the command line.
+    #[tokio::test]
+    async fn add_records_the_reference_literally() {
+        let settings = Settings::default();
+        let dir = tempfile::tempdir().unwrap();
+        let home = home_in(&dir);
+        let fake = fake();
+        hermes_of(&fake).add(&home, &settings).await.unwrap();
+        let entry = fake.registered(SERVER_NAME).unwrap();
+        assert_eq!(
+            entry.env,
+            std::collections::BTreeMap::from([(
+                "ARAUTO_HERMES_API_KEY".to_owned(),
+                "${API_SERVER_KEY}".to_owned()
+            )])
+        );
+        assert_eq!(entry.args[0], "mcp");
+        let calls = fake.calls();
+        assert_eq!(calls[0][5], "--env");
+        assert_eq!(calls[0][6], KEY_REFERENCE);
+        assert_eq!(calls[0][7], "--args");
+    }
+
+    /// A Hermes that does not know `--env` (exit 2 before any question) is connected without it.
+    #[tokio::test]
+    async fn add_falls_back_when_hermes_does_not_know_env() {
+        let settings = Settings::default();
+        let dir = tempfile::tempdir().unwrap();
+        let home = home_in(&dir);
+        let fake = fake();
+        fake.without_env_option(true);
+        let registration = hermes_of(&fake).add(&home, &settings).await.unwrap();
+        assert_eq!(registration, Registration::WithoutKeyReference);
+        let calls = fake.calls();
+        assert_eq!(calls.len(), 3, "{calls:?}");
+        assert!(calls[0].contains(&"--env".to_owned()));
+        assert!(!calls[1].contains(&"--env".to_owned()));
+        assert_eq!(calls[1][1], "add");
+        assert_eq!(calls[2], ["mcp", "list"]);
+        let entry = fake.registered(SERVER_NAME).unwrap();
+        assert!(entry.env.is_empty());
+    }
+
+    /// Only a refusal of the `add` itself is tried again without the reference.
+    #[tokio::test]
+    async fn other_failures_are_not_retried_without_the_reference() {
+        let settings = Settings::default();
+        let dir = tempfile::tempdir().unwrap();
+        let home = home_in(&dir);
+        let adds = |fake: &FakeHermes| {
+            fake.calls()
+                .iter()
+                .filter(|call| call.get(1).is_some_and(|word| word == "add"))
+                .count()
+        };
+
+        let silent = fake();
+        std::fs::write(silent.folder().join(registry::CANCEL_FILE), b"").unwrap();
+        assert!(matches!(
+            hermes_of(&silent).add(&home, &settings).await,
+            Err(HermesError::NotSaved)
+        ));
+        assert_eq!(adds(&silent), 1);
+
+        let probing = fake();
+        std::fs::write(probing.folder().join(registry::PROBE_FAILS_FILE), b"").unwrap();
+        assert!(matches!(
+            hermes_of(&probing).add(&home, &settings).await,
+            Err(HermesError::Disabled)
+        ));
+        assert_eq!(adds(&probing), 1);
+
+        let missing = Hermes::new(Some(absolute("no-such-hermes-program").into_os_string()));
+        assert!(matches!(
+            missing.add(&home, &settings).await,
+            Err(HermesError::Start)
+        ));
+        let batch = Hermes::new(Some(absolute("hermes.cmd").into_os_string()));
+        assert!(matches!(
+            batch.add(&home, &settings).await,
+            Err(HermesError::Interpreter)
+        ));
+    }
+
+    /// A shell between the connector and the command of Hermes (the shim of the Docker install
+    /// is a script) hands the argument on unchanged when it quotes it as `"$@"` does.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_shell_shim_passes_the_reference_unchanged() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let settings = Settings::default();
+        let dir = tempfile::tempdir().unwrap();
+        let home = home_in(&dir);
+        let fake = fake();
+        let shim = fake.folder().join("shim");
+        std::fs::write(
+            &shim,
+            format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", fake.program().display()),
+        )
+        .unwrap();
+        std::fs::set_permissions(&shim, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let hermes = Hermes::new(Some(shim.into_os_string()));
+        hermes.add(&home, &settings).await.unwrap();
+        assert_eq!(fake.calls()[0][6], KEY_REFERENCE);
     }
 }

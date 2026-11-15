@@ -670,7 +670,7 @@ Each message is a JSON object on one line, with `"v": 1`. An unknown version or 
 | relay | `call`, with `id`, `tool`, `args` | `{"id":1,"ok":true,"content":{}}` or `{"id":1,"ok":false,"code":"AR-..."}` |
 | relay | `tools` | The list of released tools. |
 | relay | `watch` | The connection stays open, and the leader sends a line each time the list of tools changes. |
-| `status` | `status` | The situation of the device and of the channel, with no secret. |
+| `status` | `status` | The situation of the device and of the channel, with no secret. Since 15/11/2026 (proposal, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)) it also carries `waking`: whether the leader received the key of Hermes's local API (`key_received`) and the outcome of its last wake (`last`: `accepted`, `refused`, `no_answer` or null). Never the key. A reader that finds no `waking` (an older leader) shows "unknown". |
 | `join` | `new_request` | The leader starts following the new request. |
 | `leave` | `leave` | The leader asks for the closing of each identity of the folder and returns one response per identity. |
 | `join` | `restart` | The leader ends, for Hermes to start it again in the new version. |

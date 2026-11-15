@@ -3,7 +3,8 @@
 //! the program.
 //!
 //! ```text
-//! hermes mcp add NAME --command PROGRAM --args ARGUMENT...   asks on the input, then keeps NAME
+//! hermes mcp add NAME --command PROGRAM [--env KEY=VALUE]... --args ARGUMENT...
+//!                                                            asks on the input, then keeps NAME
 //! hermes mcp list                                            prints the table of the servers
 //! hermes mcp remove NAME                                     drops NAME; a NAME it does not have is refused
 //! anything else                                              refused
@@ -18,7 +19,16 @@
 //! whose questions nobody answered. Every byte it reads is appended to [`INPUT_FILE`]. The exit
 //! code is 0 in all of these cases, as the one of Hermes is.
 //!
+//! - `--env KEY=VALUE` may come several times, before `--args` (which stays last, as in Hermes
+//!   v0.22.5, `referencia/hermes-fatos.md`). The pair is kept **literally** in the `env` map of
+//!   the entry: the reference `${NAME}` is resolved only when a copy is started
+//!   ([`crate::hermes::FakeHermes::start`]). A `KEY` out of `[A-Za-z_][A-Za-z0-9_]*` is a usage
+//!   error. With a file [`NO_ENV_FILE`] in the folder an `add` that has `--env` exits with the
+//!   usage code before any question and saves nothing, as an older Hermes whose argument parser
+//!   does not know the option.
 //! - Every call is first appended to [`CALLS_FILE`], one JSON array of the arguments per line.
+//! - Every call also appends to [`ENVIRONMENT_FILE`] the sorted **names** (never the values) of
+//!   its own environment, one JSON array per line.
 //! - With a file [`REFUSE_FILE`] in the folder, every call is refused, as a Hermes that turns
 //!   the entry down.
 //! - The servers registered are in [`SERVERS_FILE`]:
@@ -47,6 +57,18 @@ pub const PROBE_FAILS_FILE: &str = "probe-fails";
 
 /// While this file exists, `mcp add` answers "no" to every question.
 pub const CANCEL_FILE: &str = "cancel";
+
+/// While this file exists, `mcp add` does not know the option `--env`.
+pub const NO_ENV_FILE: &str = "no-env";
+
+/// The names of the environment of each call, one JSON array per line.
+pub const ENVIRONMENT_FILE: &str = "environment.jsonl";
+
+/// The secret scope of the fake Hermes: what `${NAME}` in an entry resolves from.
+pub const SECRETS_FILE: &str = "secrets.json";
+
+/// What the secret source of the fake Hermes adds to every server it starts.
+pub const INJECTED_FILE: &str = "injected.json";
 
 /// What `mcp add` read on its input, appended.
 pub const INPUT_FILE: &str = "input.log";
@@ -99,15 +121,15 @@ pub fn run(
     }
     let words: Vec<&str> = arguments.iter().map(String::as_str).collect();
     match words.as_slice() {
-        [
-            "mcp",
-            "add",
-            name,
-            "--command",
-            command,
-            "--args",
-            args @ ..,
-        ] => add(folder, name, command, args, input),
+        ["mcp", "add", name, "--command", command, rest @ ..] => {
+            let Some((env, args)) = split_options(rest) else {
+                return USAGE;
+            };
+            if !env.is_empty() && folder.join(NO_ENV_FILE).exists() {
+                return USAGE;
+            }
+            add(folder, name, command, &env, &args, input)
+        }
         ["mcp", "list"] => list(folder, output),
         ["mcp", "remove", name] => change(folder, |servers| {
             if servers.remove(*name).is_some() {
@@ -120,8 +142,51 @@ pub fn run(
     }
 }
 
+/// The `--env KEY=VALUE` pairs, and the arguments after `--args`.
+type Options<'a> = (Vec<(&'a str, &'a str)>, Vec<&'a str>);
+
+/// The `--env KEY=VALUE` pairs and the arguments after `--args`, or `None` when the options
+/// are not in the form `(--env KEY=VALUE)... --args ARG...`.
+fn split_options<'a>(rest: &[&'a str]) -> Option<Options<'a>> {
+    let mut env = Vec::new();
+    let mut at = 0;
+    while rest.get(at) == Some(&"--env") {
+        let (key, value) = rest.get(at + 1)?.split_once('=')?;
+        let mut chars = key.chars();
+        let first = chars.next()?;
+        if !(first.is_ascii_alphabetic() || first == '_')
+            || !chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return None;
+        }
+        env.push((key, value));
+        at += 2;
+    }
+    if rest.get(at) != Some(&"--args") {
+        return None;
+    }
+    Some((env, rest[at + 1..].to_vec()))
+}
+
+/// The sorted names of the environment of this process: never the values.
+#[must_use]
+pub fn environment_names() -> Vec<String> {
+    let mut names: Vec<String> = std::env::vars_os()
+        .map(|(name, _)| name.to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
 /// `mcp add`: the questions of Hermes, answered from `input`.
-fn add(folder: &Path, name: &str, command: &str, args: &[&str], input: &mut dyn Read) -> u8 {
+fn add(
+    folder: &Path,
+    name: &str,
+    command: &str,
+    env: &[(&str, &str)],
+    args: &[&str],
+    input: &mut dyn Read,
+) -> u8 {
     let mut typed = Vec::new();
     let _ = input.read_to_end(&mut typed);
     if record_input(folder, &typed).is_err() {
@@ -145,10 +210,15 @@ fn add(folder: &Path, name: &str, command: &str, args: &[&str], input: &mut dyn 
         if !yes() {
             return DONE;
         }
-        servers.insert(
-            name.to_owned(),
-            json!({"command": command, "args": args, "enabled": enabled}),
-        );
+        let mut entry = json!({"command": command, "args": args, "enabled": enabled});
+        if !env.is_empty() {
+            let env: Map<String, Value> = env
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), Value::from(*value)))
+                .collect();
+            entry["env"] = Value::Object(env);
+        }
+        servers.insert(name.to_owned(), entry);
         DONE
     })
 }
@@ -186,6 +256,13 @@ fn record_input(folder: &Path, typed: &[u8]) -> std::io::Result<()> {
 }
 
 fn record(folder: &Path, arguments: &[String]) -> std::io::Result<()> {
+    let mut line = serde_json::to_vec(&environment_names()).map_err(std::io::Error::other)?;
+    line.push(b'\n');
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(folder.join(ENVIRONMENT_FILE))?
+        .write_all(&line)?;
     let mut line = serde_json::to_vec(arguments).map_err(std::io::Error::other)?;
     line.push(b'\n');
     let mut calls = std::fs::OpenOptions::new()
@@ -275,6 +352,71 @@ mod tests {
         assert_eq!(calls.lines().count(), 6);
         let first: Vec<String> = serde_json::from_str(calls.lines().next().unwrap()).unwrap();
         assert_eq!(first, words(add));
+    }
+
+    /// The environment is kept literally, several pairs are allowed, and `--args` stays last.
+    #[test]
+    fn the_env_of_an_entry_is_kept_literally() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path();
+        let add = "mcp add arauto --command /p/c --env ARAUTO_HERMES_API_KEY=${API_SERVER_KEY} --env B_2=x --args mcp --home /h";
+        assert_eq!(call(folder, add, "y\ny\n").0, DONE);
+        assert_eq!(
+            servers(folder).unwrap()["arauto"]["env"],
+            json!({"ARAUTO_HERMES_API_KEY": "${API_SERVER_KEY}", "B_2": "x"})
+        );
+        // Without `--env` there is no `env` at all.
+        assert_eq!(call(folder, "mcp remove arauto", "").0, DONE);
+        assert_eq!(
+            call(folder, "mcp add arauto --command /p/c --args mcp", "y\ny\n").0,
+            DONE
+        );
+        assert!(servers(folder).unwrap()["arauto"].get("env").is_none());
+        // The names of the environment of each call are kept, never a value.
+        let names = std::fs::read_to_string(folder.join(ENVIRONMENT_FILE)).unwrap();
+        assert_eq!(names.lines().count(), 3);
+    }
+
+    /// An older Hermes does not know the option: usage error before any question, nothing saved.
+    #[test]
+    fn an_older_hermes_refuses_env_before_it_asks() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path();
+        std::fs::write(folder.join(NO_ENV_FILE), b"").unwrap();
+        let with = "mcp add arauto --command /p/c --env A=1 --args mcp";
+        assert_eq!(call(folder, with, "y\ny\n").0, USAGE);
+        assert!(servers(folder).unwrap().is_empty());
+        assert!(!folder.join(INPUT_FILE).exists());
+        assert_eq!(
+            call(folder, "mcp add arauto --command /p/c --args mcp", "y\ny\n").0,
+            DONE
+        );
+        assert!(servers(folder).unwrap().contains_key("arauto"));
+    }
+
+    #[test]
+    fn a_malformed_env_is_a_usage_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path();
+        for bad in [
+            "mcp add arauto --command /p/c --env NOEQUALS --args mcp",
+            "mcp add arauto --command /p/c --env 1A=x --args mcp",
+            "mcp add arauto --command /p/c --env A-B=x --args mcp",
+            "mcp add arauto --command /p/c --env =x --args mcp",
+            "mcp add arauto --command /p/c --env A=x",
+            "mcp add arauto --command /p/c --args mcp --env A=x --args y",
+            "mcp add arauto --command /p/c",
+        ] {
+            let (code, _) = call(folder, bad, "y\ny\n");
+            // Anything after `--args` is an argument, so that one is accepted.
+            if bad.ends_with("--args y") {
+                assert_eq!(code, DONE, "{bad}");
+                let _ = call(folder, "mcp remove arauto", "");
+            } else {
+                assert_eq!(code, USAGE, "{bad}");
+            }
+        }
+        assert!(servers(folder).unwrap().is_empty());
     }
 
     /// F1 to F4 of `referencia/hermes-fatos.md`: it saves only when it reads `y`.

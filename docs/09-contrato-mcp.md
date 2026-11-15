@@ -69,6 +69,7 @@ the engine, and the test checks that it carries no secret:
 | `peers.can_send` | There is a link from this Hermes to another. |
 | `peers.can_receive` | There is a link from another Hermes to this one. |
 | `peers.enabled` | Either of the two. |
+| `local_waking` | Added by the **connector**, not by the hub (proposal, 15/11/2026, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)): `true` when the connector of this Hermes received the key of Hermes's local API. When `false`, nothing wakes this Hermes whatever `can_be_woken` says. It overwrites any value of the hub. The tool description does not change. |
 
 Only the hub's answer is written. Without a channel session (pending request, channel down), the one
 that answers the tool is the connector, and that answer is not written yet.

@@ -1,16 +1,24 @@
 //! `status`: the hub, the version, the situation of the device and whether the Hermes can be
 //! woken (`docs/11-conector.md`, section 1). It reads the files and asks the leader through the
 //! local socket; it never opens a connection to the hub, and shows no secret.
+//!
+//! **The key of the local API of Hermes** is what the leader holds, not what this process has:
+//! the line comes from the answer of the leader and never from the environment of the process
+//! that runs `status`, and it is shown whatever the state of the channel. With no leader
+//! running the line says it is unknown.
 
 use std::fmt::Write as _;
 
+use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::tools::ToolName;
 
 use crate::ask;
+use crate::catalog::Told;
 use crate::home::Home;
 use crate::settings::Settings;
 use crate::status::{ChannelStatus, Status};
 use crate::store::{self, Current, Situation};
+use crate::wake::LastWake;
 
 /// What the files say about one folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +27,16 @@ pub struct FolderReport {
     pub folder: String,
     /// What the connector knows of the device, or `None` when its files are damaged.
     pub situation: Option<Situation>,
+}
+
+/// What `hub.json` says of the entry of the connector in Hermes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntryReport {
+    /// Whether `join` or `register` saved the entry.
+    pub registered: bool,
+    /// Whether it was saved with the reference to the key; `None` when it is not known (an
+    /// older connector saved it).
+    pub key_reference: Option<bool>,
 }
 
 /// What `status` found.
@@ -36,6 +54,8 @@ pub struct Report {
     pub damaged: bool,
     /// The tools of the last session, from the files.
     pub tools: Vec<ToolName>,
+    /// The entry in Hermes, from the record of the device in use, else of the request.
+    pub entry: Option<EntryReport>,
     /// What the leader in execution says, when one answers.
     pub leader: Option<Status>,
 }
@@ -65,6 +85,7 @@ pub async fn report(home: &Home, settings: &Settings) -> Report {
         others: 0,
         damaged: state.is_none() && home.state_file().exists(),
         tools: state.map(|state| state.tools).unwrap_or_default(),
+        entry: None,
         leader,
     };
     if let Some(layout) = layout {
@@ -80,6 +101,13 @@ pub async fn report(home: &Home, settings: &Settings) -> Report {
             .folders
             .len()
             .saturating_sub(usize::from(device.is_some()) + usize::from(request.is_some()));
+        report.entry = device
+            .or(request)
+            .and_then(|folder| folder.record())
+            .map(|record| EntryReport {
+                registered: record.registered,
+                key_reference: record.key_reference,
+            });
         report.device = device.map(folder);
         report.request = request.map(folder);
     }
@@ -104,6 +132,56 @@ fn channel(channel: &ChannelStatus) -> String {
         ChannelStatus::Down(None) => "down, trying again".to_owned(),
         ChannelStatus::Stopped(Some(code)) => format!("not used ({code})"),
         ChannelStatus::Stopped(None) => "not used (files damaged)".to_owned(),
+    }
+}
+
+fn entry_line(entry: &EntryReport) -> &'static str {
+    match (entry.registered, entry.key_reference) {
+        (true, Some(true)) => "saved with a reference to API_SERVER_KEY",
+        (true, Some(false)) => {
+            "saved without a reference to the key (this version of Hermes refused it)"
+        }
+        (true, None) => "saved by an older connector, perhaps without a reference to the key",
+        (false, _) => "not saved by this connector",
+    }
+}
+
+fn key_line(received: Option<bool>) -> &'static str {
+    match received {
+        Some(true) => "received by the running connector",
+        Some(false) => "not received by the running connector (no notice wakes this Hermes)",
+        None => "unknown (the running connector is of an older version)",
+    }
+}
+
+fn last_line(last: Option<LastWake>) -> &'static str {
+    match last {
+        Some(LastWake::Accepted) => "accepted by the local API of Hermes",
+        Some(LastWake::Refused) => "refused by the local API of Hermes",
+        Some(LastWake::NoAnswer) => "the local API of Hermes did not answer",
+        None => "none since the connector started",
+    }
+}
+
+/// What to tell when the running connector did not receive the key, by what the entry holds.
+fn told_when_not_received(entry: Option<EntryReport>) -> Vec<Told> {
+    match entry {
+        Some(EntryReport {
+            registered: true,
+            key_reference: Some(true),
+        }) => vec![Told::KeyNotReceived, Told::KeyAfterRestart],
+        Some(EntryReport {
+            registered: true,
+            key_reference: Some(false),
+        }) => vec![Told::ReferenceRefused],
+        Some(EntryReport {
+            registered: true,
+            key_reference: None,
+        }) => vec![Told::EntryOlder],
+        Some(EntryReport {
+            registered: false, ..
+        })
+        | None => vec![Told::KeyNotReceived],
     }
 }
 
@@ -137,6 +215,9 @@ pub fn render(report: &Report) -> String {
             "A file of the connector is damaged or has an unknown format."
         );
     }
+    if let Some(entry) = &report.entry {
+        let _ = writeln!(text, "Entry in Hermes: {}", entry_line(entry));
+    }
     match &report.leader {
         Some(leader) => {
             let process = leader
@@ -145,26 +226,35 @@ pub fn render(report: &Report) -> String {
             let _ = writeln!(text, "Leader: running{process}");
             if let Some(device) = &leader.device {
                 let _ = writeln!(text, "Channel: {}", channel(&device.channel));
-                // Two different things: what the admin allowed for WhatsApp, and whether this
-                // connector has the means. Without the key, no notice of any kind wakes the
-                // Hermes.
-                let (allowed, means) = match device.channel {
-                    ChannelStatus::Session {
-                        can_be_woken,
-                        can_wake,
-                        ..
-                    } => (
-                        if can_be_woken { "yes" } else { "no" },
-                        if can_wake {
-                            "configured"
+                // What the admin allowed for WhatsApp; whether this connector has the means is
+                // the line below, which does not depend on the channel.
+                let allowed = match device.channel {
+                    ChannelStatus::Session { can_be_woken, .. } => {
+                        if can_be_woken {
+                            "yes"
                         } else {
-                            "not configured (no notice wakes this Hermes)"
-                        },
-                    ),
-                    _ => ("unknown", "unknown"),
+                            "no"
+                        }
+                    }
+                    _ => "unknown",
                 };
                 let _ = writeln!(text, "Waking by WhatsApp allowed by the admin: {allowed}");
-                let _ = writeln!(text, "Key of the local API of Hermes: {means}");
+            }
+            let _ = writeln!(
+                text,
+                "Key of the local API of Hermes: {}",
+                key_line(leader.waking.map(|waking| waking.key_received))
+            );
+            if let Some(waking) = &leader.waking {
+                let _ = writeln!(text, "Last wake: {}", last_line(waking.last));
+                if matches!(waking.last, Some(LastWake::Refused | LastWake::NoAnswer)) {
+                    let _ = writeln!(text, "{}", ErrorCode::Ar602.phrase(None));
+                }
+                if !waking.key_received {
+                    for told in told_when_not_received(report.entry) {
+                        let _ = writeln!(text, "{}", told.phrase());
+                    }
+                }
             }
             if let Some(request) = &leader.request {
                 let _ = writeln!(text, "Request channel: {}", channel(&request.channel));
@@ -174,6 +264,10 @@ pub fn render(report: &Report) -> String {
         }
         None => {
             let _ = writeln!(text, "Leader: not running");
+            let _ = writeln!(
+                text,
+                "Key of the local API of Hermes: unknown (no connector started by Hermes is running)"
+            );
             let tools: Vec<&str> = report.tools.iter().map(ToolName::as_str).collect();
             if !tools.is_empty() {
                 let _ = writeln!(text, "Tools of the last session: {}", tools.join(", "));
@@ -181,4 +275,176 @@ pub fn render(report: &Report) -> String {
         }
     }
     text
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::status::{DeviceStatus, Role};
+    use crate::wake::Waking;
+
+    use super::*;
+
+    fn leader(waking: Option<Waking>, device: Option<ChannelStatus>) -> Status {
+        Status {
+            role: Role::Leader,
+            leader_process: Some(7),
+            version: "0.1.0".to_owned(),
+            device: device.map(|channel| DeviceStatus {
+                folder: crate::store::DeviceId::generate().unwrap().to_string(),
+                channel,
+            }),
+            request: None,
+            tools: Vec::new(),
+            leftovers: 0,
+            waking,
+        }
+    }
+
+    fn report(entry: Option<EntryReport>, leader: Option<Status>) -> Report {
+        Report {
+            hub: Some("http://192.0.2.1:1".to_owned()),
+            device: None,
+            request: None,
+            others: 0,
+            damaged: false,
+            tools: Vec::new(),
+            entry,
+            leader,
+        }
+    }
+
+    fn entry(registered: bool, key_reference: Option<bool>) -> Option<EntryReport> {
+        Some(EntryReport {
+            registered,
+            key_reference,
+        })
+    }
+
+    #[test]
+    fn render_says_what_the_leader_holds() {
+        let received = Waking {
+            key_received: true,
+            last: None,
+        };
+        let missing = Waking {
+            key_received: false,
+            last: None,
+        };
+        // Received: the key line, the last wake, and no sentence about missing keys.
+        let text = render(&report(
+            entry(true, Some(true)),
+            Some(leader(Some(received), None)),
+        ));
+        assert!(text.contains("Entry in Hermes: saved with a reference to API_SERVER_KEY\n"));
+        assert!(
+            text.contains("Key of the local API of Hermes: received by the running connector\n")
+        );
+        assert!(text.contains("Last wake: none since the connector started\n"));
+        for told in Told::ALL {
+            assert!(!text.contains(told.phrase()), "{}", told.phrase());
+        }
+        // Not received: the words depend on what the entry holds.
+        let table: [(Option<EntryReport>, &str, &[Told]); 5] = [
+            (
+                entry(true, Some(true)),
+                "saved with a reference to API_SERVER_KEY",
+                &[Told::KeyNotReceived, Told::KeyAfterRestart],
+            ),
+            (
+                entry(true, Some(false)),
+                "saved without a reference to the key (this version of Hermes refused it)",
+                &[Told::ReferenceRefused],
+            ),
+            (
+                entry(true, None),
+                "saved by an older connector, perhaps without a reference to the key",
+                &[Told::EntryOlder],
+            ),
+            (
+                entry(false, None),
+                "not saved by this connector",
+                &[Told::KeyNotReceived],
+            ),
+            (None, "", &[Told::KeyNotReceived]),
+        ];
+        for (entry, line, told) in table {
+            let text = render(&report(entry, Some(leader(Some(missing), None))));
+            assert!(
+                text.contains(
+                    "Key of the local API of Hermes: not received by the running connector (no notice wakes this Hermes)\n"
+                ),
+                "{text}"
+            );
+            if entry.is_some() {
+                assert!(
+                    text.contains(&format!("Entry in Hermes: {line}\n")),
+                    "{text}"
+                );
+            } else {
+                assert!(!text.contains("Entry in Hermes"));
+            }
+            for phrase in Told::ALL {
+                assert_eq!(
+                    text.contains(phrase.phrase()),
+                    told.contains(phrase),
+                    "{phrase:?} in {text}"
+                );
+            }
+            assert!(!text.contains("not configured"));
+        }
+        // An older leader does not say: unknown, and no claim about the entry.
+        let text = render(&report(entry(true, Some(true)), Some(leader(None, None))));
+        assert!(text.contains(
+            "Key of the local API of Hermes: unknown (the running connector is of an older version)\n"
+        ));
+        assert!(!text.contains("Last wake"));
+        // No leader: unknown, and it says why.
+        let text = render(&report(entry(true, Some(true)), None));
+        assert!(text.contains(
+            "Leader: not running\nKey of the local API of Hermes: unknown (no connector started by Hermes is running)\n"
+        ));
+    }
+
+    #[test]
+    fn the_last_wake_is_shown_with_the_phrase_of_the_code() {
+        for (last, line) in [
+            (LastWake::Accepted, "accepted by the local API of Hermes"),
+            (LastWake::Refused, "refused by the local API of Hermes"),
+            (LastWake::NoAnswer, "the local API of Hermes did not answer"),
+        ] {
+            let waking = Waking {
+                key_received: true,
+                last: Some(last),
+            };
+            let text = render(&report(None, Some(leader(Some(waking), None))));
+            assert!(text.contains(&format!("Last wake: {line}\n")), "{text}");
+            assert_eq!(
+                text.contains(&*ErrorCode::Ar602.phrase(None)),
+                last != LastWake::Accepted
+            );
+        }
+    }
+
+    /// The key line does not wait for a session: it is the same while the channel waits.
+    #[test]
+    fn the_key_line_does_not_depend_on_the_channel() {
+        let waking = Waking {
+            key_received: true,
+            last: None,
+        };
+        for channel in [
+            None,
+            Some(ChannelStatus::Waiting),
+            Some(ChannelStatus::Connecting),
+            Some(ChannelStatus::Down(None)),
+        ] {
+            let text = render(&report(None, Some(leader(Some(waking), channel))));
+            assert!(
+                text.contains(
+                    "Key of the local API of Hermes: received by the running connector\n"
+                ),
+                "{text}"
+            );
+        }
+    }
 }

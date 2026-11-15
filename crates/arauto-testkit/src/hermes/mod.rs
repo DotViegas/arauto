@@ -15,7 +15,19 @@
 //! input.log        what `mcp add` read on its input
 //! refuse           while it exists, every call is refused
 //! user/            the folder of the user of this Hermes: HOME, or USERPROFILE on Windows
+//! environment.jsonl the sorted names of the environment of each call (never a value)
+//! secrets.json     the secret scope of this Hermes: what `${NAME}` in an entry resolves from
+//! injected.json    what the "secret source" of Hermes adds to every server it starts (R6)
+//! no-env           while it exists, `mcp add` does not know `--env`
+//! terminal-env.json extra variables of the terminal of the operator
 //! ```
+//!
+//! **The environment of a copy** is what Hermes v0.22.5 was observed to give
+//! (`referencia/hermes-fatos.md`): the filtered base, the variables injected by the secret
+//! source, and the `env` of the entry, where a value that is exactly `${NAME}` or `${env:NAME}`
+//! is resolved from the secrets and a reference to a variable that is unset or empty leaves the
+//! variable out. The entry is read when the copy starts: a copy already running keeps what it
+//! was started with, as a running gateway of Hermes does.
 // Test support: a failure here is the failure of the test that called it, with the reason.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -27,11 +39,14 @@ use std::process::{ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
+
+/// The extra variables of the terminal of this Hermes.
+const TERMINAL_FILE: &str = "terminal-env.json";
 
 /// How long a request waits for its answer by default.
 pub const PATIENCE: Duration = Duration::from_secs(30);
@@ -93,6 +108,8 @@ pub struct Registered {
     pub command: PathBuf,
     /// Its arguments.
     pub args: Vec<String>,
+    /// Its `env`, as it was given: references are not resolved.
+    pub env: std::collections::BTreeMap<String, String>,
 }
 
 /// A fake Hermes: its folder, with the registry program and its records.
@@ -162,7 +179,69 @@ impl FakeHermes {
                 .iter()
                 .map(|arg| arg.as_str().unwrap().to_owned())
                 .collect(),
+            env: entry
+                .get("env")
+                .and_then(Value::as_object)
+                .map(|env| {
+                    env.iter()
+                        .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_owned()))
+                        .collect()
+                })
+                .unwrap_or_default(),
         })
+    }
+
+    /// Puts `name` in the secret scope of this Hermes, the one `${NAME}` resolves from.
+    pub fn set_secret(&self, name: &str, value: &str) {
+        self.set_in(registry::SECRETS_FILE, name, value);
+    }
+
+    /// Puts `name` in the environment of every command run through [`FakeHermes::terminal`], as
+    /// a variable the operator has in the terminal.
+    pub fn set_terminal_env(&self, name: &str, value: &str) {
+        self.set_in(TERMINAL_FILE, name, value);
+    }
+
+    /// Makes the secret source of this Hermes add `name` to every server it starts (R6).
+    pub fn inject(&self, name: &str, value: &str) {
+        self.set_in(registry::INJECTED_FILE, name, value);
+    }
+
+    /// While `on`, `mcp add` does not know the option `--env`, as an older Hermes.
+    pub fn without_env_option(&self, on: bool) {
+        let path = self.folder().join(registry::NO_ENV_FILE);
+        if on {
+            std::fs::write(path, b"").unwrap();
+        } else {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    /// The sorted names of the environment each call of the command had, one list per call.
+    #[must_use]
+    pub fn command_environments(&self) -> Vec<Vec<String>> {
+        std::fs::read_to_string(self.folder().join(registry::ENVIRONMENT_FILE))
+            .unwrap_or_default()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    fn read_map(&self, file: &str) -> Map<String, Value> {
+        match std::fs::read(self.folder().join(file)) {
+            Ok(bytes) => serde_json::from_slice(&bytes).unwrap(),
+            Err(_) => Map::new(),
+        }
+    }
+
+    fn set_in(&self, file: &str, name: &str, value: &str) {
+        let mut map = self.read_map(file);
+        map.insert(name.to_owned(), Value::from(value));
+        std::fs::write(
+            self.folder().join(file),
+            serde_json::to_vec(&Value::Object(map)).unwrap(),
+        )
+        .unwrap();
     }
 
     /// Makes every call of the command refused, or accepted again.
@@ -185,7 +264,41 @@ impl FakeHermes {
         for name in USER_FOLDER_VARIABLES {
             environment.push((OsString::from(name), self.user_folder().into_os_string()));
         }
+        // What the secret source of Hermes adds to every server (R6).
+        for (name, value) in self.read_map(registry::INJECTED_FILE) {
+            environment.push((
+                OsString::from(name),
+                OsString::from(value.as_str().unwrap()),
+            ));
+        }
         environment
+    }
+
+    /// The `env` of the entry `registered`, resolved as Hermes v0.22.5 does (R3): a value that
+    /// is exactly `${NAME}` or `${env:NAME}` comes from the secrets, and a reference to a
+    /// variable that is unset or empty is left out; any other value passes as it is.
+    fn entry_environment(&self, registered: &Registered) -> Vec<(OsString, OsString)> {
+        let secrets = self.read_map(registry::SECRETS_FILE);
+        let mut resolved = Vec::new();
+        for (key, value) in &registered.env {
+            let reference = value
+                .strip_prefix("${")
+                .and_then(|rest| rest.strip_suffix('}'))
+                .map(|name| name.strip_prefix("env:").unwrap_or(name));
+            match reference {
+                Some(name) => {
+                    if let Some(secret) = secrets
+                        .get(name)
+                        .and_then(Value::as_str)
+                        .filter(|secret| !secret.is_empty())
+                    {
+                        resolved.push((OsString::from(key), OsString::from(secret)));
+                    }
+                }
+                None => resolved.push((OsString::from(key), OsString::from(value))),
+            }
+        }
+        resolved
     }
 
     /// A command the operator runs in the terminal of this Hermes: the folder of the user is
@@ -195,6 +308,10 @@ impl FakeHermes {
         let mut command = Command::new(program);
         for name in USER_FOLDER_VARIABLES {
             command.env(name, self.user_folder());
+        }
+        // What the operator or the agent has in the environment of the terminal besides that.
+        for (name, value) in self.read_map(TERMINAL_FILE) {
+            command.env(name, value.as_str().unwrap());
         }
         command
             .env("ARAUTO_HERMES_BIN", self.program())
@@ -213,7 +330,14 @@ impl FakeHermes {
             .registered(name)
             .unwrap_or_else(|| panic!("no server {name} is registered"));
         let args: Vec<OsString> = registered.args.iter().map(OsString::from).collect();
-        self.start_command(&registered.command, &args)
+        let mut command = Command::new(&registered.command);
+        command
+            .args(&args)
+            .env_clear()
+            .envs(self.environment())
+            .envs(self.entry_environment(&registered))
+            .current_dir(self.user_folder());
+        McpCopy::spawn(command)
     }
 
     /// Starts `program` with `args` as a server of tools of this Hermes.

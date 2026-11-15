@@ -4,7 +4,7 @@
 //! | Piece | What it holds |
 //! |---|---|
 //! | [`Connector`] | The connector of a process, leader of its folder or a copy that forwards to the leader: calls, tools, status. |
-//! | [`join()`], [`leave()`], [`report()`] | The commands `join`, `leave` and `status`, as functions. |
+//! | [`join()`], [`register()`], [`leave()`], [`report()`] | The commands `join`, `register`, `leave` and `status`, as functions. |
 //! | [`cli`] | The command line, its fixed texts and its exit codes; `mcp` serves MCP over stdio, in the versions of [`PROTOCOL_VERSIONS`]. |
 //! | [`catalog`] | What the connector says: the codes of the catalog and the local problems. |
 //! | [`Home`], [`HubAddress`], [`Hermes`], [`Settings`] | The folder, the address of the hub, the command of Hermes, the waits. |
@@ -33,6 +33,7 @@ mod leave;
 mod link;
 mod local;
 mod mcp;
+mod register;
 mod relay;
 mod report;
 mod rpc;
@@ -48,12 +49,13 @@ pub mod wake;
 mod writes;
 
 pub use address::{AddressError, CHANNEL_PATH, HubAddress};
-pub use hermes::{DEFAULT_PROGRAM, Hermes, SERVER_NAME};
+pub use hermes::{DEFAULT_PROGRAM, HERMES_KEY_VARIABLE, Hermes, Registration, SERVER_NAME};
 pub use home::{Home, HomeError, PROGRAM_NAME};
-pub use join::{JoinArgs, Joined, join};
+pub use join::{Entry, JoinArgs, Joined, join};
 pub use leave::{Left, leave};
 pub use mcp::{PROTOCOL_VERSIONS, SERVER_INFO_NAME};
-pub use report::{FolderReport, Report, render, report};
+pub use register::register;
+pub use report::{EntryReport, FolderReport, Report, render, report};
 pub use runtime::{Connector, StartError};
 pub use settings::Settings;
 pub use status::{ChannelStatus, DeviceStatus, Role, Status};
