@@ -18,6 +18,9 @@ changing anything; **[to check]** an assumption with no test yet.
 | Making another domain primary moves the Open button to it. "Make primary" asks for a confirmation first. | [observed] 14/11/2026: the star of the panel's domain was pressed, confirmed, and the Open link followed it |
 | A new Compose service gets a domain created by Easypanel itself, on port 80, and that domain is already the primary one. | [observed] 14/11/2026, on a service created from zero |
 | Destroying a Compose service on its screen does not remove its volumes: they stay on the server until they are removed by hand. | [observed] 14/11/2026: the two volumes were still listed after the Destroy |
+| A Compose service created again with the same name, in the same project, takes the volumes of the destroyed one back (their names are `<project>_<service>_<volume>`). | [observed] 14/11/2026: after a Destroy the two volumes of the hub were still there under those names, and had to be removed with `docker volume rm` for the new service to start empty |
+| A domain whose destination protocol is set to HTTPS, in front of a service that speaks plain HTTP, answers "Internal Server Error" while the service is healthy. With the destination protocol HTTP (and the public side still HTTPS) it works. | [observed] 14/11/2026, on both domains of the hub |
+| The recipe of [`deploy/easypanel/`](../deploy/easypanel/README.md) was followed from start to end by a person, on a server cleaned first: service, build, first access, passkey, two Hermes connected. | [observed] 14/11/2026, one run |
 | A Deploy of a version with a new migration leaves the hub restarting until `arauto-hub migrate --i-have-a-backup` is run with the new image; run from the folder of the Compose file with `docker compose run --rm --no-deps hub migrate --i-have-a-backup`, it applied the migration and the hub came up by itself. | [observed] 14/11/2026, over SSH |
 
 ## Logs

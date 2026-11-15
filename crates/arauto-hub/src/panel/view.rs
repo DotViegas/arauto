@@ -27,9 +27,9 @@ pub enum Over {
     },
 }
 
-/// The head of a page. Only a page with a guide loads the script of the panel, and it loads
-/// it by its address: no page carries a script of its own.
-fn head(html: &mut Html, over: Over) {
+/// The head of a page. Only a page with a guide, a passkey or live lists loads the script of
+/// the panel, and it loads it by its address: no page carries a script of its own.
+fn head(html: &mut Html, over: Over, live: bool) {
     let lang = html.lang();
     html.raw("<!doctype html><html lang=\"")
         .raw(lang.tag())
@@ -44,7 +44,7 @@ fn head(html: &mut Html, over: Over) {
             .number(usize::try_from(seconds).unwrap_or(usize::MAX))
             .raw("\">");
     }
-    if over != Over::Nothing {
+    if over != Over::Nothing || live {
         html.raw("<script src=\"/assets/panel.js\"></script>");
     }
     html.raw("</head><body>");
@@ -400,6 +400,7 @@ pub fn sign_in(lang: Lang, first_access_pending: bool, refusal: Option<Said>) ->
         } else {
             Over::Passkey
         },
+        false,
     );
     html.raw("<main class=\"entry\">").raw(LOGO);
     if first_access_pending {
@@ -485,7 +486,7 @@ pub fn sign_in(lang: Lang, first_access_pending: bool, refusal: Option<Said>) ->
 #[must_use]
 pub fn first_access(lang: Lang, origin: &str, refusal: Option<Said>) -> String {
     let mut html = Html::new(lang);
-    head(&mut html, Over::Passkey);
+    head(&mut html, Over::Passkey, false);
     html.raw("<main class=\"entry\">").raw(LOGO);
     stepper(&mut html, 1);
     html.raw("<h1>")
@@ -522,7 +523,7 @@ pub fn first_access(lang: Lang, origin: &str, refusal: Option<Said>) -> String {
 }
 
 fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
-    head(html, over);
+    head(html, over, true);
     html.raw(if over == Over::Nothing {
         "<div class=\"page\"><header class=\"top\">"
     } else {
@@ -533,6 +534,9 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
     .t(k("Sign out"))
     .raw("</button></form></div></header>");
     let alerts = frame.restored.is_some() || !frame.notices.is_empty() || frame.unknown_devices > 0;
+    // The wrapper is there with no alert too: the script swaps its content, so a new alert can
+    // appear and an old one can leave.
+    html.raw("<div id=\"live-alerts\" data-live>");
     if alerts {
         html.raw("<ul class=\"alerts\" aria-label=\"")
             .t(k("Alerts"))
@@ -579,6 +583,7 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
         }
         html.raw("</ul>");
     }
+    html.raw("</div>");
     html.raw("<nav class=\"tabs\" aria-label=\"")
         .t(k("Panel"))
         .raw("\">");
@@ -600,7 +605,7 @@ fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
         };
         html.raw("</a>");
     }
-    html.raw("</nav><main>");
+    html.raw("</nav><main id=\"live-main\" data-live>");
 }
 
 /// Ends the page, up to where a window over it would go.
@@ -932,6 +937,8 @@ mod tests {
 
     /// What a page may contain besides what the program wrote: nothing that opens markup.
     fn clean(page: &str) {
+        // The one script of the panel, loaded by its address, may be there; nothing else.
+        let page = &page.replace("<script src=\"/assets/panel.js\"></script>", "");
         assert!(!page.contains("<script"), "{page}");
         assert!(!page.contains("<img"), "{page}");
         // The quotes of the value did not close an attribute nor an element.
@@ -1017,6 +1024,38 @@ mod tests {
     }
 
     #[test]
+    fn only_the_tab_pages_have_live_regions() {
+        let empty = Frame::default();
+        let alerting = hostile_frame();
+        let live_main = "<main id=\"live-main\" data-live>";
+        let live_alerts = "<div id=\"live-alerts\" data-live>";
+        for frame in [&empty, &alerting] {
+            for page in [
+                hermes(frame, &HermesPage::default()),
+                numbers(frame, &NumbersPage::default()),
+                accesses(frame, &AccessPage::default()),
+            ] {
+                assert_eq!(page.matches(live_main).count(), 1, "{page}");
+                assert_eq!(page.matches(live_alerts).count(), 1, "{page}");
+                // Present with no alert too, and wrapping the strip when there is one.
+                let strip = page.find("<ul class=\"alerts\"").is_some();
+                assert_eq!(strip, frame.notices.len() + frame.unknown_devices > 0);
+                assert!(
+                    page.find(live_alerts).unwrap() < page.find("<nav class=\"tabs\"").unwrap()
+                );
+            }
+        }
+        for page in [
+            sign_in(Lang::En, true, None),
+            sign_in(Lang::En, false, None),
+            first_access(Lang::En, "https://panel.example.com", None),
+        ] {
+            assert!(!page.contains("data-live"), "{page}");
+            assert!(!page.contains("live-main") && !page.contains("live-alerts"));
+        }
+    }
+
+    #[test]
     fn the_pages_say_when_there_is_nothing_and_carry_no_script_of_their_own() {
         let empty = Frame::default();
         for page in [
@@ -1037,11 +1076,12 @@ mod tests {
         ] {
             // Only a page that asks the browser for a passkey loads the script, and it is
             // the file of the panel: no page carries a script written inside it.
-            let asks_passkey = page.contains("data-passkey=");
+            // The tab pages load it too, for the lists that refresh by themselves.
+            let asks_passkey = page.contains("data-passkey=") || page.contains("id=\"live-main\"");
             assert_eq!(
                 page.matches("<script").count(),
                 usize::from(asks_passkey),
-                "a page without a guide or a passkey loads no script"
+                "a page without a guide, a passkey or live lists loads no script"
             );
             assert_eq!(
                 page.contains("<script src=\"/assets/panel.js\"></script>"),

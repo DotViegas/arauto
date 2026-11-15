@@ -18,9 +18,10 @@
 </p>
 
 <p align="center">
-  <b>Donne à chaque agent Hermes un accès contrôlé à des numéros WhatsApp<br>
-  et permet à un Hermes d'envoyer un message à un autre.</b><br>
-  Un seul endroit pour connecter les agents, appairer les numéros et dire qui accède à quoi.
+  <b>Plusieurs agents Hermes qui travaillent comme une seule équipe,<br>
+  chacun n'atteignant que ce qui lui revient.</b><br>
+  Un hub pour connecter les agents, dire qui peut parler à qui<br>
+  et donner à chacun son accès aux numéros WhatsApp.
 </p>
 
 <p align="center">
@@ -52,6 +53,42 @@ lien avec les auteurs de Hermes Agent ni avec WhatsApp.
 
 Les documents liés depuis cette page sont rédigés en anglais.
 
+## Pourquoi Arauto
+
+Un agent unique pour toute une entreprise sait tout, et peut finir par dire n'importe quoi à
+n'importe qui. Demander à un modèle de langage de garder un secret est un risque : tôt ou tard,
+il porte le contexte d'une équipe dans la réponse à une autre.
+
+Arauto part de l'autre bout : **ce qu'un agent ne peut pas atteindre, il ne peut pas le divulguer.**
+
+- **Un Hermes par équipe, chacun avec son propre accès.** L'agent qui s'occupe de la facturation
+  ne détient pas ce que détient l'agent qui répond aux contacts. Chacun est configuré pour son
+  propre travail.
+- **Ils se parlent, là où vous l'avez permis.** Un Hermes envoie un message à un autre par le hub,
+  uniquement par un lien que vous avez créé et uniquement dans le sens que vous avez indiqué. Celui
+  qui le reçoit juge de ce qu'il faut faire, et ne partage que ce qui est nécessaire.
+- **Un canal, des droits différents.** Un Hermes répond sur un numéro WhatsApp ; un autre se
+  contente de lire les mêmes conversations, pour les auditer, et ne peut pas répondre.
+- **Les personnes restent là où cela compte.** Le but est une entreprise dont le travail numérique
+  est fait par des agents, avec des règles claires et une personne qui décide de ce qui est critique.
+
+WhatsApp est le premier canal, pas le but. Le but, ce sont des agents qui travaillent ensemble sans
+qu'aucun d'eux ne détienne tout.
+
+### Où va le projet
+
+Pas encore construit, et pas encore conçu dans le détail. Ce qui existe aujourd'hui se trouve dans
+[le premier MVP](../15-mvp.md).
+
+- **Une place pour chaque Hermes dans l'entreprise.** Une demande venue d'en bas est jugée par celui
+  qui est au-dessus, pour le risque et pour l'autorisation ; une instruction venue d'en haut est
+  reconnue comme telle. Aujourd'hui, un message n'a aucune autorité : c'est une information.
+- **Des demandes avec réponse,** et une personne qui approuve en cours de route quand l'agent ne peut pas
+  décider seul.
+- **Un travail transmis par un seul canal.** Celui qui dirige parle à un Hermes, et celui-ci transmet
+  le travail aux autres.
+- **Davantage de canaux** à côté de WhatsApp.
+
 ## En un écran
 
 <p align="center">
@@ -61,7 +98,9 @@ Les documents liés depuis cette page sont rédigés en anglais.
   </picture>
 </p>
 
-- **Connecter, c'est copier et envoyer.** (Pas encore essayé sur un vrai Hermes ; un bloc de commande reste en solution de repli.) Une invitation à usage unique, valable 15 minutes.
+- **Connecter, c'est copier et envoyer.** Un court message à l'agent, et un code de vérification en
+  retour. Une invitation à usage unique, valable 15 minutes. (Essayé sur deux vrais Hermes le
+  14/11/2026, l'un sous Linux et l'autre sous Windows ; un bloc de commande reste en solution de repli.)
 - **Aucun secret durable ne passe par le chat.** Les identifiants sont créés par les deux machines
   et changent à chaque connexion.
 - **Les conversations sont archivées dans votre hub.** Hermes les consulte quand on le lui
@@ -102,6 +141,7 @@ sont une affaire entre vous et son auteur. Vérifiez avant d'installer.
 
 | Pour savoir | Lisez |
 |---|---|
+| Comment l'installer | [deploy/](../../deploy/README.md) |
 | Ce que c'est et ce que ce n'est pas | [docs/01-visao.md](../01-visao.md) |
 | Le parcours de l'utilisateur | [docs/02-como-funciona.md](../02-como-funciona.md) |
 | Les pièces et les frontières | [docs/03-arquitetura.md](../03-arquitetura.md) |

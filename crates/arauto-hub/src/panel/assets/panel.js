@@ -1,8 +1,10 @@
 // The script of the panel of the Arauto hub. It only helps the screen: every step of a guide
-// is a page of the hub and works without it. It never writes markup, never reads a cookie and
+// is a page of the hub and works without it. It writes markup only when it swaps a live region for
+// the same region of the same page asked again (see the end of this comment), never reads a cookie and
 // never talks to anything but the clipboard of whoever clicks and, for a passkey, the panel
 // itself and the browser. It has no sentence of its own: what it says comes from the page, in
-// the language of the page.
+// the language of the page. On the pages of the lists it also asks the same page again every few
+// seconds and swaps the content of the regions marked `data-live`: no permanent connection.
 (function () {
   'use strict';
   var root = document.documentElement;
@@ -126,6 +128,63 @@
   ready(function () {
     Array.prototype.forEach.call(document.querySelectorAll('form[data-passkey]'), passkey);
   });
+
+  // The lists refresh by themselves: every REFRESH_EVERY_MS the page is asked again, and what is
+  // inside the regions marked `data-live` is swapped, so a Hermes that connects shows without
+  // F5. The hub does not count this request as use of the panel session (the header below), so
+  // a tab nobody touches still ends at the idle time. Nothing in the regions is enhanced by
+  // this script: there is nothing to bind again after a swap.
+  var REFRESH_EVERY_MS = 5000;
+
+  function liveLists() {
+    if (!window.fetch || !window.DOMParser) return;
+    if (!document.querySelector('[data-live]') || document.querySelector('.modal')) return;
+    var asking = false;
+    var ended = false;
+
+    function swap(text) {
+      var next = new DOMParser().parseFromString(text, 'text/html');
+      if (next.querySelector('.modal') || !next.querySelector('[data-live]')) return;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-live]'), function (region) {
+        var fresh = region.id ? next.getElementById(region.id) : null;
+        if (!fresh || fresh.innerHTML === region.innerHTML) return;
+        // Do not pull a control from under the keyboard.
+        var focused = document.activeElement;
+        if (focused && focused !== document.body && region.contains(focused)) return;
+        region.innerHTML = fresh.innerHTML;
+      });
+    }
+
+    function ask() {
+      if (ended || asking || document.hidden) return;
+      asking = true;
+      fetch(location.pathname + location.search, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        redirect: 'manual',
+        headers: { 'X-Arauto-Refresh': '1' }
+      })
+        .then(function (answer) {
+          if (answer.type === 'opaqueredirect') {
+            // The panel session ended: show the entry page, not a stale list.
+            ended = true;
+            location.reload();
+            return null;
+          }
+          return answer.status === 200 ? answer.text() : null;
+        })
+        .then(function (text) { if (text !== null && !ended) swap(text); })
+        .catch(function () { /* the hub may be restarting: try again at the next tick */ })
+        .then(function () { asking = false; });
+    }
+
+    setInterval(ask, REFRESH_EVERY_MS);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) ask();
+    });
+  }
+
+  ready(liveLists);
 
   ready(function () {
     var guide = document.getElementById('guide');

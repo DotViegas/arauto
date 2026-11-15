@@ -18,9 +18,10 @@
 </p>
 
 <p align="center">
-  <b>Da a cada agente Hermes acceso controlado a números de WhatsApp<br>
-  y permite que un Hermes le envíe un mensaje a otro.</b><br>
-  Un solo lugar para conectar agentes, vincular números y decir quién accede a qué.
+  <b>Muchos agentes Hermes trabajando como un equipo,<br>
+  cada uno llegando solo a lo que le corresponde.</b><br>
+  Un hub para conectar agentes, decir quién puede hablar con quién<br>
+  y dar a cada uno su acceso a números de WhatsApp.
 </p>
 
 <p align="center">
@@ -52,6 +53,41 @@ vínculo con los autores de Hermes Agent ni con WhatsApp.
 
 Los documentos enlazados desde esta página están escritos en inglés.
 
+## Por qué Arauto
+
+Un solo agente para toda la empresa lo sabe todo, y puede terminar diciendo cualquier cosa a
+cualquiera. Pedirle a un modelo de lenguaje que guarde un secreto es un riesgo: tarde o temprano
+lleva el contexto de un equipo a la respuesta de otro.
+
+Arauto parte del otro extremo: **lo que un agente no alcanza, no lo puede filtrar.**
+
+- **Un Hermes por equipo, cada uno con su propio acceso.** El agente que se ocupa de la facturación
+  no tiene lo que tiene el agente que atiende a los contactos. Cada uno está configurado para su
+  propio trabajo.
+- **Se comunican entre sí, donde tú lo permitiste.** Un Hermes envía un mensaje a otro por el hub,
+  solo por un vínculo que tú creaste y solo en la dirección que marcaste. El que lo recibe decide
+  qué hacer y comparte únicamente lo necesario.
+- **Un canal, derechos distintos.** Un Hermes responde en un número de WhatsApp; otro solo lee las
+  mismas conversaciones, para auditarlas, y no puede responder.
+- **Las personas se quedan donde importa.** El objetivo es una empresa cuyo trabajo digital lo hacen
+  agentes, con pautas claras y una persona que decide qué es crítico.
+
+WhatsApp es el primer canal, no el centro. El centro son agentes que trabajan juntos sin que ninguno
+guarde todo.
+
+### Hacia dónde va
+
+Todavía no está construido ni diseñado en detalle. Lo que existe hoy está en
+[el primer MVP](../15-mvp.md).
+
+- **Un lugar para cada Hermes en la empresa.** Un pedido que viene de abajo lo juzga el de arriba,
+  por el riesgo y por la autorización; una instrucción que viene de arriba se reconoce como tal.
+  Hoy un mensaje no lleva autoridad: es información.
+- **Pedidos con respuesta,** y una persona que aprueba en medio cuando el agente no puede decidir solo.
+- **Trabajo pasado por un solo canal.** Quien dirige habla con un Hermes, y ese reparte el trabajo a
+  los demás.
+- **Más canales** además de WhatsApp.
+
 ## En una pantalla
 
 <p align="center">
@@ -61,7 +97,9 @@ Los documentos enlazados desde esta página están escritos en inglés.
   </picture>
 </p>
 
-- **Conectar es copiar y enviar.** (Aún no probado en un Hermes real; un bloque de comando queda como alternativa.) Una invitación de un solo uso, válida durante 15 minutos.
+- **Conectar es copiar y enviar.** Un mensaje corto al agente, y un código de verificación de vuelta.
+  Una invitación de un solo uso, válida durante 15 minutos. (Probado en dos Hermes reales el
+  14/11/2026, uno en Linux y otro en Windows; un bloque de comando queda como alternativa.)
 - **Ningún secreto duradero pasa por el chat.** Las credenciales las crean las dos máquinas y
   cambian en cada conexión.
 - **Las conversaciones quedan archivadas en tu hub.** Hermes las consulta cuando se lo piden; no
@@ -102,6 +140,7 @@ entre tú y su autor. Revísalos antes de instalar.
 
 | Para saber | Lee |
 |---|---|
+| Cómo instalarlo | [deploy/](../../deploy/README.md) |
 | Qué es y qué no es | [docs/01-visao.md](../01-visao.md) |
 | El camino de quien lo usa | [docs/02-como-funciona.md](../02-como-funciona.md) |
 | Las piezas y las fronteras | [docs/03-arquitetura.md](../03-arquitetura.md) |

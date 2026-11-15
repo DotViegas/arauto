@@ -18,9 +18,10 @@
 </p>
 
 <p align="center">
-  <b>Gibt jedem Hermes-Agenten kontrollierten Zugriff auf WhatsApp-Nummern<br>
-  und lässt einen Hermes einem anderen eine Nachricht schicken.</b><br>
-  Ein einziger Ort, um Agenten zu verbinden, Nummern zu koppeln und festzulegen, wer worauf zugreift.
+  <b>Viele Hermes-Agenten, die als ein Team arbeiten,<br>
+  jeder mit dem Zugriff, der ihm zusteht.</b><br>
+  Ein Hub, um Agenten zu verbinden und festzulegen, wer mit wem sprechen darf<br>
+  und jedem seinen Zugang zu WhatsApp-Nummern zu geben.
 </p>
 
 <p align="center">
@@ -52,6 +53,42 @@ keiner Verbindung zu den Autoren von Hermes Agent oder zu WhatsApp.
 
 Die von dieser Seite aus verlinkten Dokumente sind auf Englisch verfasst.
 
+## Warum Arauto
+
+Ein einzelner Agent für ein ganzes Unternehmen weiß alles und kann am Ende jedem alles sagen. Einem
+Sprachmodell ein Geheimnis bewahren zu lassen, ist ein Risiko: Früher oder später trägt es den
+Kontext des einen Teams in die Antwort für ein anderes.
+
+Arauto geht vom anderen Ende aus: **Was ein Agent nicht erreicht, kann er nicht preisgeben.**
+
+- **Ein Hermes pro Team, jeder mit eigenem Zugriff.** Der Agent, der die Abrechnung betreut, hat
+  nicht, was der Agent hat, der den Kontakten antwortet. Jeder ist für seine Aufgabe eingerichtet.
+- **Sie sprechen miteinander, wo du es erlaubt hast.** Ein Hermes schickt über den Hub eine
+  Nachricht an einen anderen, nur über eine Verknüpfung, die du angelegt hast, und nur in der
+  Richtung, die du festgelegt hast. Der Empfänger entscheidet, was zu tun ist, und teilt nur, was
+  nötig ist.
+- **Ein Kanal, unterschiedliche Rechte.** Ein Hermes antwortet auf einer WhatsApp-Nummer; ein
+  anderer liest nur dieselben Unterhaltungen, zur Prüfung, und kann nicht antworten.
+- **Menschen bleiben dort, wo es wichtig ist.** Ziel ist ein Unternehmen, dessen digitale Arbeit von
+  Agenten erledigt wird, mit klaren Richtlinien und einer Person, die entscheidet, was kritisch ist.
+
+WhatsApp ist der erste Kanal, nicht der Kern. Der Kern sind Agenten, die zusammenarbeiten, ohne dass
+einer von ihnen alles in der Hand hat.
+
+### Wohin es geht
+
+Noch nicht gebaut und noch nicht im Detail entworfen. Was es heute gibt, steht im
+[ersten MVP](../15-mvp.md).
+
+- **Ein Platz für jeden Hermes im Unternehmen.** Eine Anfrage von unten wird vom Hermes darüber beurteilt,
+  nach Risiko und nach Berechtigung; eine Anweisung von oben wird als solche erkannt. Heute trägt eine
+  Nachricht keine Befugnis: Sie ist eine Information.
+- **Anfragen mit Antwort,** und eine Person, die dazwischen freigibt, wenn der Agent nicht allein
+  entscheiden darf.
+- **Arbeit über einen einzigen Kanal weitergeben.** Wer führt, spricht mit einem Hermes, und der gibt
+  die Arbeit an die anderen weiter.
+- **Weitere Kanäle** neben WhatsApp.
+
 ## Auf einen Blick
 
 <p align="center">
@@ -61,8 +98,10 @@ Die von dieser Seite aus verlinkten Dokumente sind auf Englisch verfasst.
   </picture>
 </p>
 
-- **Verbinden heißt kopieren und senden.** (Noch nicht an einem echten Hermes erprobt; ein Befehlsblock bleibt als Ausweichweg.) Eine Einladung zur einmaligen Verwendung, 15 Minuten
-  gültig.
+- **Verbinden heißt kopieren und senden.** Eine kurze Nachricht an den Agenten, und ein Prüfcode
+  kommt zurück. Eine Einladung zur einmaligen Verwendung, 15 Minuten gültig. (Auf zwei echten Hermes
+  am 14/11/2026 erprobt, einem unter Linux und einem unter Windows; ein Befehlsblock bleibt als
+  Ausweichweg.)
 - **Kein dauerhaftes Geheimnis läuft über den Chat.** Die Zugangsdaten werden von den beiden
   Maschinen erzeugt und wechseln bei jeder Verbindung.
 - **Die Unterhaltungen werden in deinem Hub archiviert.** Hermes schlägt nach, wenn er gefragt
@@ -103,6 +142,7 @@ Engine sind Sache zwischen dir und ihrem Autor. Prüfe das vor der Installation.
 
 | Um zu erfahren | Lies |
 |---|---|
+| Wie man es installiert | [deploy/](../../deploy/README.md) |
 | Was es ist und was nicht | [docs/01-visao.md](../01-visao.md) |
 | Den Weg der Nutzer | [docs/02-como-funciona.md](../02-como-funciona.md) |
 | Die Teile und die Grenzen | [docs/03-arquitetura.md](../03-arquitetura.md) |

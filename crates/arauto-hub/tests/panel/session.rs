@@ -361,3 +361,81 @@ async fn the_looks_at_entry_codes_have_a_ceiling_and_the_ceiling_spends_no_code(
         "the code was not spent"
     );
 }
+
+/// A GET of a page the way the script asks it again to refresh the lists.
+async fn refresh(browser: &Browser, path: &str, cookie: Option<&str>) -> http::Response {
+    let mut headers = vec![("Host", PANEL_HOST), ("X-Arauto-Refresh", "1")];
+    if let Some(cookie) = cookie {
+        headers.push(("Cookie", cookie));
+    }
+    http::get(browser.panel, path, &headers, PATIENCE)
+        .await
+        .unwrap()
+}
+
+/// The refresh of the lists is authorized like any request but is not a use of the session: an
+/// open tab nobody touches still ends at the idle time.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_refresh_does_not_keep_an_idle_session_alive() {
+    let clock = Arc::new(ManualClock::new(1_800_000_000_000));
+    let fixture = Fixture::with_clock(fixture::settings(), clock.clone()).await;
+    let browser = Browser::of(&fixture);
+
+    // With the refresh only: just before the idle time it still answers the list, but it did
+    // not extend the session, so a normal request after the idle time counted from the last
+    // normal use is refused.
+    let cookie = browser.signed_in(&fixture).await;
+    for _ in 0..3 {
+        clock.advance(SESSION_IDLE_MS / 4);
+        let answer = refresh(&browser, "/", Some(&cookie)).await;
+        assert_eq!(answer.status, 200);
+        assert!(answer.text().contains("id=\"live-main\""));
+    }
+    clock.advance(SESSION_IDLE_MS - 3 * (SESSION_IDLE_MS / 4));
+    let answer = browser.get("/", Some(&cookie)).await;
+    assert_eq!(
+        answer.status, 303,
+        "the refreshes did not extend the session"
+    );
+    assert_eq!(answer.header("location"), Some("/sign-in"));
+    // It does not come back, by either way.
+    assert_eq!(refresh(&browser, "/", Some(&cookie)).await.status, 303);
+    assert_eq!(browser.get("/", Some(&cookie)).await.status, 303);
+
+    // The refresh itself after the idle time is refused, with the same redirect.
+    let cookie = browser.signed_in(&fixture).await;
+    clock.advance(SESSION_IDLE_MS);
+    let answer = refresh(&browser, "/", Some(&cookie)).await;
+    assert_eq!(answer.status, 303);
+    assert_eq!(answer.header("location"), Some("/sign-in"));
+
+    // The control: normal requests just before the idle time keep it signed in.
+    let cookie = browser.signed_in(&fixture).await;
+    for _ in 0..3 {
+        clock.advance(SESSION_IDLE_MS - 1);
+        assert_eq!(browser.get("/", Some(&cookie)).await.status, 200);
+    }
+
+    // Any other value of the header is a normal request, and does extend.
+    let cookie = browser.signed_in(&fixture).await;
+    clock.advance(SESSION_IDLE_MS - 1);
+    let headers = [
+        ("Host", PANEL_HOST),
+        ("X-Arauto-Refresh", "yes"),
+        ("Cookie", cookie.as_str()),
+    ];
+    let answer = http::get(browser.panel, "/", &headers, PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(answer.status, 200);
+    clock.advance(SESSION_IDLE_MS - 1);
+    assert_eq!(browser.get("/", Some(&cookie)).await.status, 200);
+
+    // No session: the same redirect, with or without the header.
+    let plain = browser.get("/", None).await;
+    let asked = refresh(&browser, "/", None).await;
+    assert_eq!(asked.status, 303);
+    assert_eq!(asked.status, plain.status);
+    assert_eq!(asked.header("location"), plain.header("location"));
+    assert_eq!(asked.body, plain.body);
+}

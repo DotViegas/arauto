@@ -217,6 +217,19 @@ impl PanelState {
         alive
     }
 
+    /// Whether a session is still within its idle time, WITHOUT counting this look as use: the
+    /// idle clock is not moved. A session past its time is forgotten, as `used` does.
+    fn looked_at(&self, session: Uuid, now: i64) -> bool {
+        let alive = self
+            .seen
+            .get(&session)
+            .is_some_and(|last| now.saturating_sub(*last) < SESSION_IDLE_MS);
+        if !alive {
+            self.seen.remove(&session);
+        }
+        alive
+    }
+
     /// `https://host[:port]`, the address of the panel: where the block of the first access
     /// says to open it.
     pub(crate) fn origin(&self) -> &str {
@@ -313,6 +326,11 @@ async fn session_of(
         .filter(|(_, session)| session.full))
 }
 
+/// The header the script of the panel sends when it asks a page again to refresh its lists.
+/// Such a request is authorized like any other but does not count as use of the session.
+/// A test reads `panel.js` for this name, so the script and the hub cannot drift apart.
+pub(crate) const REFRESH_HEADER: &str = "x-arauto-refresh";
+
 /// The session a request brings, when it is one this hub serves: open, in its hours, and
 /// used not long ago. One opened by a code only reaches the registration of a passkey: only
 /// that registration asks this function. Only reads the database.
@@ -333,7 +351,17 @@ async fn any_session_of(
     };
     let now = hub.now_ms();
     // A deadline passed when the time of the hub reached it.
-    if session.expires_at <= now || !panel.used(session.id, now) {
+    // The refresh of the lists is a look, not a use: an untouched tab still ends at the idle
+    // time. Only the exact value `1` of the header says it.
+    let refresh = headers
+        .get(REFRESH_HEADER)
+        .is_some_and(|value| value.as_bytes() == b"1");
+    let alive = if refresh {
+        panel.looked_at(session.id, now)
+    } else {
+        panel.used(session.id, now)
+    };
+    if session.expires_at <= now || !alive {
         return Ok(None);
     }
     Ok(Some((organization, session)))
@@ -951,6 +979,30 @@ mod tests {
     }
 
     #[test]
+    fn a_look_does_not_extend_the_idle_time_and_a_use_does() {
+        let state = panel("https://panel.example.com");
+        let (a, b, c) = (Uuid::from_u128(1), Uuid::from_u128(2), Uuid::from_u128(3));
+        for session in [a, b, c] {
+            state.opened(session, 0);
+        }
+        // Looked at just before the idle time: alive, and the clock did not move.
+        assert!(state.looked_at(a, SESSION_IDLE_MS - 1));
+        assert!(
+            !state.used(a, SESSION_IDLE_MS),
+            "the look did not extend it"
+        );
+        // The control: a use just before the idle time does extend.
+        assert!(state.used(b, SESSION_IDLE_MS - 1));
+        assert!(state.used(b, 2 * SESSION_IDLE_MS - 2));
+        // A look after the idle time is refused, and the session does not come back.
+        assert!(!state.looked_at(c, SESSION_IDLE_MS));
+        assert!(!state.used(c, SESSION_IDLE_MS));
+        assert!(!state.looked_at(c, 1));
+        // A session this hub never saw is no session.
+        assert!(!state.looked_at(Uuid::from_u128(9), 1));
+    }
+
+    #[test]
     fn a_block_downloads_the_connector_the_hub_serves() {
         let serves = Downloads::empty()
             .with_file(
@@ -1073,7 +1125,6 @@ mod tests {
         let script = std::str::from_utf8(ASSETS[1].2).unwrap();
         assert_eq!(ASSETS[1].1, "text/javascript; charset=utf-8");
         for forbidden in [
-            "innerHTML",
             "outerHTML",
             "insertAdjacentHTML",
             "document.write",
@@ -1086,20 +1137,56 @@ mod tests {
             "localStorage",
             "http://",
             "https://",
-            "location",
         ] {
             assert!(
                 !script.contains(forbidden),
                 "the script of the panel has {forbidden}"
             );
         }
+        // The one place that writes markup is the swap of the live regions, with the text of the
+        // same page asked again; the one place that leaves the page is the reload of an ended
+        // session; and nothing sets an address.
+        assert_eq!(
+            script
+                .matches("region.innerHTML = fresh.innerHTML;")
+                .count(),
+            1
+        );
+        assert_eq!(script.matches("innerHTML = ").count(), 1);
+        // No other spelling of a write either: every use of the word is counted.
+        assert_eq!(script.matches("innerHTML").count(), 4);
+        for other in [
+            "createContextualFragment",
+            "setHTML",
+            "insertAdjacentHTML",
+            "outerHTML",
+        ] {
+            assert!(!script.contains(other), "{other}");
+        }
+        assert_eq!(script.matches("location.reload()").count(), 1);
+        assert!(
+            !script
+                .replace("location.reload()", "")
+                .replace("location.pathname + location.search", "")
+                .contains("location")
+        );
+        // The refresh: the header of the hub, with the value `1`, never following a redirect.
+        assert!(
+            script
+                .to_lowercase()
+                .contains(&format!("'{REFRESH_HEADER}': '1'")),
+            "the script and the hub name the refresh header differently"
+        );
+        assert!(script.contains("redirect: 'manual'"));
+        assert!(script.contains("answer.type === 'opaqueredirect'"));
+        assert!(script.contains("setInterval(ask, REFRESH_EVERY_MS)"));
         // A dialog the person closed, or one that took too long, is not a refusal: the script
         // says the text of the form for it.
         assert!(script.contains(
             "say(name === 'NotAllowedError' || name === 'AbortError' ? 'cancelled' : 'failed');"
         ));
         // One call, to an address written by the hub in the page, with nothing in it.
-        assert_eq!(script.matches("fetch(").count(), 1);
+        assert_eq!(script.matches("fetch(").count(), 2);
         assert!(script.contains(
             "fetch(form.getAttribute('data-start'), { method: 'POST', credentials: 'same-origin' })"
         ));

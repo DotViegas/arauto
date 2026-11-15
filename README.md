@@ -18,9 +18,10 @@
 </p>
 
 <p align="center">
-  <b>Gives each Hermes agent controlled access to WhatsApp numbers<br>
-  and lets one Hermes send a message to another.</b><br>
-  One place to connect agents, pair numbers and say who can access what.
+  <b>Many Hermes agents working as one team,<br>
+  each one reaching only what it should.</b><br>
+  One hub to connect agents, say who may talk to whom<br>
+  and give each one its access to WhatsApp numbers.
 </p>
 
 <p align="center">
@@ -50,6 +51,41 @@
 Hermes Agent is an AI agent from Nous Research. Arauto is an independent project: it is not
 affiliated with the authors of Hermes Agent or with WhatsApp.
 
+## Why Arauto
+
+A single agent for a whole company knows everything, and can end up telling anyone anything.
+Asking a language model to keep a secret is a risk: sooner or later it carries the context of one
+team into an answer for another.
+
+Arauto starts from the other end: **what an agent cannot reach, it cannot leak.**
+
+- **One Hermes per team, each with its own access.** The agent that looks after billing does not
+  hold what the agent that answers contacts holds. Each one is set up for its own work.
+- **They talk to each other, where you allowed.** One Hermes sends a note to another through the
+  hub, only on a link you created and only in the direction you marked. The one that receives it
+  judges what to do, and shares only what is needed.
+- **One channel, different rights.** One Hermes answers on a WhatsApp number; another only reads
+  the same conversations, to audit them, and cannot reply.
+- **People stay where it matters.** The aim is a company whose digital work is done by agents,
+  with clear guidelines and a person deciding what is critical.
+
+WhatsApp is the first channel, not the point. The point is agents that work together without any
+one of them holding everything.
+
+### Where it is going
+
+Not built yet, and not designed in detail. What exists today is in
+[the first MVP](docs/15-mvp.md).
+
+- **A place for each Hermes in the company.** A request that comes from below is judged by the one
+  above, for risk and for authorization; an instruction that comes from above is recognized as
+  one. Today a note carries no authority: it is information.
+- **Requests with an answer,** and a person who approves in the middle when the agent may not
+  decide alone.
+- **Work handed down one channel.** Whoever leads talks to one Hermes, and that one passes the
+  work on to the others.
+- **More channels** beside WhatsApp.
+
 ## At a glance
 
 <p align="center">
@@ -59,7 +95,9 @@ affiliated with the authors of Hermes Agent or with WhatsApp.
   </picture>
 </p>
 
-- **Connecting is copy and send.** (Not tried on a real Hermes yet; a command block stays as the fallback.) A single-use invite, valid for 15 minutes.
+- **Connecting is copy and send.** One short message to the agent, and a verification code back.
+  A single-use invite, valid for 15 minutes. (Tried on two real Hermes on 14/11/2026, one on Linux
+  and one on Windows; a command block stays as the fallback.)
 - **No long-lived secret goes through the chat.** Credentials are created by the two machines and
   change on every connection.
 - **Conversations are archived in your hub.** Hermes looks them up when asked; it does not have to
@@ -100,6 +138,7 @@ matter between you and its author. Check before installing.
 
 | To learn | Read |
 |---|---|
+| How to install it | [deploy/](deploy/README.md) |
 | What it is and what it is not | [docs/01-visao.md](docs/01-visao.md) |
 | The path of whoever uses it | [docs/02-como-funciona.md](docs/02-como-funciona.md) |
 | The parts and the boundaries | [docs/03-arquitetura.md](docs/03-arquitetura.md) |

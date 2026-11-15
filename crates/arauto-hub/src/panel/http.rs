@@ -20,7 +20,7 @@ const FORM_READ: Duration = Duration::from_secs(5);
 /// What a page of the panel may load: its own sheet, its own fonts, its own script file, and
 /// nothing else. No script written inside a page runs, nothing is framed, a form only posts
 /// back to the panel, and the script only asks the panel itself (for the challenge of a
-/// passkey ceremony).
+/// passkey ceremony, and for the same page again when it refreshes the lists).
 const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; \
      font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; \
      frame-ancestors 'none'; base-uri 'none'";

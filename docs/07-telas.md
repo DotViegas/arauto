@@ -53,6 +53,14 @@ configuration corrected by the hub, number disconnected, hub restored from a bac
 The panel session lasts 12 hours, or 30 minutes without use. The waiting screen updates by itself,
 by periodic query to the hub.
 
+The lists (Hermes, WhatsApps, Accesses) and the alerts above the menu refresh by themselves every 5
+seconds, by asking the same page again and swapping only their content; there is no permanent
+connection. That request does not count as use of the panel session, so a tab nobody touches still
+ends at the idle time and then shows the entry page. It needs the script of the panel: without it
+the page is as before. **Not tried in a real browser yet** (14/11/2026). A list is not swapped
+while one of its controls has the focus; a browser that does not give the focus to a button on a
+click could lose a click that lands in the instant of a swap.
+
 ## T0. First access
 
 - **Shows:** three steps. (1) The installation code, which the hub writes in the output of its

@@ -10,14 +10,19 @@ on the server for the first access.
 
 ## What is left to prove
 
-**Proposal.** This recipe was written with the code and has not been followed from start to end
-on a server yet. What was observed on the screens of Easypanel 2.38.0 on 13/11/2026 is in
+**Followed from start to end on 14/11/2026, on Easypanel 2.38.0,** by the maintainer of the
+project, on a server where the service and its volumes had been removed first: the service
+created on the screens, the image built from the repository, the first access with the code of
+the log, a passkey registered by a real browser, the password of the database replaced by the
+hub, and two Hermes connected, one on Linux and one on Windows. Two things went wrong on the way
+and are now in the steps below: the protocol of the destination of the domains, and the volumes
+of an earlier install. One run, on one server and one version of Easypanel.
+
+What was observed on the screens is in
 [`referencia/easypanel-fatos.md`](../../referencia/easypanel-fatos.md): the Logs lines go from the
 oldest to the newest and the viewer has no search; the Open button points to the primary domain,
-and a "Make primary" star exists; a Console button exists. In particular, nobody has seen:
+and a "Make primary" star exists; a Console button exists. Nobody has seen yet:
 
-- a passkey registered by a real browser, or the hub replacing the password of the database on a
-  server;
 - what the Console of a Compose service opens (the guide gives another way);
 - whether the Logs screen colors lines;
 - a template of Easypanel in JSON for this recipe.
@@ -69,6 +74,12 @@ service: renaming either one is the same as changing the address.
    | the one of `ARAUTO_PUBLIC_URL` | `8443` | the connectors and the download of the connector |
 
    Port `8444` gets no domain: it is the internal one, for the WhatsApp engine.
+
+   **Leave the protocol of the destination as HTTP,** on both domains. Easypanel serves the
+   public side over HTTPS by itself; inside the server the hub speaks plain HTTP, and the channel
+   of the connectors has its own encryption on top. With HTTPS chosen as the protocol of the
+   destination, both addresses answer "Internal Server Error" while the hub is healthy (seen on
+   14/11/2026).
 
    **Observed on Easypanel 2.38.0:** the **Open** button points to the primary domain of the
    service (the one with the filled star), and with two domains it pointed to the first one
@@ -126,6 +137,26 @@ code that is in the log. Where to run it:
   (not checked);
 - or **over SSH on the server**: find the container with `docker ps --filter name=hub` and run
   `docker exec -it <that container> arauto-hub admin panel code`.
+
+## Installing again from zero
+
+Destroying the service on its screen does **not** remove its two volumes, the one of the data
+folder and the one of the database. A service created again with the same name in the same project
+takes them back: the hub comes up with the old database, the old passkey and the old key of the
+hub, and the welcome page of the first access does not appear.
+
+To start from zero, after destroying the service and before creating it again, remove the two
+volumes on the server (seen on 14/11/2026; the names carry the project and the service):
+
+```
+docker volume ls | grep arauto
+docker volume rm <project>_<service>_arauto-data <project>_<service>_arauto-postgres
+```
+
+This erases the database and the data folder for good: the passkeys, every Hermes, the audit and
+the master key. A Hermes that was connected to the old hub keeps a connector that only trusts the
+old key: it has to leave first (`arauto-connector leave`, or `leave --local` when the hub is
+already gone) and be connected again with a new invite.
 
 ## What to check
 
