@@ -7,6 +7,8 @@
 //!                                                            asks on the input, then keeps NAME
 //! hermes mcp list                                            prints the table of the servers
 //! hermes mcp remove NAME                                     drops NAME; a NAME it does not have is refused
+//! hermes config get NAME                                     exit 0 when NAME is set, 1 when it is not, no output
+//! hermes config set NAME VALUE                               keeps VALUE in the secrets, exit 0, no output
 //! anything else                                              refused
 //! ```
 //!
@@ -34,6 +36,17 @@
 //! - The servers registered are in [`SERVERS_FILE`]:
 //!   `{"NAME": {"command": ..., "args": [...], "enabled": true}}`. Adding a name that is there
 //!   replaces it.
+//!
+//! **`config get NAME`** exits 0 when the setting holds a value and 1 when it does not, and
+//! prints nothing (as Hermes v0.22.5 does for the exit code; the connector reads nothing else).
+//! `NAME` is set when it is in [`SECRETS_FILE`], or in the list of [`CONFIG_SET_FILE`], or, when
+//! [`NO_KEY_FILE`] is absent, when it is `API_SERVER_KEY`: a fake Hermes has a key unless a test
+//! says otherwise, so that the tests that are not about the key never make one.
+//! **`config set NAME VALUE`** writes VALUE in [`SECRETS_FILE`], which is also where `${NAME}`
+//! of an entry resolves from. Three files change the `config` calls only: [`GET_FAILS_FILE`]
+//! (`get` exits with the usage code), [`SET_FAILS_FILE`] (`set` exits 1 and saves nothing) and
+//! [`HANG_FILE`] (the call named in the file, `get` or `set`, does not end until it is killed,
+//! the file is removed or two minutes pass).
 //!
 //! Exit codes: 0 done, 1 refused, 2 not a command it knows, 3 its folder could not be used.
 
@@ -72,6 +85,21 @@ pub const INJECTED_FILE: &str = "injected.json";
 
 /// What `mcp add` read on its input, appended.
 pub const INPUT_FILE: &str = "input.log";
+
+/// While this file exists, `API_SERVER_KEY` is not set unless a test or `config set` set it.
+pub const NO_KEY_FILE: &str = "no-key";
+
+/// The names, a JSON list, that `config get` says are set.
+pub const CONFIG_SET_FILE: &str = "config-set.json";
+
+/// While this file exists, `config get` exits with the usage code.
+pub const GET_FAILS_FILE: &str = "config-get-fails";
+
+/// While this file exists, `config set` exits 1 and saves nothing.
+pub const SET_FAILS_FILE: &str = "config-set-fails";
+
+/// While this file names a `config` call (`get` or `set`), that call does not end.
+pub const HANG_FILE: &str = "hang";
 
 /// Done.
 pub const DONE: u8 = 0;
@@ -130,6 +158,8 @@ pub fn run(
             }
             add(folder, name, command, &env, &args, input)
         }
+        ["config", "get", name] => config_get(folder, name),
+        ["config", "set", name, value] => config_set(folder, name, value),
         ["mcp", "list"] => list(folder, output),
         ["mcp", "remove", name] => change(folder, |servers| {
             if servers.remove(*name).is_some() {
@@ -221,6 +251,65 @@ fn add(
         servers.insert(name.to_owned(), entry);
         DONE
     })
+}
+
+/// Blocks, as a call that does not end, while [`HANG_FILE`] names `call`. It ends by itself
+/// when the file is removed or after two minutes, so that a call whose caller was killed does not
+/// stay on the machine.
+fn hang_when_asked(folder: &Path, call: &str) {
+    let named = |folder: &Path| {
+        std::fs::read_to_string(folder.join(HANG_FILE)).is_ok_and(|text| text.trim() == call)
+    };
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    while named(folder) && std::time::Instant::now() < until {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+/// `config get NAME`: 0 when it is set, 1 when it is not.
+fn config_get(folder: &Path, name: &str) -> u8 {
+    hang_when_asked(folder, "get");
+    if folder.join(GET_FAILS_FILE).exists() {
+        return USAGE;
+    }
+    let in_secrets = read_object(&folder.join(SECRETS_FILE))
+        .get(name)
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty());
+    let listed = std::fs::read(folder.join(CONFIG_SET_FILE))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Vec<String>>(&bytes).ok())
+        .is_some_and(|names| names.iter().any(|listed| listed == name));
+    let by_default = name == "API_SERVER_KEY" && !folder.join(NO_KEY_FILE).exists();
+    if in_secrets || listed || by_default {
+        DONE
+    } else {
+        REFUSED
+    }
+}
+
+/// `config set NAME VALUE`: the value goes to the secrets of this Hermes.
+fn config_set(folder: &Path, name: &str, value: &str) -> u8 {
+    hang_when_asked(folder, "set");
+    if folder.join(SET_FAILS_FILE).exists() {
+        return REFUSED;
+    }
+    let mut secrets = read_object(&folder.join(SECRETS_FILE));
+    secrets.insert(name.to_owned(), Value::from(value));
+    let Ok(bytes) = serde_json::to_vec(&Value::Object(secrets)) else {
+        return BROKEN;
+    };
+    if std::fs::write(folder.join(SECRETS_FILE), bytes).is_err() {
+        return BROKEN;
+    }
+    DONE
+}
+
+fn read_object(path: &Path) -> Map<String, Value> {
+    match std::fs::read(path).map(|bytes| serde_json::from_slice(&bytes)) {
+        Ok(Ok(Value::Object(map))) => map,
+        _ => Map::new(),
+    }
 }
 
 /// `mcp list`: a table, one row per server, the name first.
@@ -417,6 +506,38 @@ mod tests {
             }
         }
         assert!(servers(folder).unwrap().is_empty());
+    }
+
+    /// `config get` and `config set`: a key by default, the scripted ways to not have one, and
+    /// a value kept where `${NAME}` resolves from.
+    #[test]
+    fn config_get_and_set_behave_as_scripted() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path();
+        let get = |name: &str| call(folder, &format!("config get {name}"), "").0;
+        assert_eq!(get("API_SERVER_KEY"), DONE);
+        assert_eq!(get("API_SERVER_HOST"), REFUSED);
+        std::fs::write(folder.join(NO_KEY_FILE), b"").unwrap();
+        assert_eq!(get("API_SERVER_KEY"), REFUSED);
+        std::fs::write(folder.join(CONFIG_SET_FILE), br#"["API_SERVER_HOST"]"#).unwrap();
+        assert_eq!(get("API_SERVER_HOST"), DONE);
+        assert_eq!(get("gateway.api_server.host"), REFUSED);
+        std::fs::write(folder.join(GET_FAILS_FILE), b"").unwrap();
+        assert_eq!(get("API_SERVER_KEY"), USAGE);
+        std::fs::remove_file(folder.join(GET_FAILS_FILE)).unwrap();
+        std::fs::write(folder.join(SET_FAILS_FILE), b"").unwrap();
+        assert_eq!(call(folder, "config set API_SERVER_KEY abc", "").0, REFUSED);
+        assert_eq!(get("API_SERVER_KEY"), REFUSED);
+        std::fs::remove_file(folder.join(SET_FAILS_FILE)).unwrap();
+        assert_eq!(call(folder, "config set API_SERVER_KEY abc", "").0, DONE);
+        assert_eq!(get("API_SERVER_KEY"), DONE);
+        assert_eq!(
+            read_object(&folder.join(SECRETS_FILE))["API_SERVER_KEY"],
+            "abc"
+        );
+        // Every call is recorded, the value of a `set` included: that file is the fake's.
+        let calls = std::fs::read_to_string(folder.join(CALLS_FILE)).unwrap();
+        assert_eq!(calls.lines().count(), 10);
     }
 
     /// F1 to F4 of `referencia/hermes-fatos.md`: it saves only when it reads `y`.

@@ -21,3 +21,7 @@ The paths are tried in this order. First, the entry of the tool server reference
 The first path (the entry references Hermes's variable) was tried by hand on **one** Hermes: Hermes Agent v0.22.5, Docker install, Linux. It worked: Hermes resolved `${API_SERVER_KEY}` in the entry's environment, the connector received the key, and a note woke that Hermes ([referencia/hermes-fatos.md](../../referencia/hermes-fatos.md), K1 to K4). The second path is **not needed for now and not built**.
 
 **Not proved:** Windows, macOS, v0.23 and other versions of Hermes; the shim `/opt/hermes/bin/hermes` passing an argument with `${...}` unchanged. **New exposure:** the key now sits in the initial environment of each connector copy. For the Hermes without a key and for the rest of this change, see [0046](0046-chave-pela-entrada-e-hermes-sem-chave.md). This decision stays as decided.
+
+## Note of 16/11/2026
+
+At the maintainer's request, a Hermes without a key is no longer always left without waking: in `join`, when Hermes has no key and the conditions of [0046](0046-chave-pela-entrada-e-hermes-sem-chave.md) hold, the connector draws one and saves it with Hermes's own command. The key still never goes to the hub and never appears on screen; while that command runs, it sits in the command's arguments (0046). The decision above stays as decided.

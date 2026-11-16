@@ -32,7 +32,7 @@ use zeroize::Zeroizing;
 use crate::address::{AddressError, HubAddress};
 use crate::ask;
 use crate::catalog::{Local, Said};
-use crate::hermes::{Hermes, Registration};
+use crate::hermes::{Budget, Hermes, Registration, Setting};
 use crate::home::Home;
 use crate::settings::Settings;
 use crate::short::{self, Enrolled};
@@ -65,7 +65,7 @@ impl std::fmt::Debug for JoinArgs {
 pub enum Entry {
     /// It was not asked for (`--no-register`).
     NotAsked,
-    /// The entry was already there with the reference to the key: no command of Hermes ran.
+    /// The entry was already there with the reference to the key: it was not saved again.
     Kept,
     /// The entry was saved by this run.
     Saved {
@@ -96,6 +96,113 @@ pub enum Joined {
         /// What was done about the entry in Hermes.
         entry: Entry,
     },
+}
+
+impl Entry {
+    /// Whether the entry carries the reference to the key of the local API: only then would a
+    /// key made now wake anything, so only then does `join` look for one.
+    #[must_use]
+    pub const fn carries_key_reference(self) -> bool {
+        matches!(
+            self,
+            Entry::Kept
+                | Entry::Saved {
+                    registration: Registration::WithKeyReference,
+                    ..
+                }
+        )
+    }
+}
+
+/// How the key step ended (`docs/11-conector.md`, section 6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyOutcome {
+    /// `API_SERVER_KEY` is already set in Hermes: nothing was made and nothing is said.
+    AlreadySet,
+    /// The connector drew a key and Hermes's own command saved it.
+    Made,
+    /// A key was not confirmed: a guard said no, a call failed or the time ran out.
+    NotMade,
+}
+
+/// The longest the listener guard waits for an answer.
+const PROBE_LIMIT: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The key step of `join`: gives a Hermes that has no key for its local API one, within the
+/// time of `settings.key_step_ms` in all. It runs after `join` printed its lines, only in
+/// `join`, and never changes how `join` ends.
+pub(crate) async fn give_key(hermes: &Hermes, settings: &Settings) -> KeyOutcome {
+    // A test that answers the commands of Hermes itself must never reach a real Hermes here:
+    // the key step is refused, as "not confirmed", instead of running the program.
+    #[cfg(feature = "testing")]
+    if settings.testing.hermes.is_some() {
+        return KeyOutcome::NotMade;
+    }
+    give_key_using(hermes, settings, draw_key).await
+}
+
+// BEGIN key step
+/// The steps of `docs/11-conector.md`, section 6, with `draw` as the source of the key.
+async fn give_key_using(
+    hermes: &Hermes,
+    settings: &Settings,
+    draw: impl FnOnce() -> Option<Zeroizing<String>>,
+) -> KeyOutcome {
+    let budget = Budget::new(settings.key_step_ms);
+    // 1. A key is set: stop. Anything but a plain "not set" is "do not know".
+    match hermes
+        .is_set(Setting::ApiServerKey, budget.call_limit(settings))
+        .await
+    {
+        Ok(true) => return KeyOutcome::AlreadySet,
+        Ok(false) => {}
+        Err(_) => return KeyOutcome::NotMade,
+    }
+    // 2. Listener guard: something already answers where the local API would be.
+    if listener_answers(settings.key_probe, budget.left().min(PROBE_LIMIT)).await {
+        return KeyOutcome::NotMade;
+    }
+    // 3. Address guard: no host named for the local API anywhere the terminal sees.
+    for setting in Setting::ADDRESS {
+        match hermes.is_set(setting, budget.call_limit(settings)).await {
+            Ok(false) => {}
+            Ok(true) | Err(_) => return KeyOutcome::NotMade,
+        }
+    }
+    // 4. The key, from the generator of the system and from nothing else.
+    let Some(key) = draw() else {
+        return KeyOutcome::NotMade;
+    };
+    // 5. Hermes's own command saves it. The key is wiped when `key` goes out of scope.
+    match hermes.save_key(&key, budget.call_limit(settings)).await {
+        Ok(()) => KeyOutcome::Made,
+        Err(_) => KeyOutcome::NotMade,
+    }
+}
+
+/// 32 bytes of the generator of the system, as 64 lowercase hexadecimal characters. Both the
+/// bytes and the text are wiped when dropped; `None` when the generator fails.
+fn draw_key() -> Option<Zeroizing<String>> {
+    let mut bytes = Zeroizing::new([0_u8; 32]);
+    getrandom::fill(bytes.as_mut_slice()).ok()?;
+    let mut text = Zeroizing::new(String::with_capacity(64));
+    for byte in bytes.iter() {
+        text.push(char::from(HEX_DIGITS[usize::from(byte >> 4)]));
+        text.push(char::from(HEX_DIGITS[usize::from(byte & 15)]));
+    }
+    Some(text)
+}
+// END key step
+
+const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
+
+/// Whether a TCP connection to `address` is accepted within `limit`. Nothing is sent and the
+/// connection is closed at once.
+async fn listener_answers(address: std::net::SocketAddr, limit: std::time::Duration) -> bool {
+    matches!(
+        tokio::time::timeout(limit, tokio::net::TcpStream::connect(address)).await,
+        Ok(Ok(_))
+    )
 }
 
 /// Whether the entry that `record` describes is saved with the reference to the key.
@@ -410,5 +517,214 @@ async fn tell_the_leader(home: &Home, changed: bool, settings: &Settings) {
             let _ = ask::ask(home, ask::operation("restart"), patience).await;
         }
         Ok(_) | Err(_) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+    use std::net::SocketAddr;
+    use std::time::{Duration, Instant};
+
+    use arauto_testkit::hermes::{FakeHermes, built_example};
+
+    use super::*;
+
+    fn fake() -> FakeHermes {
+        FakeHermes::new(&built_example("fake_hermes"))
+    }
+
+    fn hermes_of(fake: &FakeHermes) -> Hermes {
+        Hermes::new(Some(fake.program().into_os_string()))
+    }
+
+    /// An address where nothing listens: a port that was bound and let go.
+    fn nothing_listens() -> SocketAddr {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.local_addr().unwrap()
+    }
+
+    fn settings_with(probe: SocketAddr, step_ms: i64) -> Settings {
+        Settings::default()
+            .with_key_probe(probe)
+            .with_key_step_ms(step_ms)
+    }
+
+    fn names(calls: &[Vec<String>]) -> Vec<String> {
+        calls.iter().map(|call| call.join(" ")).collect()
+    }
+
+    /// The five reads of the key step, in order, as the fake records them.
+    const READS: [&str; 5] = [
+        "config get API_SERVER_KEY",
+        "config get API_SERVER_HOST",
+        "config get gateway.platforms.api_server",
+        "config get gateway.api_server.host",
+        "config get gateway.api_server.extra",
+    ];
+
+    fn is_key(text: &str) -> bool {
+        text.len() == 64
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    }
+
+    /// T2 (principle 2 and D1): a Hermes whose key is set is left alone: one read, nothing
+    /// else, nothing written. Without the first step the connector would go on to the guards and
+    /// make a key, and the calls and the outcome below would be different.
+    #[tokio::test]
+    async fn a_key_that_is_set_stops_the_step_after_one_read() {
+        let fake = fake();
+        let settings = settings_with(nothing_listens(), 30_000);
+        let outcome = give_key(&hermes_of(&fake), &settings).await;
+        assert_eq!(outcome, KeyOutcome::AlreadySet);
+        assert_eq!(names(&fake.config_calls()), [READS[0]]);
+        assert_eq!(fake.secret("API_SERVER_KEY"), None);
+    }
+
+    /// T3: something accepts on the probe address, so no key is made, and the address guard is
+    /// not even asked. Without the listener guard the same Hermes gets its key.
+    #[tokio::test]
+    async fn a_listener_on_the_local_api_address_stops_the_step() {
+        let fake = fake();
+        fake.without_key();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let settings = settings_with(listener.local_addr().unwrap(), 30_000);
+        let outcome = give_key(&hermes_of(&fake), &settings).await;
+        assert_eq!(outcome, KeyOutcome::NotMade);
+        assert_eq!(names(&fake.config_calls()), [READS[0]]);
+        assert_eq!(fake.secret("API_SERVER_KEY"), None);
+        // The same Hermes with nothing listening gets one, so the guard is what stopped it.
+        drop(listener);
+        let settings = settings_with(nothing_listens(), 30_000);
+        assert_eq!(
+            give_key(&hermes_of(&fake), &settings).await,
+            KeyOutcome::Made
+        );
+    }
+
+    /// T4: each of the four names of the address guard, set one at a time, stops the step with
+    /// no `set`; all four unset is one `set`, with the key as the last argument (T9).
+    #[tokio::test]
+    async fn a_host_named_for_the_local_api_stops_the_step_and_none_makes_one_set() {
+        for (at, name) in [
+            "API_SERVER_HOST",
+            "gateway.platforms.api_server",
+            "gateway.api_server.host",
+            "gateway.api_server.extra",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let fake = fake();
+            fake.without_key();
+            fake.has_setting(name);
+            let settings = settings_with(nothing_listens(), 30_000);
+            let outcome = give_key(&hermes_of(&fake), &settings).await;
+            assert_eq!(outcome, KeyOutcome::NotMade, "{name}");
+            // The reads stop at the first that says "set".
+            assert_eq!(names(&fake.config_calls()), READS[..at + 2], "{name}");
+            assert_eq!(fake.secret("API_SERVER_KEY"), None, "{name}");
+        }
+        let fake = fake();
+        fake.without_key();
+        let settings = settings_with(nothing_listens(), 30_000);
+        assert_eq!(
+            give_key(&hermes_of(&fake), &settings).await,
+            KeyOutcome::Made
+        );
+        let calls = fake.config_calls();
+        assert_eq!(names(&calls[..5]), READS);
+        assert_eq!(calls.len(), 6);
+        // T9, the arguments: exactly `config set API_SERVER_KEY <64 lowercase hexadecimal>`.
+        let set = &calls[5];
+        assert_eq!(set.len(), 4, "{set:?}");
+        assert_eq!(&set[..3], ["config", "set", "API_SERVER_KEY"]);
+        assert!(is_key(&set[3]), "{}", set[3].len());
+        assert_eq!(
+            fake.secret("API_SERVER_KEY").as_deref(),
+            Some(set[3].as_str())
+        );
+        // A second run finds it at the first step and does nothing more.
+        assert_eq!(
+            give_key(&hermes_of(&fake), &settings).await,
+            KeyOutcome::AlreadySet
+        );
+        assert_eq!(fake.config_calls().len(), 7);
+    }
+
+    /// T5: "do not know" is "no". A first read that exits with another code, a program that is
+    /// missing and a call that hangs past the deadline each end with no `set` and no key.
+    #[tokio::test]
+    async fn not_knowing_is_no_key() {
+        // Step 1 exits with a code that is neither 0 nor 1.
+        let failing = fake();
+        failing.without_key();
+        failing.failing_config_get(true);
+        let settings = settings_with(nothing_listens(), 30_000);
+        assert_eq!(
+            give_key(&hermes_of(&failing), &settings).await,
+            KeyOutcome::NotMade
+        );
+        assert_eq!(names(&failing.config_calls()), [READS[0]]);
+        assert_eq!(failing.secret("API_SERVER_KEY"), None);
+
+        // The program is not there.
+        let missing = Hermes::new(Some(
+            std::env::temp_dir()
+                .join("no-such-hermes-for-the-key-step")
+                .into_os_string(),
+        ));
+        assert_eq!(give_key(&missing, &settings).await, KeyOutcome::NotMade);
+
+        // A call that hangs: the deadline ends it, long before the 90 s of one call.
+        for (hanging, what) in [("get", "the first read"), ("set", "the save")] {
+            let fake = fake();
+            fake.without_key();
+            fake.hanging(Some(hanging));
+            let settings = settings_with(nothing_listens(), 600);
+            let started = Instant::now();
+            let outcome = give_key(&hermes_of(&fake), &settings).await;
+            let took = started.elapsed();
+            fake.hanging(None);
+            assert_eq!(outcome, KeyOutcome::NotMade, "{what}");
+            assert!(took < Duration::from_secs(20), "{what}: {took:?}");
+            assert!(took >= Duration::from_millis(500), "{what}: {took:?}");
+        }
+    }
+
+    /// T6: the key is 32 bytes of the generator, as 64 lowercase hexadecimal characters, never
+    /// the same twice; when the generator fails there is no `set`.
+    #[tokio::test]
+    async fn the_key_comes_from_the_generator_and_a_failure_makes_none() {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..1_000 {
+            let key = draw_key().unwrap();
+            assert!(is_key(&key), "{}", key.len());
+            assert!(seen.insert(key.to_string()));
+        }
+        let fake = fake();
+        fake.without_key();
+        let settings = settings_with(nothing_listens(), 30_000);
+        let outcome = give_key_using(&hermes_of(&fake), &settings, || None).await;
+        assert_eq!(outcome, KeyOutcome::NotMade);
+        // Every read ran, and nothing was saved.
+        assert_eq!(names(&fake.config_calls()), READS);
+        assert_eq!(fake.secret("API_SERVER_KEY"), None);
+    }
+
+    /// T8 (the part of the unit): only an entry with the reference looks for a key.
+    #[test]
+    fn only_an_entry_with_the_reference_looks_for_a_key() {
+        assert!(Entry::Kept.carries_key_reference());
+        let saved = |registration| Entry::Saved {
+            registration,
+            replaced: false,
+        };
+        assert!(saved(Registration::WithKeyReference).carries_key_reference());
+        assert!(!saved(Registration::WithoutKeyReference).carries_key_reference());
+        assert!(!Entry::NotAsked.carries_key_reference());
     }
 }

@@ -1,6 +1,6 @@
 # 0046 — The key through the entry, and a Hermes without a key
 
-**Status:** proposal · **Date:** 15/11/2026. The reference in the entry was rehearsed and is built. For a Hermes without a key, this file describes the first step (Option A, built); on 15/11/2026 the maintainer asked for Option B, which is **not designed and not built yet**. It builds on [0023](0023-chave-da-api-local.md) (decided), which it does not reopen.
+**Status:** proposal · **Date:** 15/11/2026. The reference in the entry was rehearsed and is built. For a Hermes without a key, this file describes the first step (Option A, built); on 15/11/2026 the maintainer asked for Option B, designed and built on 16/11/2026 (below) and **not rehearsed on a real Hermes yet**. It builds on [0023](0023-chave-da-api-local.md) (decided), which it does not reopen.
 
 ## Context
 
@@ -10,10 +10,10 @@ The maintainer asked that Arauto configure the key of Hermes's local API by itse
 
 - **The entry references Hermes's variable.** `join` and `register` save the entry with `--env ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}`. The reference is a fixed constant of the connector, not a secret; Hermes resolves it at spawn. If a version of Hermes rejects `--env` with a non-zero exit, the connector saves the entry without it and the connection goes on.
 - **A Hermes without a local API key connects and is told (Option A).** At `join`, `register` and `status` the connector says that this Hermes cannot be woken until its local API is on, naming Hermes's own setting `API_SERVER_KEY` and saying it is set in the configuration of Hermes.
-- **The connector never writes into Hermes's secrets file, never creates a key for Hermes and never restarts Hermes.** Option B, which would do those things, was asked for by the maintainer on 15/11/2026 and is not built: it needs its own design, a rehearsal on a real Hermes and its own decision, because it changes what the connector may touch.
+- **Option B: a key only for a Hermes that has none (proposal, built on 16/11/2026, not rehearsed on a real Hermes yet).** Only in `join`, after the verification code is printed, and only when the entry carries the reference: if Hermes's own command says `API_SERVER_KEY` is not set, nothing accepts a connection on 127.0.0.1:8642 and the configuration names no host for the local API, the connector draws 32 bytes from the system's generator and saves them, as 64 hexadecimal characters, with `hermes config set API_SERVER_KEY <key>`, with no shell and its output discarded. While that command runs, the key sits in its arguments: a departure from [04](../04-seguranca-conexao.md) and from [0023](0023-chave-da-api-local.md) that needs the maintainer's approval. The connector never writes Hermes's secrets file itself and never restarts or signals Hermes: the operator sends `/restart` after the approval. `register`, `status` and `leave` make no key, and `leave` does not remove it. On Docker the image makes a key at first boot (rehearsal 16/11/2026); whether the step then stays idle there is not proved yet.
 - **`arauto-connector register`** saves the entry again for a Hermes connected before this change. It asks the hub and the leader nothing and touches neither the identity nor the credential.
 - **`local_waking`.** `arauto_status` gains a field added by the connector: whether the connector of this Hermes received the key. Its description does not change. The hub does not change.
-- **The connector reads its own variables only,** and the key only in the `mcp` process. The `hermes` command it runs does not receive `API_SERVER_KEY` or `ARAUTO_HERMES_API_KEY`.
+- **The connector reads its own variables only,** and the key only in the `mcp` process. The `hermes` command it runs does not receive `API_SERVER_KEY` or `ARAUTO_HERMES_API_KEY` in its environment; the one `config set` of Option B receives the key it saves as an argument.
 
 ## Not guaranteed
 
@@ -25,12 +25,11 @@ The maintainer asked that Arauto configure the key of Hermes's local API by itse
 
 ## Open points for the maintainer
 
-- Option B (asked for on 15/11/2026): design it, rehearse it and record it in a decision of its own. Until then Option A is what the connector does.
+- Option B: approve the key in the arguments of `config set`, the texts and the rehearsal outside Docker. Where no key is made, Option A is what the connector does.
 - Confirm the field `local_waking` and its name.
 - Decide what to do about K5 ([facts](../../referencia/hermes-fatos.md)): a `join` that installs a new program asks the leader to end, but a running gateway did not start a dead server again in 15 minutes.
-- Optional wording of the instruction page, not changed: ask the Hermes to send, with the verification code, the line the connector printed about waking.
 
 ## Alternatives considered
 
-- **Option B** (the connector reads or writes Hermes's secrets file, creates a key, or restarts Hermes): not built in this step; asked for by the maintainer on 15/11/2026 and left for a decision of its own, since it crosses the line of what the connector may touch today.
+- **Parts of Option B not taken:** the connector writing Hermes's secrets file itself (it would read every secret there), restarting or signalling Hermes, and making a key from `register`, which a hostile note could lead the Hermes to run.
 - **Reading the key from the secrets file** (second path of 0023): not needed.

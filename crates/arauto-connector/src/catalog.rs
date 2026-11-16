@@ -125,8 +125,7 @@ impl Local {
 
 /// What a command tells the operator when it succeeded but a thing is not as they may expect,
 /// about the key of the local API of Hermes and about the lines kept in its memory. Fixed phrases, under the same rules as [`Local`].
-/// The connector never sets that key, never creates one and never restarts Hermes: these
-/// phrases say so, and say whose setting it is.
+/// The connector never restarts Hermes. It saves a key only in `join`, only when Hermes has none (KeyMade); these phrases say whose setting it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Told {
     /// The connector is registered, but waking needs the local API of Hermes to be on.
@@ -139,6 +138,12 @@ pub enum Told {
     KeyNotReceived,
     /// What to expect when the setting already holds a key.
     KeyAfterRestart,
+    /// `join` drew a key for the local API of a Hermes that had none and Hermes saved it.
+    KeyMade,
+    /// A key was made: the local API turns on only after the gateway restarts.
+    RestartAfterKey,
+    /// `join` did not confirm a new key.
+    KeyNotMade,
     /// The entry was saved by an older connector.
     EntryOlder,
     /// The registration changed nothing in the connection.
@@ -155,6 +160,9 @@ impl Told {
         Told::RunningKeepsOldEntry,
         Told::KeyNotReceived,
         Told::KeyAfterRestart,
+        Told::KeyMade,
+        Told::RestartAfterKey,
+        Told::KeyNotMade,
         Told::EntryOlder,
         Told::ConnectionUnchanged,
         Told::NotesStayInMemory,
@@ -166,8 +174,8 @@ impl Told {
         match self {
             Told::WakingNeedsLocalApi => {
                 "This Hermes can be woken only while its local API is on, which Hermes does when \
-                 its own setting API_SERVER_KEY holds a key. The connector never sets it; the \
-                 status command says whether the connector received it."
+                 its own setting API_SERVER_KEY holds a key. The status command says whether the \
+                 connector received it."
             }
             Told::ReferenceRefused => {
                 "This version of Hermes refused the reference to the key of its local API, so the \
@@ -181,11 +189,26 @@ impl Told {
             Told::KeyNotReceived => {
                 "No notice wakes this Hermes until its local API is on. Hermes turns it on when \
                  its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a \
-                 key. The connector never sets it."
+                 key."
             }
             Told::KeyAfterRestart => {
                 "If that setting already holds a key, Hermes hands it to the connector after it \
                  restarts its gateway."
+            }
+            Told::KeyMade => {
+                "This Hermes had no key for its local API, so the connector drew one and saved it \
+                 in API_SERVER_KEY with the config command of Hermes. The connector shows it to \
+                 nobody and writes it in no file of its own."
+            }
+            Told::RestartAfterKey => {
+                "The local API of this Hermes turns on only after its gateway restarts. After the \
+                 approval, the operator sends the restart command of Hermes to this Hermes in the \
+                 chat, once."
+            }
+            Told::KeyNotMade => {
+                "The connector did not confirm a new key for the local API of this Hermes. If the \
+                 status command says the key is not received, the operator sets API_SERVER_KEY in \
+                 the configuration of Hermes and restarts its gateway."
             }
             Told::EntryOlder => {
                 "The entry of the connector in Hermes was saved by an older connector and may \
@@ -289,11 +312,52 @@ mod tests {
         all.extend(&told);
         let distinct: std::collections::HashSet<&str> = all.iter().copied().collect();
         assert_eq!(distinct.len(), all.len());
-        // The two that tell the operator what to look for name Hermes's own setting, and say
-        // that the connector never sets it.
-        for phrase in [Told::WakingNeedsLocalApi, Told::KeyNotReceived].map(Told::phrase) {
+        // The ones that tell the operator what to look for name Hermes's own setting.
+        for phrase in [
+            Told::WakingNeedsLocalApi,
+            Told::KeyNotReceived,
+            Told::KeyMade,
+            Told::KeyNotMade,
+        ]
+        .map(Told::phrase)
+        {
             assert!(phrase.contains("API_SERVER_KEY"), "{phrase}");
-            assert!(phrase.contains("never sets it"), "{phrase}");
+        }
+        // The connector may set the key now (only in `join`): no phrase says it never does.
+        for phrase in &told {
+            assert!(!phrase.contains("never sets"), "{phrase}");
+        }
+    }
+
+    /// The five phrases of the key step are the approved texts, character by character.
+    #[test]
+    fn the_phrases_of_the_key_step_are_the_approved_texts() {
+        let approved: [(Told, &str); 5] = [
+            (
+                Told::WakingNeedsLocalApi,
+                "This Hermes can be woken only while its local API is on, which Hermes does when its own setting API_SERVER_KEY holds a key. The status command says whether the connector received it.",
+            ),
+            (
+                Told::KeyNotReceived,
+                "No notice wakes this Hermes until its local API is on. Hermes turns it on when its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a key.",
+            ),
+            (
+                Told::KeyMade,
+                "This Hermes had no key for its local API, so the connector drew one and saved it in API_SERVER_KEY with the config command of Hermes. The connector shows it to nobody and writes it in no file of its own.",
+            ),
+            (
+                Told::RestartAfterKey,
+                "The local API of this Hermes turns on only after its gateway restarts. After the approval, the operator sends the restart command of Hermes to this Hermes in the chat, once.",
+            ),
+            (
+                Told::KeyNotMade,
+                "The connector did not confirm a new key for the local API of this Hermes. If the status command says the key is not received, the operator sets API_SERVER_KEY in the configuration of Hermes and restarts its gateway.",
+            ),
+        ];
+        let sizes = [182, 160, 203, 173, 215];
+        for ((told, text), size) in approved.into_iter().zip(sizes) {
+            assert_eq!(told.phrase(), text);
+            assert_eq!(text.len(), size, "{text}");
         }
     }
 

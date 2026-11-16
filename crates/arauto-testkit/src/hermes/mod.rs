@@ -19,6 +19,7 @@
 //! secrets.json     the secret scope of this Hermes: what `${NAME}` in an entry resolves from
 //! injected.json    what the "secret source" of Hermes adds to every server it starts (R6)
 //! no-env           while it exists, `mcp add` does not know `--env`
+//! no-key, config-set.json, config-get-fails, config-set-fails, hang   what `config get` and `config set` do ([`registry`])
 //! terminal-env.json extra variables of the terminal of the operator
 //! ```
 //!
@@ -210,6 +211,81 @@ impl FakeHermes {
     /// While `on`, `mcp add` does not know the option `--env`, as an older Hermes.
     pub fn without_env_option(&self, on: bool) {
         let path = self.folder().join(registry::NO_ENV_FILE);
+        if on {
+            std::fs::write(path, b"").unwrap();
+        } else {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    /// [`FakeHermes::calls`], the ones about the servers of tools (`mcp ...`).
+    #[must_use]
+    pub fn mcp_calls(&self) -> Vec<Vec<String>> {
+        self.calls_of("mcp")
+    }
+
+    /// [`FakeHermes::calls`], the ones about the settings (`config ...`).
+    #[must_use]
+    pub fn config_calls(&self) -> Vec<Vec<String>> {
+        self.calls_of("config")
+    }
+
+    fn calls_of(&self, first: &str) -> Vec<Vec<String>> {
+        self.calls()
+            .into_iter()
+            .filter(|call| call.first().is_some_and(|word| word == first))
+            .collect()
+    }
+
+    /// This Hermes has no key for its local API: `config get API_SERVER_KEY` exits 1 until a
+    /// `config set` saves one.
+    pub fn without_key(&self) {
+        std::fs::write(self.folder().join(registry::NO_KEY_FILE), b"").unwrap();
+    }
+
+    /// Makes `config get` say that `name` is set (it exits 0).
+    pub fn has_setting(&self, name: &str) {
+        let path = self.folder().join(registry::CONFIG_SET_FILE);
+        let mut names: Vec<String> = std::fs::read(&path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
+        names.push(name.to_owned());
+        std::fs::write(path, serde_json::to_vec(&names).unwrap()).unwrap();
+    }
+
+    /// While `on`, `config get` exits with a code that is neither 0 nor 1.
+    pub fn failing_config_get(&self, on: bool) {
+        self.toggle(registry::GET_FAILS_FILE, on);
+    }
+
+    /// While `on`, `config set` exits 1 and saves nothing.
+    pub fn failing_config_set(&self, on: bool) {
+        self.toggle(registry::SET_FAILS_FILE, on);
+    }
+
+    /// Makes the `config` call `call` (`get` or `set`) not end, or ends that.
+    pub fn hanging(&self, call: Option<&str>) {
+        let path = self.folder().join(registry::HANG_FILE);
+        match call {
+            Some(call) => std::fs::write(path, call).unwrap(),
+            None => {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+
+    /// The value `config set` kept for `name`.
+    #[must_use]
+    pub fn secret(&self, name: &str) -> Option<String> {
+        self.read_map(registry::SECRETS_FILE)
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    }
+
+    fn toggle(&self, file: &str, on: bool) {
+        let path = self.folder().join(file);
         if on {
             std::fs::write(path, b"").unwrap();
         } else {

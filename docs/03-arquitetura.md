@@ -38,8 +38,10 @@ The project has two programs, the **hub** and the **connector**, and uses a thir
 
 - **Only the hub talks to the engine.** Hermes never receives the address or the credential of the
   engine. Files and messages go through the channel.
-- **Hermes only opens outbound connections.** No new network port listens on Hermes's machine; the
-  connector uses only a local socket, between its own copies. A Hermes behind NAT connects the same
+- **Hermes only opens outbound connections.** No new network port listens on Hermes's machine, apart
+  from Hermes's own local API on 127.0.0.1, which a key the connector made in `join` lets Hermes
+  open at its next restart ([11](11-conector.md), section 6); the connector uses only a local
+  socket, between its own copies. A Hermes behind NAT connects the same
   way.
 - **Hub and engine are separate processes.** The hub commands the engine through its API. A new
   version of the hub does not bring down the engine sessions.

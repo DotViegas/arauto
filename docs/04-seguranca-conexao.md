@@ -162,7 +162,10 @@ the first one through the same swap as all the others (C7).
 
 At the end of the enrollment the connector registers itself in Hermes as a tool server, through the
 official command (`hermes mcp add`). The entry contains no secret: only the path of the program and
-the argument `mcp`. It is the only change that stays in Hermes's configuration.
+the argument `mcp`. It is the only change that stays in Hermes's configuration, with one exception:
+when this Hermes has no key for its local API, the connector draws one from the system's generator
+and saves it with Hermes's own command (`hermes config set API_SERVER_KEY`); that key stays, also
+after `leave`, a denial or an expiry ([11](11-conector.md), section 6).
 
 Hermes starts the connector in less than a minute. While the device is pending, the connector opens
 the channel **waiting**: it proves the identity, has no WhatsApp tool at all and waits.
@@ -557,6 +560,18 @@ of the design: they only become a guarantee after the tests of Phase 1 and Phase
 17. If the connector's folder is shared between two Hermes, or the file system has no lock, the hub
     treats the two as a copy and puts the device in quarantine.
 18. A lost or damaged credential file leads to quarantine, even with no copy at all.
+19. **A key the connector makes for Hermes's local API passes through the arguments of one
+    process.** While Hermes's command saves it, the key sits in that command's arguments, which
+    other processes of the machine can read: on Linux every local user unless `/proc` hides them, on
+    Windows at least the same user and the administrators. It is then kept in plain text in Hermes's
+    secrets file, with Hermes's rights. The connector shows it to nobody and writes it in no file of
+    its own. On Docker the image makes a key at first boot (rehearsal 16/11/2026); whether the step
+    then stays idle there is not proved yet.
+20. **A key the connector makes lets Hermes open a listener.** At its next restart, Hermes opens its
+    own local API on `127.0.0.1:8642`. The connector makes the key only when the configuration of
+    Hermes names no host for that API and nothing answers on that address; a host or a key that
+    lives only in the environment of Hermes's gateway is not seen, and then the API may open
+    elsewhere ([11](11-conector.md), section 6).
 
 ## 7. To be proven before implementing
 

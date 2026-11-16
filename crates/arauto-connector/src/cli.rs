@@ -48,7 +48,7 @@ use crate::catalog::Told;
 use crate::catalog::{Local, Said};
 use crate::hermes::{Hermes, Registration};
 use crate::home::Home;
-use crate::join::{Entry, JoinArgs, Joined};
+use crate::join::{Entry, JoinArgs, Joined, KeyOutcome};
 use crate::leave::Left;
 use crate::reply::Awaited;
 use crate::runtime::Connector;
@@ -205,6 +205,17 @@ pub async fn run_waking(
 #[cfg(feature = "testing")]
 pub async fn run_with_settings(arguments: Vec<OsString>, settings: Settings) -> Exit {
     run_inner(arguments, None, || (None, None), settings).await
+}
+
+/// [`run_with_settings`], with the command of Hermes that `ARAUTO_HERMES_BIN` would name, for
+/// the tests of this crate that run `join` in the process of the test.
+#[cfg(feature = "testing")]
+pub async fn run_with_hermes_and_settings(
+    arguments: Vec<OsString>,
+    hermes: Option<OsString>,
+    settings: Settings,
+) -> Exit {
+    run_inner(arguments, hermes, || (None, None), settings).await
 }
 
 async fn run_inner(
@@ -411,6 +422,7 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
             if replaces {
                 println!("This code replaces the one shown before, which is no longer valid.");
             }
+            key_step(entry, hermes, settings).await;
             Exit::Done
         }
         Ok(Joined::AlreadyApproved { entry }) => {
@@ -418,6 +430,7 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
             if matches!(entry, Entry::Saved { .. }) {
                 print_entry(entry, true);
             }
+            key_step(entry, hermes, settings).await;
             Exit::Done
         }
         Err(said) => {
@@ -425,6 +438,28 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
             Exit::of(said)
         }
     }
+}
+
+/// What `join` does last, once its lines (the verification code, or the AR-104 line) are out
+/// and flushed, so that a slow step or a kill by the terminal never costs the code: for a Hermes
+/// that has no key for its local API, a key (`docs/11-conector.md`, section 6). It prints what
+/// happened and never changes the exit code of `join`.
+async fn key_step(entry: Entry, hermes: &Hermes, settings: &Settings) {
+    use std::io::Write;
+
+    if !entry.carries_key_reference() {
+        return;
+    }
+    let _ = std::io::stdout().flush();
+    match crate::join::give_key(hermes, settings).await {
+        KeyOutcome::AlreadySet => {}
+        KeyOutcome::Made => {
+            println!("{}", Told::KeyMade.phrase());
+            println!("{}", Told::RestartAfterKey.phrase());
+        }
+        KeyOutcome::NotMade => println!("{}", Told::KeyNotMade.phrase()),
+    }
+    let _ = std::io::stdout().flush();
 }
 
 async fn leave(home: &Home, local: bool, hermes: &Hermes, settings: &Settings) -> Exit {

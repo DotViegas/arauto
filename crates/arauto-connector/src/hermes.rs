@@ -41,8 +41,10 @@
 //!   `--env ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}` ([`KEY_REFERENCE`]). The reference is not a
 //!   secret: it is a fixed text of this program, which no input of any kind can change. Hermes
 //!   resolves it from its own secret scope when it starts the connector (observed on v0.22.5,
-//!   Docker, Linux, 15/11/2026, `referencia/hermes-fatos.md`). The connector never reads,
-//!   writes or creates anything in the secrets of Hermes, and never restarts Hermes. An `add`
+//!   Docker, Linux, 15/11/2026, `referencia/hermes-fatos.md`). The connector never reads the
+//!   secrets of Hermes and never restarts Hermes; it creates the key of the local API only in
+//!   `join`, only when Hermes has none, through `config set` (`docs/11-conector.md`,
+//!   section 6). An `add`
 //!   that rejects `--env` with a non-zero exit is tried again without it
 //!   ([`Registration::WithoutKeyReference`]): the connection never fails for lack of the
 //!   option. An `add` that silently ignores `--env` cannot be seen from here; `status` then
@@ -57,6 +59,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use zeroize::Zeroizing;
 
 use crate::home::Home;
 use crate::settings::{Settings, duration};
@@ -170,9 +173,73 @@ enum Once {
     Failed(HermesError),
 }
 
+/// A setting of Hermes the key step of `join` asks about, with `hermes config get NAME`. Only
+/// the exit code is used: 0 is set, 1 is not set (`docs/11-conector.md`, section 6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Setting {
+    /// The key of the local API.
+    ApiServerKey,
+    /// The host of the local API, in the environment file.
+    ApiServerHost,
+    /// The block of the local API under `gateway.platforms` (one call covers the block under
+    /// `platforms` too).
+    PlatformsBlock,
+    /// The host, in the shorthand block `gateway.api_server`.
+    ShorthandHost,
+    /// The extra fields, where a host may also be, in the shorthand block.
+    ShorthandExtra,
+}
+
+impl Setting {
+    /// The four whose answer decides the address guard, in the order they are asked.
+    pub(crate) const ADDRESS: [Setting; 4] = [
+        Setting::ApiServerHost,
+        Setting::PlatformsBlock,
+        Setting::ShorthandHost,
+        Setting::ShorthandExtra,
+    ];
+
+    /// The name Hermes knows it by.
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Setting::ApiServerKey => "API_SERVER_KEY",
+            Setting::ApiServerHost => "API_SERVER_HOST",
+            Setting::PlatformsBlock => "gateway.platforms.api_server",
+            Setting::ShorthandHost => "gateway.api_server.host",
+            Setting::ShorthandExtra => "gateway.api_server.extra",
+        }
+    }
+}
+
+/// The time the key step of `join` has in all: every call of Hermes and the probe draw from it.
+pub(crate) struct Budget {
+    end: tokio::time::Instant,
+}
+
+impl Budget {
+    pub(crate) fn new(ms: i64) -> Self {
+        Self {
+            end: tokio::time::Instant::now() + duration(ms),
+        }
+    }
+
+    /// What is left of the step.
+    pub(crate) fn left(&self) -> std::time::Duration {
+        self.end
+            .saturating_duration_since(tokio::time::Instant::now())
+    }
+
+    /// The limit of one call of Hermes: its own, or what is left of the step.
+    pub(crate) fn call_limit(&self, settings: &Settings) -> std::time::Duration {
+        self.left().min(duration(settings.hermes_ms))
+    }
+}
+
 /// How a run of the program ended.
 struct Ran {
     success: bool,
+    /// The exit code; none when the program was ended by a signal.
+    code: Option<i32>,
     /// The start of the standard output, when it was asked for.
     captured: Vec<u8>,
 }
@@ -223,14 +290,15 @@ impl Hermes {
                 Once::AddExitedNonZero
             };
         }
-        let added = match self.run(&arguments, settings, Some(ANSWERS), false).await {
+        let limit = duration(settings.hermes_ms);
+        let added = match self.run(&arguments, limit, Some(ANSWERS), false).await {
             Ok(added) => added,
             Err(error) => return Once::Failed(error),
         };
         if !added.success {
             return Once::AddExitedNonZero;
         }
-        let listed = match self.run(&list_arguments(), settings, None, true).await {
+        let listed = match self.run(&list_arguments(), limit, None, true).await {
             Ok(listed) => listed,
             Err(error) => return Once::Failed(error),
         };
@@ -259,8 +327,50 @@ impl Hermes {
                 Err(HermesError::Refused)
             };
         }
-        let removed = self.run(&remove_arguments(), settings, None, false).await?;
+        let limit = duration(settings.hermes_ms);
+        let removed = self.run(&remove_arguments(), limit, None, false).await?;
         if removed.success {
+            Ok(())
+        } else {
+            Err(HermesError::Refused)
+        }
+    }
+
+    /// `hermes config get NAME`, by its exit code alone: 0 is set, 1 is not set, anything else
+    /// (another code, not started, ended by force) is an error, which the caller reads as "do
+    /// not know". Nothing Hermes prints is read.
+    pub(crate) async fn is_set(
+        &self,
+        setting: Setting,
+        limit: std::time::Duration,
+    ) -> Result<bool, HermesError> {
+        let arguments: Vec<OsString> = ["config", "get", setting.name()]
+            .into_iter()
+            .map(OsString::from)
+            .collect();
+        match self.run(&arguments, limit, None, false).await?.code {
+            Some(0) => Ok(true),
+            Some(1) => Ok(false),
+            _ => Err(HermesError::Refused),
+        }
+    }
+
+    /// `hermes config set API_SERVER_KEY KEY`: the one place the key leaves the memory of the
+    /// connector, and only as the last argument of this command (`docs/11-conector.md`, section
+    /// 6). Success is the exit code 0 and nothing else.
+    pub(crate) async fn save_key(
+        &self,
+        key: &Zeroizing<String>,
+        limit: std::time::Duration,
+    ) -> Result<(), HermesError> {
+        let arguments: Vec<OsString> = vec![
+            OsString::from("config"),
+            OsString::from("set"),
+            OsString::from(Setting::ApiServerKey.name()),
+            OsString::from(key.as_str()),
+        ];
+        let saved = self.run(&arguments, limit, None, false).await?;
+        if saved.success {
             Ok(())
         } else {
             Err(HermesError::Refused)
@@ -294,24 +404,19 @@ impl Hermes {
     async fn run(
         &self,
         arguments: &[OsString],
-        settings: &Settings,
+        limit: std::time::Duration,
         answers: Option<&[u8]>,
         capture: bool,
     ) -> Result<Ran, HermesError> {
         if is_batch_file(&self.program) {
             return Err(HermesError::Interpreter);
         }
+        if limit.is_zero() {
+            return Err(HermesError::TimedOut);
+        }
         let mut programs = vec![self.program.clone()];
         programs.extend(self.fallbacks().into_iter().map(PathBuf::into_os_string));
-        run_first(
-            &programs,
-            self.explicit,
-            arguments,
-            settings,
-            answers,
-            capture,
-        )
-        .await
+        run_first(&programs, self.explicit, arguments, limit, answers, capture).await
     }
 }
 
@@ -341,14 +446,14 @@ fn windows_candidate(local_app_data: Option<&Path>) -> Option<PathBuf> {
         .map(|folder| folder.join("hermes").join("bin").join("hermes.exe"))
 }
 
-/// Starts the first of `programs` that exists and runs it to its end, within the time limit:
-/// `answers` on its input (closed after them; null without them), its output kept up to the
-/// ceiling when `capture` is set (null otherwise), its error output null.
+/// Starts the first of `programs` that exists and runs it to its end, within `limit`, and kills
+/// it when the time is up: `answers` on its input (closed after them; null without them), its
+/// output kept up to the ceiling when `capture` is set (null otherwise), its error output null.
 async fn run_first(
     programs: &[OsString],
     explicit: bool,
     arguments: &[OsString],
-    settings: &Settings,
+    limit: std::time::Duration,
     answers: Option<&[u8]>,
     capture: bool,
 ) -> Result<Ran, HermesError> {
@@ -409,10 +514,11 @@ async fn run_first(
         }
         child.wait().await.map(|status| Ran {
             success: status.success(),
+            code: status.code(),
             captured,
         })
     };
-    match tokio::time::timeout(duration(settings.hermes_ms), work).await {
+    match tokio::time::timeout(limit, work).await {
         Ok(Ok(ran)) => Ok(ran),
         Ok(Err(_)) => Err(HermesError::Refused),
         Err(_) => {
@@ -745,14 +851,14 @@ mod tests {
     #[tokio::test]
     async fn a_missing_program_is_skipped_and_the_first_that_starts_wins() {
         let fake = fake();
-        let settings = Settings::default();
+        let limit = duration(Settings::default().hermes_ms);
         let missing = |name: &str| absolute(name).into_os_string();
         let programs = [
             missing("no-such-hermes-one"),
             missing("no-such-hermes-two"),
             fake.program().into_os_string(),
         ];
-        let ran = run_first(&programs, false, &list_arguments(), &settings, None, true)
+        let ran = run_first(&programs, false, &list_arguments(), limit, None, true)
             .await
             .unwrap();
         assert!(ran.success);
@@ -760,13 +866,13 @@ mod tests {
         // None of them exists: not found when nothing was named, not started when it was.
         let none = [missing("no-such-hermes-one"), missing("no-such-hermes-two")];
         assert!(matches!(
-            run_first(&none, false, &list_arguments(), &settings, None, true)
+            run_first(&none, false, &list_arguments(), limit, None, true)
                 .await
                 .map(|_| ()),
             Err(HermesError::NotFound)
         ));
         assert!(matches!(
-            run_first(&none[..1], true, &list_arguments(), &settings, None, true)
+            run_first(&none[..1], true, &list_arguments(), limit, None, true)
                 .await
                 .map(|_| ()),
             Err(HermesError::Start)

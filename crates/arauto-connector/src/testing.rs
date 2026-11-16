@@ -12,6 +12,7 @@
 //! | [`Settings::with_await_times`] | The minute, the poll, the grace check and the retry of `await-reply`, in milliseconds. |
 //! | [`Settings::with_seed`] | The waits before a new attempt come from a seed, not from the system. |
 //! | [`Settings::with_hermes`] | The command of Hermes is answered by the test instead of run. |
+//! | [`Settings::with_key_step_ms`], [`Settings::with_key_probe`] | The time and the probe address of the key step of `join`. |
 //! | [`attempt`] | One attempt of the channel of a device, with the code of the leader, and nothing around it. |
 
 use std::ffi::OsString;
@@ -222,6 +223,21 @@ impl Settings {
         self.await_poll_ms = poll_ms;
         self.await_grace_ms = grace_ms;
         self.await_retry_ms = retry_ms;
+        self
+    }
+
+    /// The time the whole key step of `join` has, in milliseconds.
+    #[must_use]
+    pub fn with_key_step_ms(mut self, ms: i64) -> Self {
+        self.key_step_ms = ms;
+        self
+    }
+
+    /// The address the key step looks at for a listener, instead of the default one of the
+    /// local API of Hermes.
+    #[must_use]
+    pub fn with_key_probe(mut self, address: std::net::SocketAddr) -> Self {
+        self.key_probe = address;
         self
     }
 

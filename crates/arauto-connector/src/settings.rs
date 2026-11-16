@@ -34,6 +34,12 @@ pub struct Settings {
     pub(crate) command_lock_ms: i64,
     /// The command of Hermes that registers or removes the connector.
     pub(crate) hermes_ms: i64,
+    /// The whole key step of `join` (`docs/11-conector.md`, section 6): every call of Hermes in
+    /// it and the probe of the listener, together.
+    pub(crate) key_step_ms: i64,
+    /// Where the listener guard of the key step connects: the default address of the local API
+    /// of Hermes.
+    pub(crate) key_probe: std::net::SocketAddr,
     /// The orderly close of the channel at the end, below the 2 seconds Hermes gives.
     pub(crate) shutdown_ms: i64,
     /// What wakes the Hermes: one for the whole process, whatever connection is up.
@@ -69,6 +75,8 @@ impl Default for Settings {
             // The first command of Hermes in a data folder it never used took 47 s on a
             // Windows machine (14/11/2026); in a folder in use it takes 2 to 4 s.
             hermes_ms: 90 * SECOND_MS,
+            key_step_ms: 60 * SECOND_MS,
+            key_probe: std::net::SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 8642)),
             shutdown_ms: 1_500,
             waker: std::sync::Arc::default(),
             await_minute_ms: 60 * SECOND_MS,
@@ -119,6 +127,9 @@ mod tests {
         );
         // Hermes waits 2 seconds before it ends the connector by force.
         assert!(settings.shutdown_ms < 2_000);
+        // The key step: 60 seconds in all, and the default address of the local API of Hermes.
+        assert_eq!(settings.key_step_ms, 60_000);
+        assert_eq!(settings.key_probe.to_string(), "127.0.0.1:8642");
         // The leader gives up a write before the hub gives up the "saved".
         assert!(settings.devices_lock_ms < settings.deadlines.saved_ms);
         // The waits of await-reply: a minute, a 30 s poll, a 10-minute grace, a 5 s retry.

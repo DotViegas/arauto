@@ -310,7 +310,7 @@ async fn the_block_reaches_three_copies_and_each_one_answers() {
     expected.extend(args.iter().cloned());
     // The registration, and the list that proves it.
     assert_eq!(
-        hermes.calls(),
+        hermes.mcp_calls(),
         vec![expected, vec!["mcp".to_owned(), "list".to_owned()]]
     );
     assert_eq!(
@@ -980,7 +980,7 @@ async fn join_registers_with_the_reference_and_the_copies_get_the_key() {
     let device = only_device(&home);
     assert_eq!(hub_json(&home, &device)["key_reference"], json!(true));
     // Only `mcp add` and `mcp list` ran, and the environment of the command had no key variable.
-    assert!(hermes.calls().iter().all(|call| call[0] == "mcp"));
+    assert_only_mcp_and_the_key_read(&hermes);
     assert_no_key_variables(&hermes);
 
     let mut copies = started(&hermes, 2).await;
@@ -1202,7 +1202,7 @@ async fn register_saves_the_entry_again_without_touching_the_connection() {
 
     // The connector only ran `mcp add`, `mcp list` and `mcp remove`: it never touched the
     // secrets, and the environment of the command had no variable of the key.
-    assert!(hermes.calls().iter().all(|call| call[0] == "mcp"));
+    assert_only_mcp_and_the_key_read(&hermes);
     assert_no_key_variables(&hermes);
     close_all(copies).await;
 }
@@ -1300,6 +1300,7 @@ async fn a_rejoin_registers_again_only_when_the_entry_lacks_the_reference() {
 #[tokio::test(flavor = "multi_thread")]
 async fn the_command_of_hermes_never_gets_the_key_variables() {
     let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
     let fixture = Fixture::new(settings()).await;
     let hermes = fake_hermes();
     hermes.set_terminal_env("API_SERVER_KEY", "CANARY-terminal-a-0123456789abcdef");
@@ -1308,9 +1309,20 @@ async fn the_command_of_hermes_never_gets_the_key_variables() {
         "CANARY-terminal-b-0123456789abcdef",
     );
     hermes.set_terminal_env("OTHER_VARIABLE", "not a secret");
+    // No key in Hermes: the `join` runs the reads and the `set` too, and none of those calls
+    // gets the variables of the key either (T9).
+    hermes.without_key();
     let folder = Folder::new();
     let home = folder.home.clone();
     let joined = joined(&fixture, &hermes, &home).await;
+    assert!(
+        hermes
+            .config_calls()
+            .iter()
+            .any(|call| call.get(1).is_some_and(|word| word == "set")),
+        "{:?}",
+        hermes.calls()
+    );
     assert_no_key_variables(&hermes);
     assert!(
         hermes
@@ -1330,4 +1342,490 @@ async fn the_command_of_hermes_never_gets_the_key_variables() {
     );
     assert_no_key_variables(&hermes);
     drop(joined);
+}
+
+// ---- The key step of `join` (`docs/11-conector.md`, section 6) ----
+
+/// Every call of the command was about the servers of tools, or was the one read of the setting
+/// the key step makes first: this Hermes had a key, so nothing was written.
+fn assert_only_mcp_and_the_key_read(hermes: &FakeHermes) {
+    let read = ["config", "get", "API_SERVER_KEY"].map(str::to_owned);
+    assert!(
+        hermes
+            .calls()
+            .iter()
+            .all(|call| call[0] == "mcp" || call.as_slice() == read),
+        "{:?}",
+        hermes.calls()
+    );
+}
+
+/// The key step looks at the default address of the local API of Hermes. The tests that run
+/// the program itself need that port free on this machine, and say so when it is not.
+fn assert_the_local_api_port_is_free() {
+    assert!(
+        std::net::TcpStream::connect_timeout(
+            &"127.0.0.1:8642".parse().unwrap(),
+            Duration::from_secs(2)
+        )
+        .is_err(),
+        "something listens on 127.0.0.1:8642 on this machine: the tests of the key step cannot run"
+    );
+}
+
+/// `join` with the options `extra` after the address, in the terminal of Hermes.
+async fn join_with(
+    hermes: &FakeHermes,
+    fixture: &Fixture,
+    invite: &Invite,
+    home: &Path,
+    extra: &[&str],
+) -> Ran {
+    let mut command = hermes.terminal(Path::new(PROGRAM));
+    command
+        .arg("join")
+        .arg(fixture.channel_url())
+        .arg(fixture.hub_key_text())
+        .arg(invite.reveal().as_str())
+        .args(extra)
+        .arg("--home")
+        .arg(home);
+    ran(command).await
+}
+
+/// Every row of every table of the test hub, one text per row, with the bytes of a binary column
+/// written in hexadecimal: the audit and what the hub kept of the channel are in these tables.
+async fn hub_rows(fixture: &Fixture) -> Vec<(String, String)> {
+    let tables: Vec<String> = sqlx::query_scalar(
+        "SELECT table_name::text FROM information_schema.tables \
+         WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' \
+         ORDER BY table_name",
+    )
+    .fetch_all(&fixture.pool)
+    .await
+    .unwrap();
+    assert!(!tables.is_empty(), "the test hub has no tables to search");
+    let mut rows = Vec::new();
+    for table in tables {
+        let texts: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT t::text FROM \"{table}\" t"
+        )))
+        .fetch_all(&fixture.pool)
+        .await
+        .unwrap();
+        rows.extend(
+            texts
+                .into_iter()
+                .map(|text| (format!("hub table {table}"), text)),
+        );
+    }
+    rows
+}
+
+/// The line number of the first line of `text` that is exactly `line`.
+fn line_of(text: &str, line: &str) -> Option<usize> {
+    text.lines().position(|found| found == line)
+}
+
+/// T1 (principle 2): a `join` that makes a key, then the approval, the copies of `mcp`, `status`,
+/// the same `join` again and `leave`: the key, in lowercase and uppercase hexadecimal, in base64,
+/// and its first 16 characters, appears in no output, no log, no answer of the local socket and
+/// no file of the folder of the connector and no row of the hub's tables. The one place it is, by design, is the fake Hermes's
+/// own record: its secrets (what `config set` saved) and the log of its calls. It also reaches the
+/// running connector, through the reference of the entry, as it would on a real Hermes: that is
+/// what `local_waking` true shows.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_key_made_by_join_is_never_shown() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.without_key();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(ran.stderr.is_empty(), "{ran:?}");
+    let code = code_in(&ran.stdout);
+    for told in [Told::KeyMade, Told::RestartAfterKey] {
+        assert!(has_line(&ran.stdout, told.phrase()), "{ran:?}");
+    }
+    assert!(!ran.stdout.contains(Told::KeyNotMade.phrase()), "{ran:?}");
+    let key = hermes.secret("API_SERVER_KEY").expect("a key was saved");
+    assert_eq!(key.len(), 64);
+    let key_bytes = data_encoding::HEXLOWER.decode(key.as_bytes()).unwrap();
+
+    let mut secrets = Secrets::default();
+    secrets.add("the key", &key_bytes);
+    secrets.add_text("first 16 characters of the key", &key[..16]);
+    secrets.add_text(
+        "first 16 characters of the key, uppercase",
+        &key[..16].to_ascii_uppercase(),
+    );
+    secrets.add_text(
+        "the key, base64 of its text",
+        &data_encoding::BASE64.encode(key.as_bytes()),
+    );
+    // A binary column of the hub shows the text of the key as the hexadecimal of its ASCII bytes.
+    secrets.add_text(
+        "the key, as the hexadecimal of its text",
+        &data_encoding::HEXLOWER.encode(key.as_bytes()),
+    );
+    secrets.add("identity", &{
+        let device = only_device(&home);
+        std::fs::read(device_file(&home, &device, "identity.key")).unwrap()
+    });
+    secrets.add_text("invite text", &invite.reveal());
+    secrets.add("invite", &invite_bytes(&invite));
+    let mut outputs: Vec<(String, String)> =
+        vec![("join".to_owned(), format!("{}\n{}", ran.stdout, ran.stderr))];
+    approve(&fixture, &name, &code).await;
+
+    let device = only_device(&home);
+    let mut copies = started(&hermes, 2).await;
+    in_session(&fixture, &public(&home, &device)).await;
+    for copy in &mut copies {
+        // The running connector holds the key (the entry resolved the reference) and says so
+        // without saying it.
+        served_with(copy, &name, true).await;
+        copy.tools().await;
+    }
+    outputs.push((
+        "socket".to_owned(),
+        ask(&home, r#"{"v":1,"op":"status"}"#)
+            .await
+            .unwrap()
+            .to_string(),
+    ));
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert!(has_line(&ran.stdout, RECEIVED), "{ran:?}");
+    outputs.push((
+        "status".to_owned(),
+        format!("{}\n{}", ran.stdout, ran.stderr),
+    ));
+
+    // The same join again: the request is approved (AR-104), the key is found at the first
+    // step and nothing is said.
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(ran.stdout.contains("AR-104"), "{ran:?}");
+    for told in [Told::KeyMade, Told::RestartAfterKey, Told::KeyNotMade] {
+        assert!(!ran.stdout.contains(told.phrase()), "{ran:?}");
+    }
+    outputs.push((
+        "join again".to_owned(),
+        format!("{}\n{}", ran.stdout, ran.stderr),
+    ));
+
+    let ran = command(&hermes, &home, &["leave"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    outputs.push((
+        "leave".to_owned(),
+        format!("{}\n{}", ran.stdout, ran.stderr),
+    ));
+    let mut files = files_of(&home);
+    for copy in copies {
+        let closed = copy.close(CLOSE_GRACE).await;
+        outputs.push((
+            "output of mcp".to_owned(),
+            String::from_utf8_lossy(&closed.stdout).into_owned(),
+        ));
+        outputs.push((
+            "log of mcp".to_owned(),
+            String::from_utf8_lossy(&closed.stderr).into_owned(),
+        ));
+    }
+    files.extend(files_of(&home));
+    // What the hub received over the channel, from the copies that ran with the key in their
+    // environment, as the hub keeps it: its rows, its audit included.
+    files.extend(hub_rows(&fixture).await);
+
+    let mut found = Vec::new();
+    for (what, text) in &outputs {
+        for leak in secrets.leaks(text, false) {
+            found.push(format!("{what}: {leak}"));
+        }
+    }
+    for (file, text) in &files {
+        for leak in secrets.leaks(text, false) {
+            found.push(format!("{file}: {leak}"));
+        }
+    }
+    assert!(found.is_empty(), "secrets found:\n{}", found.join("\n"));
+    // The key was in the arguments of the one `set` of the fake, and nowhere in what the
+    // connector wrote: the control that the search above can find it where it is.
+    let record = std::fs::read_to_string(
+        hermes
+            .folder()
+            .join(arauto_testkit::hermes::registry::CALLS_FILE),
+    )
+    .unwrap();
+    assert!(
+        secrets
+            .leaks(&record, false)
+            .contains(&"the key".to_owned())
+    );
+}
+
+/// T2, from the command line: a Hermes with a key is told nothing and gets one read of the
+/// setting, nothing written.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_hermes_with_a_key_is_left_alone_by_join() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    let folder = Folder::new();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &folder.home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    for told in [Told::KeyMade, Told::RestartAfterKey, Told::KeyNotMade] {
+        assert!(!ran.stdout.contains(told.phrase()), "{ran:?}");
+    }
+    assert_eq!(
+        hermes.config_calls(),
+        vec![
+            ["config", "get", "API_SERVER_KEY"]
+                .map(str::to_owned)
+                .to_vec()
+        ]
+    );
+    assert_eq!(hermes.secret("API_SERVER_KEY"), None);
+}
+
+/// T12 and T10 (the order): the lines come after the code, in the order KeyMade then
+/// RestartAfterKey; and when the `set` fails, KeyNotMade is printed and neither of the other two,
+/// while `join` still exits 0 and the code is there.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_key_lines_follow_the_code_and_only_a_saved_key_says_made() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    for set_fails in [false, true] {
+        let hermes = fake_hermes();
+        hermes.without_key();
+        hermes.failing_config_set(set_fails);
+        let folder = Folder::new();
+        let name = fixture.hermes().await;
+        let invite = fixture.invite(&name).await;
+        let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &folder.home).await;
+        assert_eq!(ran.code, Some(0), "{ran:?}");
+        let code_at = ran
+            .stdout
+            .lines()
+            .position(|line| line.starts_with("VERIFICATION CODE: "))
+            .unwrap();
+        if set_fails {
+            for told in [Told::KeyMade, Told::RestartAfterKey] {
+                assert!(!ran.stdout.contains(told.phrase()), "{ran:?}");
+            }
+            let at = line_of(&ran.stdout, Told::KeyNotMade.phrase()).expect("KeyNotMade");
+            assert!(at > code_at, "{ran:?}");
+            assert_eq!(hermes.secret("API_SERVER_KEY"), None);
+        } else {
+            let made = line_of(&ran.stdout, Told::KeyMade.phrase()).expect("KeyMade");
+            let restart = line_of(&ran.stdout, Told::RestartAfterKey.phrase()).expect("restart");
+            assert!(code_at < made && made + 1 == restart, "{ran:?}");
+            assert!(!ran.stdout.contains(Told::KeyNotMade.phrase()), "{ran:?}");
+        }
+        // The phrases that say the connector never sets the key are gone from the output.
+        assert!(!ran.stdout.contains("never sets"), "{ran:?}");
+    }
+}
+
+/// T7 and T11 (processes): `register`, `status`, the copies of `mcp` and `leave`, against a
+/// Hermes that has no key, make no `config` call at all; and `leave` after a `join` that made a
+/// key makes none either, so the key stays (D4).
+#[tokio::test(flavor = "multi_thread")]
+async fn only_join_makes_a_key_and_leave_keeps_it() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+
+    // `register`, `status`, `mcp` and `leave`, with no key in Hermes.
+    let hermes = fake_hermes();
+    hermes.without_key();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join_with(&hermes, &fixture, &invite, &home, &["--no-register"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+    let ran = command(&hermes, &home, &["register"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &only_device(&home))).await;
+    served_with(&mut copies[0], &name, false).await;
+    close_all(copies).await;
+    let ran = command(&hermes, &home, &["leave"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert_eq!(hermes.config_calls(), Vec::<Vec<String>>::new());
+    assert_eq!(hermes.secret("API_SERVER_KEY"), None);
+
+    // `leave` after a `join` that made a key: no `config` call, and the key is still there.
+    let hermes = fake_hermes();
+    hermes.without_key();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+    let key = hermes.secret("API_SERVER_KEY").expect("a key was saved");
+    let before = hermes.config_calls();
+    assert_eq!(before.len(), 6, "{before:?}");
+    let ran = command(&hermes, &home, &["leave"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert_eq!(hermes.config_calls(), before);
+    assert_eq!(hermes.secret("API_SERVER_KEY"), Some(key));
+}
+
+/// T8: no key without the reference. `--no-register` runs no Hermes command at all, and an
+/// `add` that refuses `--env` leaves an entry without the reference: no `config` call either.
+#[tokio::test(flavor = "multi_thread")]
+async fn no_key_is_made_without_the_reference() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+
+    let hermes = fake_hermes();
+    hermes.without_key();
+    let folder = Folder::new();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join_with(&hermes, &fixture, &invite, &folder.home, &["--no-register"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(hermes.calls().is_empty(), "{:?}", hermes.calls());
+
+    let hermes = fake_hermes();
+    hermes.without_key();
+    hermes.without_env_option(true);
+    let folder = Folder::new();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &folder.home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        ran.stdout.contains("without a reference to the key"),
+        "{ran:?}"
+    );
+    assert_eq!(hermes.config_calls(), Vec::<Vec<String>>::new());
+    assert_eq!(hermes.secret("API_SERVER_KEY"), None);
+}
+
+/// T10 (process): the `set` hangs. The verification code is in the output while the step is
+/// still running, so that a kill by the terminal at that moment costs nothing.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_code_is_out_while_the_key_step_still_runs() {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.without_key();
+    hermes.hanging(Some("set"));
+    let folder = Folder::new();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let mut command = hermes.terminal(Path::new(PROGRAM));
+    command
+        .arg("join")
+        .arg(fixture.channel_url())
+        .arg(fixture.hub_key_text())
+        .arg(invite.reveal().as_str())
+        .arg("--home")
+        .arg(&folder.home);
+    let mut child = command.spawn().unwrap();
+    let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
+    let mut seen = Vec::new();
+    let read_code = async {
+        while let Some(line) = lines.next_line().await.unwrap() {
+            let is_code = line.starts_with("VERIFICATION CODE: ");
+            seen.push(line);
+            if is_code {
+                return true;
+            }
+        }
+        false
+    };
+    let got = tokio::time::timeout(PATIENCE, read_code).await;
+    assert_eq!(got, Ok(true), "{seen:?}");
+    // The step is under way: the `set` was asked, and the connector has not ended.
+    eventually("the set is asked", PATIENCE, || async {
+        hermes
+            .config_calls()
+            .iter()
+            .any(|call| call.get(1).is_some_and(|word| word == "set"))
+    })
+    .await;
+    assert!(child.try_wait().unwrap().is_none());
+    // The terminal kills it: nothing was lost, and nothing was saved.
+    child.kill().await.unwrap();
+    hermes.hanging(None);
+    assert_eq!(hermes.secret("API_SERVER_KEY"), None);
+    assert!(
+        seen.iter()
+            .all(|line| !line.contains(Told::KeyMade.phrase()))
+    );
+}
+
+/// T10 (the deadline): in the process of the test, with a short deadline, a `set` that hangs is
+/// cut by the deadline of the step, `join` still exits 0, and no key is said to be made.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_hanging_key_step_ends_at_its_deadline_and_join_still_exits_0() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.without_key();
+    hermes.hanging(Some("set"));
+    let folder = Folder::new();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let nothing_listens = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let probe = nothing_listens.local_addr().unwrap();
+    drop(nothing_listens);
+    let settings = arauto_connector::Settings::for_tests()
+        .with_key_step_ms(8_000)
+        .with_key_probe(probe);
+    let arguments: Vec<std::ffi::OsString> = [
+        "arauto-connector",
+        "join",
+        &fixture.channel_url(),
+        &fixture.hub_key_text(),
+        invite.reveal().as_str(),
+        "--home",
+        folder.home.to_str().unwrap(),
+    ]
+    .iter()
+    .map(std::ffi::OsString::from)
+    .collect();
+    let started = std::time::Instant::now();
+    let exit = tokio::time::timeout(
+        PATIENCE,
+        arauto_connector::cli::run_with_hermes_and_settings(
+            arguments,
+            Some(hermes.program().into_os_string()),
+            settings,
+        ),
+    )
+    .await
+    .expect("the step ended in time");
+    let took = started.elapsed();
+    hermes.hanging(None);
+    assert_eq!(exit.code(), 0);
+    assert!(took < Duration::from_secs(30), "{took:?}");
+    // The step reached the `set`, and nothing was saved.
+    let calls = hermes.config_calls();
+    assert_eq!(calls.len(), 6, "{calls:?}");
+    assert_eq!(calls[5][1], "set");
+    assert_eq!(hermes.secret("API_SERVER_KEY"), None);
 }

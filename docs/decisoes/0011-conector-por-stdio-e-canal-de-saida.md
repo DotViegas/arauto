@@ -13,7 +13,7 @@ The connector is a local tool server, started by Hermes itself over stdio. It is
 ## Consequences
 
 - It works behind NAT: Hermes only opens an outbound connection.
-- No new network port listens on Hermes's machine.
+- No new network port listens on Hermes's machine, apart from Hermes's own local API on 127.0.0.1, which a key the connector may make in `join` turns on ([0046](0046-chave-pela-entrada-e-hermes-sem-chave.md)).
 - The hub no longer keeps the API key of each Hermes.
 - The connector lives while Hermes lives, with no need to register a service.
 - It depends on a proof: how the connector gets the key of the local API ([0023](0023-chave-da-api-local.md)).

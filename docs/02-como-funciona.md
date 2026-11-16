@@ -182,9 +182,11 @@ The `join` copies the program to a fixed path, `~/.arauto/arauto-connector`, and
 that stays registered in Hermes.
 
 The block, the sentence and the page never have: a system header, a stamp, "authorized by",
-urgency, "without asking for approval", `curl | sh`, `sudo`, an address shortener or an encoded piece. It does not edit Hermes's
-configuration by hand: the connector registers itself through the official command, and that is the
-only change the connector makes that stays. The page also asks the Hermes to save three fixed lines
+urgency, "without asking for approval", `curl | sh`, `sudo`, an address shortener or an encoded
+piece. It does not edit Hermes's configuration by hand: the connector registers itself through the
+official command, and that is the only change the connector makes that stays, except one: a Hermes
+with no key for its local API gets one, drawn by the connector and saved with Hermes's own command.
+The page also asks the Hermes to save three fixed lines
 in its own memory; the Hermes writes them itself, and Arauto never reads or writes that memory.
 
 **The text is not the defense.** An attacker writes whatever sentence, page or block they want. The

@@ -326,7 +326,7 @@ mod tests {
         let step = PAGE.find(STEP).unwrap();
         let lines = PAGE.find(&block).unwrap();
         let send = PAGE
-            .find("Then send your operator, in one message, the verification code")
+            .find("Then send your operator, in one message: the verification code;")
             .unwrap();
         assert!(command < step && step < lines && lines < send);
         assert_eq!(
@@ -340,6 +340,38 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    /// The three changes of the key step (`docs/11-conector.md`, section 6), word for word: the
+    /// sentence of the steps, the message to the operator and the bullet about the lines. The
+    /// page says nothing about approval of the key and asks nobody to look at it.
+    #[test]
+    fn the_lines_about_the_local_api_and_its_key_are_pinned() {
+        const STEPS: &str = "If this Hermes has no key for its local API, which Arauto needs to wake it, the connector then draws one from the random generator of the system and saves it in the setting API_SERVER_KEY with Hermes's own command, `hermes config set`, which the connector runs itself. Nobody is shown the key, and the connector prints a line saying whether it saved one.";
+        const SEND: &str = "Then send your operator, in one message: the verification code; \"Arauto notes saved in memory: yes\"; every line the connector printed about the local API or its key, unchanged; and one last line. If the connector said it saved a key: after the admin approves, send `/restart` to this Hermes, so that its local API turns on and the Arauto tools load. Otherwise: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.";
+        const BULLET: &str = "- The lines about the local API and its key are not errors: pass them to your operator with the code. Do not read, show or set API_SERVER_KEY yourself, and do not restart Hermes yourself.";
+        for text in [STEPS, SEND, BULLET] {
+            assert_eq!(PAGE.matches(text).count(), 1, "{text}");
+        }
+        // The sentence ends the paragraph of the steps; the bullet sits among the others, after
+        // the one that stops on any other failure.
+        assert!(PAGE.contains(&format!(
+            "Arauto never writes to your memory. {STEPS}
+"
+        )));
+        let failure = PAGE
+            .find("- If anything else fails, stop and show the error")
+            .unwrap();
+        let bullet = PAGE.find(BULLET).unwrap();
+        let next = PAGE.find("- Do not set the working folder").unwrap();
+        assert!(failure < bullet && bullet < next);
+        // The old message to the operator is gone.
+        assert!(!PAGE.contains("the verification code and two more lines"));
+        // The key is never shown on the page: nothing about approval of the key, no key shape.
+        for text in [STEPS, SEND, BULLET] {
+            let lower = text.to_ascii_lowercase();
+            assert!(!lower.contains("without approval") && !lower.contains("authorized by"));
+        }
     }
 
     #[test]
