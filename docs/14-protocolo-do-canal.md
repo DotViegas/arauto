@@ -343,7 +343,7 @@ is too old presents itself this way at the leader's startup and, after that, onc
 | connector | `call` | `id`, `tool`, `args` | Tool call. |
 | hub | `result` | `id`, `ok`, and `content` or `code`; optional `retry_after_s` | Response. A refusal carries only the code; the sentence stays in the connector. |
 | hub | `notice` | `id`, `kind`, and the fields of the kind | Notice: a pointer, with no third-party text. |
-| connector | `notice_ack` | `id`, `outcome` | After Hermes's local API accepts. |
+| connector | `notice_ack` | `id`, `outcome` | After Hermes's local API accepts, or after a waiting `await-reply` was told (decision 0048, proposal, 15/11/2026). |
 | hub | `rotate` | | The 24-hour swap starts. |
 | hub | `rotated` | `generation` | The 24-hour swap was written. |
 | both | `ping`, `pong` | `n` | Heartbeat. The `pong` returns the `n`. CONTROL flag. |
@@ -402,7 +402,7 @@ manages to put into the sentence a name in this format and two numbers.
 
 | `outcome` | When | What the hub does |
 |---|---|---|
-| `accepted` | The local API accepted. | Takes the notice as confirmed. |
+| `accepted` | The Hermes was told: the local API accepted, or a waiting `await-reply` was told (proposal, 15/11/2026, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)). The wire is unchanged. | Takes the notice as confirmed. |
 | `duplicate` | The connector had already handled that `id`. | Takes it as confirmed. |
 | `failed` | The local API did not answer or refused. | Tries again, with a growing wait, until the notice expires. |
 | `throttled` | The connector reached its own ceiling of wakes. | Tries again in 5 minutes. |
@@ -674,6 +674,7 @@ Each message is a JSON object on one line, with `"v": 1`. An unknown version or 
 | `status` | `status` | The situation of the device and of the channel, with no secret. Since 15/11/2026 (proposal, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)) it also carries `waking`: whether the leader received the key of Hermes's local API (`key_received`) and the outcome of its last wake (`last`: `accepted`, `refused`, `no_answer` or null). Never the key. A reader that finds no `waking` (an older leader) shows "unknown". |
 | `join` | `new_request` | The leader starts following the new request. |
 | `leave` | `leave` | The leader asks for the closing of each identity of the folder and returns one response per identity. |
+| `await-reply` | `await`, with `id`, `thread` (a UUID) and `minutes` (1 to 120) | Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)). A long-lived operation, like `watch`. One final line: `{"v":1,"id":N,"ok":true,"arrived":true,"thread":"<uuid>","peer":"<name>"}`, or `"arrived":false` at the deadline, or `{"ok":false,"code":"AR-..."}`, or `{"ok":false,"error":"busy"}`. The thread and the name in the line were validated by the leader; no note text. At most 8 waits per Hermes and one per connection; a closed connection drops the wait. After a `{"restart":true}` line or a closed socket the client tries again every 5 seconds and registers again for the remaining time. |
 | `join` | `restart` | The leader ends, for Hermes to start it again in the new version. |
 
 No operation of the socket returns the identity or the credential. In shielded mode, `leave` and

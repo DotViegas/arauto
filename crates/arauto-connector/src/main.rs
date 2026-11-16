@@ -1,4 +1,4 @@
-//! `arauto-connector`: `join`, `mcp`, `status`, `register` and `leave` (`docs/11-conector.md`, section 1).
+//! `arauto-connector`: `join`, `mcp`, `status`, `register`, `leave` and `await-reply` (`docs/11-conector.md`, section 1).
 #![forbid(unsafe_code)]
 
 use std::process::ExitCode;

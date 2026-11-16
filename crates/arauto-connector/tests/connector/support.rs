@@ -4,6 +4,7 @@
 
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -13,10 +14,13 @@ use arauto_connector::{Connector, Hermes, Home, JoinArgs, Joined, Settings};
 use arauto_hub::repo::approval::ApproveOutcome;
 use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_protocol::invite::Invite;
+use arauto_protocol::message::CallOutcome;
 use arauto_protocol::noise::{PublicKey, StaticKeypair};
 use arauto_protocol::secret::Secret;
 use arauto_testkit::hub::fixture::Fixture;
-use serde_json::Value;
+use serde_json::{Map, Value, json};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 use zeroize::Zeroizing;
 
@@ -392,4 +396,71 @@ pub async fn clean(
         tokio::time::sleep(Duration::from_millis(30)).await;
     }
     Err(format!("no session after 20 clean attempts: {seen:?}"))
+}
+
+/// One request the local API received: its head and its body.
+pub type Asked = (String, String);
+
+/// A local API of Hermes: it records each request and answers with the status it is set to.
+pub struct FakeApi {
+    pub url: String,
+    asked: Arc<Mutex<Vec<Asked>>>,
+    pub status: Arc<AtomicU16>,
+}
+
+impl FakeApi {
+    pub async fn start() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/v1/runs", listener.local_addr().unwrap());
+        let asked: Arc<Mutex<Vec<Asked>>> = Arc::default();
+        let status = Arc::new(AtomicU16::new(202));
+        let (kept, answer) = (Arc::clone(&asked), Arc::clone(&status));
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let (kept, answer) = (Arc::clone(&kept), Arc::clone(&answer));
+                tokio::spawn(async move {
+                    let mut bytes = Vec::new();
+                    let mut chunk = [0u8; 1_024];
+                    let (head, body) = loop {
+                        let read = stream.read(&mut chunk).await.unwrap_or(0);
+                        bytes.extend_from_slice(&chunk[..read]);
+                        let text = String::from_utf8_lossy(&bytes).into_owned();
+                        if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                            let length: usize = head
+                                .lines()
+                                .find_map(|line| line.strip_prefix("Content-Length: "))
+                                .and_then(|length| length.trim().parse().ok())
+                                .unwrap_or(0);
+                            if body.len() >= length || read == 0 {
+                                break (head.to_owned(), body.to_owned());
+                            }
+                        } else if read == 0 {
+                            break (text, String::new());
+                        }
+                    };
+                    kept.lock().unwrap().push((head, body));
+                    let status = answer.load(Ordering::SeqCst);
+                    let reply = format!(
+                        "HTTP/1.1 {status} X\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}"
+                    );
+                    let _ = stream.write_all(reply.as_bytes()).await;
+                });
+            }
+        });
+        Self { url, asked, status }
+    }
+
+    pub fn asked(&self) -> Vec<Asked> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+pub async fn send(from: &Connector, to: &str, text: &str) -> Map<String, Value> {
+    let Value::Object(args) = json!({"to": to, "text": text}) else {
+        unreachable!()
+    };
+    match from.call("hermes_send_message", args).await {
+        CallOutcome::Ok(content) => content.into_map(),
+        CallOutcome::Refused { code, .. } => panic!("refused with {code}"),
+    }
 }

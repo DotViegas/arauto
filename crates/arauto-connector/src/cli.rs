@@ -6,6 +6,7 @@
 //! arauto-connector status                                the situation, without any secret
 //! arauto-connector register                              saves the entry in Hermes again
 //! arauto-connector leave [--local]                       the request to leave, and the cleaning
+//! arauto-connector await-reply THREAD [--minutes N]      waits for an answer in a thread
 //! ```
 //!
 //! Every command takes `--home FOLDER` (or `ARAUTO_HOME`; `~/.arauto` by default).
@@ -13,7 +14,8 @@
 //! `ARAUTO_HERMES_API_URL` and `ARAUTO_HERMES_API_KEY`, which Hermes gives it through the entry
 //! (the key as a reference to its own setting, resolved by Hermes). The system location
 //! variables of the user (`HOME`, `USERPROFILE`, `LOCALAPPDATA`) are read to find the default
-//! folder and the place of Hermes. No other variable is read, and there is no other command.
+//! folder and the place of Hermes. No other variable is read, and there is no other command. `await-reply` talks only to the local socket of the
+//! leader, like `status`.
 //! `tests/environment.rs` holds the exact list of the places in the source that read one.
 //!
 //! What a command says is a fixed phrase, with the code of the catalog when there is one; a
@@ -27,7 +29,10 @@
 //! AR-202, AR-204, AR-205, AR-206, AR-208); 6 the versions do not agree (AR-401, AR-402); 7 the
 //! registration in Hermes failed (AR-601); 8 leaving is pending (AR-505); 9 a problem of this
 //! machine (the folder, a damaged file, another `join` running, the copy of the program, no
-//! TLS); 10 the files were deleted and the registration in Hermes was not removed.
+//! TLS); 10 the files were deleted and the registration in Hermes was not removed; 11 no answer
+//! arrived within the wait of `await-reply`; 12 it cannot wait (unknown thread, too many waits, a
+//! tool refused). `await-reply` also exits 9 when the leader is still gone at its deadline. Its
+//! output is fixed text with only a thread, a Hermes name and the minutes (`crate::reply`).
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -36,6 +41,7 @@ use std::time::Duration;
 use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_protocol::errors::ErrorCode;
 use clap::{Parser, Subcommand};
+use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use crate::catalog::Told;
@@ -44,6 +50,7 @@ use crate::hermes::{Hermes, Registration};
 use crate::home::Home;
 use crate::join::{Entry, JoinArgs, Joined};
 use crate::leave::Left;
+use crate::reply::Awaited;
 use crate::runtime::Connector;
 use crate::settings::Settings;
 
@@ -73,6 +80,10 @@ pub enum Exit {
     Local = 9,
     /// The files were deleted and the registration in Hermes was not removed.
     Unregister = 10,
+    /// `await-reply`: no answer arrived within the wait.
+    NoAnswer = 11,
+    /// `await-reply`: it cannot wait.
+    CannotWait = 12,
 }
 
 impl Exit {
@@ -145,6 +156,15 @@ enum Command {
         #[arg(long)]
         no_register: bool,
     },
+    /// Waits, through the leader, for an answer in a thread, and prints one fixed line.
+    AwaitReply {
+        /// The thread, as a UUID.
+        #[arg(value_parser = thread_arg)]
+        thread: Uuid,
+        /// How many minutes to wait: 1 to 120.
+        #[arg(long, default_value_t = crate::reply::MINUTES_DEFAULT, value_parser = clap::value_parser!(u32).range(1..=120))]
+        minutes: u32,
+    },
     /// The server of tools that Hermes starts.
     Mcp,
     /// Shows the situation, without any secret.
@@ -162,7 +182,7 @@ enum Command {
 }
 
 /// What a wrong command line gets: the usage, and nothing it was given.
-const USAGE: &str = "Usage: arauto-connector [--home FOLDER] <join HUB KEY INVITE [--no-register] | mcp | status | register | leave [--local]>";
+const USAGE: &str = "Usage: arauto-connector [--home FOLDER] <join HUB KEY INVITE [--no-register] | mcp | status | register | leave [--local] | await-reply THREAD [--minutes N]>";
 
 /// Runs the command line `arguments`, with `hermes` the value of `ARAUTO_HERMES_BIN`, and
 /// returns the exit code.
@@ -177,6 +197,21 @@ pub async fn run_waking(
     arguments: Vec<OsString>,
     hermes: Option<OsString>,
     waking: impl FnOnce() -> (Option<OsString>, Option<OsString>),
+) -> Exit {
+    run_inner(arguments, hermes, waking, Settings::default()).await
+}
+
+/// [`run`] with `settings`, for the tests of this crate.
+#[cfg(feature = "testing")]
+pub async fn run_with_settings(arguments: Vec<OsString>, settings: Settings) -> Exit {
+    run_inner(arguments, None, || (None, None), settings).await
+}
+
+async fn run_inner(
+    arguments: Vec<OsString>,
+    hermes: Option<OsString>,
+    waking: impl FnOnce() -> (Option<OsString>, Option<OsString>),
+    settings: Settings,
 ) -> Exit {
     let cli = match Cli::try_parse_from(arguments) {
         Ok(cli) => cli,
@@ -203,7 +238,6 @@ pub async fn run_waking(
         }
     };
     let hermes = Hermes::new(hermes);
-    let settings = Settings::default();
     match cli.command {
         Command::Join {
             hub,
@@ -220,6 +254,11 @@ pub async fn run_waking(
                 program,
             };
             join(&home, args, &hermes, &settings).await
+        }
+        Command::AwaitReply { thread, minutes } => {
+            let awaited = crate::reply::await_reply(&home, thread, minutes, &settings).await;
+            println!("{}", awaited.text());
+            exit_of(&awaited)
         }
         Command::Mcp => {
             let (api_url, api_key) = waking();
@@ -256,6 +295,22 @@ pub async fn run_waking(
         }
         Command::Register => register(&home, &hermes, &settings).await,
         Command::Leave { local } => leave(&home, local, &hermes, &settings).await,
+    }
+}
+
+fn thread_arg(text: &str) -> Result<Uuid, String> {
+    crate::reply::parse_thread(text).ok_or_else(|| "not a thread".to_owned())
+}
+
+/// The exit code of how a wait ended.
+fn exit_of(awaited: &Awaited) -> Exit {
+    match awaited {
+        Awaited::Arrived { .. } => Exit::Done,
+        Awaited::NoAnswer { .. } => Exit::NoAnswer,
+        Awaited::UnknownThread | Awaited::TooMany | Awaited::Refused(_) | Awaited::OlderLeader => {
+            Exit::CannotWait
+        }
+        Awaited::LeaderGone => Exit::Local,
     }
 }
 
@@ -481,6 +536,8 @@ mod tests {
             (Exit::LeavePending, 8),
             (Exit::Local, 9),
             (Exit::Unregister, 10),
+            (Exit::NoAnswer, 11),
+            (Exit::CannotWait, 12),
         ];
         for (exit, code) in codes {
             assert_eq!(exit.code(), code);
@@ -500,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn the_command_line_has_the_five_commands() {
+    fn the_command_line_has_the_six_commands() {
         let parse = |line: &[&str]| Cli::try_parse_from(line.iter().map(OsString::from));
         assert!(matches!(
             parse(&["arauto-connector", "join", "h", "k", "i", "--no-register"])
@@ -536,8 +593,49 @@ mod tests {
                 .command,
             Command::Leave { local: true }
         ));
+        let thread = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+        let minutes_of = |line: &[&str]| match parse(line).unwrap().command {
+            Command::AwaitReply {
+                thread: parsed,
+                minutes,
+            } => {
+                assert_eq!(parsed.to_string(), thread);
+                minutes
+            }
+            _ => panic!("not await-reply"),
+        };
+        assert_eq!(minutes_of(&["arauto-connector", "await-reply", thread]), 20);
+        for (text, expected) in [("1", 1), ("120", 120), ("45", 45)] {
+            assert_eq!(
+                minutes_of(&["arauto-connector", "await-reply", thread, "--minutes", text]),
+                expected
+            );
+        }
+        for bad in ["0", "121", "abc", "-1", ""] {
+            assert!(
+                parse(&["arauto-connector", "await-reply", thread, "--minutes", bad]).is_err(),
+                "{bad}"
+            );
+        }
+        for bad in [
+            "not-a-uuid",
+            "$(id)",
+            "",
+            "0a1b2c3d4e5f4a6b8c7d9e0f1a2b3c4d",
+        ] {
+            assert!(
+                parse(&["arauto-connector", "await-reply", bad]).is_err(),
+                "{bad}"
+            );
+        }
+        assert!(parse(&["arauto-connector", "await-reply"]).is_err());
         assert!(parse(&["arauto-connector", "join", "h", "k"]).is_err());
         assert!(parse(&["arauto-connector", "update"]).is_err());
         assert!(parse(&["arauto-connector", "help"]).is_err());
+    }
+
+    #[test]
+    fn the_usage_names_await_reply() {
+        assert!(USAGE.contains(" | await-reply THREAD [--minutes N]>"));
     }
 }

@@ -9,9 +9,19 @@
 //! | The notice is of an unknown kind or has a field out of format | `rejected` |
 //! | Its identifier was already handled (the answer of the first time was lost) | `duplicate` |
 //! | This connector has no way to wake its Hermes | `failed` |
+//! | A peer notice, and an `await-reply` of this Hermes waits for that peer and the answer arrived | `accepted`, the identifier is kept, the ceiling is not used and the local API is not called |
 //! | The ceiling of this connector: 30 a minute, 300 an hour, of any kind | `throttled` |
 //! | The local API of Hermes accepted the run | `accepted`, and the identifier is kept |
 //! | It refused, or did not answer in time | `failed` |
+//!
+//! **A waiting `await-reply`** (decision 0048). When a peer notice comes from a peer that a wait
+//! of this Hermes awaits, the connector lists the threads at once ([`crate::waiters`]). If a
+//! wait resolves, the Hermes was told by the process that waited: the notice is answered
+//! `accepted` without the local API and its identifier is kept, so a repeat is `duplicate`. Ten
+//! minutes later one check lists the threads again, and only if the answer is still unread the
+//! Hermes is woken through the local API ([`Waker::wake_late`]), with the normal sentence, the
+//! identifier of the notice as the idempotency key and the normal ceiling. A listing that fails
+//! changes nothing: the notice wakes as it always did.
 //!
 //! The ceiling is the last barrier against a loop: it holds even against a hub with a defect.
 //! The identifiers handled are kept on disk, so a connector that restarts does not wake twice
@@ -34,14 +44,16 @@ use std::net::SocketAddr;
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use arauto_protocol::notice::{AckOutcome, Notice, NoticeMsg};
+use arauto_protocol::notice::{AckOutcome, Notice, NoticeId, NoticeMsg};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use crate::home::Home;
+use crate::settings::Settings;
 use crate::store;
+use crate::waiters::Lister;
 
 /// The variable with the address of the local API of Hermes.
 pub const URL_VARIABLE: &str = "ARAUTO_HERMES_API_URL";
@@ -300,7 +312,13 @@ impl Waker {
     }
 
     /// Handles one notice of the hub, and says what goes back in `notice_ack`.
-    pub(crate) async fn handle(&self, home: &Home, notice: &NoticeMsg) -> AckOutcome {
+    pub(crate) async fn handle<L: Lister>(
+        &self,
+        home: &Home,
+        notice: &NoticeMsg,
+        settings: &Settings,
+        lister: &L,
+    ) -> AckOutcome {
         let Ok(checked) = notice.validate() else {
             return AckOutcome::Rejected;
         };
@@ -312,6 +330,23 @@ impl Waker {
                 .get_or_insert_with(|| store::read_handled(home).into());
             if handled.contains(&id) {
                 return AckOutcome::Duplicate;
+            }
+        }
+        // A wait of `await-reply` for this peer takes no place in the ceiling and needs no key:
+        // a Hermes without one is still told.
+        if let Notice::Peer { from, .. } = &checked {
+            let waiters = &settings.waiters;
+            let times = crate::waiters::Times::of(settings);
+            if waiters.interested(from)
+                && let Ok(rows) = lister.list().await
+                && waiters.on_notice(notice.id, &checked, &rows, Instant::now(), times)
+            {
+                self.remember(home, id).await;
+                #[cfg(feature = "testing")]
+                settings.emit(|| crate::testing::Event::WakeSuppressed {
+                    notice: id.to_string(),
+                });
+                return AckOutcome::Accepted;
             }
         }
         let Some(target) = &self.target else {
@@ -327,26 +362,39 @@ impl Waker {
         if !self.memory().windows.take(Instant::now()) {
             return AckOutcome::Throttled;
         }
-        let called = call(target, id, &phrase(&checked)).await;
+        if !self.call_and_record(target, id, &phrase(&checked)).await {
+            return AckOutcome::Failed;
+        }
+        self.remember(home, id).await;
+        AckOutcome::Accepted
+    }
+
+    /// Calls the local API and keeps how it ended. `true` when it accepted.
+    async fn call_and_record(&self, target: &WakeTarget, id: Uuid, phrase: &str) -> bool {
+        let called = call(target, id, phrase).await;
         self.memory().last = Some(match called {
             Called::Accepted => LastWake::Accepted,
             Called::Refused(_) => LastWake::Refused,
             Called::NoAnswer => LastWake::NoAnswer,
         });
         match called {
-            Called::Accepted => {}
+            Called::Accepted => true,
             Called::Refused(status) => {
                 tracing::warn!(
                     status,
                     "a wake was refused by the local API of Hermes (AR-602)"
                 );
-                return AckOutcome::Failed;
+                false
             }
             Called::NoAnswer => {
                 tracing::warn!("the local API of Hermes did not answer a wake (AR-602)");
-                return AckOutcome::Failed;
+                false
             }
         }
+    }
+
+    /// Keeps `id` as handled, in memory and on disk.
+    async fn remember(&self, home: &Home, id: Uuid) {
         let kept: Vec<Uuid> = {
             let mut memory = self.memory();
             let handled = memory.handled.get_or_insert_with(VecDeque::new);
@@ -356,11 +404,34 @@ impl Waker {
             }
             handled.iter().copied().collect()
         };
-        // The Hermes was woken whatever becomes of this write: a failure only means that a
-        // restart may wake once more for this notice.
+        // The Hermes was told whatever becomes of this write: a failure only means that a
+        // restart may tell it once more for this notice.
         let home = home.clone();
         let _ = tokio::task::spawn_blocking(move || store::write_handled(&home, &kept)).await;
-        AckOutcome::Accepted
+    }
+
+    /// The grace check of a wait that a notice resolved found the answer still unread: wakes
+    /// the Hermes with the normal sentence, the identifier of the notice as the idempotency
+    /// key and a place in the ceiling. The identifier is already handled. No retry.
+    pub(crate) async fn wake_late(&self, settings: &Settings, id: NoticeId, notice: &Notice) {
+        let Some(target) = &self.target else {
+            return;
+        };
+        if !self.memory().windows.take(Instant::now()) {
+            tracing::warn!("a late wake for an answer was skipped: the ceiling of wakes is full");
+            return;
+        }
+        let accepted = self
+            .call_and_record(target, id.get(), &notice.phrase())
+            .await;
+        #[cfg(feature = "testing")]
+        if accepted {
+            settings.emit(|| crate::testing::Event::GraceWake {
+                notice: id.get().to_string(),
+            });
+        }
+        #[cfg(not(feature = "testing"))]
+        let _ = (accepted, settings);
     }
 }
 
@@ -457,5 +528,235 @@ mod tests {
         assert!(!head.contains("X-Injected"));
         let parsed: serde_json::Value = serde_json::from_str(body).unwrap();
         assert_eq!(parsed["input"], "say \"hi\"\r\nX-Injected: 1");
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Waiting `await-reply` and the notices (decision 0048)
+    // -----------------------------------------------------------------------------------
+
+    use std::sync::Arc;
+
+    use arauto_protocol::errors::ErrorCode;
+    use arauto_protocol::names::{ChatId, HermesName, NumberAlias};
+    use arauto_protocol::notice::NoticeCount;
+
+    use crate::waiters::Row;
+
+    /// A local API that records the head and the body of each request and accepts it.
+    async fn fake_api() -> (WakeTarget, Arc<Mutex<Vec<String>>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/v1/runs", listener.local_addr().unwrap());
+        let asked: Arc<Mutex<Vec<String>>> = Arc::default();
+        let kept = Arc::clone(&asked);
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let kept = Arc::clone(&kept);
+                tokio::spawn(async move {
+                    let mut bytes = Vec::new();
+                    let mut chunk = [0u8; 1_024];
+                    loop {
+                        let read = stream.read(&mut chunk).await.unwrap_or(0);
+                        bytes.extend_from_slice(&chunk[..read]);
+                        let text = String::from_utf8_lossy(&bytes).into_owned();
+                        if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                            let length: usize = head
+                                .lines()
+                                .find_map(|line| line.strip_prefix("Content-Length: "))
+                                .and_then(|length| length.trim().parse().ok())
+                                .unwrap_or(0);
+                            if body.len() >= length {
+                                break;
+                            }
+                        }
+                        if read == 0 {
+                            break;
+                        }
+                    }
+                    kept.lock()
+                        .unwrap()
+                        .push(String::from_utf8_lossy(&bytes).into_owned());
+                    let _ = stream
+                        .write_all(
+                            b"HTTP/1.1 202 X\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+                        )
+                        .await;
+                });
+            }
+        });
+        (WakeTarget::new(&url, "k3y").unwrap(), asked)
+    }
+
+    /// A lister that answers with canned rows, or fails, or must never be asked.
+    enum Listing {
+        Rows(Vec<Row>),
+        Fails(ErrorCode),
+        Never,
+    }
+
+    impl Lister for Listing {
+        async fn list(&self) -> Result<Vec<Row>, ErrorCode> {
+            match self {
+                Listing::Rows(rows) => Ok(rows.clone()),
+                Listing::Fails(code) => Err(*code),
+                Listing::Never => panic!("the waits were consulted"),
+            }
+        }
+    }
+
+    fn name(text: &str) -> HermesName {
+        HermesName::parse(text).unwrap()
+    }
+
+    fn row(thread: u128, peer: &str, unread: u64) -> Row {
+        Row {
+            thread: Uuid::from_u128(thread),
+            peer: name(peer),
+            unread,
+        }
+    }
+
+    fn peer_notice(id: u128, from: &str) -> (NoticeMsg, Notice) {
+        let notice = Notice::Peer {
+            from: name(from),
+            count: NoticeCount::new(1).unwrap(),
+        };
+        (
+            NoticeMsg::new(NoticeId::new(Uuid::from_u128(id)), &notice),
+            notice,
+        )
+    }
+
+    type Waiting = (
+        Settings,
+        (
+            crate::waiters::Armed,
+            tokio::sync::oneshot::Receiver<crate::waiters::Arrival>,
+        ),
+    );
+
+    /// A settings value with one wait armed on thread 1 for `peer`.
+    fn waiting_for(peer: &str) -> Waiting {
+        let settings = Settings::default();
+        let reservation = settings.waiters.reserve().unwrap();
+        let (armed, told) = settings
+            .waiters
+            .arm(reservation, Uuid::from_u128(1), &[row(1, peer, 0)])
+            .unwrap();
+        (settings, (armed, told))
+    }
+
+    fn home() -> (tempfile::TempDir, Home) {
+        let dir = tempfile::tempdir().unwrap();
+        let home = Home::at(&dir.path().join("arauto")).unwrap();
+        home.prepare().unwrap();
+        (dir, home)
+    }
+
+    #[tokio::test]
+    async fn a_whatsapp_notice_never_consults_the_waiters_and_wakes() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let (settings, _armed) = waiting_for("ana");
+        let notice = Notice::Whatsapp {
+            number: NumberAlias::parse("balcao").unwrap(),
+            chat: ChatId::parse("abc-1").unwrap(),
+            count: NoticeCount::new(2).unwrap(),
+        };
+        let message = NoticeMsg::new(NoticeId::new(Uuid::from_u128(5)), &notice);
+        let outcome = waker
+            .handle(&home, &message, &settings, &Listing::Never)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        assert_eq!(asked.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_peer_notice_that_resolves_a_wait_is_accepted_without_the_local_api_and_without_the_ceiling()
+     {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        for _ in 0..WAKES_PER_MINUTE {
+            assert!(waker.memory().windows.take(Instant::now()));
+        }
+        let (settings, _armed) = waiting_for("ana");
+        let (message, _) = peer_notice(6, "ana");
+        let listing = Listing::Rows(vec![row(1, "ana", 1)]);
+        let outcome = waker.handle(&home, &message, &settings, &listing).await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        assert!(asked.lock().unwrap().is_empty(), "the local API was asked");
+        assert_eq!(waker.memory().windows.made.len(), WAKES_PER_MINUTE);
+        // A suppressed notice is remembered as handled: the same identifier is a duplicate.
+        let again = waker.handle(&home, &message, &settings, &listing).await;
+        assert_eq!(again, AckOutcome::Duplicate);
+        assert!(store::read_handled(&home).contains(&Uuid::from_u128(6)));
+        // Without a key a Hermes is still told by its waiting process.
+        let keyless = Waker::new(None);
+        let (settings, _armed) = waiting_for("ana");
+        let (message, _) = peer_notice(7, "ana");
+        assert_eq!(
+            keyless.handle(&home, &message, &settings, &listing).await,
+            AckOutcome::Accepted
+        );
+    }
+
+    #[tokio::test]
+    async fn a_peer_notice_when_the_listing_fails_wakes_as_before() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let (settings, _armed) = waiting_for("ana");
+        let (message, _) = peer_notice(8, "ana");
+        let outcome = waker
+            .handle(
+                &home,
+                &message,
+                &settings,
+                &Listing::Fails(ErrorCode::Ar203),
+            )
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        // A notice from another peer is never held back either.
+        let (other, _) = peer_notice(9, "bento");
+        let rows = Listing::Rows(vec![row(1, "ana", 1)]);
+        assert_eq!(
+            waker.handle(&home, &other, &settings, &rows).await,
+            AckOutcome::Accepted
+        );
+        assert_eq!(asked.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_late_wake_uses_the_identifier_of_the_notice_and_the_ceiling() {
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let settings = Settings::default();
+        let (message, notice) = peer_notice(0x77, "ana");
+        waker.wake_late(&settings, message.id, &notice).await;
+        {
+            let asked = asked.lock().unwrap();
+            assert_eq!(asked.len(), 1);
+            let request = asked.first().unwrap();
+            assert!(request.contains(&format!(
+                "Idempotency-Key: {}",
+                Uuid::from_u128(0x77).as_hyphenated()
+            )));
+            let body: serde_json::Value =
+                serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+            assert_eq!(body["input"], notice.phrase());
+        }
+        assert_eq!(waker.memory().windows.made.len(), 1);
+        // A full ceiling skips it, and nothing is retried.
+        for _ in 0..WAKES_PER_MINUTE {
+            let _ = waker.memory().windows.take(Instant::now());
+        }
+        waker.wake_late(&settings, message.id, &notice).await;
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        // Without a key there is nothing to call.
+        Waker::new(None)
+            .wake_late(&settings, message.id, &notice)
+            .await;
     }
 }

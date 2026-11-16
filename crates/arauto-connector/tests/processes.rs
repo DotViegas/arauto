@@ -265,3 +265,20 @@ async fn the_commands_print_fixed_texts() {
     assert!(!ran.stdout.contains(&code) && !ran.stdout.contains(&code.replace('-', "")));
     assert!(!ran.stdout.contains(&text));
 }
+
+/// A wrong thread is answered with the usage and nothing it was given: the argument may be
+/// anything, and it is never echoed.
+#[tokio::test(flavor = "multi_thread")]
+async fn await_reply_with_a_wrong_thread_prints_the_usage_only() {
+    let folder = Folder::new();
+    let canary = "CANARY-thread-argument-3f9a";
+    let ran = run(&folder.home, &["await-reply", canary]).await;
+    assert_eq!(ran.code, Some(2), "{ran:?}");
+    assert!(ran.stderr.starts_with("Usage:"), "{ran:?}");
+    assert!(ran.stderr.contains("await-reply THREAD"), "{ran:?}");
+    assert!(
+        !ran.stdout.contains(canary) && !ran.stderr.contains(canary),
+        "{ran:?}"
+    );
+    assert!(ran.stdout.is_empty(), "{ran:?}");
+}

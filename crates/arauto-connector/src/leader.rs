@@ -14,6 +14,9 @@
 //! - When the hub tells it to stop using the channel (quarantine, suspended, revoked, unknown,
 //!   expired, replaced with nothing to go to), the leader stays alive: the calls get the code,
 //!   and the local socket still serves `join`, `leave` and `status`.
+//! - It keeps the waits of `await-reply` (`crate::waiters`), at most 8 for its Hermes: each is
+//!   one request on the local socket that is answered once, and a closed connection frees its
+//!   place. A connection holds one wait at a time.
 //! - It serves the local socket to the other copies. When a `join` asks it to end for the new
 //!   program, it tells every connection of the socket, so that the copies that forward end
 //!   too.
@@ -26,7 +29,7 @@ use arauto_platform::{FileLock, LocalListener, LocalSocketError, LocalStream};
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::limits::CALLS_IN_FLIGHT_MAX;
 use arauto_protocol::message::{CallOutcome, LeftStatus, Payload};
-use arauto_protocol::tools::{ARAUTO_STATUS, ToolName};
+use arauto_protocol::tools::{ARAUTO_STATUS, HERMES_SEND_MESSAGE, ToolName};
 use serde_json::{Value, json};
 use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::{Semaphore, mpsc, oneshot, watch};
@@ -36,7 +39,7 @@ use crate::attempt::{self, Ctx, stopped};
 use crate::backoff::{self, Backoff, Next};
 use crate::catalog::{Local, Said};
 use crate::home::Home;
-use crate::local::{self, Envelope, Lines, Request};
+use crate::local::{self, Envelope, Lines, Refusal, Request};
 use crate::session::{LeaveAsk, Live, News, refused};
 use crate::settings::{Settings, duration};
 use crate::short;
@@ -79,7 +82,7 @@ pub(crate) struct Shared {
     /// What a call gets without a session.
     unavailable: watch::Sender<ErrorCode>,
     view: watch::Sender<View>,
-    finished: watch::Sender<Option<Finish>>,
+    pub(crate) finished: watch::Sender<Option<Finish>>,
 }
 
 /// What `status` shows of the slots.
@@ -224,6 +227,7 @@ impl Leader {
         });
         let actor = tokio::spawn(actor(Arc::clone(&shared), received));
         let server = tokio::spawn(serve(Arc::clone(&shared), listener));
+        let waits = tokio::spawn(crate::waiters::run(Arc::clone(&shared)));
         #[cfg(feature = "testing")]
         shared
             .settings
@@ -231,7 +235,7 @@ impl Leader {
         tracing::info!("this copy of the connector is the leader of its folder");
         Ok(Self {
             shared,
-            tasks: vec![actor, server],
+            tasks: vec![actor, server, waits],
         })
     }
 
@@ -292,6 +296,31 @@ fn with_connector_fields(outcome: CallOutcome, can_wake: bool) -> CallOutcome {
     }
 }
 
+/// The answer of `hermes_send_message`, with the field that tells the asking Hermes how to wait
+/// for the reply (`crate::reply`, decision 0048). It is built only when the thread the hub
+/// sent parses as a UUID, and is printed hyphenated; any value the hub sent under the name of
+/// the field is removed first. The hub never sends this text (principle 6).
+fn with_reply_field(outcome: CallOutcome) -> CallOutcome {
+    match outcome {
+        CallOutcome::Ok(payload) => {
+            let mut map = payload.into_map();
+            map.remove(crate::reply::FIELD);
+            let thread = map
+                .get("thread")
+                .and_then(Value::as_str)
+                .and_then(crate::reply::parse_thread);
+            if let Some(thread) = thread {
+                map.insert(
+                    crate::reply::FIELD.to_owned(),
+                    Value::from(crate::reply::to_get_the_reply(thread)),
+                );
+            }
+            CallOutcome::Ok(Payload::new(map))
+        }
+        refused @ CallOutcome::Refused { .. } => refused,
+    }
+}
+
 fn always() -> Vec<ToolName> {
     ToolName::parse(ARAUTO_STATUS)
         .map(|tool| vec![tool])
@@ -302,15 +331,15 @@ impl Shared {
     /// A call, through the session of the device in use.
     pub(crate) async fn call(&self, tool: ToolName, args: Payload) -> CallOutcome {
         let live = self.live.borrow().clone();
-        let is_status = tool.as_str() == ARAUTO_STATUS;
+        let name = tool.as_str().to_owned();
         let outcome = match live {
             Some(live) => live.calls.call(tool, args).await,
             None => refused(*self.unavailable.borrow()),
         };
-        if is_status {
-            with_connector_fields(outcome, self.settings.waker.can_wake())
-        } else {
-            outcome
+        match name.as_str() {
+            ARAUTO_STATUS => with_connector_fields(outcome, self.settings.waker.can_wake()),
+            HERMES_SEND_MESSAGE => with_reply_field(outcome),
+            _ => outcome,
         }
     }
 
@@ -1060,6 +1089,7 @@ async fn client(shared: Arc<Shared>, stream: LocalStream) {
     let calls = Arc::new(Semaphore::new(CALLS_IN_FLIGHT_MAX));
     let mut finished = shared.finished.subscribe();
     let mut watching: Option<JoinHandle<()>> = None;
+    let mut awaiting: Option<JoinHandle<()>> = None;
     loop {
         let line = tokio::select! {
             line = lines.next() => line,
@@ -1143,12 +1173,34 @@ async fn client(shared: Arc<Shared>, stream: LocalStream) {
                     send(local::done(id)).await;
                     shared.send(Command::Finish(Finish::Restart));
                 }
+                Request::Await { thread, minutes } => {
+                    let Some(id) = id else {
+                        continue;
+                    };
+                    // One wait for each connection.
+                    if awaiting.as_ref().is_some_and(|task| !task.is_finished()) {
+                        send(local::refusal(Some(id), Refusal::Busy)).await;
+                    } else {
+                        awaiting = Some(tokio::spawn(crate::waiters::serve(
+                            Arc::clone(&shared),
+                            id,
+                            thread,
+                            minutes,
+                            out.clone(),
+                        )));
+                    }
+                }
             },
         }
     }
     if let Some(watching) = watching {
         watching.abort();
         let _ = watching.await;
+    }
+    // A wait whose connection closed is dropped: its place is free and normal waking applies.
+    if let Some(awaiting) = awaiting {
+        awaiting.abort();
+        let _ = awaiting.await;
     }
     // A restart ends every copy that forwards here too: Hermes starts each one again, on the
     // new program, and none of the old ones takes the place of the leader.
@@ -1215,5 +1267,47 @@ mod tests {
             retry_after: None,
         };
         assert_eq!(with_connector_fields(refused.clone(), true), refused);
+    }
+
+    #[test]
+    fn the_reply_field_is_built_only_from_a_thread_in_uuid_form() {
+        let good = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+        let outcome = |thread: Option<Value>| {
+            let mut map = json!({"message": "m1", crate::reply::FIELD: "from the hub"})
+                .as_object()
+                .cloned()
+                .unwrap();
+            if let Some(thread) = thread {
+                map.insert("thread".to_owned(), thread);
+            }
+            with_reply_field(CallOutcome::Ok(Payload::new(map)))
+        };
+        let field = |outcome: CallOutcome| match outcome {
+            CallOutcome::Ok(payload) => payload.as_map().get(crate::reply::FIELD).cloned(),
+            CallOutcome::Refused { .. } => panic!("a success stays a success"),
+        };
+        for hostile in [
+            Some(json!("not-a-uuid")),
+            Some(json!("$(rm -rf ~)")),
+            Some(json!(format!("{good};rm"))),
+            Some(json!("0a1b2c3d4e5f4a6b8c7d9e0f1a2b3c4d")),
+            Some(json!(format!("{{{good}}}"))),
+            Some(json!(5)),
+            Some(json!(null)),
+            None,
+        ] {
+            assert_eq!(field(outcome(hostile.clone())), None, "{hostile:?}");
+        }
+        let expected = Some(json!(crate::reply::to_get_the_reply(
+            crate::reply::parse_thread(good).unwrap()
+        )));
+        assert_eq!(field(outcome(Some(json!(good)))), expected);
+        // An upper-case thread is printed in lower case.
+        assert_eq!(field(outcome(Some(json!(good.to_uppercase())))), expected);
+        let refused = CallOutcome::Refused {
+            code: ErrorCode::Ar707,
+            retry_after: None,
+        };
+        assert_eq!(with_reply_field(refused.clone()), refused);
     }
 }

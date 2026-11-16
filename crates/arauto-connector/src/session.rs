@@ -8,7 +8,7 @@
 //! | `rotate`, then `credential` | The 24-hour swap: the credential is written durably and only then `saved` goes; the calls go on meanwhile. A `credential` without `rotate` before it ends the connection. |
 //! | `rotated` | The swap was recorded. |
 //! | `tools` | The list of released tools changed: it is kept in `state.json`. |
-//! | `notice` | Checked, and the Hermes is woken through its local API ([`crate::wake`]): `rejected` when out of format, `duplicate`, `throttled`, `accepted` or `failed`. |
+//! | `notice` | Checked, and the Hermes is woken through its local API ([`crate::wake`]): `rejected` when out of format, `duplicate`, `throttled`, `accepted` (also when a waiting `await-reply` was told, decision 0048) or `failed`. |
 //! | `left` | The answer to the request to leave sent over this channel. |
 //! | anything else | Ends the connection. |
 //!
@@ -181,6 +181,7 @@ pub(crate) async fn serve(mut link: Link, session: Session, around: Around<'_>) 
         link: link.handle(),
         flight: Arc::clone(&flight),
     };
+    let notice_calls = calls.clone();
     let _ = around.news.send(News::Session(Live {
         calls,
         session: session.clone(),
@@ -227,9 +228,13 @@ pub(crate) async fn serve(mut link: Link, session: Session, around: Around<'_>) 
                     // of the session goes on meanwhile.
                     let handle = link.handle();
                     let home = around.saving.home.clone();
-                    let waker = Arc::clone(&around.saving.settings.waker);
+                    let settings = Arc::clone(&around.saving.settings);
+                    let calls = notice_calls.clone();
                     tokio::spawn(async move {
-                        let outcome = waker.handle(&home, &notice).await;
+                        let outcome = settings
+                            .waker
+                            .handle(&home, &notice, &settings, &calls)
+                            .await;
                         let ack = Message::NoticeAck(NoticeAck {
                             id: notice.id,
                             outcome,

@@ -50,6 +50,7 @@ proofs below do not run.
 | How many copies of the connector Hermes starts | Bring up all of Hermes's processes and count. |
 | Hermes restarts a tool server that exits | Terminate the minimal program and see whether, and in how long, it comes back. **Result, 15/11/2026, one Hermes (v0.22.5, Docker, Linux): a running gateway did not start the killed connector again in 15 minutes**; it came back only after the gateway was restarted (K5). |
 | The call to the local API | Address, body, in which conversation the run happens and how to use the repetition identifier. **Result, 15/11/2026, one Hermes (v0.22.5, Docker, Linux): the call with the fixed sentence was accepted and the Hermes answered the note within 8 seconds** (K4). The repetition identifier and the conversation of the run were not separately checked. |
+| Answers between agents, waiting with `await-reply` (proposal, 15/11/2026, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)); built, none of it tried on a real Hermes | A note that arrives while a turn runs is queued. The TUI and the dashboard. The approval request. A wait of 20 minutes against the 180-second command limit. Compression, `/new`, a restart of the gateway and `persist_on_release`. The size and the masking of the output tail. The refusal of `notify` in a run of the API server. Whether a model follows the field `to_get_the_reply`. Whether a woken Hermes now answers by note. |
 | What changes in version 0.23 | Repeat each line of [hermes-fatos](../referencia/hermes-fatos.md). |
 
 ### On the channel
@@ -143,6 +144,8 @@ inactivity period, with the label of the screen that is still missing
 ## Phase 5 — Wake
 
 The notice queue, the fixed sentence and the call to Hermes's local API.
+
+Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)): the sentence of a peer notice says how to answer, and a Hermes that asked can wait for the answer in its own conversation through `arauto-connector await-reply`. Built, not tried on a real Hermes.
 
 **Done when:** with randomized drops of the hub, of the connector and of Hermes, no notice
 disappears before expiring and no repeated notice starts a second run in Hermes; the notice does not

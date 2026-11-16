@@ -2,8 +2,7 @@
 //! section 6): the real hub, the real connector, and a local API of Hermes that only records
 //! what it was asked.
 
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use arauto_connector::Connector;
@@ -11,80 +10,12 @@ use arauto_connector::wake::WakeTarget;
 use arauto_protocol::message::CallOutcome;
 use arauto_testkit::hub::fixture::{Fixture, settings as hub_settings};
 use serde_json::{Map, Value, json};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-use crate::support::{PATIENCE, connected, eventually, settings};
+use crate::support::{FakeApi, PATIENCE, connected, eventually, send, settings};
 
 const KEY: &str = "CANARY-key-of-the-local-api-5d1e";
 const TEXT: &str = "CANARY-text-of-a-message-between-agents-77aa";
-
-/// One request the local API received: its head and its body.
-type Asked = (String, String);
-
-/// A local API of Hermes: it records each request and answers with the status it is set to.
-struct FakeApi {
-    url: String,
-    asked: Arc<Mutex<Vec<Asked>>>,
-    status: Arc<AtomicU16>,
-}
-
-impl FakeApi {
-    async fn start() -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let url = format!("http://{}/v1/runs", listener.local_addr().unwrap());
-        let asked: Arc<Mutex<Vec<Asked>>> = Arc::default();
-        let status = Arc::new(AtomicU16::new(202));
-        let (kept, answer) = (Arc::clone(&asked), Arc::clone(&status));
-        tokio::spawn(async move {
-            while let Ok((mut stream, _)) = listener.accept().await {
-                let (kept, answer) = (Arc::clone(&kept), Arc::clone(&answer));
-                tokio::spawn(async move {
-                    let mut bytes = Vec::new();
-                    let mut chunk = [0u8; 1_024];
-                    let (head, body) = loop {
-                        let read = stream.read(&mut chunk).await.unwrap_or(0);
-                        bytes.extend_from_slice(&chunk[..read]);
-                        let text = String::from_utf8_lossy(&bytes).into_owned();
-                        if let Some((head, body)) = text.split_once("\r\n\r\n") {
-                            let length: usize = head
-                                .lines()
-                                .find_map(|line| line.strip_prefix("Content-Length: "))
-                                .and_then(|length| length.trim().parse().ok())
-                                .unwrap_or(0);
-                            if body.len() >= length || read == 0 {
-                                break (head.to_owned(), body.to_owned());
-                            }
-                        } else if read == 0 {
-                            break (text, String::new());
-                        }
-                    };
-                    kept.lock().unwrap().push((head, body));
-                    let status = answer.load(Ordering::SeqCst);
-                    let reply = format!(
-                        "HTTP/1.1 {status} X\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}"
-                    );
-                    let _ = stream.write_all(reply.as_bytes()).await;
-                });
-            }
-        });
-        Self { url, asked, status }
-    }
-
-    fn asked(&self) -> Vec<Asked> {
-        self.asked.lock().unwrap().clone()
-    }
-}
-
-async fn send(from: &Connector, to: &str, text: &str) -> Map<String, Value> {
-    let Value::Object(args) = json!({"to": to, "text": text}) else {
-        unreachable!()
-    };
-    match from.call("hermes_send_message", args).await {
-        CallOutcome::Ok(content) => content.into_map(),
-        CallOutcome::Refused { code, .. } => panic!("refused with {code}"),
-    }
-}
 
 /// The states of the notices of the hub, the oldest first.
 async fn notices(fixture: &Fixture) -> Vec<String> {
@@ -145,6 +76,14 @@ async fn a_message_of_another_hermes_wakes_through_the_local_api_with_the_fixed_
         phrase.contains(&format!("from Hermes agent \"{sender}\"")),
         "{phrase}"
     );
+    // Rule 6, end to end: exactly the fixed sentence of the protocol, around the validated name
+    // and the count.
+    let expected = arauto_protocol::notice::Notice::Peer {
+        from: arauto_protocol::names::HermesName::parse(&sender).unwrap(),
+        count: arauto_protocol::notice::NoticeCount::new(1).unwrap(),
+    }
+    .phrase();
+    assert_eq!(phrase, expected);
     // Never the text of the message, nor its thread.
     assert!(!phrase.contains(TEXT));
     assert!(!phrase.contains(sent["thread"].as_str().unwrap()));

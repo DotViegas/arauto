@@ -217,3 +217,29 @@ Not checked: Windows (the launcher `hermes.exe` handing its command line to Pyth
 macOS, v0.23 and other versions; the handling of `$` in arguments by the shim
 `/opt/hermes/bin/hermes`; an API on another port; whether Hermes's masking of the terminal
 output hides the name `API_SERVER_KEY` in printed lines.
+
+## A background process with notify, and answers between agents (15/11/2026)
+
+**Hermes Agent v0.22.5, Docker install, Linux, 15/11/2026.** Marking as at the top: [code] was read
+in the source of Hermes and not run; [observed] was seen on a running Hermes. Used by
+[decision 0048](../docs/decisoes/0048-resposta-na-conversa-que-perguntou.md). No name of a person,
+company or server is recorded here.
+
+| | Fact |
+|---|---|
+| N1 | [code] The terminal tool with `background=true` and `notify=true`: when the process ends, the gateway puts a message into the same conversation with the exit code, the command and the last part of the output (about 2000 characters, masked), and starts a turn. If a turn is running, the message is queued. |
+| N2 | [code] `notify` is refused (`notify_unsupported`) in runs of the API server, one-shot runs, cron jobs and Kanban workers. A run created by a wake through the local API is of the first kind. |
+| N3 | [code] A background process with notify is dropped after `/new`, and killed by the sweeps at the end of a conversation and at compression unless it was started with `persist_on_release`. It may ask for approval. At most 64 processes. |
+| N4 | [code] Terminal processes get variables that name the conversation; a stdio tool server gets none. MCP notifications, sampling and elicitation do not start a turn. |
+| N5 | [observed] On a conversation of the WhatsApp gateway, a background process of 40 seconds with notify: when it ended, the Hermes spoke by itself in the same conversation, with the exit code and the output. No approval request was seen. |
+| N6 | [observed] A Hermes woken by a note for a peer read it and wrote its answer as plain text into the API run, which nobody reads. It sent no note back. |
+| N7 | [observed] The asking Hermes, in a WhatsApp conversation with its operator, said it had no answer yet and ended its turn. A later answer would wake it in a separate run that the operator does not see. |
+
+K4 above saw another Hermes answer a note by note within 8 seconds, so the behavior differs between
+Hermes and between models. N6 and N7 are one pair of Hermes on one day.
+
+Not checked: whether a note that arrives while a turn runs is queued as N1 says; the TUI and the
+dashboard; the approval request; whether the 180-second command limit applies to a background
+process; compression, `/new`, a gateway restart and `persist_on_release`; the size and the masking
+of the output tail; Windows, macOS, v0.23 and other versions; whether a model follows the text the
+connector adds to a result.

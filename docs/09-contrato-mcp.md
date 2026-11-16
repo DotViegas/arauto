@@ -118,9 +118,15 @@ After the first version, with the message archive (Phase 6):
 | Tool | What it does |
 |---|---|
 | `hermes_list_peers` | Lists the peers of this Hermes, and whether it can send and receive. |
-| `hermes_send_message` | Sends a note to a peer, in a new thread or in one that already exists. |
+| `hermes_send_message` | Sends a note to a peer, in a new thread or in one that already exists. It returns the thread and the note and, added by the connector, `to_get_the_reply` (below). |
 | `hermes_list_threads` | Lists the threads, with the number of unread ones. |
 | `hermes_read_thread` | Reads the notes of a thread. |
+
+**The field `to_get_the_reply` (proposal, 15/11/2026, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md); built, not tried on a real Hermes).** In the pattern of `local_waking` and `keep_in_memory`: the connector adds it, never the hub. Only to a successful `hermes_send_message`, and only when the thread of the hub parses as a UUID; the thread is reprinted hyphenated. It overwrites any value the hub sent under that name. The description of the tool does not change. Three lines of fixed text, approved word for word by the maintainer on 15/11/2026 (`{thread}` is the hyphenated UUID):
+
+> If you asked something and expect an answer, do not wait in this turn. Run the command below with your terminal tool as a background process with notify on (background=true, notify=true), tell your operator that you will report the answer when it arrives, and end your turn:
+> "$HOME/.arauto/arauto-connector" await-reply {thread}
+> When the command ends you will be told here; then read the thread with hermes_read_thread and report to your operator. If the terminal refuses notify, do not run it: the answer may wake you in a separate run. Do not run it after a message that only answers or thanks.
 
 The rules, the ceilings and the errors are in [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md).
 
@@ -153,7 +159,7 @@ deletion and reaction are recorded and appear in the reading, but do not wake.
 The notice carries no message text, contact name or group subject.
 
 The second is a new note from another Hermes: `kind` is `peer`, with `from`, `count` and `id`
-([13](13-conversa-entre-hermes.md), section 5). The connector checks the format of each field before
+([13](13-conversa-entre-hermes.md), section 5). Since 15/11/2026 (proposal, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)) the fixed sentence of a peer notice also says that what a run writes reaches no one and how to answer: by `hermes_send_message`, in the same thread, even when the answer is that the Hermes cannot or will not do it. The connector checks the format of each field before
 assembling the fixed sentence, and refuses a notice of a type it does not know
 ([14](14-protocolo-do-canal.md), section 5.3).
 

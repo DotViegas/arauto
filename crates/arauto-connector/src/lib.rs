@@ -6,6 +6,7 @@
 //! | [`Connector`] | The connector of a process, leader of its folder or a copy that forwards to the leader: calls, tools, status. |
 //! | [`join()`], [`register()`], [`leave()`], [`report()`] | The commands `join`, `register`, `leave` and `status`, as functions. |
 //! | [`cli`] | The command line, its fixed texts and its exit codes; `mcp` serves MCP over stdio, in the versions of [`PROTOCOL_VERSIONS`]. |
+//! | [`reply`] | `await-reply`: the field `to_get_the_reply`, the fixed lines of the command and its client (decision 0048). |
 //! | [`catalog`] | What the connector says: the codes of the catalog and the local problems. |
 //! | [`Home`], [`HubAddress`], [`Hermes`], [`Settings`] | The folder, the address of the hub, the command of Hermes, the waits. |
 //! | `testing` (feature) | Faults on command, events and short deadlines, for the tests of this crate. |
@@ -15,7 +16,8 @@
 //! `session` (the calls and the 24-hour swap), `backoff` (what follows an attempt), `leader`
 //! (the slots of the device in use and of the request, the switch of device, the cleaning, the
 //! local socket), `relay` (the copy that forwards), `local` (the messages of the local
-//! socket), `store` (the files), `short` (the enrollment and the request to leave), `mcp` (the
+//! socket), `store` (the files), `short` (the enrollment and the request to leave), `waiters` (the
+//! waits of `await-reply` that the leader holds), `mcp` (the
 //! server of tools Hermes talks to) and `rpc` (JSON-RPC 2.0 over lines, for it).
 #![forbid(unsafe_code)]
 
@@ -36,6 +38,7 @@ mod mcp;
 pub mod memory;
 mod register;
 mod relay;
+pub mod reply;
 mod report;
 mod rpc;
 mod runtime;
@@ -46,6 +49,7 @@ mod status;
 mod store;
 #[cfg(feature = "testing")]
 pub mod testing;
+mod waiters;
 pub mod wake;
 mod writes;
 
@@ -56,6 +60,7 @@ pub use join::{Entry, JoinArgs, Joined, join};
 pub use leave::{Left, leave};
 pub use mcp::{PROTOCOL_VERSIONS, SERVER_INFO_NAME};
 pub use register::register;
+pub use reply::{Awaited, await_reply};
 pub use report::{EntryReport, FolderReport, Report, render, report};
 pub use runtime::{Connector, StartError};
 pub use settings::Settings;

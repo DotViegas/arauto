@@ -9,6 +9,7 @@
 //! | [`Settings::for_tests`] | Deadlines of milliseconds instead of seconds. |
 //! | [`Faults`] | Says, at each [`Point`] of the swap, whether the connector fails there. |
 //! | [`Event`] | What the connector did: attempts, waits, sessions, stops, the switch of device. |
+//! | [`Settings::with_await_times`] | The minute, the poll, the grace check and the retry of `await-reply`, in milliseconds. |
 //! | [`Settings::with_seed`] | The waits before a new attempt come from a seed, not from the system. |
 //! | [`Settings::with_hermes`] | The command of Hermes is answered by the test instead of run. |
 //! | [`attempt`] | One attempt of the channel of a device, with the code of the leader, and nothing around it. |
@@ -146,6 +147,22 @@ pub enum Event {
         /// The folder of the device.
         device: String,
     },
+    /// A peer notice was taken as delivered by a waiting `await-reply`: the local API was not
+    /// called.
+    WakeSuppressed {
+        /// The identifier of the notice.
+        notice: String,
+    },
+    /// The grace check found the answer still unread and woke the Hermes.
+    GraceWake {
+        /// The identifier of the notice.
+        notice: String,
+    },
+    /// A wait of `await-reply` was resolved.
+    WaitResolved {
+        /// Whether a notice of the hub resolved it (otherwise the poll did).
+        by_notice: bool,
+    },
 }
 
 type HermesAnswer = Arc<dyn Fn(&[OsString]) -> bool + Send + Sync>;
@@ -188,6 +205,23 @@ impl Settings {
     #[must_use]
     pub fn with_devices_lock_ms(mut self, ms: i64) -> Self {
         self.devices_lock_ms = ms;
+        self
+    }
+
+    /// The times of `await-reply`, in milliseconds: a minute, the poll of the leader, the grace
+    /// check after a notice, and the pause before the client asks again.
+    #[must_use]
+    pub fn with_await_times(
+        mut self,
+        minute_ms: i64,
+        poll_ms: i64,
+        grace_ms: i64,
+        retry_ms: i64,
+    ) -> Self {
+        self.await_minute_ms = minute_ms;
+        self.await_poll_ms = poll_ms;
+        self.await_grace_ms = grace_ms;
+        self.await_retry_ms = retry_ms;
         self
     }
 

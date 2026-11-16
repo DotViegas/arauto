@@ -11,6 +11,7 @@
 //! | `{"v":1,"op":"tools"}` | `{"v":1,"ok":true,"tools":["arauto_status"]}` |
 //! | `{"v":1,"op":"watch"}` | `{"v":1,"ok":true,"tools":[...]}`, then one line `{"v":1,"tools":[...]}` each time the list changes |
 //! | `{"v":1,"op":"status"}` | `{"v":1,"ok":true,"status":{...}}`, without any secret |
+//! | `{"v":1,"op":"await","id":1,"thread":"<uuid>","minutes":20}` | one final line, later: `{"v":1,"id":1,"ok":true,"arrived":true,"thread":"<uuid>","peer":"<name>"}`, `{"v":1,"id":1,"ok":true,"arrived":false}` (the deadline), `{"v":1,"id":1,"ok":false,"code":"AR-708"}` or `{"v":1,"id":1,"ok":false,"error":"busy"}` |
 //! | `{"v":1,"op":"new_request"}` | `{"v":1,"ok":true}`: the leader reads the folders again |
 //! | `{"v":1,"op":"leave"}` | `{"v":1,"ok":true,"done":true,"left":[{"device":"...","outcome":"closed"}]}` |
 //! | `{"v":1,"op":"restart"}` | `{"v":1,"ok":true}`, and the leader ends |
@@ -20,6 +21,10 @@
 //! `{"v":1,"restart":true}`, before it closes: a copy that forwards ends too, so that Hermes
 //! starts it again on the new program.
 //!
+//! The answer to `await` carries only a thread and a Hermes name that the leader validated from
+//! the hub's listing of threads: never the text of a note. A connection holds one `await` at a
+//! time, and a leader holds at most 8 for its Hermes.
+//!
 //! What comes in is hostile: a line is at most a little more than the largest message of the
 //! channel, it is read with the rules of a message (no repeated key, a ceiling of values and of
 //! nesting), and nothing of it is repeated in an answer but the number of the request. No
@@ -28,9 +33,11 @@
 use arauto_protocol::errors::{ErrorCode, RetryAfter};
 use arauto_protocol::limits::{CONNECTOR_MESSAGE_MAX, HUB_MESSAGE_MAX};
 use arauto_protocol::message::{CallOutcome, Payload, read_strict};
+use arauto_protocol::names::HermesName;
 use arauto_protocol::tools::ToolName;
 use serde_json::{Map, Value, json};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt};
+use uuid::Uuid;
 
 /// The version of the messages.
 pub(crate) const VERSION: u64 = 1;
@@ -63,6 +70,13 @@ pub(crate) enum Request {
     Leave,
     /// End, so that Hermes starts the new version.
     Restart,
+    /// Wait for an answer in a thread (decision 0048).
+    Await {
+        /// The thread.
+        thread: Uuid,
+        /// How long, in minutes: 1 to 120.
+        minutes: u32,
+    },
 }
 
 /// A request and its number.
@@ -79,6 +93,8 @@ pub(crate) enum Refusal {
     Unsupported,
     /// A field missing or out of its format.
     Invalid,
+    /// This connection or this leader already holds the most waits it may.
+    Busy,
 }
 
 impl Refusal {
@@ -86,6 +102,7 @@ impl Refusal {
         match self {
             Refusal::Unsupported => "unsupported",
             Refusal::Invalid => "invalid",
+            Refusal::Busy => "busy",
         }
     }
 }
@@ -133,6 +150,21 @@ pub(crate) fn parse_request(line: &[u8]) -> Result<Envelope, (Option<u64>, Refus
         "new_request" => Request::FolderChanged,
         "leave" => Request::Leave,
         "restart" => Request::Restart,
+        "await" => {
+            let thread = object
+                .get("thread")
+                .and_then(Value::as_str)
+                .and_then(crate::reply::parse_thread);
+            let minutes = object
+                .get("minutes")
+                .and_then(Value::as_u64)
+                .filter(|minutes| (1..=u64::from(crate::reply::MINUTES_MAX)).contains(minutes))
+                .and_then(|minutes| u32::try_from(minutes).ok());
+            match (id, thread, minutes) {
+                (Some(_), Some(thread), Some(minutes)) => Request::Await { thread, minutes },
+                _ => return Err((id, Refusal::Invalid)),
+            }
+        }
         _ => return Err((id, Refusal::Unsupported)),
     };
     Ok(Envelope { id, request })
@@ -239,6 +271,77 @@ pub(crate) fn read_call_answer(object: &Map<String, Value>) -> CallOutcome {
     }
 }
 
+/// The final line of `await` when an answer arrived: a thread and a name, both checked.
+pub(crate) fn await_arrived(id: u64, thread: Uuid, peer: &HermesName) -> Value {
+    with_id(
+        object(json!({
+            "ok": true,
+            "arrived": true,
+            "thread": thread.as_hyphenated().to_string(),
+            "peer": peer.as_str(),
+        })),
+        Some(id),
+    )
+}
+
+/// The final line of `await` at its deadline.
+pub(crate) fn await_deadline(id: u64) -> Value {
+    with_id(object(json!({"ok": true, "arrived": false})), Some(id))
+}
+
+/// The final line of `await` when a tool was refused.
+pub(crate) fn await_refused(id: u64, code: ErrorCode) -> Value {
+    with_id(
+        object(json!({"ok": false, "code": code.as_str()})),
+        Some(id),
+    )
+}
+
+/// What the leader said to an `await`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum AwaitAnswer {
+    /// An answer arrived.
+    Arrived { thread: Uuid, peer: HermesName },
+    /// The deadline came.
+    Deadline,
+    /// A tool was refused, with this code.
+    Code(ErrorCode),
+    /// Too many waits.
+    Busy,
+    /// An older leader, or a request it did not accept.
+    Unsupported,
+}
+
+/// Reads the final line of an `await` that came from the leader. `None` for a restart line
+/// and for anything out of its form.
+pub(crate) fn read_await_answer(object: &Map<String, Value>, id: u64) -> Option<AwaitAnswer> {
+    if is_restart(object) || object.get("id").and_then(Value::as_u64) != Some(id) {
+        return None;
+    }
+    match object.get("ok")? {
+        Value::Bool(true) => match object.get("arrived")? {
+            Value::Bool(true) => {
+                let thread = crate::reply::parse_thread(object.get("thread")?.as_str()?)?;
+                let peer = HermesName::parse(object.get("peer")?.as_str()?).ok()?;
+                Some(AwaitAnswer::Arrived { thread, peer })
+            }
+            Value::Bool(false) => Some(AwaitAnswer::Deadline),
+            _ => None,
+        },
+        Value::Bool(false) => {
+            if let Some(code) = object.get("code").and_then(Value::as_str) {
+                return ErrorCode::parse(code).map(AwaitAnswer::Code);
+            }
+            match object.get("error").and_then(Value::as_str)? {
+                "busy" => Some(AwaitAnswer::Busy),
+                "unsupported" | "invalid" => Some(AwaitAnswer::Unsupported),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Reads the names of a list of tools that came from the leader. A name out of its format is
 /// left out.
 pub(crate) fn read_tools(object: &Map<String, Value>) -> Option<Vec<ToolName>> {
@@ -329,6 +432,10 @@ mod tests {
             (r#"{"v":1,"op":"new_request"}"#, "new"),
             (r#"{"v":1,"op":"leave"}"#, "leave"),
             (r#"{"v":1,"op":"restart"}"#, "restart"),
+            (
+                r#"{"v":1,"op":"await","id":2,"thread":"0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","minutes":20}"#,
+                "await",
+            ),
         ] {
             let request = parse(text).unwrap().request;
             let name = match request {
@@ -338,6 +445,7 @@ mod tests {
                 Request::FolderChanged => "new",
                 Request::Leave => "leave",
                 Request::Restart => "restart",
+                Request::Await { .. } => "await",
                 Request::Call { .. } => "call",
             };
             assert_eq!(name, expected, "{text}");
@@ -371,9 +479,34 @@ mod tests {
                 r#"{"v":1,"op":"call","id":1,"tool":"arauto_status","args":[]}"#,
                 Refusal::Invalid,
             ),
+            (
+                r#"{"v":1,"op":"await","thread":"0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","minutes":5}"#,
+                Refusal::Invalid,
+            ),
+            (
+                r#"{"v":1,"op":"await","id":1,"minutes":5}"#,
+                Refusal::Invalid,
+            ),
         ] {
             let (_, found) = parse(text).unwrap_err();
             assert_eq!(found, refusal, "{text}");
+        }
+        let good = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+        for minutes in ["0", "121", "\"20\"", "1.5", "-1", "null"] {
+            let text =
+                format!(r#"{{"v":1,"op":"await","id":1,"thread":"{good}","minutes":{minutes}}}"#);
+            assert_eq!(parse(&text).unwrap_err().1, Refusal::Invalid, "{text}");
+        }
+        for thread in [
+            "\"0a1b2c3d4e5f4a6b8c7d9e0f1a2b3c4d\"",
+            "\"{0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d}\"",
+            "\"$(id)\"",
+            "\"0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4dd\"",
+            "null",
+            "5",
+        ] {
+            let text = format!(r#"{{"v":1,"op":"await","id":1,"thread":{thread},"minutes":5}}"#);
+            assert_eq!(parse(&text).unwrap_err().1, Refusal::Invalid, "{text}");
         }
         let deep = format!(
             r#"{{"v":1,"op":"tools","x":{}{}}}"#,
@@ -420,5 +553,74 @@ mod tests {
         assert_eq!(lines.next().await, Err(LineError::TooLong));
         let mut lines = Lines::new(&b"no end"[..], 16);
         assert_eq!(lines.next().await.unwrap(), None);
+    }
+
+    #[test]
+    fn the_await_answers_are_the_wire_lines() {
+        let thread = crate::reply::parse_thread("0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d").unwrap();
+        let peer = HermesName::parse("ana").unwrap();
+        assert_eq!(
+            await_arrived(3, thread, &peer),
+            json!({"v":1,"id":3,"ok":true,"arrived":true,
+                   "thread":"0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","peer":"ana"})
+        );
+        assert_eq!(
+            await_deadline(3),
+            json!({"v":1,"id":3,"ok":true,"arrived":false})
+        );
+        assert_eq!(
+            await_refused(3, ErrorCode::Ar708),
+            json!({"v":1,"id":3,"ok":false,"code":"AR-708"})
+        );
+        assert_eq!(
+            refusal(Some(3), Refusal::Busy),
+            json!({"v":1,"id":3,"ok":false,"error":"busy"})
+        );
+        for (line, expected) in [
+            (
+                await_arrived(1, thread, &peer),
+                AwaitAnswer::Arrived {
+                    thread,
+                    peer: peer.clone(),
+                },
+            ),
+            (await_deadline(1), AwaitAnswer::Deadline),
+            (
+                await_refused(1, ErrorCode::Ar203),
+                AwaitAnswer::Code(ErrorCode::Ar203),
+            ),
+            (refusal(Some(1), Refusal::Busy), AwaitAnswer::Busy),
+            (
+                refusal(Some(1), Refusal::Unsupported),
+                AwaitAnswer::Unsupported,
+            ),
+            (refusal(Some(1), Refusal::Invalid), AwaitAnswer::Unsupported),
+        ] {
+            assert_eq!(
+                read_await_answer(line.as_object().unwrap(), 1),
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn an_await_answer_is_read_only_in_its_form() {
+        for line in [
+            json!({"v":1,"id":2,"ok":true,"arrived":false}),
+            json!({"v":1,"id":1,"ok":true,"arrived":true,"thread":"0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","peer":"Ana"}),
+            json!({"v":1,"id":1,"ok":true,"arrived":true,"thread":"$(id)","peer":"ana"}),
+            json!({"v":1,"id":1,"ok":true,"arrived":true,"peer":"ana"}),
+            json!({"v":1,"id":1,"ok":true}),
+            json!({"v":1,"id":1,"ok":false,"code":"AR-999"}),
+            json!({"v":1,"id":1,"ok":false,"error":"other"}),
+            json!({"v":1,"id":1,"ok":false}),
+            json!({"v":1,"restart":true}),
+        ] {
+            assert_eq!(
+                read_await_answer(line.as_object().unwrap(), 1),
+                None,
+                "{line}"
+            );
+        }
     }
 }

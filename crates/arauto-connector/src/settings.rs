@@ -38,6 +38,16 @@ pub struct Settings {
     pub(crate) shutdown_ms: i64,
     /// What wakes the Hermes: one for the whole process, whatever connection is up.
     pub(crate) waker: std::sync::Arc<crate::wake::Waker>,
+    /// How long a minute of `await-reply` lasts, in milliseconds.
+    pub(crate) await_minute_ms: i64,
+    /// How often the leader lists the threads for the waits it holds.
+    pub(crate) await_poll_ms: i64,
+    /// How long after a wait ended by a notice the leader checks that the answer was read.
+    pub(crate) await_grace_ms: i64,
+    /// The pause of `await-reply` before it asks the leader again.
+    pub(crate) await_retry_ms: i64,
+    /// The waits of `await-reply` that this process holds: one for the whole process.
+    pub(crate) waiters: std::sync::Arc<crate::waiters::Waiters>,
     #[cfg(feature = "testing")]
     pub(crate) testing: crate::testing::Testing,
 }
@@ -61,6 +71,11 @@ impl Default for Settings {
             hermes_ms: 90 * SECOND_MS,
             shutdown_ms: 1_500,
             waker: std::sync::Arc::default(),
+            await_minute_ms: 60 * SECOND_MS,
+            await_poll_ms: 30 * SECOND_MS,
+            await_grace_ms: 600 * SECOND_MS,
+            await_retry_ms: 5 * SECOND_MS,
+            waiters: std::sync::Arc::default(),
             #[cfg(feature = "testing")]
             testing: crate::testing::Testing::default(),
         }
@@ -106,6 +121,16 @@ mod tests {
         assert!(settings.shutdown_ms < 2_000);
         // The leader gives up a write before the hub gives up the "saved".
         assert!(settings.devices_lock_ms < settings.deadlines.saved_ms);
+        // The waits of await-reply: a minute, a 30 s poll, a 10-minute grace, a 5 s retry.
+        assert_eq!(
+            (
+                settings.await_minute_ms,
+                settings.await_poll_ms,
+                settings.await_grace_ms,
+                settings.await_retry_ms
+            ),
+            (60_000, 30_000, 600_000, 5_000)
+        );
     }
 
     #[test]

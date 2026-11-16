@@ -12,6 +12,9 @@ arauto-connector register saves the entry in Hermes again, with the reference to
                           its local API (for a Hermes connected before 15/11/2026)
 arauto-connector leave    asks the hub for its own closing and cleans the folder
                           (leave --local: cleans without the hub; it is for a person)
+arauto-connector await-reply THREAD [--minutes N]
+                          waits, through the leader, for an answer in a thread, and prints one
+                          fixed line (proposal, 15/11/2026, decision 0048)
 ```
 
 One file only, with nothing else to install. It opens no network port, runs no command from the hub
@@ -27,6 +30,7 @@ that has not received a credential yet.
 | `status` | Hub, version, situation of the device, whether the admin allowed waking by WhatsApp. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. |
 | `register` | Proposal, 15/11/2026 ([decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). For a Hermes that is already connected: runs the same registration as `join` (section 4) and records in the folder of the device whether the entry has the reference to the key. It does not contact the hub, does not ask the leader anything, does not touch the identity, the credential or `current`, and does not restart Hermes. With no device in the folder it runs no Hermes command and says so. A running Hermes keeps the entry it loaded: the new one takes effect after Hermes restarts its gateway. After `register`, the operator restarts Hermes's gateway; until then the running connector keeps the old entry, and `status` says whether the key was received. |
 | `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. It then prints a fixed line saying that the Arauto notes the Hermes may have saved in its memory stay there until the Hermes removes them (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). |
+| `await-reply THREAD [--minutes N]` | Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)); built, not tried on a real Hermes. Waits for an answer in a thread and prints one fixed line. THREAD must be a UUID; otherwise it prints the usage line, exits with 2 and never shows the argument. N is from 1 to 120 minutes, default 20. It talks only to the local socket of the leader, like `status`: no connection of its own to the hub, no port, no new variable. Exit codes: 0 an answer arrived; 11 no answer in time; 12 cannot wait; 9 the leader is still gone at the deadline; 2 usage. A refusal that may pass (AR-203, AR-207, AR-710: for example a fresh leader without its channel session yet) is tried again every 5 seconds until the deadline, and then exits 12 with that code. The output is fixed text that carries only a validated thread, a validated name of a Hermes, the minutes, or a code of the catalog with its catalog sentence. It never reads the thread: no note text appears in it. |
 | `leave --local` | Deletes the files and the registration without talking to the hub. It exists for when the hub no longer exists or changed its key. It is for a person to run: the device stays valid in the hub until it is revoked in the panel. |
 
 ### Cases of `join`
@@ -135,6 +139,8 @@ each copy opened its own channel, the hub would see double connections of a heal
 - When the hub tells the leader to stop using the channel (quarantine, suspended, revoked,
   incompatible), the leader stays alive: it answers the tools with the error and serves `join` and
   `leave` through the local socket.
+
+**Waits of `await-reply` (proposal, 15/11/2026, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)).** The leader keeps the waits that `await-reply` registers, at most 8 per Hermes and one per connection. A closed connection frees its place, and normal waking applies again to that Hermes.
 
 The format of the messages on the local socket is in
 [14-protocolo-do-canal.md](14-protocolo-do-canal.md), section 11.
@@ -290,7 +296,22 @@ Not separately checked: the use of the API's repetition identifier, an API on an
 port than `127.0.0.1:8642` (not followed; only `ARAUTO_HERMES_API_URL` set by hand), and any other
 Hermes version or system.
 
-**Not guaranteed.**
+### An answer in the conversation that asked (proposal, decision 0048)
+
+**Proposal, 15/11/2026. Built and covered by the automatic tests; not tried on a real Hermes.** Context: a woken Hermes wrote its answer into the run instead of sending a note, and an asking Hermes ended its turn, so a later answer woke it in a separate run that its operator never saw ([hermes-fatos.md](../referencia/hermes-fatos.md), N6 and N7; the background process with notify is N2 and N5).
+
+- **The field `to_get_the_reply`.** The connector adds it to a successful `hermes_send_message`, only when the thread of the hub parses as a UUID, and prints the thread hyphenated. It overwrites any value of the hub. Three fixed lines tell the asking Hermes to run `"$HOME/.arauto/arauto-connector" await-reply THREAD` as a background process with `notify` on, tell its operator, and end its turn ([09](09-contrato-mcp.md)).
+- **The wait.** The leader lists the threads once at registration (a listing never marks a note read), then every 30 seconds, one listing for all waiters. An answer is unread notes in the thread, or more unread notes than the baseline in another thread of the same peer.
+- **The notice path.** When a peer notice arrives from a peer that someone awaits, the leader lists at once. If a waiter resolves, the leader does **not** call the local API: it answers `accepted` and records the notice identifier as handled. No place is taken in the wake ceiling. A listing that fails falls through to the normal wake.
+- **The grace check.** Ten minutes after a waiter was resolved by a notice, the leader lists again. If the thread still has unread notes, it wakes through the local API with the normal peer sentence, the identifier of the stored notice as the repetition key and the normal windows. A restart of the leader loses it: the grace checks are kept in memory only, so a Hermes that never read the answer is then not woken for it.
+- **A resolution by polling alone never wakes.** It makes no call to the local API, at once or later. A link without the wake mark therefore makes no call at all.
+- **A notice of another peer, and a WhatsApp notice, wake as before.**
+- **`accepted` now means** that the Hermes was told, by its local API or by a waiting `await-reply` ([14](14-protocolo-do-canal.md), section 5.3).
+- **The peer sentence** is new: it says that what a woken run writes reaches no one and how to answer ([13](13-conversa-entre-hermes.md), section 5). It rests on the change of 15/11/2026 to [decision 0005](decisoes/0005-comando-e-dado-sao-separados.md), approved by the maintainer.
+- **Not guaranteed:** the list in [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md): among others, a reply after `/new`, after the deadline or after a restart does not appear in the conversation; a woken Hermes cannot use `notify`; whether a model follows the field is untried; compression may kill the wait; Windows is untried. A poll can resolve a wait just before the notice of the same answer arrives; the notice then finds no wait and wakes a separate run too, so the Hermes may be told twice (the identifier keeps the wake itself to one). The same happens when the answer arrives before `await-reply` registers: its notice wakes a separate run and the wait then resolves at once. The grace check looks at every thread of that peer, not only at the awaited one, so a later note of the same peer in another thread may cause a second wake. The wake of the grace check is not made when the connector has no key of the local API, and one that fails is not tried again.
+
+### Not guaranteed (waking and the key)
+
 - Only one Hermes was observed. The reference, the resolution of `${VAR}` and the wake on Windows,
   macOS and other versions are unproved.
 - The key now sits in the initial environment of every connector copy. On Linux, any process of the
@@ -359,6 +380,7 @@ carries a command to run. The text `keep_in_memory` of `arauto_status` is not a 
 | AR-507 | Device expired by inactivity. The admin needs to reconnect this Hermes. |
 | AR-601 | The registration in Hermes failed or was refused. The request still stands; run the command again. |
 | AR-602 | Hermes's local API does not answer or refuses the key. |
+| `await-reply` lines | Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)). Fixed lines of the command, with only a validated thread, a validated name and the minutes. They are not catalog messages: the line of exit 0 is longer than the 240 bytes of the catalog rule, and the field `to_get_the_reply` names a command, like `keep_in_memory`. The refusal line of exit 12 carries the code and the sentence of the catalog. |
 | Told lines | Fixed sentences that `join`, `register` and `status` print about waking (proposal, 15/11/2026; decision 0046). Wake needs the local API: "This Hermes can be woken only while its local API is on, which Hermes does when its own setting API_SERVER_KEY holds a key. The connector never sets it; the status command says whether the connector received it." Key not received: "No notice wakes this Hermes until its local API is on. Hermes turns it on when its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a key. The connector never sets it." After a restart: "If that setting already holds a key, Hermes hands it to the connector after it restarts its gateway." Reference refused: "This version of Hermes refused the reference to the key of its local API, so the entry was saved without it and no notice wakes this Hermes. Notes and tools still work." Running keeps the old entry: "A running Hermes keeps the entry it loaded: the new entry takes effect after Hermes restarts its gateway. The connector does not restart Hermes." Older entry: "The entry of the connector in Hermes was saved by an older connector and may have no reference to the key. The register command of the connector saves it again." Unchanged connection: "The connection did not change: the same device and the same credential." |
 | No device (`register`) | "There is no device in this folder. Nothing was registered in Hermes." Exit code 9, like the other local failures. |
 | Notes in memory (`leave`) | Proposal, 15/11/2026 ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). Printed by `leave` after a leave that deleted the files: "If this Hermes saved the three Arauto notes in its memory, they are still there: remove them with the memory tool of Hermes. The connector never reads or changes the memory of Hermes." |
