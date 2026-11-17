@@ -60,7 +60,7 @@ To talk to another Hermes, use hermes_list_peers to see who you can reach, herme
 If an Arauto tool fails or is missing, call arauto_status. If the tools are not loaded, run "$HOME/.arauto/arauto-connector" status in the terminal and report its lines to your operator.
 ```
 
-Then send your operator, in one message: the verification code; "Arauto notes saved in memory: yes"; every line the connector printed about the local API or its key, unchanged; and one last line. If the connector said it saved a key: after the admin approves, send `/restart` to this Hermes, so that its local API turns on and the Arauto tools load. Otherwise: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.
+Then send your operator, in one message: the verification code; "Arauto notes saved in memory: yes"; every line the connector printed about the local API or its key, unchanged; and one last line. If the connector said it saved a key: after the admin approves, restart the gateway of this Hermes once: send `/restart` to this Hermes or, if it answers that the command is not available, click Restart Gateway in the Hermes dashboard, so that its local API turns on and the Arauto tools load. Otherwise: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.
 
 ## If something goes wrong
 

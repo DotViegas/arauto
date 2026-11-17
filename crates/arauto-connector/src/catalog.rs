@@ -202,8 +202,9 @@ impl Told {
             }
             Told::RestartAfterKey => {
                 "The local API of this Hermes turns on only after its gateway restarts. After the \
-                 approval, the operator sends the restart command of Hermes to this Hermes in the \
-                 chat, once."
+                 approval, the operator restarts the gateway of this Hermes, once: with the \
+                 restart command of Hermes in the chat or, where the chat refuses it, with the \
+                 Restart Gateway button of the Hermes dashboard."
             }
             Told::KeyNotMade => {
                 "The connector did not confirm a new key for the local API of this Hermes. If the \
@@ -289,7 +290,7 @@ mod tests {
                 "{phrase}"
             );
             assert!(phrase.ends_with('.'), "{phrase}");
-            assert!(phrase.len() >= 30 && phrase.len() <= 240, "{phrase}");
+            assert!(phrase.len() >= 30 && phrase.len() <= 300, "{phrase}");
             assert!(!phrase.contains("  "), "{phrase}");
             for piece in forbidden {
                 assert!(!phrase.contains(piece), "{piece:?} in: {phrase}");
@@ -347,14 +348,14 @@ mod tests {
             ),
             (
                 Told::RestartAfterKey,
-                "The local API of this Hermes turns on only after its gateway restarts. After the approval, the operator sends the restart command of Hermes to this Hermes in the chat, once.",
+                "The local API of this Hermes turns on only after its gateway restarts. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard.",
             ),
             (
                 Told::KeyNotMade,
                 "The connector did not confirm a new key for the local API of this Hermes. If the status command says the key is not received, the operator sets API_SERVER_KEY in the configuration of Hermes and restarts its gateway.",
             ),
         ];
-        let sizes = [182, 160, 203, 173, 215];
+        let sizes = [182, 160, 203, 281, 215];
         for ((told, text), size) in approved.into_iter().zip(sizes) {
             assert_eq!(told.phrase(), text);
             assert_eq!(text.len(), size, "{text}");
