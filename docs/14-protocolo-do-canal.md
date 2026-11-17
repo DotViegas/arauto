@@ -394,7 +394,9 @@ is too old presents itself this way at the leader's startup and, after that, onc
 | `kind` | Fields | Validation in the connector, before building the fixed sentence |
 |---|---|---|
 | `whatsapp` | `number` (alias), `chat` (opaque identifier), `count`; the `id` of every notice is a UUID | `number` in the name format; `chat` with up to 64 characters of `A-Z a-z 0-9 _ -`; `count` from 1 to 9,999 |
-| `peer` | `from` (name of the Hermes), `count` | `from` in the name format; `count` from 1 to 9,999 |
+| `peer` | `from` (name of the Hermes), `count`, and optionally `follow` (boolean; proposal, [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md)) | `from` in the name format; `count` from 1 to 9,999; `follow` absent, `null`, `true` or `false`, and anything else (`"true"`, `1`, `[]`, `{}`) is `rejected` |
+
+The hub writes `"follow": true` only when the link has the follow mark at the moment the notice leaves, and omits the field otherwise, so a notice without the mark is byte-identical to the one before the field existed. In the connector, `true` selects the second fixed sentence ([13](13-conversa-entre-hermes.md), section 5); absent, `null` and `false` select the first. A connector of an older version ignores the field. The field and the sentence are built in the protocol crate and the connector, and the hub sends the field for a marked link; all covered by automatic tests against a fake Hermes, nothing tried on a real Hermes.
 
 The name format is `^[a-z0-9][a-z0-9_-]{0,31}$`, and it holds for the name of the Hermes and for the
 alias of the number. The validation is **compiled into the connector**: even an invaded hub only

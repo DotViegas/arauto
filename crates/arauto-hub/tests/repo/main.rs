@@ -12,6 +12,7 @@ mod approval;
 mod closing;
 mod database;
 mod enrollment;
+mod follow;
 mod hermes;
 mod org;
 mod org_rounds;

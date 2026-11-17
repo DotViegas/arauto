@@ -833,8 +833,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Same level: note", "Тот же уровень: заметка"),
     (
-        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
-        "В этой версии уровни, роли и виды стрелок показываются только здесь: ни один Hermes о них не узнаёт, а заметка остаётся данными, а не приказом. Только связь позволяет одному Hermes отправить заметку другому.",
+        "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
+        "Уровни и роли показываются только здесь: ни один Hermes о них не узнаёт. Заметка — это данные, кроме стрелки типа «инструкция» с отметкой следования: тогда уведомление говорит нижнему Hermes выполнять эти новые сообщения верхнего в этом запуске, с приоритетом указаний его оператора. Только связь позволяет одному Hermes отправить заметку другому.",
     ),
     ("instruction", "инструкция"),
     ("request", "запрос"),
@@ -1299,5 +1299,30 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "С этой отметкой заметка по этой связи пробуждает {name} в пределах лимитов уведомлений.",
+    ),
+    // decision 0050
+    (
+        "{to} follows the instructions of {from}",
+        "{to} следует указаниям {from}",
+    ),
+    (
+        "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        "С этой отметкой уведомление о заметке говорит {to} выполнить в этом запуске то, о чём просит {from}, не дожидаясь своего оператора, если только его оператор не запретит. Только на стрелке типа «инструкция» и только с отметкой пробуждения; {to} нужен обратный путь, чтобы ответить. Это фраза для ИИ, а не средство контроля.",
+    ),
+    (
+        "Link {from} → {to}: {to} now follows the instructions of {from}",
+        "Связь {from} → {to}: {to} теперь следует указаниям {from}",
+    ),
+    (
+        "Link {from} → {to}: {to} no longer follows the instructions of {from}",
+        "Связь {from} → {to}: {to} больше не следует указаниям {from}",
+    ),
+    (
+        "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        "Hermes, который следует за другим, делает то, о чём тот просит, не дожидаясь своего оператора. Кто обманет верхний Hermes через WhatsApp или заметку, достанет и нижний; кто управляет хабом, может писать от имени любого Hermes; а кто владеет сеансом панели, может ставить эти отметки. Коннектор старой версии по-прежнему считает такие заметки данными.",
+    ),
+    (
+        "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        "Отметка следования идёт только с более высокого уровня на более низкий и только на связи с пробуждением.",
     ),
 ];

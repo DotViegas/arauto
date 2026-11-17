@@ -767,8 +767,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Same level: note", "同一层级：便条"),
     (
-        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
-        "在此版本中，层级、职责和箭头类型只在这里显示：不会告知任何 Hermes，便条仍然只是数据，绝不是命令。只有链接才能让一个 Hermes 向另一个 Hermes 发送便条。",
+        "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
+        "层级和职责只在这里显示：不会告知任何 Hermes。便条是数据，但带有遵循标记的指示箭头除外：此时通知会告诉下层 Hermes，在那一次运行中遵循上层 Hermes 的这些新消息，且低于其操作者的指示。只有链接才能让一个 Hermes 向另一个 Hermes 发送便条。",
     ),
     ("instruction", "指示"),
     ("request", "请求"),
@@ -1203,5 +1203,30 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "有此标记时，通过该链接发出的便条会在通知限额内唤醒 {name}。",
+    ),
+    // decision 0050
+    (
+        "{to} follows the instructions of {from}",
+        "{to} 遵循 {from} 的指示",
+    ),
+    (
+        "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        "有此标记时，便条的通知会告诉 {to}：在那一次运行中，按 {from} 的要求去做，无需等待其操作者，除非其操作者禁止。仅限指示箭头，且仅限有唤醒标记；{to} 需要返回的链接才能回报。这是写给 AI 的一句话，不是控制手段。",
+    ),
+    (
+        "Link {from} → {to}: {to} now follows the instructions of {from}",
+        "链接 {from} → {to}：{to} 现在遵循 {from} 的指示",
+    ),
+    (
+        "Link {from} → {to}: {to} no longer follows the instructions of {from}",
+        "链接 {from} → {to}：{to} 不再遵循 {from} 的指示",
+    ),
+    (
+        "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        "遵循另一个 Hermes 的 Hermes，会不等其操作者就去做对方要求的事。误导上层 Hermes 的人（通过 WhatsApp 或便条）也能触及下层 Hermes；控制 hub 的人可以冒充任何 Hermes 写入；持有面板会话的人可以设置这些标记。旧版本的连接器仍会把这些便条当作数据。",
+    ),
+    (
+        "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        "遵循标记只能从较高层级指向较低层级，且只能设在会唤醒的链接上。",
     ),
 ];

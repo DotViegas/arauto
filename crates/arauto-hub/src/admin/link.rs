@@ -103,7 +103,10 @@ impl Session {
             match outcome {
                 LinkSet::Missing(which) => return Err(missing(which)),
                 LinkSet::SameHermes => return Err(AdminError::LinkToItself),
-                LinkSet::Created | LinkSet::Changed | LinkSet::Unchanged => {}
+                LinkSet::Created
+                | LinkSet::Changed
+                | LinkSet::FollowRemoved
+                | LinkSet::Unchanged => {}
             }
             changes.push(LinkChange {
                 from,

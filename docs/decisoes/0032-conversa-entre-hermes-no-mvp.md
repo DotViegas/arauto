@@ -21,4 +21,4 @@ The conversation between Hermes goes into the first MVP, in the format of **note
 
 ## Change of 16/11/2026 (reopened by the maintainer)
 
-The note "with the authority of an order", discarded above, returns in the bounded form of [0050](0050-etapa-b-marca-de-seguir.md): one notice, one run, and only on links that the admin marked downward on the org chart and that wake. Notes on every other link are unchanged: data, never an order. Proposal: the field and the sentence are built in the protocol and the connector, the mark in the hub, the panel and the command is not built, and nothing was tried on a real Hermes.
+The note "with the authority of an order", discarded above, returns in the bounded form of [0050](0050-etapa-b-marca-de-seguir.md): one notice, one run, and only on links that the admin marked downward on the org chart and that wake. Notes on every other link are unchanged: data, never an order. Proposal: the field, the sentence, the mark in the hub, the panel and the command are built and covered by automatic tests, and nothing was tried on a real Hermes.

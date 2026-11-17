@@ -195,7 +195,7 @@ They come in with the first MVP ([15](15-mvp.md)). The rules are in
 
 **ligacao** (the peer list): `organizacao_id`, `de_hermes_id`, `para_hermes_id`, `acordar`,
 `criada_por`, `alterada_em`. Unique per ordered pair. Origin and destination are different and of the
-same organization.
+same organization. Proposal, built ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md), migration 0019): the column `peer_link.follow` (boolean, false by default, so false on every existing row), with a `CHECK` that it needs the wake mark. See section 11.
 
 **fio**: `id`, `organizacao_id`, the two Hermes, `criado_em`, `ultimo_recado_em`.
 
@@ -242,5 +242,7 @@ Decision [0043](decisoes/0043-organograma-e-niveis.md). Built in the hub; tried 
 The program's checks are the authority; the `CHECK`s repeat them as a second line (the control-character check beyond ASCII depends on the database locale).
 
 **Life cycle.** A new Hermes is not placed until the next publish. Removing a Hermes deletes its row (and its role text) in the same write that removes its links; the level stays, empty. The last Hermes leaving a level does not remove it: only a publish does. A publish needs at least one level and every live Hermes placed.
+
+**The follow mark (proposal, [0050](decisoes/0050-etapa-b-marca-de-seguir.md), built and covered by automatic tests; nothing tried on a real Hermes).** Migration 0019 adds `peer_link.follow`, false by default, with a `CHECK` that a marked link also has the wake mark (the database refuses a mark without wake). The invariant that a marked link goes from a higher level to a lower one is **not** in the database, because the levels live in other tables: it is kept by the publish, which refuses a mark on a link that goes sideways or up, including a marked link that a moved card or level no longer makes go down. The mark is not the level and not the kind of an arrow: the kind is still not stored. The link events carry the flags `follow` and `follow_before`, never a level name or a role text. Removing a Hermes removes its marked links in both directions, with the others.
 
 **Not stored:** the kind of an arrow (instruction, request, note), the connection state and the number chips; they are computed when the page is read. **Read by no part of the channel:** only the panel, the admin commands and the Hermes removal touch these tables; no notice, tool answer or log carries a level name or a role text, and the audit holds neither.

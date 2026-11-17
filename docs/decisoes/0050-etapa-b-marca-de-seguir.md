@@ -1,6 +1,6 @@
 # 0050 — Org chart stage B: the follow mark of a link
 
-**Status:** proposal · **Date:** 16/11/2026. Approved word for word by the maintainer on 16/11/2026: the follow sentence, item 21 of [04](../04-seguranca-conexao.md) and the changes of [0005](0005-comando-e-dado-sao-separados.md) and [0018](0018-aviso-e-ponteiro.md). Built: the field and the follow sentence in the protocol and the connector, with their tests; the hub always sends the notice without the field. Not built: the mark in the hub, the panel and the command. Not tried on a real Hermes.
+**Status:** proposal · **Date:** 16/11/2026. Approved word for word by the maintainer on 16/11/2026: the follow sentence, item 21 of [04](../04-seguranca-conexao.md) and the changes of [0005](0005-comando-e-dado-sao-separados.md) and [0018](0018-aviso-e-ponteiro.md). Built and covered by automatic tests against a fake Hermes: the field and the follow sentence in the protocol and the connector, and the mark in the hub (migration 0019, the check at publish, the panel box, the admin command, and the notice that carries `follow: true` for a marked link). Not tried on a real Hermes, and the panel was not opened in a browser.
 
 ## Asked by the maintainer (16/11/2026)
 
@@ -95,6 +95,6 @@ Each new security rule comes with a test that fails when the rule is removed.
 
 ## Consequences
 
-- A migration will add `peer_link.follow`, false by default, with a check that it needs the wake mark.
-- The org chart tab will gain a checkbox in the window of an instruction arrow, a line per mark in the summary of Publish, and one warning when a mark is turned on; a card or a level that moves so that a marked arrow no longer goes down drops the mark and says so.
+- Migration 0019 adds `peer_link.follow`, false by default, with a check that it needs the wake mark.
+- The org chart tab gained a checkbox in the window of an instruction arrow, a line per mark in the summary of Publish, and one warning when a mark is turned on; a card or a level that moves so that a marked arrow no longer goes down drops the mark and says so.
 - The documents [04](../04-seguranca-conexao.md) (item 21 of section 6, which needs the maintainer's approval) and [05](../05-modelo-de-ameacas.md) say the new limits. Decisions [0005](0005-comando-e-dado-sao-separados.md), [0018](0018-aviso-e-ponteiro.md) and [0032](0032-conversa-entre-hermes-no-mvp.md) carry a dated change; the other documents that the design lists carry a dated note when the code is built.

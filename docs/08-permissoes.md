@@ -100,7 +100,7 @@ What Hermes does on waking is defined by the instructions of Hermes itself, not 
 The notice of a note between Hermes follows the same rules, with the ceilings of
 [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), section 6.
 
-The wake mark of the link is enough ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
+The wake mark of the link is enough ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026). The follow mark (proposal, [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md), built, not tried on a real Hermes) is read when the notice leaves and only changes which fixed sentence the connector shows; the access checks on every call are unchanged.
 
 A WhatsApp message wakes a Hermes when the verb "be woken" holds for the chat: on the access of the
 number, or on the line of the chat when the chat has its own rule. Nothing else about the Hermes is
@@ -119,7 +119,7 @@ is gone, or the number is not connected. Without the key of Hermes's local API
 - Choosing which Hermes answers.
 - Answering by itself.
 - Holding a message for approval.
-- Giving any weight to the level of a Hermes or to the kind of a link: they decide nothing in the hub ([decision 0043](decisoes/0043-organograma-e-niveis.md), stage A, proposal).
+- Giving any weight to the level of a Hermes or to the kind of a link: they decide nothing in the hub ([decision 0043](decisoes/0043-organograma-e-niveis.md), stage A, proposal). The level decides only where the admin may set the follow mark, at publish; at the time of a note the hub reads only the mark ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md), proposal, built, not tried on a real Hermes). The mark gives the sender nothing in the hub: no access, no link, no number.
 
 When two Hermes can send or be woken in the same chats, the panel **warns and does not
 prevent**.

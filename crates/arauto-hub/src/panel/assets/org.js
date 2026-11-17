@@ -44,7 +44,7 @@
     return {
       levels: draft.levels.map(function (l) { return { key: l.key, name: l.name }; }),
       hermes: draft.hermes.map(function (h) { return { name: h.name, level: h.level, x: h.x, role: h.role, auto: h.auto }; }),
-      links: draft.links.map(function (l) { return { from: l.from, to: l.to, wake: l.wake }; })
+      links: draft.links.map(function (l) { return { from: l.from, to: l.to, wake: l.wake, follow: l.follow === true }; })
     };
   }
 
@@ -149,7 +149,7 @@
         if (h.level) return;
         draft.hermes.push({ name: h.name, level: lowest, x: rightOf(draft, lowest), role: h.role, auto: true });
       });
-      stored.links.forEach(function (l) { draft.links.push({ from: l.from, to: l.to, wake: l.wake }); });
+      stored.links.forEach(function (l) { draft.links.push({ from: l.from, to: l.to, wake: l.wake, follow: l.follow === true }); });
       return draft;
     }
 
@@ -189,7 +189,7 @@
       });
       wanted.links.forEach(function (l) {
         var ends = draft.hermes.map(function (h) { return h.name; });
-        if (ends.indexOf(l.from) >= 0 && ends.indexOf(l.to) >= 0) draft.links.push({ from: l.from, to: l.to, wake: l.wake });
+        if (ends.indexOf(l.from) >= 0 && ends.indexOf(l.to) >= 0) draft.links.push({ from: l.from, to: l.to, wake: l.wake, follow: l.follow === true });
       });
       return draft;
     }
@@ -226,7 +226,19 @@
       if (hist.length > 100) hist.shift();
       said = '';
       change();
+      dropBrokenFollow();
       render();
+    }
+
+    // A follow mark stays only on an instruction arrow that wakes. A move of a card or a level, or
+    // an unticked wake mark, takes it off: the page only ever removes a mark, never adds one, and
+    // the summary lists what it removed.
+    function dropBrokenFollow() {
+      S.links.forEach(function (l) {
+        if (!l.follow) return;
+        var from = hermesOf(l.from), to = hermesOf(l.to);
+        if (!l.wake || !from || !to || kindOf(l) !== 'instruction') l.follow = false;
+      });
     }
 
     function diff() {
@@ -270,10 +282,22 @@
         var o = before[l.from + ' ' + l.to];
         if (o && o.wake !== l.wake) out.push(say(l.wake ? 'change-wake-on' : 'change-wake-off', { from: l.from, to: l.to }));
       });
+      S.links.forEach(function (l) {
+        var o = before[l.from + ' ' + l.to];
+        var wasFollow = !!(o && o.follow);
+        if (l.follow && !wasFollow) out.push(say('change-follow-on', { from: l.from, to: l.to }));
+        else if (o && wasFollow && !l.follow) out.push(say('change-follow-off', { from: l.from, to: l.to }));
+      });
       base.links.forEach(function (l) {
         if (!now[l.from + ' ' + l.to]) out.push(say('change-link-removed', { from: l.from, to: l.to }));
       });
       return out;
+    }
+
+    function turnsFollowOn() {
+      var before = {};
+      base.links.forEach(function (l) { before[l.from + ' ' + l.to] = l.follow === true; });
+      return S.links.some(function (l) { return l.follow && !before[l.from + ' ' + l.to]; });
     }
 
     function createsLink() {
@@ -379,7 +403,7 @@
       if (from === to || !hermesOf(from) || !hermesOf(to)) return;
       if (linkOf(from, to) >= 0) { said = say('link-exists'); render(); return; }
       mutate(function () {
-        S.links.push({ from: from, to: to, wake: false });
+        S.links.push({ from: from, to: to, wake: false, follow: false });
         selLink = view === 'map' ? { from: from, to: to } : null;
         sel = null;
       });
@@ -395,6 +419,15 @@
       var at = linkOf(from, to);
       if (at < 0 || S.links[at].wake === wake) return;
       mutate(function () { S.links[at].wake = wake; });
+    }
+
+    // The mark is set only on an instruction arrow that wakes; the box is disabled otherwise, and
+    // this refuses the same way.
+    function setFollow(from, to, follow) {
+      var at = linkOf(from, to);
+      if (at < 0 || S.links[at].follow === follow) return;
+      if (follow && (!S.links[at].wake || kindOf(S.links[at]) !== 'instruction')) return;
+      mutate(function () { S.links[at].follow = follow; });
     }
 
     function wayBack(from, to) {
@@ -458,6 +491,9 @@
         var warning = node('p', 'org-warning', say('cross-warning'));
         warning.id = 'org-publish-warning';
         bodyBox.appendChild(warning);
+        var followWarning = node('p', 'org-warning', say('follow-warning'));
+        followWarning.id = 'org-publish-follow-warning';
+        bodyBox.appendChild(followWarning);
         var list = node('ul', 'org-changes');
         list.id = 'org-publish-changes';
         bodyBox.appendChild(list);
@@ -473,6 +509,7 @@
       while (changes.firstChild) changes.removeChild(changes.firstChild);
       lines.forEach(function (line) { changes.appendChild(node('li', '', line)); });
       document.getElementById('org-publish-warning').hidden = !createsLink();
+      document.getElementById('org-publish-follow-warning').hidden = !turnsFollowOn();
       dialog.showModal();
     }
 
@@ -480,7 +517,7 @@
       return {
         levels: S.levels.map(function (l) { return { key: l.key, name: l.name }; }),
         hermes: S.hermes.map(function (h) { return { name: h.name, level: h.level, x: h.x, role: h.role }; }),
-        links: S.links.map(function (l) { return { from: l.from, to: l.to, wake: l.wake }; })
+        links: S.links.map(function (l) { return { from: l.from, to: l.to, wake: l.wake, follow: l.follow === true }; })
       };
     }
 
@@ -756,6 +793,19 @@
       label.appendChild(node('span', '', say('wakes-name', { name: link.to })));
       pop.appendChild(label);
       pop.appendChild(node('span', 'hint', say('wake-hint', { name: link.to })));
+      if (kindOf(link) === 'instruction') {
+        var followLabel = node('label', 'option');
+        var followCheck = node('input');
+        followCheck.type = 'checkbox';
+        followCheck.checked = link.follow === true;
+        followCheck.disabled = !link.wake;
+        followCheck.setAttribute('data-fk', 'popfollow');
+        followCheck.addEventListener('change', function () { setFollow(link.from, link.to, followCheck.checked); });
+        followLabel.appendChild(followCheck);
+        followLabel.appendChild(node('span', '', say('follows-name', { from: link.from, to: link.to })));
+        pop.appendChild(followLabel);
+        pop.appendChild(node('span', 'hint', say('follow-hint', { from: link.from, to: link.to })));
+      }
       var row = node('div', 'org-row');
       var back = linkOf(link.to, link.from) >= 0;
       row.appendChild(button(say(back ? 'way-back-remove' : 'way-back-create'), function () { wayBack(link.from, link.to); }));
@@ -1019,7 +1069,7 @@
         if (from === to) return;
         if (linkOf(from, to) >= 0) { said = say('link-exists'); render(); return; }
         var wake = wakeNew.checked;
-        mutate(function () { S.links.push({ from: from, to: to, wake: wake }); });
+        mutate(function () { S.links.push({ from: from, to: to, wake: wake, follow: false }); });
       });
       addButton.setAttribute('data-fk', 'aadd');
       cell(addRow, addButton);
@@ -1077,6 +1127,8 @@
     var echo = document.getElementById('org-draft');
     if (echo) {
       S = draftFromEcho(JSON.parse(echo.getAttribute('data-draft')));
+      // Same rule as every change: a mark the draft cannot keep is dropped, and the summary says so.
+      dropBrokenFollow();
       echoed = true;
     }
     host.hidden = false;

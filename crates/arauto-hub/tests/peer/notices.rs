@@ -3,7 +3,7 @@
 
 use arauto_protocol::notice::AckOutcome;
 
-use crate::world::{HOUR, MINUTE, SECOND, World, ok, peer_notice};
+use crate::world::{HOUR, MINUTE, SECOND, World, ok, peer_follows, peer_notice};
 
 const CANARY: &str = "CANARY-text-of-a-message-7f3a";
 
@@ -84,6 +84,60 @@ async fn the_wake_mark_alone_wakes() {
     let second = b.next_notice().await;
     assert_eq!(peer_notice(&second), (a.name.clone(), 1));
     assert_ne!(second.id, first.id);
+}
+
+#[tokio::test]
+async fn a_notice_tells_the_receiver_to_follow_only_while_its_link_has_the_follow_mark() {
+    let (world, mut a, mut b) = marked().await;
+    // No follow mark: the field is not on the wire at all.
+    let thread = a.thread_with(&b.name, "one").await;
+    let first = b.next_notice().await;
+    assert!(!peer_follows(&first));
+    assert!(
+        !serde_json::to_string(&first).unwrap().contains("follow"),
+        "an unmarked notice has the bytes it always had"
+    );
+    b.acknowledge(&first, AckOutcome::Accepted).await;
+
+    // The mark is read when the notice leaves.
+    world.set_follow(&a, &b, true).await;
+    world.advance(SECOND);
+    ok(a.send_in(&thread, "two").await);
+    world.advance(10 * SECOND);
+    let second = b.next_notice().await;
+    assert!(peer_follows(&second));
+    assert!(
+        serde_json::to_string(&second)
+            .unwrap()
+            .contains("\"follow\":true")
+    );
+    assert_eq!(peer_notice(&second), (a.name.clone(), 1));
+    b.acknowledge(&second, AckOutcome::Accepted).await;
+
+    // Taken away, the next notice leaves without it.
+    world.set_follow(&a, &b, false).await;
+    world.advance(SECOND);
+    ok(a.send_in(&thread, "three").await);
+    world.advance(10 * SECOND);
+    let third = b.next_notice().await;
+    assert!(!peer_follows(&third));
+    assert!(!serde_json::to_string(&third).unwrap().contains("follow"));
+}
+
+#[tokio::test]
+async fn a_mark_taken_away_while_the_notice_waits_makes_it_leave_without_it() {
+    let (world, mut a, mut b) = marked().await;
+    let thread = a.thread_with(&b.name, "one").await;
+    let first = b.next_notice().await;
+    b.acknowledge(&first, AckOutcome::Accepted).await;
+    world.set_follow(&a, &b, true).await;
+    world.advance(SECOND);
+    // The notice of this note waits its ten seconds; the mark goes in the meantime.
+    ok(a.send_in(&thread, "two").await);
+    world.set_follow(&a, &b, false).await;
+    world.advance(10 * SECOND);
+    let second = b.next_notice().await;
+    assert!(!peer_follows(&second));
 }
 
 #[tokio::test]

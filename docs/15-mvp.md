@@ -39,7 +39,8 @@ are in [0031](decisoes/0031-banco-postgresql.md),
 | Conversation between Hermes ([13](13-conversa-entre-hermes.md)) | Observer, rooms and reading of the text by the admin |
 | Fake engine and WAHA adapter; read, send and modify | Message archive and search (reading depends on the engine being up) |
 | Access matrix, by number and by chat | Sending a file by address |
-| Org chart tab, stage A: levels, places, role text and links on a map, edited as a draft and published in one write ([decision 0043](decisoes/0043-organograma-e-niveis.md), proposal, tried only in a desktop Chrome without a window (15/11/2026)) | Notes that know the levels (stage B, pending) |
+| Org chart tab, stage A: levels, places, role text and links on a map, edited as a draft and published in one write ([decision 0043](decisoes/0043-organograma-e-niveis.md), proposal, tried only in a desktop Chrome without a window (15/11/2026)) | Notes that know the levels (the levels never reach a Hermes; see the next row for the follow mark) |
+| Org chart stage B, the follow mark of a link: the notice of a note on a marked instruction arrow asks the receiver to follow it in that run ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md), proposal; built and covered by automatic tests against a fake Hermes; not tried on a real Hermes or in a browser) | Asking for the passkey at publish (waits for [0019](decisoes/0019-painel-com-passkey.md)) |
 | Notices and waking, with the fixed sentence | List of versions of the program, with revocation and signature |
 | Audit that only grows, and alerts read by command | Adjustable ceilings |
 | Send ceiling (20 per minute, per Hermes and per number) and note ceilings | Private authority in the connector's TLS |
@@ -158,6 +159,7 @@ that of [06-modelo-de-dados.md](06-modelo-de-dados.md), with the names in Englis
 | (new) thread, note | `peer_thread`, `peer_message` | The text of the note goes encrypted. |
 | (new) retention | `retention` | Retention period per table. |
 | (new) org chart: level, place | `org_level`, `org_member` | Migration 0017. [decision 0043](decisoes/0043-organograma-e-niveis.md). Read by nothing in the channel. |
+| (new) follow mark of a link | `peer_link.follow` | Migration 0019 (proposal, built). [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md). False by default, with a `CHECK` that it needs the wake mark. |
 
 The `slot` of the device: `request` while it has not confirmed the first credential and the state is
 not final; `in_use` after the first confirmation, in active, suspended or quarantine; null in a

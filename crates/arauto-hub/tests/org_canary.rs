@@ -226,12 +226,15 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
     let version = between(&page, "id=\"org-data\" data-version=\"", "\"").to_owned();
     let draft = |role: &str| {
         json!({
-            "levels": [ { "key": "new-1", "name": level } ],
+            "levels": [
+                { "key": "new-1", "name": level },
+                { "key": "new-2", "name": format!("{level}-low") },
+            ],
             "hermes": [
                 { "name": a, "level": "new-1", "x": 10, "role": role },
-                { "name": b, "level": "new-1", "x": 300, "role": role },
+                { "name": b, "level": "new-2", "x": 300, "role": role },
             ],
-            "links": [ { "from": a, "to": b, "wake": true } ],
+            "links": [ { "from": a, "to": b, "wake": true, "follow": true } ],
         })
         .to_string()
     };
@@ -382,6 +385,12 @@ async fn no_role_or_level_name_reaches_the_channel_a_notice_a_tool_or_the_log() 
     assert!(
         notices.iter().all(|text| !text.contains(&note)),
         "the text of a note is in a notice"
+    );
+    // The link has the follow mark: the notice says so with one boolean, and the levels and the
+    // roles stay where they are (they are checked below, in everything the connectors heard).
+    assert!(
+        notices.iter().any(|text| text.contains("\"follow\":true")),
+        "the notice of a followed link carries the mark: {notices:?}"
     );
     assert!(
         heard.iter().any(|text| text.contains(&note)),

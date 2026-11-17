@@ -64,6 +64,8 @@ pub struct LinkLine {
     pub to: HermesName,
     /// Whether a message of `from` wakes `to`.
     pub wake: bool,
+    /// Whether `to` follows the instructions of `from` (decision 0050).
+    pub follow: bool,
     /// When it last changed, in milliseconds of the hub.
     pub changed_at: i64,
 }
@@ -84,6 +86,9 @@ pub enum LinkSet {
     Created,
     /// The link was there with the other wake mark.
     Changed,
+    /// The link was there with the follow mark, and the write took the mark away (the wake mark
+    /// may have changed too). Only the admin command can end so: it cannot set the mark.
+    FollowRemoved,
     /// It already was as asked: nothing was written.
     Unchanged,
     /// One end names no Hermes.
@@ -141,7 +146,9 @@ fn link_details(from: &HermesName, from_id: Uuid, to: &HermesName, to_id: Uuid) 
         .id("to_id", to_id)
 }
 
-/// Creates the link from `from` to `to`, or sets its wake mark.
+/// Creates the link from `from` to `to`, or sets its wake mark. The command cannot set the
+/// follow mark (decision 0050): on a link that has it, the mark is taken away
+/// ([`LinkSet::FollowRemoved`]).
 ///
 /// # Errors
 /// [`RepoError::Restored`] when the database is behind the audit mark: nothing is written.
@@ -173,7 +180,7 @@ pub async fn link_set(
         admin,
         (from, from_id),
         (to, to_id),
-        wake,
+        (wake, false),
         now,
     )
     .await?;
@@ -188,7 +195,9 @@ pub async fn link_set(
 /// The body of [`link_set`], for a caller that already holds the write and has locked the two
 /// Hermes, in the order of their identifiers: the admin command, and the publish of the org
 /// chart, which applies its links through this same code. It writes nothing when the link
-/// already is as asked ([`LinkSet::Unchanged`]).
+/// already is as asked ([`LinkSet::Unchanged`]). `marks` is the wake mark and the follow mark
+/// wanted. This code reads no org table: whether the follow mark may be set is checked by the
+/// publish of the org chart, the only caller that sets it.
 ///
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.
@@ -198,12 +207,13 @@ pub(crate) async fn set_locked(
     admin: &Admin,
     from: (&HermesName, Uuid),
     to: (&HermesName, Uuid),
-    wake: bool,
+    marks: (bool, bool),
     now: i64,
 ) -> Result<LinkSet, RepoError> {
     let ((from, from_id), (to, to_id)) = (from, to);
-    let before: Option<bool> = sqlx::query_scalar(
-        "SELECT wake FROM peer_link \
+    let (wake, follow) = marks;
+    let before: Option<(bool, bool)> = sqlx::query_as(
+        "SELECT wake, follow FROM peer_link \
          WHERE organization_id = $1 AND from_hermes_id = $2 AND to_hermes_id = $3 FOR UPDATE",
     )
     .bind(organization.id())
@@ -211,37 +221,49 @@ pub(crate) async fn set_locked(
     .bind(to_id)
     .fetch_optional(write.connection())
     .await?;
-    let details = link_details(from, from_id, to, to_id).flag("wake", wake);
+    let details = link_details(from, from_id, to, to_id)
+        .flag("wake", wake)
+        .flag("follow", follow);
     let (action, details, outcome) = match before {
-        Some(old) if old == wake => return Ok(LinkSet::Unchanged),
-        Some(old) => {
+        Some(old) if old == (wake, follow) => return Ok(LinkSet::Unchanged),
+        Some((old_wake, old_follow)) => {
             sqlx::query(
-                "UPDATE peer_link SET wake = $4, changed_at = $5 \
+                "UPDATE peer_link SET wake = $4, follow = $5, changed_at = $6 \
                  WHERE organization_id = $1 AND from_hermes_id = $2 AND to_hermes_id = $3",
             )
             .bind(organization.id())
             .bind(from_id)
             .bind(to_id)
             .bind(wake)
+            .bind(follow)
             .bind(now)
             .execute(write.connection())
             .await?;
             (
                 Action::PeerLinkChanged,
-                details.flag("wake_before", old),
-                LinkSet::Changed,
+                details
+                    .flag("wake_before", old_wake)
+                    .flag("follow_before", old_follow),
+                // A write that takes the mark away is the command's (the publish with the mark
+                // off reports the removal from the diff it computed).
+                if old_follow && !follow {
+                    LinkSet::FollowRemoved
+                } else {
+                    LinkSet::Changed
+                },
             )
         }
         None => {
             sqlx::query(
                 "INSERT INTO peer_link (organization_id, from_hermes_id, to_hermes_id, wake, \
-                                        created_by, created_at, changed_at) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $6)",
+                                        follow, created_by, created_at, changed_at) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $7)",
             )
             .bind(organization.id())
             .bind(from_id)
             .bind(to_id)
             .bind(wake)
+            .bind(follow)
             .bind(admin.id)
             .bind(now)
             .execute(write.connection())
@@ -374,8 +396,8 @@ async fn discard_notices(
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.
 pub async fn links(pool: &PgPool, organization: ResolvedOrg) -> Result<Vec<LinkLine>, RepoError> {
-    let rows: Vec<(String, String, bool, i64)> = sqlx::query_as(
-        "SELECT f.name, t.name, l.wake, l.changed_at \
+    let rows: Vec<(String, String, bool, bool, i64)> = sqlx::query_as(
+        "SELECT f.name, t.name, l.wake, l.follow, l.changed_at \
          FROM peer_link l \
          JOIN hermes f ON f.id = l.from_hermes_id \
          JOIN hermes t ON t.id = l.to_hermes_id \
@@ -386,11 +408,12 @@ pub async fn links(pool: &PgPool, organization: ResolvedOrg) -> Result<Vec<LinkL
     .fetch_all(pool)
     .await?;
     rows.into_iter()
-        .map(|(from, to, wake, changed_at)| {
+        .map(|(from, to, wake, follow, changed_at)| {
             Ok(LinkLine {
                 from: name_of(&from)?,
                 to: name_of(&to)?,
                 wake,
+                follow,
                 changed_at,
             })
         })
@@ -1282,6 +1305,8 @@ pub enum NoticeTarget {
     Peer {
         /// The Hermes that sent them.
         from: HermesName,
+        /// The link had the follow mark when the notice left (decision 0050).
+        follow: bool,
     },
     /// Messages in a chat of a number of WhatsApp.
     Whatsapp {
@@ -1334,14 +1359,18 @@ pub async fn lease(
     for id in lapsed {
         back_to_pending(&mut tx, organization, id, now, now).await?;
     }
-    let rows: Vec<(Uuid, i32, String, bool)> = sqlx::query_as(
+    let rows: Vec<(Uuid, i32, String, bool, bool)> = sqlx::query_as(
         "SELECT n.id, n.count, f.name, \
                 (f.organization_id = n.organization_id AND f.deleted_at IS NULL \
                  AND h.deleted_at IS NULL \
                  AND EXISTS (SELECT 1 FROM peer_link l \
                              WHERE l.organization_id = n.organization_id \
                                AND l.from_hermes_id = n.from_hermes_id \
-                               AND l.to_hermes_id = n.hermes_id AND l.wake)) \
+                               AND l.to_hermes_id = n.hermes_id AND l.wake)), \
+                COALESCE((SELECT l.follow AND l.wake FROM peer_link l \
+                          WHERE l.organization_id = n.organization_id \
+                            AND l.from_hermes_id = n.from_hermes_id \
+                            AND l.to_hermes_id = n.hermes_id), FALSE) \
          FROM notice n \
          JOIN hermes f ON f.id = n.from_hermes_id \
          JOIN hermes h ON h.id = n.hermes_id \
@@ -1361,10 +1390,11 @@ pub async fn lease(
     .fetch_all(&mut *tx)
     .await?;
     let mut judged: Vec<(Uuid, i32, Option<NoticeTarget>)> = Vec::new();
-    for (id, count, from, still) in rows {
+    for (id, count, from, still, follow) in rows {
         let target = if still {
             Some(NoticeTarget::Peer {
                 from: name_of(&from)?,
+                follow,
             })
         } else {
             None

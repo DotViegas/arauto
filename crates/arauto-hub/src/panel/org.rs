@@ -50,8 +50,8 @@ const NO_SCRIPT: &str = k(
 const HINT: &str = k(
     "Drag a Hermes to change its level. Pull the purple dot of a card to another card to create a link. Click an arrow or a card to adjust it.",
 );
-const STAGE_A: &str = k(
-    "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
+const STAGE_B: &str = k(
+    "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
 );
 const LEGEND: [&str; 3] = [
     k("From a higher level to a lower one: instruction"),
@@ -107,6 +107,19 @@ const SAY: &[(&str, &str)] = &[
     (
         "wake-hint",
         k("With this mark, a note on this link wakes {name}, within the notice limits."),
+    ),
+    ("follows-name", k("{to} follows the instructions of {from}")),
+    (
+        "follow-hint",
+        k(
+            "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        ),
+    ),
+    (
+        "follow-warning",
+        k(
+            "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        ),
     ),
     ("way-back-create", k("Create the way back")),
     ("way-back-remove", k("Remove the way back")),
@@ -164,6 +177,14 @@ const SAY: &[(&str, &str)] = &[
         k("Link {from} → {to}: no longer wakes {to}"),
     ),
     ("change-link-removed", k("Link removed: {from} → {to}")),
+    (
+        "change-follow-on",
+        k("Link {from} → {to}: {to} now follows the instructions of {from}"),
+    ),
+    (
+        "change-follow-off",
+        k("Link {from} → {to}: {to} no longer follows the instructions of {from}"),
+    ),
     (
         "change-level",
         k("{name} changes level: {before} → {after}"),
@@ -356,6 +377,7 @@ fn state_json(page: &OrgPage, lang: Lang) -> String {
                 "from": link.from.as_str(),
                 "to": link.to.as_str(),
                 "wake": link.wake,
+                "follow": link.follow,
             })
         })
         .collect();
@@ -385,6 +407,9 @@ fn rule(html: &mut Html, invalid: OrgInvalid) {
             "A link joins two different Hermes, once in each direction.",
         )),
         OrgInvalid::TooLarge => html.t(k("The draft is too large to publish.")),
+        OrgInvalid::Follow => html.t(k(
+            "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        )),
     };
 }
 
@@ -605,7 +630,7 @@ fn write(frame: &Frame, page: &OrgPage, said: Said, echo: Option<&str>) -> Strin
             .raw("</span>");
     }
     html.raw("</div><p class=\"note\">")
-        .t(STAGE_A)
+        .t(STAGE_B)
         .raw("</p><form id=\"org-form\" method=\"post\" action=\"/org/publish\" hidden><input type=\"hidden\" name=\"version\"><input type=\"hidden\" name=\"draft\"></form>");
     view::close(&mut html);
     html.raw(view::TAIL);
@@ -789,7 +814,9 @@ pub(super) async fn publish(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::org::{LevelName, MapX, Place, RoleText, StoredLevel, StoredMember};
+    use crate::core::org::{
+        LevelName, MapX, Place, RoleText, StoredLevel, StoredLink, StoredMember,
+    };
     use arauto_protocol::names::HermesName;
 
     const HOSTILE: &str = "<script>alert(1)</script>\"'><img src=x onerror=alert(2)>";
@@ -885,6 +912,55 @@ mod tests {
     }
 
     #[test]
+    fn the_state_of_the_page_and_the_echo_carry_the_follow_mark() {
+        let mut page = page_with("");
+        let (ana, bia) = (
+            HermesName::parse("ana").unwrap(),
+            HermesName::parse("bia").unwrap(),
+        );
+        page.chart.links = vec![StoredLink {
+            from_id: Uuid::from_u128(1),
+            from: ana,
+            to_id: Uuid::from_u128(2),
+            to: bia,
+            wake: true,
+            follow: true,
+        }];
+        let state: serde_json::Value =
+            serde_json::from_str(&state_json(&page, Frame::default().lang)).unwrap();
+        assert_eq!(state["links"][0]["follow"], true);
+        page.chart.links[0].follow = false;
+        let state: serde_json::Value =
+            serde_json::from_str(&state_json(&page, Frame::default().lang)).unwrap();
+        assert_eq!(state["links"][0]["follow"], false);
+
+        // The echo of a refused draft: the mark comes back, and an old script that sends no mark
+        // reads as off.
+        let draft = |link: serde_json::Value| {
+            Draft::parse(
+                &serde_json::json!({
+                    "levels": [ { "key": "new-1", "name": "board" } ],
+                    "hermes": [
+                        { "name": "ana", "level": "new-1", "x": 1, "role": "" },
+                        { "name": "bia", "level": "new-1", "x": 2, "role": "" },
+                    ],
+                    "links": [link],
+                })
+                .to_string(),
+            )
+            .unwrap()
+        };
+        let echoed = |draft: &Draft| -> serde_json::Value {
+            serde_json::from_str(&draft.to_json()).unwrap()
+        };
+        let on =
+            draft(serde_json::json!({ "from": "ana", "to": "bia", "wake": true, "follow": true }));
+        assert_eq!(echoed(&on)["links"][0]["follow"], true);
+        let absent = draft(serde_json::json!({ "from": "ana", "to": "bia", "wake": true }));
+        assert_eq!(echoed(&absent)["links"][0]["follow"], false);
+    }
+
+    #[test]
     fn without_the_script_the_page_shows_the_lists_and_says_why() {
         let html = write(
             &Frame::default(),
@@ -908,6 +984,7 @@ mod tests {
         assert_eq!(html.matches("<table class=\"list\">").count(), 3);
         // The stage-A sentence is always there.
         assert!(html.contains("only shown here"));
+        assert!(html.contains("with the follow mark"));
         // Nobody on the chart: the empty state, and no editor.
         let empty = OrgPage {
             chart: Chart::default(),

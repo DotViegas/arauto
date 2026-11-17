@@ -966,7 +966,10 @@ async fn run_installed(
                 );
                 let text = std::fs::read_to_string(&file)?;
                 match arauto_hub::core::org::Draft::parse(&text) {
-                    Ok(draft) => org::published(&session.org_publish(&draft, base, now).await?),
+                    Ok(draft) => {
+                        let dropped = session.org_follow_dropped(&draft, base).await?;
+                        org::published(&session.org_publish(&draft, base, now).await?, &dropped)
+                    }
                     Err(reason) => Report {
                         text: format!("{reason} Nothing was published.\n"),
                         done: false,

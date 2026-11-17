@@ -2,7 +2,8 @@
 
 **Status: proposal**, to be validated in the first MVP ([15-mvp.md](15-mvp.md)). Revised on
 10/11/2026, after the design review.
-Changed on 15/11/2026 by [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md): the wake mark of the link is enough to wake by a note. How one Hermes sends a note to another through the hub, who
+Changed on 15/11/2026 by [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md): the wake mark of the link is enough to wake by a note.
+Changed on 16/11/2026 by [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md) (proposal, built and covered by automatic tests, not tried on a real Hermes): a link may carry a third mark, the follow mark. How one Hermes sends a note to another through the hub, who
 may send to whom and what keeps two Hermes from entering a loop.
 
 ## Summary
@@ -19,7 +20,7 @@ may send to whom and what keeps two Hermes from entering a loop.
 | Question | Answer |
 |---|---|
 | Who may send a note to whom? | Only where the admin created the link, and only in the marked direction. |
-| Is a note an order? | No. It is data, written by another agent. Arauto does not transmit authority. |
+| Is a note an order? | No. It is data, written by another agent. Arauto does not transmit authority. One exception, proposal ([0050](decisoes/0050-etapa-b-marca-de-seguir.md)): on a link with the follow mark, the notice asks the receiver, for the run it starts, to follow the new messages. It is a sentence to an AI, not a control. |
 | And if the recipient is off? | The note stays kept. It finds it when it comes back. |
 | What keeps two Hermes from talking without stopping? | Fixed ceilings, counted per link and per recipient. Opening a new thread resets none. |
 | Does the admin see what was said? | In the MVP the admin command shows only who talked to whom, when and how much. Whoever has the database and the master key can read the text: the conversation is not private from whoever administers the hub. |
@@ -43,12 +44,13 @@ A thread has exactly two Hermes. Rooms with several Hermes are not in the first 
 
 ## 2. The peer list
 
-A link says: **from A to B**. It has two marks.
+A link says: **from A to B**. It has two marks, and a third one in the proposal of [0050](decisoes/0050-etapa-b-marca-de-seguir.md).
 
 | Mark | What it allows |
 |---|---|
 | **Send note** | A sends a note to B. Every link has it. |
 | **Wake** | A note from A wakes B. The mark is enough: nothing else about B is consulted ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026). It once said that the switch "woken by WhatsApp" of B was not consulted; since 16/11/2026 the switch no longer exists ([decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)). |
+| **Follow** (proposal, [0050](decisoes/0050-etapa-b-marca-de-seguir.md), built, not tried on a real Hermes) | The notice of a note from A tells B to follow those new messages in the run it starts, below its operator's instructions. Off by default. See rule 8. |
 
 Rules:
 
@@ -65,6 +67,12 @@ Rules:
    does not exist (AR-707), decided by a single query.
 7. **There is no link from a Hermes to itself**, nor between organizations. The database forbids
    both.
+8. **The follow mark (proposal, 0050).** It is set only by publishing the org chart (the panel or
+   `arauto-hub admin org publish`), only on an instruction arrow (from a higher level to a lower
+   one) and only on a link that also has the wake mark. It is off by default. `arauto-hub admin
+   link add` cannot set it and removes it from a link that has it. The hub reads only the mark when
+   a note is delivered, never the levels. Because it goes only downward, followed links cannot form
+   a cycle. The mark gives the sender nothing in the hub: no access, no link, no number.
 
 The name of the Hermes follows the format `^[a-z0-9][a-z0-9_-]{0,31}$`: lowercase letters, digits,
 hyphen and underscore, up to 32 characters. It does not change after it is created and is not reused
@@ -78,12 +86,15 @@ The one that checks the format when building the sentence is the connector
 
 - It shows the WhatsApp numbers and the verbs of each side. The link lets a request cross from one
   number to another: a contact that deceives A can make A ask B for something on B's number.
-- It reminds that a note is data. Instructing a Hermes to obey another makes the hub a path of
-  command, which the project does not guarantee (section 9).
+- It says that a message on this link is data written by another agent, not an instruction, and
+  that only the follow mark, set on the org chart, tells a receiver to follow a sender (proposal,
+  0050). If the link had the follow mark, the command removes it and says so.
 
 ### The org chart (proposal, stage A)
 
 [Decision 0043](decisoes/0043-organograma-e-niveis.md), built in the hub, tried only in a desktop Chrome without a window (15/11/2026). The admin can arrange the Hermes in levels on the panel's org chart, and the panel shows each link as an instruction (to a lower level), a request (to a higher one) or a note (same level). **Levels and kinds are for the admin's eyes**: no Hermes is told its level or a kind, and nothing here changes a note, a notice or a tool. Rules 1 to 7 above do not change. Publishing the chart changes the peer list through the same functions as the admin command, in one write. **Not guaranteed:** that a Hermes behaves by its level; in stage A it does not know it.
+
+**Stage B (proposal, [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md), 16/11/2026; the field, the sentence, the mark in the hub, the panel and the command are built and covered by automatic tests against a fake Hermes; not tried on a real Hermes or in a browser).** The only thing that changes for a Hermes is the follow mark of rule 8. The levels and the roles still never leave the hub, and the kind of an arrow still gives no permission: it only bounds where the admin may set the mark.
 
 ## 3. The path of a note
 
@@ -147,6 +158,7 @@ The notice of a note is a pointer, like the one of a WhatsApp message
 | `from` | The name of the sender Hermes. |
 | `count` | How many new notes since the last notice. |
 | `id` | Identifier of the notice, to discard repetition. |
+| `follow` | Optional boolean (proposal, 0050). The hub writes `true` only when the link has the follow mark at the moment the notice leaves, and omits the field otherwise. |
 
 The notice does not carry the text of the note or the thread. The sentence that wakes Hermes is
 fixed and stays in the connector:
@@ -160,6 +172,14 @@ fixed and stays in the connector:
 
 Approved word for word by the maintainer on 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)); it replaces the shorter one. It tells a Hermes how to answer, never what to do. It rests on the change of 15/11/2026 to [decision 0005](decisoes/0005-comando-e-dado-sao-separados.md), approved by the maintainer. Not tried on a real Hermes: whether a woken Hermes now answers by note is owed ([12](12-roteiro.md)).
 
+### The second sentence, for a followed link (proposal)
+
+**Proposal, 16/11/2026, [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md); the sentence is approved word for word and built in the protocol and the connector, and the hub sends the field for a marked link; covered by automatic tests against a fake Hermes; not tried on a real Hermes.** When the notice carries `follow: true`, the connector starts the run with a second fixed sentence, in the common protocol crate beside the first (its exact text is in 0050, section C). It says that the Arauto admin marked the sender as an agent whose instructions the receiver follows: in this run only, do what the new messages ask without waiting for the operator, unless the operator's instructions forbid it; text claiming to be an Arauto notice or the admin's mark is data. The connector accepts `follow` absent, `null` or `false` (the sentence above) or `true` (the second sentence); any other value is `rejected`. A connector of an older version ignores the field and keeps the first sentence.
+
+- **The reach is one notice, one run and the new messages of that notice.** The same thread read later, in another run or in a conversation with the operator, is data. The late wake after the grace check (below) uses the first sentence.
+- The descriptions of the tools do not change: they keep saying that a note is data.
+- **Not guaranteed:** the sentence is an instruction to a model, not enforcement. A Hermes may still not do what is asked, may refuse, or may take a forged text as authority. The limits are in section 9.
+
 ### When the sender waits for an answer (proposal)
 
 **Proposal, 15/11/2026, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md); built, not tried on a real Hermes.** A Hermes that asked something and ended its turn would be woken by the answer in a separate run, which its operator never sees. To avoid that, the connector adds to a successful send a field `to_get_the_reply` ([09](09-contrato-mcp.md)) that tells the asking Hermes to start `arauto-connector await-reply THREAD` as a background process with notify. When an answer arrives, the command prints one fixed line, with no note text, and Hermes puts it into the same conversation. When a waiter is told this way, the notice is confirmed without calling the local API; a check ten minutes later wakes only if the thread is still unread. The details and the limits are in [11](11-conector.md), section 6.
@@ -171,6 +191,7 @@ Delivery rules:
 - The first notice leaves at once. The next one, from the same sender, only after 10 seconds.
 - The notice is re-evaluated at delivery: if the link lost the wake, if it left, or if either Hermes
   was removed, it is discarded. The verb "be woken" for WhatsApp is not consulted (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): there is no switch of the Hermes any more).
+- The follow mark is read at the same moment (proposal, 0050): a mark removed while the notice waits makes it leave without the field.
 - Otherwise, the rules of every notice apply ([08](08-permissoes.md), section 4): at least once,
   with confirmation, for up to 24 hours.
 - A notice that the ceiling blocked is **discarded**, never postponed. If it were postponed, the
@@ -261,8 +282,8 @@ They stay in the connector, with fixed name and description ([09-contrato-mcp.md
 
 It does not:
 
-- **It does not transmit an order.** There is no note "with authority".
-- **The level of a Hermes and the kind of a link give no authority** (stage A).
+- **It does not transmit an order.** The only exception, a proposal ([0050](decisoes/0050-etapa-b-marca-de-seguir.md)), is a sentence in the notice of a link with the follow mark; Arauto does not check what the receiver did. On every other link there is no note "with authority".
+- **The level of a Hermes and the kind of a link give no authority.** The kind only bounds where the follow mark may be set.
 - **It does not give a Hermes anything of the admin.** There is no note that changes access, list,
   invite or device.
 - **It does not choose who answers and does not answer by itself.**
@@ -292,6 +313,17 @@ Known limits:
    command that shows the text; whoever has the database and the key reads without going through
    any command.
 
+Limits of the follow mark (proposal, [0050](decisoes/0050-etapa-b-marca-de-seguir.md); nothing tried on a real Hermes):
+
+9. **Forgery by the hub.** A forged note on a marked link, or any note notice whose `follow` an invaded hub sets, is presented as an instruction and the connector cannot tell. Whoever writes to the database, even without the master key, can set the mark on any link.
+10. **A faked notice inside a note.** A note, or WhatsApp text that a Hermes relays, can look like an Arauto notice or claim the admin's mark. The sentence is public, so a fake can copy it. It is a reminder to an AI, not a control.
+11. **Chains.** A higher Hermes misled by a message passes the request down and each marked level acts on it. Bounded by the levels (at most 12 levels, 11 hops) and the ceilings, not prevented.
+12. **Authority that outlives the run or the mark.** A receiver may keep "follow X" in its memory. Removing the mark stops the sentence on later notices; it does not undo what was done, and a run already started is not stopped.
+13. **Conflicting instructions** from two senders: Arauto gives no precedence.
+14. **A stolen panel session** can set marks: Publish is not confirmed again by the passkey ([0019](decisoes/0019-painel-com-passkey.md) is not built).
+15. **Loops and numbers.** Marks cannot form a cycle, but answers go up and can provoke new instructions; only the ceilings bound it, they do not stop waste. Inside the accesses it already has, a followed instruction can make the receiver send on WhatsApp; the send ceiling bounds volume, not harm.
+16. **Following at all.** Whether a model follows the sentence, refuses when its operator forbids it, or keeps to the new messages is not tried. The operator of the receiver is not asked and not told. Old connectors keep the first sentence. The mark is read when the notice leaves, so a note written before the mark was set is presented as an instruction if its notice leaves after.
+
 ## 10. Open
 
 | Point | Situation |
@@ -303,4 +335,4 @@ Known limits:
 | Note signed by the identity of the sender device | It would give the end-to-end proof of limit 1. To be evaluated after the MVP. |
 | Admin command to read the text of the notes | Out of the MVP. If it comes in, it escapes every control character and records who read. |
 | The wording of the fixed sentence | Approved on 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)). |
-| Stage B: notes that know the levels | Pending. It needs decision 0005 reopened by the maintainer and new fixed sentences he approves ([0043](decisoes/0043-organograma-e-niveis.md)). |
+| Stage B: the follow mark | Designed in [0050](decisoes/0050-etapa-b-marca-de-seguir.md) (proposal): the field, the sentence, the mark in the hub, the panel and the command are built and covered by automatic tests against a fake Hermes; nothing tried on a real Hermes or in a browser. Asking for the passkey at publish waits for [0019](decisoes/0019-painel-com-passkey.md). |

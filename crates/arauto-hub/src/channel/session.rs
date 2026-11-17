@@ -478,10 +478,10 @@ impl Serving<'_> {
                 continue;
             };
             let pointer = match notice.target {
-                NoticeTarget::Peer { from } => Notice::Peer {
+                NoticeTarget::Peer { from, follow } => Notice::Peer {
                     from,
                     count,
-                    follow: false,
+                    follow,
                 },
                 NoticeTarget::Whatsapp { number, chat } => {
                     // A UUID is always an opaque identifier of a chat.

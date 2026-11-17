@@ -824,8 +824,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Same level: note", "同じレベル: メモ"),
     (
-        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
-        "このバージョンでは、レベル、役割、矢印の種類はここに表示されるだけです。どの Hermes にも伝えられず、メモは引き続きデータであり、命令ではありません。Hermes がほかの Hermes にメモを送れるのは、リンクがある場合だけです。",
+        "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
+        "レベルと役割はここに表示されるだけで、どの Hermes にも伝えられません。メモはデータです。ただし、従う設定のある指示の矢印は別で、その場合、通知は下位の Hermes に、上位の Hermes からのその新しいメッセージを、その実行の間、オペレーターの指示の下で従うよう伝えます。Hermes がほかの Hermes にメモを送れるのは、リンクがある場合だけです。",
     ),
     ("instruction", "指示"),
     ("request", "依頼"),
@@ -1290,5 +1290,30 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "この設定がある場合、このリンクで届いたメモは、通知の上限の範囲内で {name} に起動通知を送ります。",
+    ),
+    // decision 0050
+    (
+        "{to} follows the instructions of {from}",
+        "{to} は {from} の指示に従う",
+    ),
+    (
+        "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        "この設定があると、メモの通知は、その実行の間、{from} が求めることを、オペレーターを待たずに、オペレーターが禁じていない限り行うよう {to} に伝えます。指示の矢印でのみ、起動通知の設定とあわせてのみ使えます。{to} が報告するには戻りのリンクが必要です。これは AI に向けた文であり、制御ではありません。",
+    ),
+    (
+        "Link {from} → {to}: {to} now follows the instructions of {from}",
+        "リンク {from} → {to}: {to} が {from} の指示に従うようになりました",
+    ),
+    (
+        "Link {from} → {to}: {to} no longer follows the instructions of {from}",
+        "リンク {from} → {to}: {to} は {from} の指示に従わなくなりました",
+    ),
+    (
+        "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        "ほかの Hermes に従う Hermes は、オペレーターを待たずにその指示を実行します。上位の Hermes を WhatsApp やメモで惑わせた人は、下位の Hermes にも届きます。ハブを制御できる人はどの Hermes としても書き込めます。パネルのセッションを持つ人はこれらの設定を付けられます。古いバージョンのコネクターは、これらのメモを引き続きデータとして扱います。",
+    ),
+    (
+        "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        "従う設定は、上位のレベルから下位のレベルへ向かい、起動通知のあるリンクにだけ付けられます。",
     ),
 ];

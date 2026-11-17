@@ -71,6 +71,24 @@ impl World {
             .unwrap();
     }
 
+    /// Sets or takes away the follow mark of a link by hand, in the table. The mark is set by the
+    /// publish of the org chart, which is tested in the repositories; here only the way of the
+    /// mark to the wire is looked at.
+    pub async fn set_follow(&self, from: &Agent, to: &Agent, follow: bool) {
+        let done = sqlx::query(
+            "UPDATE peer_link SET follow = $3 \
+             WHERE from_hermes_id = (SELECT id FROM hermes WHERE name = $1) \
+               AND to_hermes_id = (SELECT id FROM hermes WHERE name = $2)",
+        )
+        .bind(&from.name)
+        .bind(&to.name)
+        .bind(follow)
+        .execute(&self.fixture.pool)
+        .await
+        .unwrap();
+        assert_eq!(done.rows_affected(), 1);
+    }
+
     /// `admin link remove FROM TO`.
     pub async fn unlink(&self, from: &Agent, to: &Agent) {
         self.fixture
@@ -269,6 +287,14 @@ pub fn texts(read: &Map<String, Value>) -> Vec<String> {
         .iter()
         .map(|message| message["text"].as_str().unwrap().to_owned())
         .collect()
+}
+
+/// Whether a notice of messages tells the receiver to follow its sender.
+pub fn peer_follows(notice: &NoticeMsg) -> bool {
+    match notice.validate().unwrap() {
+        Notice::Peer { follow, .. } => follow,
+        Notice::Whatsapp { .. } => panic!("a notice of WhatsApp"),
+    }
 }
 
 /// The sender and the count of a notice of messages.

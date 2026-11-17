@@ -65,6 +65,10 @@ pub enum OrgInvalid {
     /// The draft is larger than a publish takes.
     #[error("The draft is too large to publish.")]
     TooLarge,
+    /// A follow mark is on a link that does not go from a higher level to a lower one, or that
+    /// does not wake.
+    #[error("A follow mark goes only from a higher level to a lower one, on a link that wakes.")]
+    Follow,
 }
 
 /// The name of a level: the format and the reserved words of a Hermes name.
@@ -274,6 +278,8 @@ pub struct WantedLink {
     pub to: HermesName,
     /// Whether a message of `from` wakes `to`.
     pub wake: bool,
+    /// Whether `to` follows the instructions of `from` (decision 0050).
+    pub follow: bool,
 }
 
 #[derive(Deserialize)]
@@ -298,6 +304,8 @@ struct RawLink {
     from: String,
     to: String,
     wake: bool,
+    #[serde(default)]
+    follow: bool,
 }
 
 #[derive(Deserialize)]
@@ -384,6 +392,7 @@ impl Draft {
                 from,
                 to,
                 wake: link.wake,
+                follow: link.follow,
             });
         }
         Ok(Self {
@@ -424,6 +433,7 @@ impl Draft {
                     "from": link.from.as_str(),
                     "to": link.to.as_str(),
                     "wake": link.wake,
+                    "follow": link.follow,
                 })
             })
             .collect();
@@ -477,6 +487,8 @@ pub struct StoredLink {
     pub to: HermesName,
     /// The wake mark.
     pub wake: bool,
+    /// The follow mark.
+    pub follow: bool,
 }
 
 /// The chart as the database holds it, read in one snapshot.
@@ -538,7 +550,8 @@ impl Chart {
         for link in links {
             hasher.update(link.from_id.as_bytes());
             hasher.update(link.to_id.as_bytes());
-            hasher.update([u8::from(link.wake)]);
+            // wake | follow << 1: the same byte as before while no link is followed.
+            hasher.update([u8::from(link.wake) | (u8::from(link.follow) << 1)]);
         }
         ChartVersion(hasher.finalize().into())
     }
@@ -770,6 +783,18 @@ mod tests {
             }),
             Err(OrgInvalid::Link)
         );
+        // The follow mark is a boolean that may be left out; anything else is not a draft.
+        assert!(!parse(&draft_json()).unwrap().links[0].follow);
+        assert!(
+            with(&|v| v["links"][0]["follow"] = true.into())
+                .unwrap()
+                .links[0]
+                .follow
+        );
+        assert_eq!(
+            with(&|v| v["links"][0]["follow"] = "true".into()),
+            Err(OrgInvalid::Unreadable)
+        );
         // No error carries a value of the draft.
         let refused = with(&|v| {
             v["hermes"][0]["role"] = format!("{canary}\n").into();
@@ -835,6 +860,7 @@ mod tests {
                 to_id: Uuid::from_u128(2),
                 to: name("bia"),
                 wake: false,
+                follow: false,
             }],
         }
     }
@@ -884,6 +910,7 @@ mod tests {
                 }),
             ),
             ("link wake", Box::new(|c| c.links[0].wake = true)),
+            ("link follow", Box::new(|c| c.links[0].follow = true)),
             ("link removed", Box::new(|c| c.links.clear())),
             (
                 "link added",
@@ -894,6 +921,7 @@ mod tests {
                         to_id: Uuid::from_u128(1),
                         to: name("ana"),
                         wake: false,
+                        follow: false,
                     });
                 }),
             ),

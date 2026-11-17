@@ -163,6 +163,8 @@ The second is a new note from another Hermes: `kind` is `peer`, with `from`, `co
 assembling the fixed sentence, and refuses a notice of a type it does not know
 ([14](14-protocolo-do-canal.md), section 5.3).
 
+A peer notice may also carry the optional boolean `follow` (proposal, [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md); built in the protocol, the connector and the hub, with automatic tests; not tried on a real Hermes): with `true`, the connector uses a second fixed sentence. The descriptions of the tools do not change: they keep saying that a note is data, and none contains the word "follow".
+
 ## 6. Note on origin
 
 The `whatsapp_*` family comes from the source service. On 10/11/2026 the names moved to English,

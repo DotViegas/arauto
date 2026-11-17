@@ -794,8 +794,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Same level: note", "समान स्तर: नोट"),
     (
-        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
-        "इस संस्करण में स्तर, भूमिकाएँ और तीरों के प्रकार केवल यहीं दिखते हैं: किसी Hermes को इनके बारे में नहीं बताया जाता, और नोट अब भी केवल डेटा है, कभी आदेश नहीं। केवल लिंक ही एक Hermes को दूसरे को नोट भेजने देता है।",
+        "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
+        "स्तर और भूमिकाएँ केवल यहीं दिखते हैं: किसी Hermes को इनके बारे में नहीं बताया जाता। नोट डेटा है, सिवाय उस निर्देश वाले तीर के जिस पर पालन का निशान हो: तब सूचना नीचे वाले Hermes से कहती है कि ऊपर वाले के उन नए संदेशों का उस रन में पालन करे, अपने ऑपरेटर के निर्देशों के नीचे रहते हुए। केवल लिंक ही एक Hermes को दूसरे को नोट भेजने देता है।",
     ),
     ("instruction", "निर्देश"),
     ("request", "अनुरोध"),
@@ -1239,5 +1239,30 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "इस निशान के साथ, इस लिंक से भेजा गया नोट {name} को जगाता है, सूचना की सीमाओं के भीतर।",
+    ),
+    // decision 0050
+    (
+        "{to} follows the instructions of {from}",
+        "{to} {from} के निर्देशों का पालन करता है",
+    ),
+    (
+        "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        "इस निशान के साथ, नोट की सूचना {to} से कहती है कि उस रन में वह वही करे जो {from} कहे, अपने ऑपरेटर का इंतज़ार किए बिना, जब तक उसका ऑपरेटर मना न करे। केवल निर्देश वाले तीर पर, केवल जगाने के निशान के साथ; रिपोर्ट करने के लिए {to} को लौटने वाला लिंक चाहिए। यह एक AI को दिया गया वाक्य है, नियंत्रण नहीं।",
+    ),
+    (
+        "Link {from} → {to}: {to} now follows the instructions of {from}",
+        "लिंक {from} → {to}: अब {to}, {from} के निर्देशों का पालन करता है",
+    ),
+    (
+        "Link {from} → {to}: {to} no longer follows the instructions of {from}",
+        "लिंक {from} → {to}: अब {to}, {from} के निर्देशों का पालन नहीं करता",
+    ),
+    (
+        "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        "जो Hermes किसी दूसरे का पालन करता है, वह अपने ऑपरेटर का इंतज़ार किए बिना वही करता है जो दूसरा कहता है। जो ऊपर वाले Hermes को WhatsApp या किसी नोट से भटकाता है, वह नीचे वाले तक भी पहुँच जाता है; जो हब को नियंत्रित करता है, वह किसी भी Hermes की तरह लिख सकता है; और जिसके पास पैनल सत्र है, वह ये निशान लगा सकता है। पुराने संस्करण का कनेक्टर इन नोटों को अब भी डेटा ही मानता है।",
+    ),
+    (
+        "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        "पालन का निशान केवल ऊँचे स्तर से नीचे के स्तर तक जाता है, और केवल ऐसे लिंक पर जो जगाता है।",
     ),
 ];

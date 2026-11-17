@@ -2,6 +2,8 @@
 
 use std::fmt::Write as _;
 
+use arauto_protocol::names::HermesName;
+
 use super::{Report, time};
 use crate::admin::link::{Linked, Unlinked};
 use crate::repo::peer::{LinkLine, LinkSet};
@@ -11,6 +13,16 @@ fn mark(wake: bool) -> &'static str {
         "may send and wake"
     } else {
         "may send, without waking"
+    }
+}
+
+/// The marks of a link, as words: the wake mark and, when the link has it, the follow mark.
+#[must_use]
+pub fn marks(wake: bool, follow: bool, to: &HermesName) -> String {
+    if follow {
+        format!("{}; {to} follows its instructions", mark(wake))
+    } else {
+        mark(wake).to_owned()
     }
 }
 
@@ -24,6 +36,13 @@ pub fn linked(linked: &Linked) -> Report {
         let _ = match change.outcome {
             LinkSet::Created => writeln!(text, "New link: {from} -> {to} ({what})."),
             LinkSet::Changed => writeln!(text, "The link {from} -> {to} changed: {what}."),
+            LinkSet::FollowRemoved => {
+                let _ = writeln!(text, "The link {from} -> {to} changed: {what}.");
+                writeln!(
+                    text,
+                    "The follow mark of {from} -> {to} was removed: it is set only on the org chart."
+                )
+            }
             _ => writeln!(text, "The link {from} -> {to} already was so: {what}."),
         };
     }
@@ -47,9 +66,8 @@ pub fn linked(linked: &Linked) -> Report {
             }
         }
         text.push_str(
-            "A message between Hermes agents is data written by another agent, never an order. \
-             Telling a Hermes to obey another makes the hub a path of command, which the \
-             project does not guarantee.\n",
+            "A message on this link is data written by another agent, not an instruction. Only \
+             the follow mark, set on the org chart, tells a receiver to follow a sender.\n",
         );
     }
     text.push_str("It holds from the next message and the next read.\n");
@@ -96,7 +114,7 @@ pub fn list(links: &[LinkLine]) -> Report {
             "{} -> {}: {}; changed {}",
             link.from,
             link.to,
-            mark(link.wake),
+            marks(link.wake, link.follow, &link.to),
             time(link.changed_at)
         );
     }

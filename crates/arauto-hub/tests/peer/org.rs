@@ -50,7 +50,9 @@ async fn arrange(
         None => chart
             .links
             .iter()
-            .map(|l| json!({ "from": l.from.as_str(), "to": l.to.as_str(), "wake": l.wake }))
+            .map(|l| {
+                json!({ "from": l.from.as_str(), "to": l.to.as_str(), "wake": l.wake, "follow": l.follow })
+            })
             .collect(),
     };
     let draft = Draft::parse(
@@ -310,4 +312,78 @@ async fn the_command_shows_and_publishes_the_same_chart() {
             .await
             .unwrap();
     assert_eq!(notes, [Some("panel".to_owned())]);
+}
+
+#[tokio::test]
+async fn the_command_names_the_follow_marks_a_file_leaves_out() {
+    let world = World::new().await;
+    let a = world.agent().await;
+    let b = world.agent().await;
+    let admin = &world.fixture.admin;
+    let draft = |follow: Option<bool>| {
+        let mut link = json!({ "from": a.name, "to": b.name, "wake": true });
+        if let Some(follow) = follow {
+            link["follow"] = follow.into();
+        }
+        Draft::parse(
+            &json!({
+                "levels": [
+                    { "key": "new-1", "name": "board" },
+                    { "key": "new-2", "name": "floor" },
+                ],
+                "hermes": [
+                    { "name": a.name, "level": "new-1", "x": 1, "role": "" },
+                    { "name": b.name, "level": "new-2", "x": 2, "role": "" },
+                ],
+                "links": [link],
+            })
+            .to_string(),
+        )
+        .unwrap()
+    };
+    let base = admin.org_chart().await.unwrap().version();
+    // Nothing is followed yet: nothing to name.
+    assert!(
+        admin
+            .org_follow_dropped(&draft(Some(true)), base)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let done = admin
+        .org_publish(&draft(Some(true)), base, world.now())
+        .await
+        .unwrap();
+    assert!(matches!(done, PublishOutcome::Published(_)));
+    let now = admin.org_chart().await.unwrap();
+    assert!(now.links[0].follow);
+
+    // A file that leaves the mark out, or says false: the link is named. A file that keeps it
+    // names nothing. A file that started from another version names nothing (it is stale).
+    let pair = (
+        arauto_protocol::names::HermesName::parse(&a.name).unwrap(),
+        arauto_protocol::names::HermesName::parse(&b.name).unwrap(),
+    );
+    for follow in [None, Some(false)] {
+        // The levels of this draft are new keys; the names are what the function compares.
+        let dropped = admin
+            .org_follow_dropped(&draft(follow), now.version())
+            .await
+            .unwrap();
+        assert_eq!(dropped, std::slice::from_ref(&pair), "{follow:?}");
+    }
+    assert!(
+        admin
+            .org_follow_dropped(&draft(Some(true)), now.version())
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        admin
+            .org_follow_dropped(&draft(None), base)
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }

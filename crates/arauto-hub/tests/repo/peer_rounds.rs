@@ -5,13 +5,15 @@
 //! same explicit clock. A note wakes by the mark of its link and by nothing else (there is no
 //! switch of the Hermes since decision 0049), so the two normalized traces must be equal.
 //!
-//! The steps: a link with or without the mark, a link removed, a step that does nothing (it
-//! was the switch), a note, a lease, an answer (any of the five, none at all, or the same one twice), a repeated
-//! lease, and time that moves by 0, 1, 5, 11 or 61 seconds or by an hour and a second.
+//! The steps: a link with or without the mark, a link removed, a publish of the org chart that
+//! sets or takes away the follow marks (the three Hermes sit in three levels, the first one
+//! the highest, and a publish that puts the mark where it may not go is refused), a note, a
+//! lease, an answer (any of the five, none at all, or the same one twice), a repeated lease, and time that moves by 0, 1, 5, 11 or 61 seconds or by an hour and a second.
 //!
 //! After every lease: a notice that leaves had, at that moment, a live link from its sender
 //! with the mark (I1); two different notices of the same pair never leave less than ten
-//! seconds apart (I2). At the end, in the table: no pair of Hermes got more than 10 new
+//! seconds apart (I2); the notice carries `follow` equal to the follow mark of the link at that
+//! moment, and never without the wake mark (I5). At the end, in the table: no pair of Hermes got more than 10 new
 //! notices in a sliding hour and no recipient more than 30 (I3); and the twins agree (I4).
 //!
 //! A failing round prints its seed. `ARAUTO_TEST_SEED=<seed>` moves the run to other rounds
@@ -19,13 +21,16 @@
 
 use std::collections::HashMap;
 
+use arauto_hub::core::org::OrgInvalid;
 use arauto_hub::repo;
+use arauto_hub::repo::org::PublishOutcome;
 use arauto_hub::repo::peer::{LinkRemoved, LinkSet, NewMessage, NoticeTarget, Sent};
 use arauto_protocol::clock::SeededRng;
 use arauto_protocol::names::{HermesName, MessageText};
 use arauto_protocol::notice::AckOutcome;
 use uuid::Uuid;
 
+use crate::org::{chart, draft, keep, publish};
 use crate::support::World;
 
 const DEFAULT_SEED: u64 = 0x5045_4552_0045;
@@ -58,6 +63,8 @@ struct Run {
     ids: Vec<Uuid>,
     /// The links the test believes there are: `links[from][to]` is the wake mark.
     links: [[Option<bool>; 3]; 3],
+    /// The follow marks the test believes there are: `follows[from][to]`.
+    follows: [[bool; 3]; 3],
     now: i64,
     /// The notices seen, in order of first appearance.
     seen: Vec<Uuid>,
@@ -79,12 +86,33 @@ impl Run {
             ids.push(world.hermes_id(&name).await);
             names.push(name);
         }
+        // The three Hermes in three levels, the first one the highest.
+        let before = chart(&world).await;
+        let wanted = draft(&serde_json::json!({
+            "levels": [
+                { "key": "new-1", "name": "top" },
+                { "key": "new-2", "name": "middle" },
+                { "key": "new-3", "name": "bottom" },
+            ],
+            "hermes": names.iter().enumerate().map(|(at, name)| serde_json::json!({
+                "name": name.as_str(),
+                "level": format!("new-{}", at + 1),
+                "x": at * 200,
+                "role": "",
+            })).collect::<Vec<_>>(),
+            "links": [],
+        }));
+        assert!(matches!(
+            publish(&world, &wanted, before.version()).await,
+            PublishOutcome::Published(_)
+        ));
         let now = world.now();
         Self {
             world,
             names,
             ids,
             links: [[None; 3]; 3],
+            follows: [[false; 3]; 3],
             now,
             seen: Vec::new(),
             out: [Vec::new(), Vec::new(), Vec::new()],
@@ -122,13 +150,13 @@ impl Run {
         let mut due = due;
         due.sort_by_key(|notice| {
             let from = match &notice.target {
-                NoticeTarget::Peer { from } => self.names.iter().position(|n| n == from),
+                NoticeTarget::Peer { from, .. } => self.names.iter().position(|n| n == from),
                 NoticeTarget::Whatsapp { .. } => None,
             };
             (from, notice.count)
         });
         for notice in due {
-            let NoticeTarget::Peer { from } = &notice.target else {
+            let NoticeTarget::Peer { from, follow } = &notice.target else {
                 panic!("a notice of WhatsApp in a round of notes");
             };
             let from = self.names.iter().position(|name| name == from).unwrap();
@@ -138,6 +166,12 @@ impl Run {
                 Some(true),
                 "a notice left without a live link with the mark ({from} -> {to})"
             );
+            // I5: the follow mark of the link at this moment, and never without the wake mark.
+            assert_eq!(
+                *follow, self.follows[from][to],
+                "a notice left with another follow mark than its link ({from} -> {to})"
+            );
+            assert!(!*follow || self.links[from][to] == Some(true));
             // I2: ten seconds between two different notices of the same pair.
             for (other, f, t, at) in &self.leases {
                 if *f == from && *t == to && *other != notice.id {
@@ -153,7 +187,8 @@ impl Run {
             if !self.out[to].contains(&notice.id) {
                 self.out[to].push(notice.id);
             }
-            line.push_str(&format!(" n{at}(from {from}, x{})", notice.count));
+            let marked = if *follow { ", follow" } else { "" };
+            line.push_str(&format!(" n{at}(from {from}, x{}{marked})", notice.count));
         }
         self.trace.push(line);
     }
@@ -178,9 +213,14 @@ impl Run {
                 .unwrap();
                 assert!(matches!(
                     set,
-                    LinkSet::Created | LinkSet::Changed | LinkSet::Unchanged
+                    LinkSet::Created
+                        | LinkSet::Changed
+                        | LinkSet::FollowRemoved
+                        | LinkSet::Unchanged
                 ));
                 self.links[a][b] = Some(wake);
+                // The command sets the whole link, the follow mark included.
+                self.follows[a][b] = false;
                 self.trace.push(format!("link {a}->{b} wake={wake}"));
             }
             2 => {
@@ -200,12 +240,12 @@ impl Run {
                     LinkRemoved::Removed | LinkRemoved::NoLink
                 ));
                 self.links[a][b] = None;
+                self.follows[a][b] = false;
                 self.trace.push(format!("unlink {a}->{b}"));
             }
             3 => {
-                // Once the switch of the Hermes; it is gone (decision 0049). The draw stays so
-                // the seeds keep their rounds.
-                let _ = rng.below(2);
+                let wants = rng.below(2) == 0;
+                self.publish_marks(wants).await;
             }
             4..=6 => {
                 let text = MessageText::new(format!("note {}", rng.below(1_000))).unwrap();
@@ -290,6 +330,62 @@ impl Run {
         }
     }
 
+    /// A publish of the org chart that keeps every link and sets the follow mark on the ones that
+    /// may have it (a link that wakes and goes from a higher level to a lower one) when `wants`,
+    /// or takes every mark away. Then one that asks for a mark where it may not go, which is
+    /// refused and leaves the chart as it was.
+    async fn publish_marks(&mut self, wants: bool) {
+        let now = chart(&self.world).await;
+        let names = self.names.clone();
+        let index_of = |name: &str| names.iter().position(|n| n.as_str() == name).unwrap();
+        let mut value = keep(&now);
+        let mut forbidden = None;
+        for link in value["links"].as_array_mut().unwrap() {
+            let from = index_of(link["from"].as_str().unwrap());
+            let to = index_of(link["to"].as_str().unwrap());
+            let allowed = link["wake"] == true && from < to;
+            link["follow"] = (wants && allowed).into();
+            if !allowed {
+                // The links come in the order of their rows, which differ between the twins:
+                // the lowest pair is the one tried.
+                forbidden =
+                    Some(forbidden.map_or((from, to), |old: (usize, usize)| old.min((from, to))));
+            }
+        }
+        let outcome = publish(&self.world, &draft(&value), now.version()).await;
+        assert!(
+            matches!(
+                outcome,
+                PublishOutcome::Published(_) | PublishOutcome::Unchanged
+            ),
+            "{outcome:?}"
+        );
+        for link in &chart(&self.world).await.links {
+            let (from, to) = (index_of(link.from.as_str()), index_of(link.to.as_str()));
+            self.follows[from][to] = link.follow;
+        }
+        self.trace.push(format!("marks wants={wants}"));
+        if let Some((from, to)) = forbidden {
+            let now = chart(&self.world).await;
+            let mut value = keep(&now);
+            for link in value["links"].as_array_mut().unwrap() {
+                if index_of(link["from"].as_str().unwrap()) == from
+                    && index_of(link["to"].as_str().unwrap()) == to
+                {
+                    link["follow"] = true.into();
+                }
+            }
+            let refused = publish(&self.world, &draft(&value), now.version()).await;
+            assert_eq!(
+                refused,
+                PublishOutcome::Invalid(OrgInvalid::Follow),
+                "a mark on {from} -> {to}"
+            );
+            assert_eq!(chart(&self.world).await, now, "the refusal wrote");
+            self.trace.push(format!("refused {from}->{to}"));
+        }
+    }
+
     /// I3, in the table: new notices in any sliding hour.
     async fn limits(&self) {
         let rows: Vec<(Uuid, Uuid, i64)> = sqlx::query_as(
@@ -336,6 +432,7 @@ async fn the_notices_of_a_round_follow_the_marks_and_repeat_exactly() {
     let seed = number_from("ARAUTO_TEST_SEED").unwrap_or(DEFAULT_SEED);
     let rounds = number_from("ARAUTO_PEER_ROUNDS").unwrap_or(DEFAULT_ROUNDS);
     let mut woke = 0;
+    let mut followed = 0;
     for round in 0..rounds {
         let seed = seed.wrapping_add(round);
         let with_switch = tokio::spawn(play(seed)).await;
@@ -355,10 +452,18 @@ async fn the_notices_of_a_round_follow_the_marks_and_repeat_exactly() {
             at.map(|i| &with_switch[i]),
             at.map(|i| &without[i])
         );
+        followed += with_switch
+            .iter()
+            .filter(|line| line.starts_with("lease") && line.contains(", follow)"))
+            .count();
         woke += with_switch
             .iter()
             .filter(|line| line.starts_with("lease") && line.contains(" n"))
             .count();
     }
     assert!(woke > 0, "the rounds never woke anybody: they test nothing");
+    assert!(
+        followed > 0,
+        "the rounds never leased a notice of a followed link: the mark is not tested"
+    );
 }

@@ -1,6 +1,6 @@
 # 0043 — The org chart of the Hermes: levels, places and links on a map (stage A)
 
-**Status:** proposal · **Date:** 14/11/2026. Stage A is built in the hub; **it was tried only in a desktop Chrome without a window.** Stage B is **not designed** and is a pending decision of the maintainer.
+**Status:** proposal · **Date:** 14/11/2026. Stage A is built in the hub; **it was tried only in a desktop Chrome without a window.** Stage B is designed in [0050](0050-etapa-b-marca-de-seguir.md) (proposal, 16/11/2026).
 
 ## Asked by the maintainer (14/11/2026)
 
@@ -26,21 +26,21 @@ Decision [0005](0005-comando-e-dado-sao-separados.md) (decided) and [0032](0032-
 - **The page's script.** A second file, `org.js`, loaded only by this tab, writes no markup and calls nothing on the network; the live refresh of the tab is paused while a draft exists ([0040](0040-painel-dentro-do-hub.md), change of 14/11/2026).
 - **Out of stage A:** people on the chart; a Hermes in more than one level; editing accesses from the card; any permission derived from a level or a kind.
 
-## Stage B: pending decision of the maintainer
+## Stage B: designed in 0050 (proposal)
 
-He stated that an order from above is to be accepted automatically. That would make a note from a higher level an order, which 0005 and 0032 forbid. Doing it needs, from him:
+He stated that an order from above is to be accepted automatically. That would make a note from a higher level an order, which 0005 and 0032 forbade. On 16/11/2026 he reopened them and answered the questions of the design; the design is in [0050](0050-etapa-b-marca-de-seguir.md), a proposal. Of the four needs listed here:
 
-1. decision 0005 **reopened by him**; nothing here reopens it;
-2. new fixed sentences (the notice of a note from a higher level, the descriptions of the tools), approved by him;
-3. the levels sent to the connector;
-4. a decision on whether a kind of arrow becomes a permission.
+1. decision 0005 reopened by him: done on 16/11/2026;
+2. new fixed sentences approved by him: the follow sentence was approved on 16/11/2026; the descriptions of the tools do not change;
+3. the levels sent to the connector: not needed. The levels and the roles never leave the hub; only a boolean `follow` goes in the notice;
+4. whether a kind of arrow becomes a permission: answered, no. The kind of an arrow only bounds where the admin may set the follow mark (an instruction arrow, from a higher level to a lower one) and gives nothing else.
 
-Not designed here.
+The mark, the panel and the command are built and covered by automatic tests; nothing was tried on a real Hermes or in a browser. Stage A, above, is unchanged: the org chart still sends nothing to the channel except through that mark.
 
 ## What is not guaranteed
 
 - In stage A no Hermes knows its level, so the chart changes no behaviour of any Hermes.
-- In stage B, an instruction accepted automatically would be obeyed whoever forged it: an invaded hub, or whoever holds the database and the key, writes a note as any Hermes ([13](../13-conversa-entre-hermes.md), section 9, limit 1), and a Hermes on top, deceived by a text, passes the order down.
+- In stage B, an instruction presented as accepted automatically could be taken as one whoever forged it: an invaded hub, or whoever holds the database and the key, writes a note as any Hermes ([13](../13-conversa-entre-hermes.md), section 9, limit 1), and a Hermes on top, deceived by a text, passes the request down. The full list of limits is in [0050](0050-etapa-b-marca-de-seguir.md); whether a Hermes follows the sentence is not guaranteed and not tried.
 - A level is a label the admin gives, not a proof.
 - The map was tried on 15/11/2026 in Chrome 157 for Windows, without a window and driven by a script with the mouse, against a test hub with six Hermes and the content policy in force: adding levels, moving a card to another level, pulling four links, the window of an arrow, the drawer of a card, the list view, Publish and the refresh after it. That trial found and fixed three defects (an empty area above the map, a tall card cut by its band, Escape not closing the window of an arrow pulled with the mouse). Not tried: touch screens, other browsers, a narrow screen beyond one look at the list view, a hub behind a proxy. The size ceiling of a publish (1 MiB, estimated for about 200 Hermes) is not proved. The check of control characters in the database beyond ASCII depends on the locale; the check in the program is the authority.
 - While a publish runs it holds the rows of every live Hermes of the organization until its durable commit, so a link command, a note sent by a Hermes or a device call that needs one of those rows waits for it. A wait longer than the database's lock timeout (5 seconds) ends in an error and the caller tries again. The publish reads the chart once and writes without asking again, to keep that time short, but it grows with the number of links changed and with the speed of the disk; it was not measured on a large organization.

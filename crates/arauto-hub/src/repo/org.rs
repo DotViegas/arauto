@@ -52,7 +52,7 @@ pub struct Published {
     pub roles_changed: u32,
     /// Links created.
     pub links_created: u32,
-    /// Links with another wake mark.
+    /// Links with another wake mark or another follow mark.
     pub links_changed: u32,
     /// Links removed.
     pub links_removed: u32,
@@ -103,8 +103,8 @@ async fn read(
     .bind(organization.id())
     .fetch_all(&mut *connection)
     .await?;
-    let links: Vec<(Uuid, String, Uuid, String, bool)> = sqlx::query_as(
-        "SELECT l.from_hermes_id, f.name, l.to_hermes_id, t.name, l.wake \
+    let links: Vec<(Uuid, String, Uuid, String, bool, bool)> = sqlx::query_as(
+        "SELECT l.from_hermes_id, f.name, l.to_hermes_id, t.name, l.wake, l.follow \
          FROM peer_link l \
          JOIN hermes f ON f.id = l.from_hermes_id \
          JOIN hermes t ON t.id = l.to_hermes_id \
@@ -148,13 +148,14 @@ async fn read(
             .collect::<Result<_, RepoError>>()?,
         links: links
             .into_iter()
-            .map(|(from_id, from, to_id, to, wake)| {
+            .map(|(from_id, from, to_id, to, wake, follow)| {
                 Ok(StoredLink {
                     from_id,
                     from: stored_name(&from)?,
                     to_id,
                     to: stored_name(&to)?,
                     wake,
+                    follow,
                 })
             })
             .collect::<Result<_, RepoError>>()?,
@@ -367,10 +368,10 @@ pub async fn publish(
         }
     }
 
-    let current: BTreeMap<(&str, &str), (&StoredLink, bool)> = before
+    let current: BTreeMap<(&str, &str), &StoredLink> = before
         .links
         .iter()
-        .map(|link| ((link.from.as_str(), link.to.as_str()), (link, link.wake)))
+        .map(|link| ((link.from.as_str(), link.to.as_str()), link))
         .collect();
     let mut removals: Vec<&StoredLink> = Vec::new();
     for link in &before.links {
@@ -383,7 +384,15 @@ pub async fn publish(
         }
     }
     summary.links_removed = count(removals.len());
-    let mut sets: Vec<(&HermesName, Uuid, &HermesName, Uuid, bool)> = Vec::new();
+    // A follow mark needs the wake mark: refused before any write. Where the levels let it be
+    // is checked after the writes, against the positions as they will be.
+    if draft.links.iter().any(|link| link.follow && !link.wake) {
+        write.rollback().await?;
+        return Ok(invalid(OrgInvalid::Follow));
+    }
+    // The sender and the recipient with their rows, and the wake and follow marks wanted.
+    type LinkSets<'a> = Vec<(&'a HermesName, Uuid, &'a HermesName, Uuid, (bool, bool))>;
+    let mut sets: LinkSets<'_> = Vec::new();
     for wanted in &draft.links {
         let (Some(&from_id), Some(&to_id)) = (
             hermes_ids.get(wanted.from.as_str()),
@@ -394,10 +403,18 @@ pub async fn publish(
         };
         match current.get(&(wanted.from.as_str(), wanted.to.as_str())) {
             None => summary.links_created += 1,
-            Some((_, wake)) if *wake == wanted.wake => continue,
+            Some(stored) if (stored.wake, stored.follow) == (wanted.wake, wanted.follow) => {
+                continue;
+            }
             Some(_) => summary.links_changed += 1,
         }
-        sets.push((&wanted.from, from_id, &wanted.to, to_id, wanted.wake));
+        sets.push((
+            &wanted.from,
+            from_id,
+            &wanted.to,
+            to_id,
+            (wanted.wake, wanted.follow),
+        ));
     }
 
     if level_changes.is_empty()
@@ -479,14 +496,14 @@ pub async fn publish(
             ));
         }
     }
-    for (from, from_id, to, to_id, wake) in sets {
+    for (from, from_id, to, to_id, marks) in sets {
         let done = set_locked(
             &mut write,
             organization,
             admin,
             (from, from_id),
             (to, to_id),
-            wake,
+            marks,
             now,
         )
         .await?;
@@ -502,6 +519,28 @@ pub async fn publish(
     sqlx::query("SET CONSTRAINTS org_level_name_once, org_level_position_once IMMEDIATE")
         .execute(write.connection())
         .await?;
+    // The follow marks, against the positions as they now are (decision 0050). It runs on every
+    // publish that writes: a moved card or level can leave a link that already was followed
+    // without a higher sender or without a lower receiver. A mark is off a link that goes sideways,
+    // up, or touches a Hermes without a level.
+    let broken: bool = sqlx::query_scalar(
+        "SELECT EXISTS ( \
+           SELECT 1 FROM peer_link l \
+           LEFT JOIN org_member mf ON mf.hermes_id = l.from_hermes_id \
+           LEFT JOIN org_level  vf ON vf.id = mf.level_id \
+           LEFT JOIN org_member mt ON mt.hermes_id = l.to_hermes_id \
+           LEFT JOIN org_level  vt ON vt.id = mt.level_id \
+           WHERE l.organization_id = $1 AND l.follow \
+             AND NOT (vf.position IS NOT NULL AND vt.position IS NOT NULL \
+                      AND vf.position < vt.position))",
+    )
+    .bind(organization.id())
+    .fetch_one(write.connection())
+    .await?;
+    if broken {
+        write.rollback().await?;
+        return Ok(invalid(OrgInvalid::Follow));
+    }
 
     // The events: ordinary ones, with ids, flags and numbers; never a name of a level or a role.
     let number = |at: usize| i64::try_from(at).unwrap_or(i64::MAX);
@@ -602,6 +641,7 @@ pub async fn publish(
                     to_id: *hermes_ids.get(wanted.to.as_str())?,
                     to: wanted.to.clone(),
                     wake: wanted.wake,
+                    follow: wanted.follow,
                 })
             })
             .collect(),

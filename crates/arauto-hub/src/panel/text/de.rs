@@ -839,8 +839,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Same level: note", "Gleiche Ebene: Notiz"),
     (
-        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
-        "In dieser Version werden die Ebenen, die Rollen und die Pfeilarten nur hier angezeigt: Kein Hermes erfährt davon, und eine Notiz bleibt eine Angabe, nie eine Anordnung. Nur eine Verknüpfung erlaubt es einem Hermes, einem anderen eine Notiz zu schicken.",
+        "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
+        "Die Ebenen und die Rollen werden nur hier angezeigt: Kein Hermes erfährt davon. Eine Notiz ist eine Angabe, außer an einem Anweisungspfeil mit der Folgen-Markierung: Dann sagt der Hinweis dem niedrigeren Hermes, diese neuen Nachrichten des höheren in diesem Durchlauf zu befolgen, unterhalb der Anweisungen seines Betreibers. Nur eine Verknüpfung erlaubt es einem Hermes, einem anderen eine Notiz zu schicken.",
     ),
     ("instruction", "Anweisung"),
     ("request", "Anfrage"),
@@ -1308,5 +1308,30 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "Mit dieser Markierung weckt eine Notiz über diese Verknüpfung {name}, innerhalb der Grenzen für Hinweise.",
+    ),
+    // decision 0050
+    (
+        "{to} follows the instructions of {from}",
+        "{to} folgt den Anweisungen von {from}",
+    ),
+    (
+        "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        "Mit dieser Markierung sagt der Hinweis einer Notiz {to}, in diesem Durchlauf zu tun, was {from} verlangt, ohne auf seinen Betreiber zu warten, es sei denn, sein Betreiber verbietet es. Nur an einem Anweisungspfeil, nur mit der Weck-Markierung; {to} braucht die Verknüpfung zurück, um zu berichten. Es ist ein Satz an eine KI, keine Kontrolle.",
+    ),
+    (
+        "Link {from} → {to}: {to} now follows the instructions of {from}",
+        "Verknüpfung {from} → {to}: {to} folgt jetzt den Anweisungen von {from}",
+    ),
+    (
+        "Link {from} → {to}: {to} no longer follows the instructions of {from}",
+        "Verknüpfung {from} → {to}: {to} folgt den Anweisungen von {from} nicht mehr",
+    ),
+    (
+        "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        "Ein Hermes, der einem anderen folgt, tut, was dieser verlangt, ohne auf seinen Betreiber zu warten. Wer den höheren Hermes täuscht, über WhatsApp oder eine Notiz, erreicht auch den niedrigeren; wer den Hub kontrolliert, kann als jeder Hermes schreiben; und wer eine Sitzung im Panel hat, kann diese Markierungen setzen. Ein Connector einer älteren Version behandelt diese Notizen weiterhin als Angaben.",
+    ),
+    (
+        "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        "Eine Folgen-Markierung geht nur von einer höheren Ebene zu einer niedrigeren, an einer Verknüpfung, die weckt.",
     ),
 ];

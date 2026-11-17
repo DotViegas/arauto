@@ -119,11 +119,12 @@
 
 | Term | What it is |
 |---|---|
-| **Note** | A text message from one Hermes to another, delivered by the hub. It is data, never an order. |
+| **Note** | A text message from one Hermes to another, delivered by the hub. It is data. On a link with the follow mark, the notice tells the receiver to follow those new messages in the run it starts, below its operator's instructions (proposal, decision 0050). |
 | **Arauto notes** | Proposal ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). The three fixed lines the instruction page asks a Hermes to save in its own main memory. Not a note between Hermes. |
 | **Link** | An entry of the peer list: from one Hermes to another, in one direction only. |
 | **Peer list** | The set of links of an organization. Only the admin changes it. |
 | **Wake mark** | The mark of a link that makes a note wake its receiver. It is enough by itself. |
+| **Follow mark** | Proposal ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md)). The mark of a link, set on the org chart, only from a higher level to a lower one and only with the wake mark. The notice of a note on it tells the receiver, for that run, to follow the sender's instructions. A sentence to an AI, not a control. |
 | **Peer** | For a Hermes, another Hermes it has a link with. |
 | **Thread** | A sequence of notes between the same two Hermes, about the same subject. |
 | **Ceiling** | A fixed limit on quantity, which the hub applies without looking at the content. |
@@ -137,7 +138,7 @@ All of these are a **proposal**, built in the hub on 14/11/2026 and tried only i
 | **Org chart** | The panel tab that shows the Hermes in levels, with an arrow for each link. Only Hermes are on it. |
 | **Level** | A named row of the org chart, ordered from the top. A Hermes is in one level only. |
 | **Role** | A short text per Hermes, for the admin's own reading. No Hermes is told it. |
-| **Kind of a link** | Shown on the arrow, from the levels: instruction (to a lower level), request (to a higher one), note (same level). Only shown; it gives no permission. "Request" here is not a connection request. |
+| **Kind of a link** | Shown on the arrow, from the levels: instruction (to a lower level), request (to a higher one), note (same level). Only shown; by itself it gives no permission. The follow mark can be set only on an instruction arrow. "Request" here is not a connection request. |
 | **Draft** | The changes made on the org chart that were not published yet. |
 | **Publish** | Writing the whole draft in one go, after a summary of the changes. |
 
@@ -170,7 +171,7 @@ The word "session" always comes with its owner:
 | tenant, slot | Hermes, organization | They were names from the source service. |
 | device, for WhatsApp | linked device | A device is an installation of the connector. |
 | channel, for Telegram or e-mail | conversation platform | The channel is the connection from the connector to the hub. |
-| order, command, for a kind of link | instruction | Nothing here gives a Hermes authority over another. |
+| order, command, for a kind of link | instruction | The follow mark asks a Hermes to follow another for one run, below its operator's instructions; it gives no power in the hub. |
 | customer, client, meaning whoever uses the project | whoever installs, organization | The project is free. The technical sense ("unofficial client", "MCP client") still holds. |
 
 ## From Portuguese

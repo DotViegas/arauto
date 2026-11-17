@@ -2,6 +2,8 @@
 
 use std::fmt::Write as _;
 
+use arauto_protocol::names::HermesName;
+
 use super::{Report, escape};
 use crate::core::org::{Chart, Kind, kind};
 use crate::repo::org::{PublishOutcome, Published};
@@ -64,26 +66,34 @@ pub fn show(chart: &Chart) -> Report {
             chart.position_of_member(&link.from),
             chart.position_of_member(&link.to),
         );
+        let marks = if link.follow {
+            format!("may send and wake; {} follows its instructions", link.to)
+        } else if link.wake {
+            "wakes".to_owned()
+        } else {
+            "does not wake".to_owned()
+        };
         let _ = writeln!(
             text,
-            "Link {} -> {}: {}, {}",
+            "Link {} -> {}: {}, {marks}",
             link.from,
             link.to,
             word(arrow),
-            if link.wake { "wakes" } else { "does not wake" }
         );
     }
     text.push_str(
-        "In this version the levels, the roles and the kinds of arrow are only shown: no Hermes \
-         is told about them, and a note is still data, never an order.\n",
+        "The levels, the roles and the kinds of arrow are only shown: no Hermes is told them. A \
+         note is data, except on a link with the follow mark, whose notice tells the receiver to \
+         follow it in that run.\n",
     );
     let _ = writeln!(text, "version: {}", chart.version().to_hex());
     Report::done(text)
 }
 
-/// `admin org publish`.
+/// `admin org publish`. `follow_dropped` are the links the file kept without the mark they had:
+/// the publish removed it, and the report says so, link by link.
 #[must_use]
-pub fn published(outcome: &PublishOutcome) -> Report {
+pub fn published(outcome: &PublishOutcome, follow_dropped: &[(HermesName, HermesName)]) -> Report {
     match outcome {
         PublishOutcome::Published(Published {
             levels_added,
@@ -96,13 +106,22 @@ pub fn published(outcome: &PublishOutcome) -> Report {
             links_changed,
             links_removed,
             version,
-        }) => Report::done(format!(
-            "Published. Levels: {levels_added} added, {levels_removed} removed, {levels_renamed} \
-             renamed, {levels_moved} moved. Hermes changed: {members_changed} ({roles_changed} \
-             roles). Links: {links_created} created, {links_changed} changed, {links_removed} \
-             removed.\nversion: {}\n",
-            version.to_hex()
-        )),
+        }) => {
+            let mut text = format!(
+                "Published. Levels: {levels_added} added, {levels_removed} removed, \
+                 {levels_renamed} renamed, {levels_moved} moved. Hermes changed: \
+                 {members_changed} ({roles_changed} roles). Links: {links_created} created, \
+                 {links_changed} changed, {links_removed} removed.\n"
+            );
+            for (from, to) in follow_dropped {
+                let _ = writeln!(
+                    text,
+                    "The follow mark of {from} -> {to} was removed: the file does not set it."
+                );
+            }
+            let _ = writeln!(text, "version: {}", version.to_hex());
+            Report::done(text)
+        }
         PublishOutcome::Unchanged => {
             Report::done("The chart already is as the draft says. Nothing was written.\n".into())
         }

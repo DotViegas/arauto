@@ -827,8 +827,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Same level: note", "Mismo nivel: nota"),
     (
-        "In this version the levels, the roles and the kinds of arrow are only shown here: no Hermes is told about them, and a note is still data, never an order. Only a link lets one Hermes send a note to another.",
-        "En esta versión los niveles, los papeles y los tipos de flecha solo se muestran aquí: ningún Hermes se entera de ellos, y una nota sigue siendo un dato, nunca una orden. Solo un enlace permite que un Hermes envíe una nota a otro.",
+        "The levels and the roles are only shown here: no Hermes is told them. A note is data, except on an instruction arrow with the follow mark: then the notice tells the lower Hermes to follow those new messages of the higher one, in that run, below its operator's instructions. Only a link lets one Hermes send a note to another.",
+        "Los niveles y los papeles solo se muestran aquí: ningún Hermes se entera de ellos. Una nota es un dato, salvo en una flecha de instrucción con la marca de seguir: entonces el aviso le dice al Hermes de abajo que siga esos mensajes nuevos del de arriba, en esa ejecución, por debajo de las instrucciones de su operador. Solo un enlace permite que un Hermes envíe una nota a otro.",
     ),
     ("instruction", "instrucción"),
     ("request", "solicitud"),
@@ -1296,5 +1296,30 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "Con esta marca, una nota por este enlace despierta a {name}, dentro de los límites de avisos.",
+    ),
+    // decision 0050
+    (
+        "{to} follows the instructions of {from}",
+        "{to} sigue las instrucciones de {from}",
+    ),
+    (
+        "With this mark, the notice of a note tells {to} to do what {from} asks in that run, without waiting for its operator, unless its operator forbids it. Only on an instruction arrow, only with the wake mark; {to} needs the link back to report. It is a sentence to an AI, not a control.",
+        "Con esta marca, el aviso de una nota le dice a {to} que haga lo que {from} pida en esa ejecución, sin esperar a su operador, salvo que su operador lo prohíba. Solo en una flecha de instrucción, solo con la marca de despertar; {to} necesita el enlace de vuelta para informar. Es una frase dirigida a una IA, no un control.",
+    ),
+    (
+        "Link {from} → {to}: {to} now follows the instructions of {from}",
+        "Enlace {from} → {to}: ahora {to} sigue las instrucciones de {from}",
+    ),
+    (
+        "Link {from} → {to}: {to} no longer follows the instructions of {from}",
+        "Enlace {from} → {to}: {to} ya no sigue las instrucciones de {from}",
+    ),
+    (
+        "A Hermes that follows another does what it asks without waiting for its operator. Whoever misleads the higher Hermes, through WhatsApp or a note, reaches the lower one too, whoever controls the hub can write as any Hermes, and whoever holds a panel session can set these marks. A connector of an older version keeps treating these notes as data.",
+        "Un Hermes que sigue a otro hace lo que este le pide sin esperar a su operador. Quien engañe al Hermes de arriba, por WhatsApp o con una nota, llega también al de abajo; quien controle el hub puede escribir como cualquier Hermes; y quien tenga una sesión del panel puede poner estas marcas. Un conector de una versión anterior sigue tratando esas notas como datos.",
+    ),
+    (
+        "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
+        "Una marca de seguir va solo de un nivel más alto a uno más bajo, en un enlace que despierta.",
     ),
 ];

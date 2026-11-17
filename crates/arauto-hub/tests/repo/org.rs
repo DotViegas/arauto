@@ -51,7 +51,7 @@ pub fn keep(chart: &Chart) -> Value {
     let links: Vec<Value> = chart
         .links
         .iter()
-        .map(|l| json!({ "from": l.from.as_str(), "to": l.to.as_str(), "wake": l.wake }))
+        .map(|l| json!({ "from": l.from.as_str(), "to": l.to.as_str(), "wake": l.wake, "follow": l.follow }))
         .collect();
     json!({ "levels": levels, "hermes": hermes, "links": links })
 }
