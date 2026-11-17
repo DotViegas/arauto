@@ -26,7 +26,7 @@ async fn before_the_engine_is_set_the_commands_say_so() {
     assert!(matches!(
         fixture
             .admin
-            .number_add(&vault, "vendas", &phone(30), false, now)
+            .number_add(&vault, "vendas", &phone(30), now)
             .await,
         Err(AdminError::NoEngine)
     ));
@@ -178,7 +178,7 @@ async fn an_alias_or_a_telephone_outside_the_format_is_refused_before_anything()
                 world
                     .fixture
                     .admin
-                    .number_add(&world.vault, alias, &phone(31), false, world.now())
+                    .number_add(&world.vault, alias, &phone(31), world.now())
                     .await,
                 Err(AdminError::InvalidAlias(_))
             ),
@@ -195,7 +195,7 @@ async fn an_alias_or_a_telephone_outside_the_format_is_refused_before_anything()
         let refused = world
             .fixture
             .admin
-            .number_add(&world.vault, "vendas", telephone, false, world.now())
+            .number_add(&world.vault, "vendas", telephone, world.now())
             .await
             .unwrap_err();
         assert!(matches!(refused, AdminError::InvalidPhone), "{telephone:?}");
@@ -219,7 +219,7 @@ async fn an_alias_or_a_telephone_outside_the_format_is_refused_before_anything()
         world
             .fixture
             .admin
-            .number_add(&world.vault, "outro", &phone(32), false, world.now())
+            .number_add(&world.vault, "outro", &phone(32), world.now())
             .await,
         Err(AdminError::PhoneTaken)
     ));
@@ -231,7 +231,8 @@ async fn an_alias_or_a_telephone_outside_the_format_is_refused_before_anything()
         .number_phone(&world.vault, &number)
         .await
         .unwrap();
-    let text = render::number_list(&[(number, Some(telephone))]).text;
+    let orders = world.fixture.admin.orders_for_the_list().await.unwrap();
+    let text = render::number_list(&[(number, Some(telephone))], &orders).text;
     assert!(
         text.contains("vendas") && text.contains(&phone(32)) && text.contains("unpaired"),
         "{text}"
@@ -249,7 +250,7 @@ async fn a_database_that_came_back_from_a_copy_gets_nothing_from_the_admin() {
     let admin = &world.fixture.admin;
     assert!(matches!(
         admin
-            .number_add(&world.vault, "suporte", &phone(34), false, now)
+            .number_add(&world.vault, "suporte", &phone(34), now)
             .await,
         Err(AdminError::Restored(_))
     ));

@@ -45,6 +45,10 @@ and where it moved away from them. Everything was tested only against the fake e
   `...@c.us`, `...@lid`) or the identifier of the hub shown by `access list`. The command warns,
   and does not prevent, when it gives "send" on a number marked as a command number and when
   another Hermes also sends or is woken on the same number (08, sections 5 and 6).
+  **Note of 17/11/2026 ([0051](0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal):** the
+  command number mark and its warning no longer exist; the command warns only when another Hermes
+  also sends or is woken on the same number. Who gives a Hermes orders is recorded per Hermes and
+  refused by the hub.
 
 ### The list of tools
 

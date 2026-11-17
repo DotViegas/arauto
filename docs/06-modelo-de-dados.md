@@ -107,12 +107,13 @@ an invite of one organization that points to a device of another.
 `segredo_de_eventos_cifrado`, `versao_vista`, `ultimo_ok_em`.
 
 **numero**: `id`, `organizacao_id`, `motor_id`, `sessao_no_motor` (name randomly drawn by the hub,
-never reused), `telefone`, `apelido` (unique in the organization), `de_comando` (marking by the
-admin), `estado`, `estado_desde`, `pareado_em`. The alias follows the same restricted format as the
-name of the Hermes.
+never reused), `telefone`, `apelido` (unique in the organization), `estado`, `estado_desde`, `pareado_em`. The alias follows the same restricted format as the
+name of the Hermes. (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal: the column `de_comando`, the marking by the admin, is dropped by migration 0020, with no carry-over.)
 
 **conversa**: `id`, `numero_id`, `tipo` (contact, group), `identificadores_no_motor` (a chat
 may appear with more than one), `nome_exibido` (untrusted text), `ultima_mensagem_em`.
+
+**hermes_whatsapp_phone** (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal; migration 0021; the tables carry English names): the record of who gives a Hermes orders on WhatsApp. `id`, `organization_id`, `hermes_id`, `role` (`takes_orders`: the telephone the Hermes's own WhatsApp runs on, one per Hermes; `gives_orders`: a telephone that gives it orders, at most 16), `whatsapp_mode` (`bot` or `self_chat`, only on the `takes_orders` row), `phone_enc` (sealed under its own field, bound to the row), `created_at`. **hermes_whatsapp_phone_digest**: `organization_id`, `phone_id`, `role` and the keyed digest of each form of the telephone, made by the function that gives the digest of the telephone of a number, so the two compare without opening the seal. One Hermes per bridge telephone in the organization. A Hermes removed takes its record in the same write. The telephone is read back only by the admin command; no audit row, log or tool answer carries it. Not guaranteed: only the Brazilian ninth digit is matched across forms; a restored database keeps what the backup had.
 
 Hermes never states the name of the engine session. It states the alias of the number, and the hub
 resolves the engine session from the accesses of the Hermes of that device.

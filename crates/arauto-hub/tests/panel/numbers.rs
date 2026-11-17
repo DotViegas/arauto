@@ -318,16 +318,15 @@ async fn the_first_number_asks_for_the_acceptance_and_later_ones_do_not() {
     assert!(refused.text().contains("Nothing was added."));
     assert_eq!(rig.count("number").await, 0);
     assert_eq!(audited(&rig.world.fixture, "number.added").await, 0);
-    // With it: the add of the command, with the acceptance and the marks in its audit row.
+    // With it: the add, with the acceptance in its audit row and no "command" flag.
     let added = rig
         .post(
             "/whatsapps/add",
-            &format!("alias=vendas&phone=%2B{}&command=on&accept=on", phone(60)),
+            &format!("alias=vendas&phone=%2B{}&accept=on", phone(60)),
         )
         .await;
     assert_eq!(added.status, 303, "{}", added.text());
     let number = rig.world.number("vendas").await;
-    assert!(number.command);
     assert_eq!(number.state, NumberState::Unpaired);
     assert_eq!(
         rig.world.fake.status(number.session.as_str()).as_deref(),
@@ -342,13 +341,14 @@ async fn the_first_number_asks_for_the_acceptance_and_later_ones_do_not() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].0, "panel");
     assert!(
-        rows[0].1.contains("risk_accepted") && rows[0].1.contains("command"),
+        rows[0].1.contains("risk_accepted") && !rows[0].1.contains("command"),
         "{}",
         rows[0].1
     );
     // The second number asks for nothing and records no acceptance.
     let window = rig.get("/whatsapps/add").await.text();
     assert!(!dialog(&window).contains("name=\"accept\""));
+    assert!(!dialog(&window).contains("name=\"command\""));
     rig.add("filial", &phone(61)).await;
     let details: Vec<String> = sqlx::query_scalar(
         "SELECT details::text FROM audit WHERE action = 'number.added' ORDER BY seq",

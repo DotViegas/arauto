@@ -297,7 +297,7 @@ async fn removing_ends_the_number_keeps_or_erases_its_session_and_never_frees_th
         world
             .fixture
             .admin
-            .number_add(&world.vault, "vendas", &phone(19), false, world.now())
+            .number_add(&world.vault, "vendas", &phone(19), world.now())
             .await,
         Err(AdminError::AliasTaken)
     ));
@@ -440,13 +440,12 @@ async fn a_pairing_stopped_from_outside_is_cancelled_and_the_number_goes_back() 
 async fn the_command_adds_with_no_acceptance_and_the_panel_function_records_it_when_given() {
     let world = World::new().await;
     world.add("first", &phone(34)).await;
-    let accepted = world
+    world
         .fixture
         .admin
-        .number_add_accepting(&world.vault, "second", &phone(35), true, true, world.now())
+        .number_add_accepting(&world.vault, "second", &phone(35), true, world.now())
         .await
         .unwrap();
-    assert!(accepted.number.command);
     let details: Vec<String> = sqlx::query_scalar(
         "SELECT details::text FROM audit WHERE action = 'number.added' ORDER BY seq",
     )

@@ -27,6 +27,7 @@ use super::{Block, InitOutcome, Status, UNSEEN_COUNT_MAX};
 
 pub mod access;
 pub mod link;
+pub mod orders;
 pub mod org;
 pub mod whatsapp;
 

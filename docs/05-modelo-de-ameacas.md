@@ -102,7 +102,7 @@ full reports are not published. Review by people, from outside, has not happened
 | 13 | A manipulated LLM uses the tools Hermes already has. | Minimum access per number and per chat; closed list of tools; authorization on every call; everything in the audit. | **It uses what it has.** No connection protocol solves this. |
 | 14 | A Hermes reaches the number of another. | Hermes never states an engine session; a single point calls the engine and only accepts an authorized session; validated identifiers. | Implementation error. The automatic test of this is a criterion of the MVP ([15](15-mvp.md), M3). |
 | 15 | The access is removed and the open session keeps being valid. | Authorization on every call, against the current state. | Nothing known. |
-| 16 | A paired number is also the command channel of some Hermes. | The panel allows marking the number as "command" and alerts when send is granted on it. | The hub does not know the lists of each Hermes. It depends on whoever installs. |
+| 16 | A paired number is also the command channel of some Hermes. | The admin records, per Hermes, the telephone its own WhatsApp runs on and who gives it orders there; the hub refuses every Hermes writing in that chat ([08](08-permissoes.md), section 3; 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal, tested against a fake engine, not tried on a real Hermes). The old "command" mark of a number and its alert are gone. | Only what is recorded is refused: the hub does not know the lists of each Hermes, and a channel nobody recorded is open to writing. A Hermes that can read that chat reads the orders and the connection sentence. Groups, owner forwarding and the open policy of the bridge are not modelled. The command and `number list` say the risk; the panel does not yet. |
 | 17 | The hub, compromised, dictates what the LLM reads. | A notice is a pointer; the fixed sentence and the tool descriptions stay in the connector; the connector does not execute a remote command. | The content of the messages, which is already treated as coming from third parties. |
 
 ### In the conversation between Hermes
@@ -141,7 +141,7 @@ It comes in with the first MVP. The design and the limits are in
 ## 5. What this model does not cover
 
 - The conduct of Hermes: what it does with what it reads.
-- The security of Hermes's command channel, which exists outside Arauto.
+- The security of Hermes's command channel, which exists outside Arauto. Except one thing: when that channel is a WhatsApp chat with one end on a number of the hub and the admin recorded it, the hub refuses every Hermes writing in it ([decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal).
 - The machine of whoever administers: whoever administers Hermes's server reads the connector files.
 
 ## 6. How to test

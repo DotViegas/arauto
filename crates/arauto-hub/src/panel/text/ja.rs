@@ -59,7 +59,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "番号"),
     ("Hermes with access", "アクセス権のある Hermes"),
     ("Last message", "最後のメッセージ"),
-    ("command", "コマンド"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
         "最後のメッセージは時刻だけを表示し、内容は表示しません。パネルに表示されるのはハブを通るものだけです。同じ番号にリンクされたほかのデバイスは、スマートフォンにしか表示されません。",
@@ -617,10 +616,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias}: {n} Hermes send in the same chats.",
         "{alias}: {n} 個の Hermes が同じチャットで送信します。",
     ),
-    (
-        "{alias} is marked as a command number and there are Hermes allowed to send on it.",
-        "{alias} はコマンド用の番号に指定されていますが、この番号で送信できる Hermes があります。",
-    ),
     // connect.rs
     (
         "There already is a Hermes with that name. To link another device to it, use the button on its line.",
@@ -1027,14 +1022,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
         "例: +55 11 9XXXX-XXXX。数字、スペース、ハイフン、かっこのみ使えます。",
-    ),
-    (
-        "It is the command channel of a Hermes",
-        "Hermes のコマンドチャネルです",
-    ),
-    (
-        "It shows as \"command\" in the list.",
-        "一覧では「コマンド」と表示されます。",
     ),
     ("Before the first number", "最初の番号の前に"),
     (

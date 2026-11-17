@@ -62,7 +62,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "Número"),
     ("Hermes with access", "Hermes con acceso"),
     ("Last message", "Último mensaje"),
-    ("command", "órdenes"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
         "Del último mensaje solo se muestra la hora, nunca el contenido. El panel lista lo que pasa por el hub: los demás dispositivos vinculados al mismo número solo aparecen en el teléfono.",
@@ -620,10 +619,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias}: {n} Hermes send in the same chats.",
         "{alias}: Hermes que envían en los mismos chats: {n}.",
     ),
-    (
-        "{alias} is marked as a command number and there are Hermes allowed to send on it.",
-        "{alias} está marcado como número de órdenes y hay Hermes autorizados a enviar en él.",
-    ),
     // connect.rs
     (
         "There already is a Hermes with that name. To link another device to it, use the button on its line.",
@@ -1030,14 +1025,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
         "Como +55 11 9XXXX-XXXX. Solo dígitos, espacios, guiones y paréntesis.",
-    ),
-    (
-        "It is the command channel of a Hermes",
-        "Es el canal de órdenes de un Hermes",
-    ),
-    (
-        "It shows as \"command\" in the list.",
-        "En la lista aparece como “órdenes”.",
     ),
     ("Before the first number", "Antes del primer número"),
     (

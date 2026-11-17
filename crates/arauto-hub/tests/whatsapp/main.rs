@@ -26,6 +26,7 @@ mod hostile;
 mod inbox;
 mod isolation;
 mod numbers;
+mod orders;
 mod supervision;
 mod tools;
 mod wake;

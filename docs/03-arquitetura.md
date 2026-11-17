@@ -23,6 +23,8 @@ code yet: the verbs in the present tense describe the design.
                                       outside Arauto)
 ```
 
+When the command channel is a WhatsApp chat with one end on a number of the hub, and the admin recorded it, the hub refuses every Hermes writing in it (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal).
+
 The project has two programs, the **hub** and the **connector**, and uses a third one, the
 **engine**, which belongs to whoever installs.
 

@@ -128,6 +128,12 @@ actions! {
     PeerLinkChanged => "peer_link.changed", true;
     /// A link between two Hermes was removed.
     PeerLinkRemoved => "peer_link.removed", true;
+    /// The admin recorded, changed or cleared who gives a Hermes orders on WhatsApp, or the
+    /// record went with its Hermes. Counts only: never a telephone.
+    HermesWhatsappOrdersChanged => "hermes.whatsapp_orders_changed", true;
+    /// A call of a Hermes that would write in the chat where a Hermes takes orders was refused:
+    /// one row per Hermes, number and chat per hour. Never a telephone.
+    WhatsappOrderChatRefused => "whatsapp.order_chat_refused", false;
     /// A message ceiling was reached: one row per link and per hour.
     PeerCeilingReached => "peer.ceiling_reached", false;
     /// The hub noticed it came back from an older copy.
@@ -633,6 +639,8 @@ mod tests {
             "peer_link.created",
             "peer_link.changed",
             "peer_link.removed",
+            // Who gives a Hermes orders on WhatsApp is what the hub refuses to everyone.
+            "hermes.whatsapp_orders_changed",
             "restored_mode.entered",
             "restored_mode.ended",
             // Where every number is reached and who proves itself to whom; a number that

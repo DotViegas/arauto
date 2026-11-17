@@ -340,6 +340,34 @@ impl Waha {
         Ok(None)
     }
 
+    /// `GET /api/{s}/lids/{lid}` answers `{"lid", "pn"}`, `pn` ending in `@c.us`
+    /// (`referencia/waha-fatos.md`, 17/11/2026). An identifier the engine does not know is
+    /// "no telephone"; an answer with a `pn` that is not a telephone is malformed.
+    async fn hidden_phone(
+        &self,
+        session: &SessionName,
+        hidden: &EngineChatId,
+    ) -> Result<Option<Phone>, EngineError> {
+        let call = Call::new(
+            Method::GET,
+            format!("/api/{}/lids/{}", session.segment(), hidden.segment()),
+            Expect::Json(JSON_ANSWER_MAX),
+        );
+        let raw: RawLid = match self.typed(call).await {
+            Ok(raw) => raw,
+            Err(EngineError::NotFound) => return Ok(None),
+            Err(other) => return Err(other),
+        };
+        let Some(pn) = raw.pn.as_deref().filter(|pn| !pn.is_empty()) else {
+            return Ok(None);
+        };
+        EngineChatId::parse(pn)
+            .ok()
+            .and_then(|id| id.phone())
+            .map(Some)
+            .ok_or_else(EngineError::malformed)
+    }
+
     async fn post_sent(&self, path: &str, body: &Value) -> Result<Sent, EngineError> {
         let answer = self
             .http
@@ -608,6 +636,12 @@ struct RawCheck {
     number_exists: bool,
     #[serde(default, rename = "chatId")]
     chat_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawLid {
+    #[serde(default)]
+    pn: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1086,6 +1120,14 @@ impl WhatsappEngine for Waha {
         phone: &'a Phone,
     ) -> BoxFuture<'a, Result<Option<EngineChatId>, EngineError>> {
         Box::pin(self.check_phone(session, phone))
+    }
+
+    fn phone_of_hidden<'a>(
+        &'a self,
+        session: &'a SessionName,
+        hidden: &'a EngineChatId,
+    ) -> BoxFuture<'a, Result<Option<Phone>, EngineError>> {
+        Box::pin(self.hidden_phone(session, hidden))
     }
 
     fn send_text<'a>(

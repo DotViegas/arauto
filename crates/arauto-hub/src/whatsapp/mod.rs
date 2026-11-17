@@ -12,6 +12,7 @@
 //! | `number` names no number this Hermes has an access to (or is left out with more than one) | AR-701 (AR-711) |
 //! | The telephone of the number was swapped: its accesses wait for the admin | AR-702 |
 //! | The verb on the number, or in the chat (its line, or the scope) | AR-701, AR-705 |
+//! | A write in the chat where a Hermes takes orders (decision 0051) | AR-705, AR-712 |
 //! | The number is not connected to WhatsApp | AR-702 |
 //! | The engine is not there | AR-703 |
 //! | The send limit | AR-704, with `retry_after_s` |
@@ -26,6 +27,7 @@
 //! after the checks above: the one place where a call of a Hermes meets the engine.
 
 pub mod ceiling;
+mod refusals;
 mod token;
 
 use std::sync::Arc;
@@ -44,6 +46,7 @@ use uuid::Uuid;
 
 pub use ceiling::SendCeiling;
 
+use crate::audit::{self, Action, Actor, Details, Event, TargetKind};
 use crate::channel::Hub;
 use crate::core::access::{Scope, Verb};
 use crate::core::number::NumberState;
@@ -236,6 +239,30 @@ struct Authorized<'a> {
     session: &'a SessionName,
 }
 
+/// A write held in the chat where a Hermes takes orders: the record that matched, when one did,
+/// and why.
+struct Held {
+    record: Option<Uuid>,
+    why: &'static str,
+}
+
+impl Held {
+    const fn matched(record: Option<Uuid>) -> Self {
+        Self {
+            record,
+            why: "matched",
+        }
+    }
+
+    /// A hidden contact chat the engine did not translate: held because it could not be told.
+    const fn hidden() -> Self {
+        Self {
+            record: None,
+            why: "hidden",
+        }
+    }
+}
+
 /// A chat of the number, with the identifier the engine knows it by.
 struct Reached {
     chat: Uuid,
@@ -321,11 +348,16 @@ impl<'a> Call<'a> {
     /// A chat of this number, with `verb` in it. A chat of another number, or none at all, is
     /// the chat that does not exist (AR-705).
     async fn chat(&self, chat: Uuid, verb: Verb) -> Result<Reached, Refusal> {
-        let Some(engine_chat) = self.engine_ids(chat).await?.into_iter().next() else {
+        let ids = self.engine_ids(chat).await?;
+        let Some(engine_chat) = ids.first().cloned() else {
             return Err(ErrorCode::Ar705.into());
         };
         let line = self.line(chat).await?;
         self.access.grant.in_chat(line, verb)?;
+        // After the ordinary check: a Hermes that could not write here anyway keeps its
+        // ordinary answer, and learns nothing about the chat from this one.
+        self.hold_order_chat(Some(chat), &ids, verb, ErrorCode::Ar705)
+            .await?;
         Ok(Reached { chat, engine_chat })
     }
 
@@ -357,7 +389,161 @@ impl<'a> Call<'a> {
                 ErrorCode::Ar701 => Refusal::from(ErrorCode::Ar701),
                 _ => Refusal::from(ErrorCode::Ar712),
             })?;
+        self.hold_order_chat(Some(chat), &ids, verb, ErrorCode::Ar712)
+            .await?;
         Ok((Reached { chat, engine_chat }, message))
+    }
+
+    /// Refuses a writing (`Send` or `Modify`) in the chat where a Hermes takes orders, for every
+    /// Hermes, the one that takes the orders included (decision 0051). Reading is never
+    /// refused here, and nothing else of the number is: only the chat between the telephone a
+    /// Hermes's own WhatsApp runs on and a telephone that gives it orders, or, in `self-chat`,
+    /// the chat of that WhatsApp with itself.
+    ///
+    /// `ids` are all the identifiers the engine knows the chat by. A chat the engine names
+    /// only by a hidden identifier is asked of the engine, and when the engine does not say,
+    /// the writing in that chat alone is refused (it fails closed), on a number that has a
+    /// recorded counterpart. No line is created, and no other chat is touched.
+    async fn hold_order_chat(
+        &self,
+        chat: Option<Uuid>,
+        ids: &[EngineChatId],
+        verb: Verb,
+        code: ErrorCode,
+    ) -> Result<(), Refusal> {
+        if !matches!(verb, Verb::Send | Verb::Modify) {
+            return Ok(());
+        }
+        let counterparts = self.counterparts().await?;
+        if counterparts.is_empty() {
+            return Ok(());
+        }
+        let mut held = ids
+            .iter()
+            .filter_map(EngineChatId::phone)
+            .find_map(|phone| self.counterpart_of(&counterparts, &phone))
+            .map(|record| Held::matched(Some(record)));
+        let gives_a_phone = ids.iter().any(|id| id.phone().is_some());
+        if held.is_none() && !gives_a_phone {
+            let hidden: Vec<&EngineChatId> = ids
+                .iter()
+                .filter(|id| id.as_str().ends_with("@lid"))
+                .collect();
+            if !hidden.is_empty() {
+                // A hidden contact chat: the engine keeps the telephone of a hidden identifier.
+                held = self.hidden_order_chat(&hidden, &counterparts).await;
+            }
+        }
+        let Some(held) = held else {
+            return Ok(());
+        };
+        self.note_refusal(chat.or(held.record), chat, verb, held.why)
+            .await;
+        Err(code.into())
+    }
+
+    /// The counterparts of this number, read now (rule 9).
+    async fn counterparts(&self) -> Result<repo::orders::Counterparts, Refusal> {
+        repo::orders::counterparts(self.hub.pool(), self.organization, self.access.number.id)
+            .await
+            .map_err(|error| failed(&error, "the records of who gives orders could not be read"))
+    }
+
+    /// The record row whose telephone `phone` is, when it is a counterpart of this number.
+    fn counterpart_of(
+        &self,
+        counterparts: &repo::orders::Counterparts,
+        phone: &Phone,
+    ) -> Option<Uuid> {
+        counterparts.matching(self.key, self.organization, phone)
+    }
+
+    /// A chat under hidden identifiers only: asks the engine for the telephone of each. A
+    /// telephone is matched like any other; no answer, or a failure, holds the chat.
+    async fn hidden_order_chat(
+        &self,
+        hidden: &[&EngineChatId],
+        counterparts: &repo::orders::Counterparts,
+    ) -> Option<Held> {
+        let Ok(engine) = self.authorized().await else {
+            return Some(Held::hidden());
+        };
+        for id in hidden {
+            match engine
+                .engine
+                .client
+                .phone_of_hidden(engine.session, id)
+                .await
+            {
+                Ok(Some(phone)) => {
+                    if let Some(record) = self.counterpart_of(counterparts, &phone) {
+                        return Some(Held::matched(Some(record)));
+                    }
+                }
+                Ok(None) | Err(_) => return Some(Held::hidden()),
+            }
+        }
+        None
+    }
+
+    /// The audit row of a refusal: once an hour per Hermes, number and chat. A failure to write
+    /// it is logged and changes nothing: the call is refused either way.
+    async fn note_refusal(
+        &self,
+        subject: Option<Uuid>,
+        chat: Option<Uuid>,
+        verb: Verb,
+        why: &'static str,
+    ) {
+        let now = self.hub.now_ms();
+        let subject = subject.unwrap_or_else(Uuid::nil);
+        if !refusals::first_of_the_hour(self.hermes, self.access.number.id, subject, now) {
+            return;
+        }
+        let mut details = Details::new()
+            .alias("alias", &self.access.number.alias)
+            .word("verb", verb.as_str())
+            .word("why", why);
+        if let Some(chat) = chat {
+            details = details.id("chat", chat);
+        }
+        let event = Event::new(Action::WhatsappOrderChatRefused, Actor::System)
+            .in_organization(self.organization)
+            .about(TargetKind::Hermes, self.hermes)
+            .with(details);
+        if let Err(error) = audit::record(self.hub.pool(), now, &event).await {
+            tracing::error!(%error, "a refusal in the chat of orders could not be audited");
+        }
+    }
+
+    /// Before the send limit and before the engine hears of it: a sending to a telephone whose
+    /// chat is the one where a Hermes takes orders. It is only told to a Hermes that could
+    /// write there by the ordinary rules (the verb send on the number, or the scope "list",
+    /// where every answer is AR-705 anyway): the others keep their ordinary answer.
+    async fn hold_phone(&self, to: &Recipient) -> Result<(), Refusal> {
+        let Recipient::Phone(given) = to else {
+            return Ok(());
+        };
+        if !(self.access.grant.verbs.has(Verb::Send) || self.access.grant.scope == Scope::List) {
+            return Ok(());
+        }
+        let Ok(phone) = Phone::parse(given.digits()) else {
+            return Ok(());
+        };
+        let counterparts = self.counterparts().await?;
+        if counterparts.is_empty() {
+            return Ok(());
+        }
+        let Some(record) = phone
+            .forms()
+            .iter()
+            .find_map(|form| self.counterpart_of(&counterparts, form))
+        else {
+            return Ok(());
+        };
+        self.note_refusal(Some(record), None, Verb::Send, "matched")
+            .await;
+        Err(ErrorCode::Ar705.into())
     }
 
     /// A sending to a telephone asks WhatsApp about that telephone before anything else,
@@ -412,6 +598,9 @@ impl<'a> Call<'a> {
                 if let Some(chat) = known {
                     let line = self.line(chat).await?;
                     self.access.grant.in_chat(line, Verb::Send)?;
+                    let ids = self.engine_ids(chat).await?;
+                    self.hold_order_chat(Some(chat), &ids, Verb::Send, ErrorCode::Ar705)
+                        .await?;
                     return Ok(Destination {
                         chat: Some(chat),
                         engine_chat,
@@ -436,6 +625,14 @@ impl<'a> Call<'a> {
                 } else {
                     self.access.grant.new_chat()?;
                 }
+                // The exact form the engine gave, after the ordinary checks.
+                self.hold_order_chat(
+                    None,
+                    std::slice::from_ref(&engine_chat),
+                    Verb::Send,
+                    ErrorCode::Ar705,
+                )
+                .await?;
                 Ok(Destination {
                     chat: None,
                     engine_chat,
@@ -518,6 +715,7 @@ impl<'a> Call<'a> {
             }
             WhatsappOp::SendText(send) => {
                 let engine = self.authorized().await?;
+                self.hold_phone(&send.to).await?;
                 let by_phone = self.spend_for_a_phone(op, &send.to)?;
                 let destination = self.destination(&engine, &send.to).await?;
                 let reply_to = match &send.reply_to {
@@ -548,6 +746,7 @@ impl<'a> Call<'a> {
             }
             WhatsappOp::SendFile(send) => {
                 let engine = self.authorized().await?;
+                self.hold_phone(&send.to).await?;
                 let by_phone = self.spend_for_a_phone(op, &send.to)?;
                 let destination = self.destination(&engine, &send.to).await?;
                 let file = SendFile {
@@ -623,6 +822,7 @@ impl<'a> Call<'a> {
                 // Reading in the chat of the message, and sending in the other.
                 let (_, message) = self.message(message, Verb::Read).await?;
                 let engine = self.authorized().await?;
+                self.hold_phone(to).await?;
                 let by_phone = self.spend_for_a_phone(op, to)?;
                 let destination = self.destination(&engine, to).await?;
                 if !by_phone {

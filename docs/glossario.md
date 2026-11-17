@@ -30,7 +30,8 @@
 
 | Term | What it is |
 |---|---|
-| **Command channel** | Where the operator gives orders to Hermes. It exists outside Arauto and does not go through it. |
+| **Command channel** | Where the operator gives orders to Hermes. It exists outside Arauto and no order goes into it through Arauto ([0005](decisoes/0005-comando-e-dado-sao-separados.md)). When it is a WhatsApp chat with one end on a number of the hub and the admin recorded it, Arauto lets no Hermes write in it; who reads it follows the accesses (proposal, 17/11/2026, [0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)). |
+| **Own WhatsApp (of a Hermes)** | The telephone Hermes's WhatsApp bridge runs on, where it takes orders. It may or may not be a number of the hub. Proposal, 17/11/2026 ([0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)). |
 | **Hermes's conversation platforms** | The platforms on which Hermes talks: the command channel and the others. |
 | **Number** | A WhatsApp account paired in the engine. |
 | **Alias** | The name the admin gives a number in the panel. |
@@ -172,6 +173,7 @@ The word "session" always comes with its owner:
 | device, for WhatsApp | linked device | A device is an installation of the connector. |
 | channel, for Telegram or e-mail | conversation platform | The channel is the connection from the connector to the hub. |
 | order, command, for a kind of link | instruction | The follow mark asks a Hermes to follow another for one run, below its operator's instructions; it gives no power in the hub. |
+| command number, command phone, operator number | the telephone a Hermes's own WhatsApp runs on; the telephone that gives it orders | The old mark "command" of a number did not say whether the number gives orders or takes them, and was removed on 17/11/2026 ([0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)). Every name now says the direction. |
 | customer, client, meaning whoever uses the project | whoever installs, organization | The project is free. The technical sense ("unofficial client", "MCP client") still holds. |
 
 ## From Portuguese

@@ -42,6 +42,7 @@ use crate::vault::{MASTER_KEY_FILE, Vault, VaultError};
 
 pub mod access;
 pub mod link;
+pub mod orders;
 pub mod org;
 pub mod panel;
 pub mod qr;
@@ -238,6 +239,14 @@ pub enum AdminError {
     /// The engine says the telephone has no WhatsApp.
     #[error("the engine says that telephone has no WhatsApp")]
     NoWhatsapp,
+
+    /// The record of who gives a Hermes orders breaks one of its rules.
+    #[error("{}", orders::rule_text(*.0))]
+    OrdersRule(crate::repo::orders::Invalid),
+
+    /// Another Hermes already takes orders on that telephone.
+    #[error("{0} already takes orders on this telephone")]
+    OrdersTelephoneTaken(String),
 
     /// The password of the database role was not replaced, or was replaced and something
     /// after it failed (the text says which).

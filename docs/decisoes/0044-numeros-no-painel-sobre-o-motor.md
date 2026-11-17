@@ -17,7 +17,7 @@ To do everything about the numbers in the panel, on WAHA for now, without leavin
 
 ## Decision (proposal)
 
-- **Routes and windows.** Everything is under `/whatsapps/`. Each step is a window over the list, as the access editor is: add (alias, number, "command", the acceptance for the first number), the choice of QR or code, the wait, the decision after a swapped number, disconnect, remove and the native window. Restart is a one-click form on the line. The actions on each line follow the state of the number.
+- **Routes and windows.** Everything is under `/whatsapps/`. Each step is a window over the list, as the access editor is: add (alias, number, the acceptance for the first number; the box "command" was removed on 17/11/2026, [0051](0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)), the choice of QR or code, the wait, the decision after a swapped number, disconnect, remove and the native window. Restart is a one-click form on the line. The actions on each line follow the state of the number.
 - **Same functions as the command.** Every write goes through the admin functions the command uses (authorization, audit rows, ceilings, state machine), with the actor "panel". Nothing is duplicated. Only a full panel session reaches these routes; every write is a `POST` with the panel's `Origin` check.
 - **A read changes nothing.** The pairing window is polled with `GET`s that only read what the hub holds in memory. Starting, cancelling and the decisions are `POST`s.
 - **The pairing runs in a task owned by the hub process.** It holds the QR or the code in memory only and the page reads it. The panel never holds a request open for minutes.
@@ -59,7 +59,7 @@ A built-in engine. It would need the maintainer to reopen 0003 and 0014, and the
 3. **The passkey on every action** (0019, 0040 pending decision 2). A step-up ceremony bound to the action is a new mechanism.
 4. **The threat model** ([05](../05-modelo-de-ameacas.md)) should get the line about a stolen panel session, above. It is not changed by this delivery.
 5. **The acceptance sentence in the command** (for example a `--accept-risk` flag).
-6. **"Mark as command" after the add**: no function exists; the panel offers it only at the add.
+6. **"Mark as command" after the add**: moot since 17/11/2026: the mark was removed ([0051](0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)).
 7. **Auditing the end of a pairing** (for example a cancel by an admin).
 8. **The command's text** about trying again at the next check: correct it, or extend the supervision to stop the session of a disconnected number and retry a failed logout.
 9. **Orphan pairings at start**: stopping them would be a new start-up step, not designed here.

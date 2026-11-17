@@ -63,24 +63,14 @@ pub fn granted(hermes: &str, number: &str, granted: &Granted) -> Report {
         let _ = writeln!(text, "It holds from the next call of the Hermes.");
     }
     for warning in &granted.warnings {
-        match warning {
-            Warning::CommandNumber => {
-                let _ = writeln!(
-                    text,
-                    "WARNING: {number} is marked as the command channel of some Hermes. {hermes} \
-                     can now write into that channel."
-                );
-            }
-            Warning::Shared(others) => {
-                let names: Vec<&str> = others.iter().map(|name| name.as_str()).collect();
-                let _ = writeln!(
-                    text,
-                    "WARNING: other Hermes may also send or be woken on {number}: {}. The hub \
-                     does not choose which one acts.",
-                    names.join(", ")
-                );
-            }
-        }
+        let Warning::Shared(others) = warning;
+        let names: Vec<&str> = others.iter().map(|name| name.as_str()).collect();
+        let _ = writeln!(
+            text,
+            "WARNING: other Hermes may also send or be woken on {number}: {}. The hub \
+             does not choose which one acts.",
+            names.join(", ")
+        );
     }
     Report::done(text)
 }

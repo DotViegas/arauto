@@ -59,7 +59,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "号码"),
     ("Hermes with access", "有访问权限的 Hermes"),
     ("Last message", "最后一条消息"),
-    ("command", "指令"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
         "最后一条消息只显示时间，从不显示内容。面板只列出经过 hub 的内容：同一号码关联的其他设备只在手机上显示。",
@@ -569,10 +568,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias}: {n} Hermes send in the same chats.",
         "{alias}：有 {n} 个 Hermes 在相同的会话中发送。",
     ),
-    (
-        "{alias} is marked as a command number and there are Hermes allowed to send on it.",
-        "{alias} 被标记为指令号码，却有 Hermes 获准在其上发送。",
-    ),
     // connect.rs
     (
         "There already is a Hermes with that name. To link another device to it, use the button on its line.",
@@ -949,14 +944,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
         "例如 +55 11 9XXXX-XXXX。只能包含数字、空格、连字符和括号。",
-    ),
-    (
-        "It is the command channel of a Hermes",
-        "它是某个 Hermes 的指令通道",
-    ),
-    (
-        "It shows as \"command\" in the list.",
-        "它在列表中显示为“指令”。",
     ),
     ("Before the first number", "添加第一个号码之前"),
     (

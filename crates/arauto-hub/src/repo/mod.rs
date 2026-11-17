@@ -37,6 +37,7 @@
 //! | [`device`] | What a connection needs to know about its device. |
 //! | [`engine`] | The engine of the organization: its addresses and its sealed secrets. |
 //! | [`number`] | The numbers of WhatsApp and their states. |
+//! | [`orders`] | Who gives a Hermes orders on WhatsApp, and the counterparts the hub refuses writing to. |
 //! | [`chat`] | The chats of a number, by their identifiers in the engine. |
 //! | [`engine_event`] | The inbox of events of the engine. |
 //! | [`access`] | The matrix of accesses: what each Hermes may do on each number and in each chat. |
@@ -68,6 +69,7 @@ pub mod enroll;
 pub mod hermes;
 pub mod invite;
 pub mod number;
+pub mod orders;
 pub mod org;
 pub mod panel;
 pub mod peer;

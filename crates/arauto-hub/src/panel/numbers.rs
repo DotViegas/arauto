@@ -403,7 +403,6 @@ fn choice(
 struct AddView {
     alias: String,
     phone: String,
-    command: bool,
     /// The organization never had a number: the acceptance is asked.
     first: bool,
     engine: EngineState,
@@ -458,18 +457,6 @@ fn add_window(html: &mut Html, view: &AddView) {
                     .raw("\"><p class=\"hint\">")
                     .t(k("Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only."))
                     .raw("</p></div>");
-                choice(
-                    html,
-                    "checkbox",
-                    "command",
-                    "on",
-                    view.command,
-                    None,
-                    k("It is the command channel of a Hermes"),
-                );
-                html.raw("<p class=\"hint\">")
-                    .t(k("It shows as \"command\" in the list."))
-                    .raw("</p>");
                 if view.first {
                     html.raw("<fieldset><legend>")
                         .t(k("Before the first number"))
@@ -498,10 +485,7 @@ fn add_window(html: &mut Html, view: &AddView) {
     );
 }
 
-async fn add_view(
-    cx: &Cx<'_>,
-    typed: Option<(String, String, bool)>,
-) -> Result<AddView, RepoError> {
+async fn add_view(cx: &Cx<'_>, typed: Option<(String, String)>) -> Result<AddView, RepoError> {
     let engine = match repo::engine::get(cx.pool(), cx.organization).await? {
         None => EngineState::None,
         Some(row) if row.api_key_enc.is_none() => EngineState::NoKey,
@@ -512,11 +496,10 @@ async fn add_view(
     let first = repo::number::list(cx.pool(), cx.organization, true)
         .await?
         .is_empty();
-    let (alias, phone, command) = typed.unwrap_or_default();
+    let (alias, phone) = typed.unwrap_or_default();
     Ok(AddView {
         alias,
         phone,
-        command,
         first,
         engine,
         error: None,
@@ -538,9 +521,8 @@ async fn add(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoError
             .unwrap_or_default()
     };
     let (alias, phone) = (field("alias"), field("phone"));
-    let command = form.field("command").is_some();
     let accept = form.field("accept").is_some();
-    let mut view = add_view(cx, Some((alias.clone(), phone.clone(), command))).await?;
+    let mut view = add_view(cx, Some((alias.clone(), phone.clone()))).await?;
     if !matches!(view.engine, EngineState::Ready { .. }) {
         return add_page(cx, view).await;
     }
@@ -554,7 +536,6 @@ async fn add(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoError
             cx.hub.vault(),
             &alias,
             &phone,
-            command,
             view.first && accept,
             cx.hub.now_ms(),
         )
@@ -1527,7 +1508,6 @@ mod tests {
         let view = AddView {
             alias: HOSTILE.to_owned(),
             phone: HOSTILE.to_owned(),
-            command: true,
             first: true,
             engine: EngineState::Ready { answered: false },
             error: Some(refused(N33)),
@@ -1537,7 +1517,7 @@ mod tests {
         let page = html.finish();
         clean(&page);
         assert!(page.contains("name=\"accept\""));
-        assert!(page.contains("checked"));
+        assert!(!page.contains("name=\"command\""));
         // With no engine, no form at all, and the command that sets it.
         let mut html = Html::new(Lang::En);
         add_window(

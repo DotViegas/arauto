@@ -214,7 +214,7 @@ Type the verification code Hermes answered in the command channel:
 
 ## T4. WhatsApps
 
-- **Shows:** one line per number: alias, paired number, state, whether it is "command", Hermes with
+- **Shows:** one line per number: alias, paired number, state, Hermes with
   access, time of the last message received (no content), and an Actions column (built on
   15/11/2026; the other columns are as before).
 - **Buttons of the tab:** "Connect WhatsApp (WAHA)" opens T5. "Connect WhatsApp (native · in test)"
@@ -224,8 +224,9 @@ Type the verification code Hermes answered in the command channel:
 - **Actions on each line, by state** (built; a button that the state does not allow is not shown):
   Pair or Pair again (unpaired, disconnected, or pairing with no run in the hub); Continue pairing;
   Restart the engine session (failed); Disconnect from WhatsApp (connected, reconnecting); Decide
-  (number swapped); Remove (any state). "Mark as command" is offered **only when the number is
-  added**; changing it afterwards is not built, because no function does it.
+  (number swapped); Remove (any state). (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md): the "command" mark of a number, which the
+  Add window offered and could not change afterwards, is gone. Who gives a Hermes orders is recorded
+  per Hermes, today only by the command `arauto-hub admin hermes whatsapp`; the panel has no control for it yet.)
 - **Disconnect and Remove ask for the alias typed, and not the passkey again.** The passkey on every
   action (decision 0019) is not built (decision 0040, pending decision 2). The alias typed, the
   `POST` with the panel's `Origin` and the full panel session are the strictest check that needs no
@@ -248,7 +249,7 @@ Type the verification code Hermes answered in the command channel:
 
 Built in the hub on 15/11/2026, in windows over the list (decision 0044, proposal).
 
-- **Step 1:** alias and number with country code, and the box "command". For the first number the
+- **Step 1:** alias and number with country code (the box "command" was removed on 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)). For the first number the
   organization ever had, also the acceptance sentence of T4, which must be ticked.
 - **Step 2:** the choice of QR or pairing code.
 - **Step 3:** the QR, drawn by the hub as an image in the page, which renews itself in the window,
@@ -294,7 +295,7 @@ R read · S send · M modify · W be woken
 - **Save** applies on the next call, without restarting anything.
 - The editor holds no switch of the Hermes: the checkbox "Woken by WhatsApp" added by [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md) is removed (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)). "Be woken" is the only checkbox for waking by WhatsApp; its hint says: "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule." Turning it off removes the verb from those chat lines in the same write; turning it on does not touch them. Notes do not depend on it.
 - **Warnings that do not block:** two Hermes woken or sending in the same chats; a restrictive chat
-  line under the scope "all"; **send** granted on a number marked as "command".
+  line under the scope "all". (The warning for **send** on a number marked "command" went with the mark, 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md).)
 - **Empty:** "Connect a Hermes first"; "Add a WhatsApp first"; "Nobody has access to
   anything. Click a cell to grant."
 

@@ -140,6 +140,7 @@ They come from the experience of the source service:
   version keeps sending by address, beside sending by content
   ([decisoes/0024](decisoes/0024-envio-de-arquivo-por-endereco.md)).
 - Brazilian telephone with and without the ninth digit: the hub tests both forms.
+- A write in the chat where a Hermes takes orders on WhatsApp, or to its telephone, is refused to every Hermes with AR-705 (AR-712 for a message of that chat), the same answers as for a chat that does not exist or a message that cannot be changed, without saying why. Reading is not refused. Only what the admin recorded is refused ([08](08-permissoes.md), section 3, rule 7; 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal). The list of tools and `arauto_status` do not change.
 - Editing without stating the text and deleting without the full identifier are refused: in the
   engine, both have dangerous behavior by default.
 

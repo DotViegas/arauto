@@ -65,6 +65,22 @@ Applied in the hub, in this order:
 6. The call depends on the engine (send, modify, check a telephone, download a file that is not
    stored) and the number is unavailable or the engine is down: **error**. Reading what is already
    in the message archive does not depend on the engine.
+7. The call writes (send or modify) in the chat where a Hermes takes orders on WhatsApp, as the
+   admin recorded it: **deny**, for every Hermes, the one that takes the orders included. It comes
+   after the scope and line check of rules 3 and 4, so a chat outside the scope keeps its answer.
+   (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal, built and tested against a fake engine; not tried on a real
+   Hermes.) What is protected is a chat: the one between the telephone a Hermes's own WhatsApp runs
+   on and a telephone that gives it orders or, in `self-chat` mode, the chat of that account with
+   itself. It applies when one end is a number of the hub, on the number of either end. Refused:
+   `send_text`, `send_file` and `forward` into it (by hub identifier or by telephone, in both
+   Brazilian forms, existing or not; for a telephone before the send-limit place is spent),
+   `mark_read`, `set_typing`, and `react`, `edit_message`, `delete_message` on a message of it. Not
+   refused: reading, `check_number`, `forward` from it, being woken, every other chat of the number.
+   A chat the engine names only by a hidden identifier (`@lid`), on a number that has a recorded
+   counterpart: the hub asks the engine for the telephone of that identifier and matches it; if the
+   engine does not answer, the write in that chat alone is refused. No access line is created and
+   nothing is granted or refused at grant time. Only what the admin recorded is refused; see
+   the cautions in section 6.
 
 The change applies on the next call. A notice that is already in the queue is evaluated again on
 delivery and discarded if the access was removed.
@@ -76,6 +92,7 @@ delivery and discarded if the access was removed.
 | Device in quarantine, revoked or suspended; incompatible connector | AR-501, AR-502, AR-506 or AR-401 |
 | There is no access to the number, or the verb is missing on the number | AR-701 |
 | The chat is outside the scope, or the line of the chat does not have the verb | AR-705, the same answer as for a chat that does not exist |
+| A write in a chat, or to a telephone, where a Hermes takes orders on WhatsApp (rule 7) | AR-705; AR-712 for a message of that chat. Hermes is not told why: the answer is the one of a chat that does not exist or of a message that cannot be changed (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)) |
 | Number disconnected or in "number swapped", on a call that depends on the engine | AR-702 |
 | Engine down, on a call that depends on the engine | AR-703 |
 | Send ceiling reached | AR-704 |
@@ -124,6 +141,11 @@ is gone, or the number is not connected. Without the key of Hermes's local API
 When two Hermes can send or be woken in the same chats, the panel **warns and does not
 prevent**.
 
+One exception, asked by the maintainer (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal; the text was not approved word for word):
+the hub **prevents** every Hermes from writing in the chat where a Hermes takes orders on WhatsApp, when
+one end of it is a number of the hub and the admin recorded it. It applies decision 0005: an order never
+comes through Arauto. Reading that chat follows the accesses.
+
 ## 6. Two cautions that are not permission
 
 **The tools appear on all of Hermes's conversation platforms.** Whoever manages to give orders to
@@ -133,8 +155,15 @@ card of each Hermes.
 
 **A number that is also a command channel.** If a number paired in the engine is in the list of those
 who give orders to some Hermes, a Hermes with **send** on that number manages to write in the command
-channel of the other. The hub does not know these lists. The panel allows marking a number as
-"command" and alerts when **send** is granted on it.
+channel of the other. The hub does not know these lists on its own.
+
+(17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal.) The "command" mark of a number and its alert are gone: the mark did
+not say whether a number gives orders or takes them. The admin records, per Hermes, the telephone its
+own WhatsApp runs on and who gives it orders there, with `arauto-hub admin hermes whatsapp NAME`;
+the hub then refuses every Hermes writing in that chat (section 3, rule 7). Reading it follows the
+accesses. **Not guaranteed:** a command channel nobody recorded is open to writing; the hub cannot
+know it. While nothing is recorded for a Hermes, the command prints a warning, and `number list`
+ends with a line while no Hermes protects any chat. The panel does not yet show any of it.
 
 ## 7. Send ceiling
 

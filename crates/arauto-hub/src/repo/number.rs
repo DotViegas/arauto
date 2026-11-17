@@ -34,8 +34,6 @@ pub struct Number {
     pub session: SessionName,
     /// The alias the admin gave it.
     pub alias: NumberAlias,
-    /// Marked by the admin as a command channel of some Hermes (`docs/08-permissoes.md`, 6).
-    pub command: bool,
     /// Its state.
     pub state: NumberState,
     /// Since when.
@@ -87,7 +85,6 @@ struct Row {
     engine_id: Uuid,
     session_name: String,
     alias: String,
-    command: bool,
     state: String,
     state_since: i64,
     paired_at: Option<i64>,
@@ -102,7 +99,7 @@ struct Row {
 /// The columns of [`Row`], as a literal for the statements.
 macro_rules! columns {
     () => {
-        "id, engine_id, session_name, alias, command, state, state_since, paired_at, \
+        "id, engine_id, session_name, alias, state, state_since, paired_at, \
          pairing_until, config_digest, last_message_at, caught_up_until, created_at, \
          phone_enc"
     };
@@ -119,7 +116,6 @@ impl TryFrom<Row> for Number {
                 .map_err(|_| RepoError::Inconsistent("the session name of a number"))?,
             alias: NumberAlias::parse(&row.alias)
                 .map_err(|_| RepoError::Inconsistent("the alias of a number"))?,
-            command: row.command,
             state: NumberState::parse(&row.state)
                 .ok_or(RepoError::Inconsistent("the state of a number"))?,
             state_since: row.state_since,
@@ -167,7 +163,6 @@ pub async fn add(
     key: &OrganizationKey,
     alias: &NumberAlias,
     phone: &Phone,
-    command: bool,
     risk_accepted: bool,
     now: i64,
 ) -> Result<AddOutcome, RepoError> {
@@ -214,8 +209,8 @@ pub async fn add(
     let phone_enc = key.seal_whatsapp(WhatsappField::Phone, id, phone.digits().as_bytes())?;
     let row: Row = sqlx::query_as(concat!(
         "INSERT INTO number (id, organization_id, engine_id, session_name, phone_enc, \
-                             phone_digest, alias, command, state, state_since, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unpaired', $9, $9) \
+                             phone_digest, alias, state, state_since, created_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'unpaired', $8, $8) \
          RETURNING ",
         columns!(),
         ""
@@ -227,7 +222,6 @@ pub async fn add(
     .bind(phone_enc)
     .bind(digest.as_slice())
     .bind(alias.as_str())
-    .bind(command)
     .bind(now)
     .fetch_one(write.connection())
     .await?;
@@ -238,9 +232,7 @@ pub async fn add(
                 .in_organization(organization)
                 .about(TargetKind::Number, id)
                 .with({
-                    let details = Details::new()
-                        .alias("alias", alias)
-                        .flag("command", command);
+                    let details = Details::new().alias("alias", alias);
                     // Only the panel records the acceptance, and only when it was given: a
                     // row written by the command stays as it always was.
                     if risk_accepted {

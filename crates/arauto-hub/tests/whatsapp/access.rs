@@ -273,7 +273,7 @@ async fn warnings_are_given_and_nothing_is_prevented() {
     world
         .fixture
         .admin
-        .number_add(&world.vault, "comando", &phone(10), true, world.now())
+        .number_add(&world.vault, "comando", &phone(10), world.now())
         .await
         .unwrap();
     let first = world.fixture.hermes().await;
@@ -283,12 +283,11 @@ async fn warnings_are_given_and_nothing_is_prevented() {
         .access_grant(&first, "comando", all(READ_SEND), world.now())
         .await
         .unwrap();
-    assert_eq!(granted.warnings, [Warning::CommandNumber]);
+    assert!(granted.warnings.is_empty());
     let granted = admin
         .access_grant(&second, "comando", all(ALL_VERBS), world.now())
         .await
         .unwrap();
-    assert!(granted.warnings.contains(&Warning::CommandNumber));
     assert!(
         granted
             .warnings

@@ -265,6 +265,48 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         }
         world.fake.heal();
     }
+    // The admin records who gives a Hermes orders: the chat with the contact is now the one
+    // where it takes orders. The record, the refusals it makes and what the command prints are
+    // searched for the telephones like the rest.
+    let edit = arauto_hub::admin::orders::OrdersEdit {
+        takes_orders_on: Some(Some(format!("+{own}"))),
+        self_chat: false,
+        orders_from: Some(vec![format!("+{contact}")]),
+    };
+    let recorded = world
+        .fixture
+        .admin
+        .hermes_orders_set(&world.vault, &agent.name, &edit, world.now())
+        .await
+        .unwrap();
+    refusals.push_str(&arauto_hub::admin::render::orders::orders(&recorded, true).text);
+    let rejected = world
+        .fixture
+        .admin
+        .hermes_orders_set(
+            &world.vault,
+            &agent.name,
+            &arauto_hub::admin::orders::OrdersEdit {
+                takes_orders_on: Some(Some(format!("{text} {own}"))),
+                ..Default::default()
+            },
+            world.now(),
+        )
+        .await
+        .unwrap_err();
+    refusals.push_str(&format!(
+        "{rejected}
+"
+    ));
+    for to in [json!(hub_chat), json!(format!("+{contact}"))] {
+        let outcome = refused(
+            agent
+                .call("whatsapp_send_text", json!({"to": to, "text": text}))
+                .await,
+            &mut refusals,
+        );
+        assert!(matches!(outcome, CallOutcome::Refused { .. }));
+    }
     // The admin changes the matrix: blocked, and the access taken away.
     world.line(&agent.name, "canario", &hub_chat, NONE).await;
     refused(
@@ -301,6 +343,8 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         "chat_engine_id",
         "number",
         "engine",
+        "hermes_whatsapp_phone",
+        "hermes_whatsapp_phone_digest",
     ] {
         let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT row_to_json(t)::text FROM {table} t"

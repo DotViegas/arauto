@@ -132,7 +132,7 @@ impl World {
     pub async fn add(&self, alias: &str, phone: &str) -> Number {
         self.fixture
             .admin
-            .number_add(&self.vault, alias, phone, false, self.now())
+            .number_add(&self.vault, alias, phone, self.now())
             .await
             .unwrap()
             .number

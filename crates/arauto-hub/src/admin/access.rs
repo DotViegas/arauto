@@ -8,9 +8,8 @@
 //! their new list of tools; a call reads the access again anyway, at every call.
 //!
 //! What the panel does besides deciding, and the command does too: it warns, and never
-//! prevents, when sending is given on a number marked as a command channel, or when another
-//! Hermes may also send or be woken on the same number (`docs/08-permissoes.md`, sections 5
-//! and 6).
+//! prevents, when another Hermes may also send or be woken on the same number
+//! (`docs/08-permissoes.md`, section 5).
 
 use arauto_protocol::names::{HermesName, NumberAlias};
 use uuid::Uuid;
@@ -25,9 +24,6 @@ use crate::vault::Vault;
 /// What the admin is told besides the outcome.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Warning {
-    /// The number is marked as the command channel of some Hermes, and this one may now send
-    /// on it: it can write into that channel.
-    CommandNumber,
     /// Other Hermes may also send or be woken on this number.
     Shared(Vec<HermesName>),
 }
@@ -120,13 +116,6 @@ impl Session {
         };
         let mut warnings = Vec::new();
         let sends = grant.verbs.send;
-        if sends
-            && repo::number::by_alias(&self.pool, self.organization, &alias)
-                .await?
-                .is_some_and(|number| number.command)
-        {
-            warnings.push(Warning::CommandNumber);
-        }
         if sends || grant.verbs.wake {
             let others =
                 repo::access::others_sending_or_woken(&self.pool, self.organization, &alias, &name)

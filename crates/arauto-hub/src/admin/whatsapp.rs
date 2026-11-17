@@ -270,7 +270,7 @@ impl Session {
 
     // ------------------------------------------------------------------ numbers
 
-    /// `admin number add ALIAS PHONE [--command]`: the number, unpaired, and its session in the
+    /// `admin number add ALIAS PHONE`: the number, unpaired, and its session in the
     /// engine, created already configured.
     ///
     /// # Errors
@@ -281,10 +281,9 @@ impl Session {
         vault: &Vault,
         alias_text: &str,
         phone: &str,
-        command: bool,
         now: i64,
     ) -> Result<Added, AdminError> {
-        self.number_add_accepting(vault, alias_text, phone, command, false, now)
+        self.number_add_accepting(vault, alias_text, phone, false, now)
             .await
     }
 
@@ -298,7 +297,6 @@ impl Session {
         vault: &Vault,
         alias_text: &str,
         phone: &str,
-        command: bool,
         risk_accepted: bool,
         now: i64,
     ) -> Result<Added, AdminError> {
@@ -313,7 +311,6 @@ impl Session {
             &key,
             &alias,
             &phone,
-            command,
             risk_accepted,
             now,
         )

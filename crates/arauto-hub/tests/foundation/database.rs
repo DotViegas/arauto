@@ -945,3 +945,172 @@ async fn the_wake_switch_is_folded_into_the_verb_and_its_columns_are_dropped() {
     assert!(!column_exists(&db.pool, "hermes", "can_be_woken").await);
     assert!(!column_exists(&db.pool, "hermes", "wake_reason").await);
 }
+
+/// The "command" mark of a number goes, with no carry-over: the column is dropped from a database
+/// that already has data, and a number that carried the mark stays as it was otherwise.
+#[tokio::test]
+async fn the_command_mark_of_a_number_is_dropped_without_carry_over() {
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 20)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+    assert!(column_exists(&db.pool, "number", "command").await);
+
+    let organization = uuid::Uuid::new_v4();
+    let engine = uuid::Uuid::new_v4();
+    let number = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO organization (id, name, state, key_enc, created_at) \
+         VALUES ($1, 'one', 'active', decode('00', 'hex'), 1)",
+    )
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO engine (id, organization_id, kind, address, events_url, events_secret_enc, \
+                             config_version, created_at, changed_at) \
+         VALUES ($1, $2, 'waha', 'http://192.0.2.10:3000', 'http://192.0.2.11:9000', \
+                 decode('00', 'hex'), 1, 1, 1)",
+    )
+    .bind(engine)
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO number (id, organization_id, engine_id, session_name, phone_enc, \
+                             phone_digest, alias, command, state, state_since, created_at) \
+         VALUES ($1, $2, $3, 'sessionnamesession1', decode('00', 'hex'), \
+                 decode(repeat('01', 32), 'hex'), 'sales', TRUE, 'unpaired', 1, 1)",
+    )
+    .bind(number)
+    .bind(organization)
+    .bind(engine)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+
+    assert!(!column_exists(&db.pool, "number", "command").await);
+    let alias: String = sqlx::query_scalar("SELECT alias FROM number WHERE id = $1")
+        .bind(number)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(alias, "sales");
+}
+
+/// Who gives a Hermes orders on WhatsApp (migration 0021): the tables come to a database that
+/// has data, empty, and the schema itself refuses a record that is not one.
+#[tokio::test]
+async fn the_record_of_who_gives_a_hermes_orders_comes_empty_and_the_schema_keeps_its_rules() {
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 21)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+    assert!(!table_exists(&db.pool, "hermes_whatsapp_phone").await);
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+    for table in ["hermes_whatsapp_phone", "hermes_whatsapp_phone_digest"] {
+        assert!(table_exists(&db.pool, table).await, "{table}");
+        let rows: i64 = sqlx::query_scalar(AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(rows, 0, "{table} starts empty");
+    }
+
+    let home = TestHome::new();
+    let organization = common::organization(&db.pool, &home).await;
+    let first = common::hermes(&db.pool, organization).await;
+    let second = common::hermes(&db.pool, organization).await;
+    let insert = |hermes: uuid::Uuid, role: &'static str, mode: Option<&'static str>| {
+        let pool = db.pool.clone();
+        async move {
+            let id = uuid::Uuid::new_v4();
+            sqlx::query(
+                "INSERT INTO hermes_whatsapp_phone \
+                     (id, organization_id, hermes_id, role, whatsapp_mode, phone_enc, created_at) \
+                 VALUES ($1, $2, $3, $4, $5, decode('00', 'hex'), 1)",
+            )
+            .bind(id)
+            .bind(organization.id())
+            .bind(hermes)
+            .bind(role)
+            .bind(mode)
+            .execute(&pool)
+            .await
+            .map(|_| id)
+        }
+    };
+    let digest = |phone: uuid::Uuid, role: &'static str, byte: &'static str| {
+        let pool = db.pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO hermes_whatsapp_phone_digest (organization_id, phone_id, role, digest) \
+                 VALUES ($1, $2, $3, decode(repeat($4, 32), 'hex'))",
+            )
+            .bind(organization.id())
+            .bind(phone)
+            .bind(role)
+            .bind(byte)
+            .execute(&pool)
+            .await
+        }
+    };
+    // The mode belongs to the bridge's row, and only to it.
+    assert!(insert(first, "takes_orders", None).await.is_err());
+    assert!(insert(first, "gives_orders", Some("bot")).await.is_err());
+    assert!(insert(first, "gives_orders", None).await.is_ok());
+    assert!(insert(first, "takes_orders", Some("loud")).await.is_err());
+    let takes = insert(first, "takes_orders", Some("self_chat"))
+        .await
+        .unwrap();
+    // One bridge per Hermes.
+    assert!(insert(first, "takes_orders", Some("bot")).await.is_err());
+    // One Hermes per bridge telephone: the same digest in two Hermes is refused, for the
+    // bridge only.
+    digest(takes, "takes_orders", "0a").await.unwrap();
+    let other = insert(second, "takes_orders", Some("bot")).await.unwrap();
+    assert!(digest(other, "takes_orders", "0a").await.is_err());
+    let giver = insert(second, "gives_orders", None).await.unwrap();
+    assert!(digest(giver, "gives_orders", "0a").await.is_ok());
+    // A digest is 32 bytes.
+    let short = sqlx::query(
+        "INSERT INTO hermes_whatsapp_phone_digest (organization_id, phone_id, role, digest) \
+         VALUES ($1, $2, 'gives_orders', decode('01', 'hex'))",
+    )
+    .bind(organization.id())
+    .bind(giver)
+    .execute(&db.pool)
+    .await;
+    assert!(short.is_err());
+    // The digests go with their telephone.
+    sqlx::query("DELETE FROM hermes_whatsapp_phone WHERE id = $1")
+        .bind(takes)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let left: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM hermes_whatsapp_phone_digest WHERE phone_id = $1")
+            .bind(takes)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(left, 0);
+}

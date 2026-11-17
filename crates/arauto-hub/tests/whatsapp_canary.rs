@@ -310,26 +310,14 @@ async fn no_secret_of_the_whatsapp_reaches_the_log_the_errors_the_audit_or_the_a
     let taken = world
         .fixture
         .admin
-        .number_add(
-            &world.vault,
-            "again",
-            &format!("+{own}"),
-            false,
-            world.now(),
-        )
+        .number_add(&world.vault, "again", &format!("+{own}"), world.now())
         .await
         .unwrap_err();
     errors.push_str(&written(&taken));
     let wrong = world
         .fixture
         .admin
-        .number_add(
-            &world.vault,
-            "wrong",
-            &format!("{text} {own}"),
-            false,
-            world.now(),
-        )
+        .number_add(&world.vault, "wrong", &format!("{text} {own}"), world.now())
         .await
         .unwrap_err();
     errors.push_str(&written(&wrong));

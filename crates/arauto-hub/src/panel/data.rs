@@ -541,7 +541,6 @@ pub(super) async fn numbers(
                 phone: phones.remove(alias),
                 tone,
                 state,
-                command: number.command,
                 hermes: accesses
                     .iter()
                     .filter(|access| access.number.as_str() == alias)
@@ -715,16 +714,6 @@ pub(super) async fn accesses(
                 lang,
                 k("{alias}: {n} Hermes send in the same chats."),
                 &[("alias", alias), ("n", &sending.to_string())],
-            ));
-        }
-        let sends = here
-            .iter()
-            .any(|access| Reach::of(access, |verbs| verbs.send).reaches_something());
-        if number.command && sends {
-            warnings.push(text::fill(
-                lang,
-                k("{alias} is marked as a command number and there are Hermes allowed to send on it."),
-                &[("alias", alias)],
             ));
         }
     }

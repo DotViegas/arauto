@@ -59,7 +59,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Number", "नंबर"),
     ("Hermes with access", "पहुँच वाले Hermes"),
     ("Last message", "आखिरी संदेश"),
-    ("command", "कमांड"),
     (
         "The last message is shown only by its time, never its content. The panel lists what goes through the hub: other linked devices of the same number only show on the phone.",
         "आखिरी संदेश का केवल समय दिखाया जाता है, उसकी सामग्री कभी नहीं। पैनल वही दिखाता है जो हब से होकर गुज़रता है: उसी नंबर के दूसरे लिंक किए गए डिवाइस केवल फ़ोन पर दिखते हैं।",
@@ -596,10 +595,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias}: {n} Hermes send in the same chats.",
         "{alias}: एक ही चैट में भेजने वाले Hermes: {n}।",
     ),
-    (
-        "{alias} is marked as a command number and there are Hermes allowed to send on it.",
-        "{alias} कमांड नंबर के रूप में चिह्नित है और कुछ Hermes को इस पर भेजने की अनुमति है।",
-    ),
     // connect.rs
     (
         "There already is a Hermes with that name. To link another device to it, use the button on its line.",
@@ -982,14 +977,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Like +55 11 9XXXX-XXXX. Digits, spaces, hyphens and parentheses only.",
         "जैसे +55 11 9XXXX-XXXX। केवल अंक, स्पेस, हाइफ़न और कोष्ठक।",
-    ),
-    (
-        "It is the command channel of a Hermes",
-        "यह किसी Hermes का कमांड चैनल है",
-    ),
-    (
-        "It shows as \"command\" in the list.",
-        "सूची में यह \"कमांड\" के रूप में दिखता है।",
     ),
     ("Before the first number", "पहले नंबर से पहले"),
     (

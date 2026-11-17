@@ -111,6 +111,8 @@ struct State {
     received: Vec<Received>,
     faults: Vec<(String, Fault)>,
     contacts: BTreeMap<String, (String, String, String)>,
+    /// The table of hidden identifiers: `digits@lid` to the `digits@c.us` it stands for.
+    lids: BTreeMap<String, String>,
     registered: BTreeMap<String, String>,
     files: BTreeMap<String, (String, Vec<u8>)>,
     sent: Vec<(String, Value)>,
@@ -348,6 +350,13 @@ impl FakeEngine {
             contact.to_owned(),
             (name.to_owned(), pushname.to_owned(), about.to_owned()),
         );
+    }
+
+    /// Says that the hidden identifier `lid` (`digits@lid`) stands for the telephone `pn`
+    /// (`digits@c.us`), as the engine's table of hidden identifiers does
+    /// (`GET /api/{session}/lids/{lid}`).
+    pub fn add_lid(&self, lid: &str, pn: &str) {
+        lock(&self.state).lids.insert(lid.to_owned(), pn.to_owned());
     }
 
     /// Says that `phone` (digits) has WhatsApp, with the chat `chat`.
@@ -981,6 +990,15 @@ fn route(
             match state.registered.get(&phone) {
                 Some(chat) => ok(json!({"numberExists": true, "chatId": chat})),
                 None => ok(json!({"numberExists": false, "chatId": null})),
+            }
+        }
+        ["api", session, "lids", lid] if get => {
+            if !state.sessions.contains_key(*session) {
+                return not_found();
+            }
+            match state.lids.get(*lid) {
+                Some(pn) => ok(json!({"lid": lid, "pn": pn})),
+                None => not_found(),
             }
         }
         ["api", session, "groups"] if get => {

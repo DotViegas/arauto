@@ -8,7 +8,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use arauto_hub::admin::render::{self, Report, access, link, org, whatsapp};
+use arauto_hub::admin::orders::OrdersEdit;
+use arauto_hub::admin::render::{self, Report, access, link, orders, org, whatsapp};
 use arauto_hub::admin::whatsapp::{PairMethod, Removal};
 use arauto_hub::admin::{self, Session};
 use arauto_hub::channel::{self, ChannelSettings};
@@ -366,9 +367,6 @@ enum NumberCommand {
         alias: String,
         /// The telephone, with the code of the country.
         phone: String,
-        /// Marks the number as a command channel of some Hermes.
-        #[arg(long)]
-        command: bool,
     },
     /// Lists the numbers.
     List {
@@ -439,6 +437,21 @@ enum HermesCommand {
     Remove {
         /// The name of the Hermes.
         name: String,
+    },
+    /// Records the telephone a Hermes's WhatsApp runs on and who gives it orders there. No
+    /// Hermes can write in that chat through Arauto.
+    Whatsapp {
+        /// The name of the Hermes.
+        name: String,
+        /// The telephone the Hermes's own WhatsApp runs on, or none.
+        #[arg(long = "takes-orders-on", value_name = "PHONE|none")]
+        takes_orders_on: Option<String>,
+        /// Its own WhatsApp gives it orders, in the chat with itself.
+        #[arg(long = "self-chat", conflicts_with = "orders_from")]
+        self_chat: bool,
+        /// A telephone that gives the Hermes orders. Repeat it; none clears the list.
+        #[arg(long = "orders-from", value_name = "PHONE|none")]
+        orders_from: Vec<String>,
     },
 }
 
@@ -725,22 +738,16 @@ async fn run_number(
 ) -> anyhow::Result<Report> {
     let vault = vault(storage).await?;
     Ok(match command {
-        NumberCommand::Add {
-            alias,
-            phone,
-            command,
-        } => whatsapp::number_added(
-            &session
-                .number_add(&vault, &alias, &phone, command, now)
-                .await?,
-        ),
+        NumberCommand::Add { alias, phone } => {
+            whatsapp::number_added(&session.number_add(&vault, &alias, &phone, now).await?)
+        }
         NumberCommand::List { all } => {
             let mut listed = Vec::new();
             for number in session.number_list(all).await? {
                 let phone = session.number_phone(&vault, &number).await.ok();
                 listed.push((number, phone));
             }
-            whatsapp::number_list(&listed)
+            whatsapp::number_list(&listed, &session.orders_for_the_list().await?)
         }
         NumberCommand::Pair { alias, code } => {
             let method = if code {
@@ -889,6 +896,26 @@ async fn run_installed(
             HermesCommand::List { all } => render::hermes_list(&session.hermes_list(all).await?),
             HermesCommand::Remove { name } => {
                 render::hermes_removed(&session.hermes_remove(&name, now).await?)
+            }
+            HermesCommand::Whatsapp {
+                name,
+                takes_orders_on,
+                self_chat,
+                orders_from,
+            } => {
+                let vault = vault(storage).await?;
+                let edit = OrdersEdit {
+                    takes_orders_on: takes_orders_on.map(Some),
+                    self_chat,
+                    orders_from: (!orders_from.is_empty()).then_some(orders_from),
+                };
+                let asked = !edit.is_empty();
+                let outcome = if asked {
+                    session.hermes_orders_set(&vault, &name, &edit, now).await?
+                } else {
+                    session.hermes_orders_show(&vault, &name).await?
+                };
+                orders::orders(&outcome, asked)
             }
         },
         InstalledCommand::Invite { name, command } => {
@@ -1096,6 +1123,12 @@ mod tests {
             "arauto-hub admin hermes add vendas",
             "arauto-hub admin hermes list",
             "arauto-hub admin hermes remove vendas",
+            "arauto-hub admin hermes whatsapp vendas",
+            "arauto-hub admin hermes whatsapp vendas --takes-orders-on +5511900000001",
+            "arauto-hub admin hermes whatsapp vendas --takes-orders-on +5511900000001 --self-chat",
+            "arauto-hub admin hermes whatsapp vendas --takes-orders-on +5511900000001 --orders-from +5511900000002 --orders-from +5511900000003",
+            "arauto-hub admin hermes whatsapp vendas --orders-from none",
+            "arauto-hub admin hermes whatsapp vendas --takes-orders-on none",
             "arauto-hub admin invite vendas",
             "arauto-hub admin approve vendas",
             "arauto-hub admin approve vendas 123-456",
@@ -1114,7 +1147,6 @@ mod tests {
             "arauto-hub admin engine health",
             "arauto-hub admin engine version",
             "arauto-hub admin number add vendas +5511900000000",
-            "arauto-hub admin number add vendas 5511900000000 --command",
             "arauto-hub admin number list",
             "arauto-hub admin number list --all",
             "arauto-hub admin number pair vendas",
@@ -1154,6 +1186,8 @@ mod tests {
         }
         for line in [
             "arauto-hub admin approve vendas 123456 --recognized --not-recognized",
+            "arauto-hub admin hermes whatsapp vendas --self-chat --orders-from +5511900000002",
+            "arauto-hub admin hermes whatsapp",
             "arauto-hub admin wake vendas on",
             "arauto-hub admin wake vendas off",
             "arauto-hub admin alerts --ack not-an-id",

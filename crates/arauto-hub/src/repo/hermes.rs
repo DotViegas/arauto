@@ -256,6 +256,9 @@ pub async fn remove(
         now,
     )
     .await?;
+    // Who gives it orders on WhatsApp ends with it: the refusal ends in the same write.
+    super::orders::end_with_the_hermes(&mut write, organization, admin, locked.hermes.id, now)
+        .await?;
     // Its place and its role in the org chart go with it. The level stays, empty.
     sqlx::query("DELETE FROM org_member WHERE organization_id = $1 AND hermes_id = $2")
         .bind(organization.id())

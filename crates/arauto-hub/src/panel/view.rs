@@ -213,8 +213,6 @@ pub struct NumberRow {
     pub tone: Tone,
     /// Its state: a sentence of the screens.
     pub state: &'static str,
-    /// Whether the admin marked it as a command channel.
-    pub command: bool,
     /// The Hermes with an access to it.
     pub hermes: Vec<String>,
     /// When its last message came, in words. Never what it said.
@@ -892,11 +890,6 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
         html.raw("<tr><td><span class=\"name\">")
             .text(&row.alias)
             .raw("</span>");
-        if row.command {
-            html.raw("<span class=\"tag\">")
-                .t(k("command"))
-                .raw("</span>");
-        }
         html.raw("</td><td class=\"wide-only mono\">");
         match &row.phone {
             Some(phone) => html.text(phone),
@@ -1095,7 +1088,6 @@ mod tests {
                 phone: Some(HOSTILE.to_owned()),
                 tone: Tone::Ok,
                 state: k("Connected"),
-                command: true,
                 hermes: vec![HOSTILE.to_owned()],
                 last_message: HOSTILE.to_owned(),
                 actions: vec![

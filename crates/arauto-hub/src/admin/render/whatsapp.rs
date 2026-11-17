@@ -7,6 +7,7 @@
 use std::fmt::Write as _;
 
 use super::{Report, escape, maybe_time, time};
+use crate::admin::orders::OrdersOfNumbers;
 use crate::admin::qr::QrCode;
 use crate::admin::whatsapp::{Added, Changed, PairOutcome, Shown};
 use crate::engine::{EngineError, EngineVersion, Ensured, Phone};
@@ -123,8 +124,10 @@ pub fn number_added(added: &Added) -> Report {
 }
 
 /// `admin number list`. `phones` holds the telephone of each number, in the same order.
+/// `orders` says how each number takes part in the records of who gives a Hermes orders, and
+/// whether some Hermes has a chat protected at all (decision 0051).
 #[must_use]
-pub fn number_list(numbers: &[(Number, Option<Phone>)]) -> Report {
+pub fn number_list(numbers: &[(Number, Option<Phone>)], orders: &OrdersOfNumbers) -> Report {
     if numbers.is_empty() {
         return Report::done("No numbers.\n".to_owned());
     }
@@ -133,18 +136,27 @@ pub fn number_list(numbers: &[(Number, Option<Phone>)]) -> Report {
         let phone = phone
             .as_ref()
             .map_or_else(|| "?".to_owned(), |phone| format!("+{}", phone.digits()));
-        let _ = writeln!(
+        let _ = write!(
             text,
-            "{:<32}  {:<16}  {:<15}  since {}{}",
+            "{:<32}  {:<16}  {:<15}  since {}",
             number.alias,
             phone,
             number.state.as_str(),
-            time(number.state_since),
-            if number.command {
-                "  (command channel)"
+            time(number.state_since)
+        );
+        for tag in orders.tags.iter().filter(|tag| tag.number == number.id) {
+            if tag.takes_orders_here {
+                let _ = write!(text, "  ({} takes orders here)", tag.hermes);
             } else {
-                ""
+                let _ = write!(text, "  (gives orders to {})", tag.hermes);
             }
+        }
+        text.push('\n');
+    }
+    if !orders.some_hermes_protects_a_chat {
+        text.push_str(
+            "No Hermes has recorded who gives it orders on WhatsApp: until then a Hermes can \
+             pass for that person. See: arauto-hub admin hermes whatsapp NAME\n",
         );
     }
     Report::done(text)

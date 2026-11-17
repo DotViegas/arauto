@@ -124,6 +124,10 @@ pub enum WhatsappField {
     /// The signature of the identifier of a message the hub gives a Hermes
     /// ([`crate::whatsapp`]): it is kept nowhere, and checked when the Hermes gives it back.
     MessageRef,
+    /// `hermes_whatsapp_phone.phone_enc`: a telephone of the record of who gives a Hermes orders
+    /// on WhatsApp, in either role. Its digests are of the field [`WhatsappField::Phone`], so
+    /// they compare with `number.phone_digest`.
+    HermesWhatsappPhone,
 }
 
 impl WhatsappField {
@@ -135,6 +139,7 @@ impl WhatsappField {
             WhatsappField::EventBody => 4,
             WhatsappField::EventKey => 5,
             WhatsappField::MessageRef => 6,
+            WhatsappField::HermesWhatsappPhone => 7,
         }
     }
 }
