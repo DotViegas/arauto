@@ -183,3 +183,20 @@ It checks the health and the version, the session, the chats, the messages of a 
 with the participants, a contact and the check of the phone, and, with the sending requested, the
 text and the reaction. The format of the message event is still checked by hand, looking at what
 arrives at the hub's inbox.
+
+## Hidden identifiers in the list of chats (17/11/2026)
+
+[observed] WAHA 2026.10.1, engine GOWS, six paired sessions of one installation, read-only, counts only.
+`GET /api/{s}/chats/overview?limit=300` listed every chat with a person under an identifier ending in
+`@c.us` (662 chats in all) and none ending in `@lid`; groups end in `@g.us`. `GET /api/{s}/lids/count`
+answered a count above zero in every session (from 4 to 2,429), so the engine keeps a table from hidden
+identifiers to telephones. Not tried: `GET /api/{s}/lids/{lid}` itself, the identifier that arrives in the
+event of a message, another engine or version.
+
+[observed] same day, same installation, five sessions, shapes only. In `chats/overview` a chat with a
+person is listed under `@c.us`, but the field `from` of its last message ended in `@lid` in most chats
+(127 of 143 looked at) and in `@c.us` in the rest: the same engine names one person both ways.
+`GET /api/{s}/lids?limit=1` answers rows `{"lid", "pn"}` and `GET /api/{s}/lids/{lid}` answers
+`{"lid", "pn"}` with `pn` ending in `@c.us`: the engine translates a hidden identifier into a
+telephone. One session listed the chat of the account with itself, under its own `@c.us` identifier.
+Not tried: a hidden identifier the engine does not know; the identifier in the event of a webhook.
