@@ -565,8 +565,8 @@ of the design: they only become a guarantee after the tests of Phase 1 and Phase
     other processes of the machine can read: on Linux every local user unless `/proc` hides them, on
     Windows at least the same user and the administrators. It is then kept in plain text in Hermes's
     secrets file, with Hermes's rights. The connector shows it to nobody and writes it in no file of
-    its own. On Docker the image makes a key at first boot (rehearsal 16/11/2026); whether the step
-    then stays idle there is not proved yet.
+    its own. On Docker the image makes a key at first boot (rehearsals of 16/11/2026, Hermes Agent
+    v0.22.5 and v0.23.2), and in one rehearsal on v0.23.2 the step then stayed idle.
 20. **A key the connector makes lets Hermes open a listener.** At its next restart, Hermes opens its
     own local API on `127.0.0.1:8642`. The connector makes the key only when the configuration of
     Hermes names no host for that API and nothing answers on that address; a host or a key that
