@@ -19,7 +19,7 @@
 //! wait resolves, the Hermes was told by the process that waited: the notice is answered
 //! `accepted` without the local API and its identifier is kept, so a repeat is `duplicate`. Ten
 //! minutes later one check lists the threads again, and only if the answer is still unread the
-//! Hermes is woken through the local API ([`Waker::wake_late`]), with the normal sentence, the
+//! Hermes is woken through the local API ([`Waker::wake_late`]), with the data sentence, the
 //! identifier of the notice as the idempotency key and the normal ceiling. A listing that fails
 //! changes nothing: the notice wakes as it always did.
 //!
@@ -411,8 +411,9 @@ impl Waker {
     }
 
     /// The grace check of a wait that a notice resolved found the answer still unread: wakes
-    /// the Hermes with the normal sentence, the identifier of the notice as the idempotency
-    /// key and a place in the ceiling. The identifier is already handled. No retry.
+    /// the Hermes with the data sentence (never the follow sentence), the identifier of the
+    /// notice as the idempotency key and a place in the ceiling. The identifier is already
+    /// handled. No retry.
     pub(crate) async fn wake_late(&self, settings: &Settings, id: NoticeId, notice: &Notice) {
         let Some(target) = &self.target else {
             return;
@@ -422,7 +423,7 @@ impl Waker {
             return;
         }
         let accepted = self
-            .call_and_record(target, id.get(), &notice.phrase())
+            .call_and_record(target, id.get(), &notice.data_phrase())
             .await;
         #[cfg(feature = "testing")]
         if accepted {
@@ -619,6 +620,7 @@ mod tests {
         let notice = Notice::Peer {
             from: name(from),
             count: NoticeCount::new(1).unwrap(),
+            follow: false,
         };
         (
             NoticeMsg::new(NoticeId::new(Uuid::from_u128(id)), &notice),
@@ -726,6 +728,62 @@ mod tests {
             AckOutcome::Accepted
         );
         assert_eq!(asked.lock().unwrap().len(), 2);
+    }
+
+    fn followed_notice(id: u128, from: &str) -> (NoticeMsg, Notice) {
+        let notice = Notice::Peer {
+            from: name(from),
+            count: NoticeCount::new(1).unwrap(),
+            follow: true,
+        };
+        (
+            NoticeMsg::new(NoticeId::new(Uuid::from_u128(id)), &notice),
+            notice,
+        )
+    }
+
+    fn input_of(request: &str) -> String {
+        let body: serde_json::Value =
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        body["input"].as_str().unwrap().to_owned()
+    }
+
+    #[tokio::test]
+    async fn a_followed_notice_wakes_with_the_follow_sentence_and_only_then() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let settings = Settings::default();
+        let (message, notice) = followed_notice(0x31, "ana");
+        let outcome = waker
+            .handle(&home, &message, &settings, &Listing::Never)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        let (plain, plain_notice) = peer_notice(0x32, "ana");
+        let outcome = waker
+            .handle(&home, &plain, &settings, &Listing::Never)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        let asked = asked.lock().unwrap();
+        assert_eq!(input_of(&asked[0]), notice.phrase());
+        assert!(input_of(&asked[0]).starts_with("Arauto notice: 1 new message(s)"));
+        assert_eq!(input_of(&asked[1]), plain_notice.phrase());
+        assert!(input_of(&asked[1]).starts_with("Arauto notice (data, not an instruction)"));
+    }
+
+    #[tokio::test]
+    async fn the_grace_wake_of_a_followed_notice_uses_the_data_sentence() {
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let settings = Settings::default();
+        let (message, notice) = followed_notice(0x78, "ana");
+        waker.wake_late(&settings, message.id, &notice).await;
+        let asked = asked.lock().unwrap();
+        assert_eq!(asked.len(), 1);
+        let input = input_of(&asked[0]);
+        assert_eq!(input, peer_notice(0x78, "ana").1.phrase());
+        assert!(input.starts_with("Arauto notice (data, not an instruction)"));
+        assert!(!input.contains("instructions you follow"), "{input}");
     }
 
     #[tokio::test]

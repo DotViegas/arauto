@@ -29,3 +29,9 @@ What the fixed sentences of the connector may say is widened. The sentence of a 
 What stays: an order comes only from the operator, through the command channel of Hermes, which is outside Arauto. A note is data, written by another agent, and every text of the connector that points to one says so. Nothing in Arauto tells a Hermes to obey another, and the level of a Hermes or the kind of a link gives no authority ([0043](0043-organograma-e-niveis.md)).
 
 The first texts under this change are in decision [0048](0048-resposta-na-conversa-que-perguntou.md). Nothing else in this decision is reopened. Not tried on a real Hermes.
+
+## Change of 16/11/2026 (reopened by the maintainer)
+
+The maintainer reopened this decision on 16/11/2026 so that an instruction from above can be accepted automatically ([0050](0050-etapa-b-marca-de-seguir.md)). On a link that the admin marks on the org chart, and only there, the notice of a note makes the connector start the run with a fixed sentence that tells the receiver to do what those new messages ask, in that run only, without waiting for its operator, unless its operator's instructions forbid it. The mark is off by default, goes only from a higher level to a lower one and only on a link that wakes.
+
+What stays: the command channel of a Hermes stays outside Arauto, and its operator's instructions come first. Everything that comes in through the numbers of the hub is data, and so is text that a marked sender quotes. A note on any other link, and any note read outside the run its notice started, is data; the descriptions of the tools still say so. A level or the kind of an arrow gives nothing by itself. Arauto does not check what the receiver did, and the mark gives the sender nothing in the hub: no access, no link, no number. Not tried on a real Hermes.

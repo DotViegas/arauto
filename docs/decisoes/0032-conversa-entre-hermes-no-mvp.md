@@ -18,3 +18,7 @@ The conversation between Hermes goes into the first MVP, in the format of **note
 - The ceilings are counted per link and per recipient, never per thread: opening a new thread resets none of them. The value is fixed in the first version and is calibrated in the MVP.
 - There is no end-to-end proof of sender: whoever controls the hub writes as any Hermes. It is stated as a limit.
 - The notice of a note follows the pointer rule ([0018](0018-aviso-e-ponteiro.md)). The wording of the fixed sentence depends on approval.
+
+## Change of 16/11/2026 (reopened by the maintainer)
+
+The note "with the authority of an order", discarded above, returns in the bounded form of [0050](0050-etapa-b-marca-de-seguir.md): one notice, one run, and only on links that the admin marked downward on the org chart and that wake. Notes on every other link are unchanged: data, never an order. Proposal: the field and the sentence are built in the protocol and the connector, the mark in the hub, the panel and the command is not built, and nothing was tried on a real Hermes.

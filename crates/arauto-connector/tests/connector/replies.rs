@@ -413,6 +413,7 @@ async fn an_answer_still_unread_after_the_grace_time_wakes_through_the_local_api
     let expected = Notice::Peer {
         from: HermesName::parse(&duo.b_name).unwrap(),
         count: NoticeCount::new(1).unwrap(),
+        follow: false,
     }
     .phrase();
     assert_eq!(body["input"], json!(expected));

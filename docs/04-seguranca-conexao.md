@@ -572,6 +572,17 @@ of the design: they only become a guarantee after the tests of Phase 1 and Phase
     Hermes names no host for that API and nothing answers on that address; a host or a key that
     lives only in the environment of Hermes's gateway is not seen, and then the API may open
     elsewhere ([11](11-conector.md), section 6).
+21. **A note on a link with the follow mark is presented as an instruction, whoever wrote it.**
+    For the run its notice starts, the connector tells the receiver to do what those new messages
+    ask without waiting for its operator, unless its operator's instructions forbid it. Whoever
+    writes to the hub's database, or holds a panel session, can set the mark; an invaded hub, or
+    whoever holds the database and the master key, writes a note as any Hermes and can make any
+    note notice carry the mark; and a higher Hermes misled by a WhatsApp message or by a note
+    passes the request down. The sentence is a reminder to an AI, not a control: nothing
+    guarantees that the receiver follows, refuses, or tells a forged note from a real one, and
+    what it did or kept in its memory is not undone when the mark is removed. The mark never
+    widens what the receiver may do on numbers: its accesses are checked on every call
+    ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md)).
 
 ## 7. To be proven before implementing
 

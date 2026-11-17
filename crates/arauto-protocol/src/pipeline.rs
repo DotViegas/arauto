@@ -410,6 +410,7 @@ fn a_channel_from_hello_to_the_session_and_its_use() {
     let pointer = Notice::Peer {
         from: HermesName::parse("bento").unwrap(),
         count: NoticeCount::new(2).unwrap(),
+        follow: false,
     };
     let id = NoticeId::new(Uuid::from_u128(0x3f2b7c1e_58a4_4d6b_9e0f_a1b2c3d4e5f6));
     let notice = Message::Notice(NoticeMsg::new(id, &pointer));

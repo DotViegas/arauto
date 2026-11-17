@@ -274,7 +274,7 @@ pub fn texts(read: &Map<String, Value>) -> Vec<String> {
 /// The sender and the count of a notice of messages.
 pub fn peer_notice(notice: &NoticeMsg) -> (String, u16) {
     match notice.validate().unwrap() {
-        Notice::Peer { from, count } => (from.as_str().to_owned(), count.get()),
+        Notice::Peer { from, count, .. } => (from.as_str().to_owned(), count.get()),
         Notice::Whatsapp { .. } => panic!("a notice of WhatsApp"),
     }
 }

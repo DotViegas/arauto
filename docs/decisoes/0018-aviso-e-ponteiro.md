@@ -19,3 +19,7 @@ The hub sends only a pointer: number, chat and count. The sentence that wakes He
 ## Change of 14/11/2026
 
 Principle 6 of the `CLAUDE.md` gains a sentence: the hub may serve a fixed page compiled into it, whose only fields have a strict format (host, Hermes name, UTC time, version, file name). The notice stays a pointer, and the fixed sentence and the descriptions of the tools stay in the connector. The page is not a notice and holds no free text from a device or from WhatsApp. The maintainer asked for the link and the page and approved the design on 14/11/2026. Decision [0042](0042-frase-de-conexao-e-pagina-de-instrucoes.md). Nothing else in this decision is reopened. The design was not tried on a real Hermes yet.
+
+## Change of 16/11/2026 (reopened by the maintainer)
+
+The notice of a note may carry one more field of strict format, the boolean `follow`, and the connector then wakes Hermes with a second fixed sentence compiled into it ([0050](0050-etapa-b-marca-de-seguir.md)). The hub still sends no text, but with this boolean it chooses which of two fixed sentences the LLM reads: "the hub cannot change a text the LLM reads" holds with this one exception. An invaded hub can make the connector use the second sentence for any note notice. The descriptions of the tools do not change.

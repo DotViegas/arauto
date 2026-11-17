@@ -255,6 +255,7 @@ fn golden() -> Vec<(Message, String)> {
                 &Notice::Peer {
                     from: HermesName::parse("ana").unwrap(),
                     count: NoticeCount::new(2).unwrap(),
+                    follow: false,
                 },
             )),
             format!(r#"{{"t":"notice","id":"{NOTICE_ID}","kind":"peer","from":"ana","count":2}}"#),

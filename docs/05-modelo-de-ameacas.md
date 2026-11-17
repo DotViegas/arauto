@@ -113,10 +113,10 @@ It comes in with the first MVP. The design and the limits are in
 | Threat | Handling | What is left |
 |---|---|---|
 | Two Hermes wake each other without stopping. | Fixed ceilings per link and per recipient, which opening a new thread does not reset; ceiling of wakes in the connector. | Up to the ceiling, they still exchange notes for nothing. |
-| A manipulated Hermes writes to another. | A note only exists where the admin created the link; a note is data, never an order; the fixed sentence says so. | **It uses the links it has.** What the other one does depends on its instructions. |
+| A manipulated Hermes writes to another. | A note only exists where the admin created the link; a note is data, never an order; the fixed sentence says so. | **It uses the links it has.** What the other one does depends on its instructions. Proposal ([0050](decisoes/0050-etapa-b-marca-de-seguir.md); the mark is not built in the hub): on a link with the follow mark, its note reaches a receiver that is told to follow it, so a misled higher Hermes passes the request down. |
 | A Hermes reads or answers in a thread that is not its own. | Reading and sending check the link and the participation on every call; a thread of others answers the same as a thread that does not exist. | Implementation error. It has a test in the MVP. |
 | A sender fills the database or the notice queue of another. | Ceilings per day, of unread notes and of new threads; one pending notice per sender; purge in 30 days. | Nothing known. |
-| The hub, compromised, forges a note. | The sender's name has a restricted format, checked in the connector. | **Root.** There is no end-to-end proof of sender: whoever controls the hub writes as any Hermes. |
+| The hub, compromised, forges a note. | The sender's name has a restricted format, checked in the connector. | **Root.** There is no end-to-end proof of sender: whoever controls the hub writes as any Hermes. Proposal ([0050](decisoes/0050-etapa-b-marca-de-seguir.md), the connector side is built): such a hub can also make any note notice carry the follow mark, and a connector of this version then tells the receiver to follow the forged note. |
 
 ### In the panel and in the hub
 

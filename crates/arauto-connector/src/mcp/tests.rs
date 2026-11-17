@@ -868,3 +868,17 @@ async fn a_last_line_without_its_end_is_not_read() {
     assert_eq!(nothing, None);
     assert_eq!(client.end().await, Ended::Input);
 }
+
+/// The follow sentence lives only in the notice (decision 0050): no tool description, schema
+/// text included, may mention it, so a note stays data in every other run.
+#[test]
+fn no_tool_description_mentions_follow() {
+    for spec in arauto_protocol::tools::CATALOG {
+        let shown = format!("{} {}", spec.description, spec.input_schema());
+        assert!(
+            !shown.to_ascii_lowercase().contains("follow"),
+            "{}",
+            spec.name
+        );
+    }
+}

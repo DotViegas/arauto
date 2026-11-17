@@ -478,7 +478,11 @@ impl Serving<'_> {
                 continue;
             };
             let pointer = match notice.target {
-                NoticeTarget::Peer { from } => Notice::Peer { from, count },
+                NoticeTarget::Peer { from } => Notice::Peer {
+                    from,
+                    count,
+                    follow: false,
+                },
                 NoticeTarget::Whatsapp { number, chat } => {
                     // A UUID is always an opaque identifier of a chat.
                     let Ok(chat) = ChatId::parse(&chat.as_hyphenated().to_string()) else {

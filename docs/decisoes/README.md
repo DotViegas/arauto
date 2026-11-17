@@ -53,3 +53,4 @@ prototype, or is **pending**.
 | 0047 | [The Arauto notes in the main memory of a Hermes](0047-notas-do-arauto-na-memoria.md) | proposal (the step and the three lines were approved on 15/11/2026) |
 | 0048 | [An answer in the conversation that asked](0048-resposta-na-conversa-que-perguntou.md) | proposal (the sentence, the field and two outputs were approved on 15/11/2026) |
 | 0049 | [Waking by WhatsApp is decided by the verb "be woken" alone](0049-acordar-pelo-whatsapp-so-pelo-verbo.md) | decided |
+| 0050 | [Org chart stage B: the follow mark of a link](0050-etapa-b-marca-de-seguir.md) | proposal (the follow sentence, item 21 of docs/04 and the changes of 0005 and 0018 were approved on 16/11/2026; the connector side is built) |

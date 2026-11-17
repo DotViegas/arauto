@@ -593,6 +593,7 @@ mod tests {
         Notice::Peer {
             from: name(from),
             count: arauto_protocol::notice::NoticeCount::new(1).unwrap(),
+            follow: false,
         }
     }
 

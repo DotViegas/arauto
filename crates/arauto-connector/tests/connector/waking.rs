@@ -81,6 +81,7 @@ async fn a_message_of_another_hermes_wakes_through_the_local_api_with_the_fixed_
     let expected = arauto_protocol::notice::Notice::Peer {
         from: arauto_protocol::names::HermesName::parse(&sender).unwrap(),
         count: arauto_protocol::notice::NoticeCount::new(1).unwrap(),
+        follow: false,
     }
     .phrase();
     assert_eq!(phrase, expected);
