@@ -3,8 +3,8 @@
 //! `docs/10-maquinas-de-estado.md`, section 5).
 //!
 //! A message wakes a Hermes when, at that moment: the number is in use (connected, or coming
-//! back: its notices then wait for it in the queue); the Hermes may be
-//! woken by WhatsApp (the switch) and has an active device; and the matrix gives it the verb "be woken" in that chat
+//! back: its notices then wait for it in the queue); the Hermes
+//! has an active device; and the matrix gives it the verb "be woken" in that chat
 //! (the line of the chat when there is one, which replaces the verbs of the number whole;
 //! otherwise the verbs of the number, with the scope "all", and only in a chat with one
 //! person: a group wakes only by a line of its own). A message the number itself sent wakes
@@ -102,7 +102,7 @@ async fn notify(
          JOIN chat ch ON ch.organization_id = a.organization_id AND ch.id = $3 \
          LEFT JOIN access_chat c ON c.access_id = a.id AND c.chat_id = $3 \
          WHERE a.organization_id = $1 AND a.number_id = $2 \
-           AND h.deleted_at IS NULL AND h.can_be_woken \
+           AND h.deleted_at IS NULL \
            AND COALESCE(c.can_wake, a.scope = 'all' AND a.can_wake AND ch.kind = 'contact' \
                         AND NOT (ch.hidden_id AND EXISTS (SELECT 1 FROM access_chat x \
                                                           WHERE x.access_id = a.id))) \

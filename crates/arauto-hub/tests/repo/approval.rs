@@ -629,13 +629,16 @@ async fn the_admin_functions_tell_the_hub_what_changed() {
     world
         .approve(&name, request.code, Some(Recognition::NotRecognized))
         .await;
-    arauto_hub::repo::hermes::set_wake(
+    // A link tells the hub to look at the Hermes again.
+    let linked = world.hermes().await;
+    arauto_hub::repo::peer::link_set(
         world.pool(),
         &world.home.mark,
         world.org,
         &world.admin,
         &name,
-        true,
+        &linked,
+        false,
         world.now(),
     )
     .await

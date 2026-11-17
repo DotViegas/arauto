@@ -34,7 +34,7 @@ use crate::repo::approval::{Answer, ApproveOutcome, DenyOutcome, Recognized, Req
 use crate::repo::audit_log::AuditRow;
 use crate::repo::closing::{Closed, RevokeOutcome};
 use crate::repo::device::UnknownListed;
-use crate::repo::hermes::{CreateOutcome, HermesLine, RemoveOutcome, Removed, WakeOutcome};
+use crate::repo::hermes::{CreateOutcome, HermesLine, RemoveOutcome, Removed};
 use crate::repo::invite::{IssueOutcome, IssuedInvite};
 use crate::repo::{self, Admin, RepoError};
 use crate::restore::{self, Evidence, Installation, RestoreError, Standing};
@@ -763,28 +763,6 @@ impl Session {
         match removed {
             RemoveOutcome::Removed(removed) => Ok(removed),
             RemoveOutcome::NotFound => Err(AdminError::NoSuchHermes),
-        }
-    }
-
-    /// `admin wake NAME on|off`.
-    ///
-    /// # Errors
-    /// [`AdminError::NoSuchHermes`]; [`AdminError::Restored`].
-    pub async fn wake(&self, name: &str, on: bool, now: i64) -> Result<WakeOutcome, AdminError> {
-        let name = known_name(name)?;
-        let outcome = repo::hermes::set_wake(
-            &self.pool,
-            &self.mark,
-            self.organization,
-            &self.admin,
-            &name,
-            on,
-            now,
-        )
-        .await?;
-        match outcome {
-            WakeOutcome::NotFound => Err(AdminError::NoSuchHermes),
-            other => Ok(other),
         }
     }
 

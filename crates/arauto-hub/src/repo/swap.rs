@@ -913,8 +913,6 @@ pub struct SessionStart {
     pub hermes: Uuid,
     /// Its name, for the `session` message.
     pub name: HermesName,
-    /// Whether it may be woken by WhatsApp (the switch; notes do not depend on it).
-    pub can_be_woken: bool,
 }
 
 /// Why a "saved" was refused. The connection is closed; nothing was written.
@@ -1047,7 +1045,6 @@ pub async fn confirm(
         session: SessionStart {
             hermes: locked.hermes.id,
             name: locked.hermes.name.clone(),
-            can_be_woken: locked.hermes.can_be_woken,
         },
     })
 }

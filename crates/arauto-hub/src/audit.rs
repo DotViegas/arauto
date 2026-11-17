@@ -79,7 +79,8 @@ actions! {
     HermesCreated => "hermes.created", true;
     /// A Hermes line was removed.
     HermesRemoved => "hermes.removed", true;
-    /// Whether a Hermes may be woken by WhatsApp (the switch; notes do not depend on it) changed.
+    /// The switch "woken by WhatsApp" of a Hermes changed. No longer written since decision 0049
+    /// removed the switch; it stays in the closed list because old audit rows carry it.
     HermesWakeChanged => "hermes.wake_changed", true;
     /// An invite was issued.
     InviteIssued => "invite.issued", false;

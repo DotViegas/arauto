@@ -416,8 +416,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("edit and delete what already exists", "编辑和删除已有内容"),
     ("Be woken", "被唤醒"),
     (
-        "the hub gives notice when a message arrives (requires reading)",
-        "消息到达时 hub 发出通知（需要读取权限）",
+        "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule.",
+        "消息到达时 hub 发出通知（需要读取权限）。关闭它时，也会在此访问中有独立规则的聊天里关闭。",
     ),
     ("Wait", "等待时间"),
     ("seconds of silence before waking", "唤醒前的静默秒数"),
@@ -1200,14 +1200,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "在手机上：WhatsApp › 已关联的设备 › 关联设备 › 改为用手机号码关联，然后输入此代码：",
     ),
     // decision 0045
-    ("Woken by WhatsApp", "由 WhatsApp 唤醒"),
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "有此标记时，通过该链接发出的便条会在通知限额内唤醒 {name}。",
-    ),
-    ("This Hermes, on every number", "此 Hermes，所有号码"),
-    (
-        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
-        "没有它，任何号码上的 WhatsApp 消息都不会唤醒此 Hermes。其他 Hermes 发来的便条不依赖于它。",
     ),
 ];

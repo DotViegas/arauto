@@ -180,7 +180,6 @@ Then, the number and the accesses:
 ```
 ... admin number add balcao +5565900000000
 ... admin number pair balcao
-... admin wake atendimento on
 ... admin access grant atendimento balcao --scope all --read --send --wake
 ```
 

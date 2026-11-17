@@ -470,8 +470,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Be woken", "Geweckt werden"),
     (
-        "the hub gives notice when a message arrives (requires reading)",
-        "der Hub benachrichtigt, wenn eine Nachricht eintrifft (setzt Lesen voraus)",
+        "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule.",
+        "der Hub benachrichtigt, wenn eine Nachricht eintrifft (setzt Lesen voraus). Wird es ausgeschaltet, wird es auch in den Chats dieses Zugriffs mit eigener Regel ausgeschaltet.",
     ),
     ("Wait", "Wartezeit"),
     (
@@ -1305,17 +1305,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Auf dem Telefon: WhatsApp › Verknüpfte Geräte › Gerät verknüpfen › Stattdessen mit Telefonnummer verknüpfen, und geben Sie diesen Code ein:",
     ),
     // decision 0045
-    ("Woken by WhatsApp", "Von WhatsApp geweckt"),
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "Mit dieser Markierung weckt eine Notiz über diese Verknüpfung {name}, innerhalb der Grenzen für Hinweise.",
-    ),
-    (
-        "This Hermes, on every number",
-        "Dieser Hermes, auf jeder Nummer",
-    ),
-    (
-        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
-        "ohne dies weckt keine WhatsApp-Nachricht diesen Hermes, auf keiner Nummer. Notizen anderer Hermes hängen nicht davon ab.",
     ),
 ];

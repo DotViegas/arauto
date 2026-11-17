@@ -14,7 +14,6 @@ use arauto_hub::repo::alert::AlertFilter;
 use arauto_hub::repo::approval::{ApproveOutcome, DenyOutcome, Recognition, Recognized};
 use arauto_hub::repo::connection;
 use arauto_hub::repo::enroll::{self, EnrollOutcome, Enrollment, RefusedEnrollments};
-use arauto_hub::repo::hermes::WakeOutcome;
 use arauto_hub::repo::swap::{self, ConfirmOutcome, IssueOutcome, Stranger, UnknownOutcome};
 use arauto_hub::restore::{self, EnterOutcome, Evidence, Standing};
 use arauto_hub::vault::{MASTER_KEY_FILE, Vault};
@@ -707,20 +706,6 @@ arauto-connector join"
     );
     assert!(report.text.contains("1 active"), "{}", report.text);
 
-    // wake on and off.
-    assert_eq!(
-        session.wake("vendas", true, NOW).await.unwrap(),
-        WakeOutcome::Changed
-    );
-    assert_eq!(
-        session.wake("vendas", true, NOW).await.unwrap(),
-        WakeOutcome::Unchanged
-    );
-    assert!(matches!(
-        session.wake("nobody", true, NOW).await,
-        Err(AdminError::NoSuchHermes)
-    ));
-
     // A reconnect: the last use is asked about before the code is even looked at.
     let block = session.invite("vendas", &url, NOW).await.unwrap();
     assert!(block.issued.reconnect);
@@ -835,7 +820,6 @@ arauto-connector join"
             "invite.issued",
             "device.code_rejected",
             "device.approved",
-            "hermes.wake_changed",
             "invite.issued",
             "device.quarantined",
             "device.approved",
@@ -1113,10 +1097,6 @@ async fn admin_on_a_database_behind_the_mark_writes_nothing_and_leaves_the_mark(
         evidence
     );
     assert_eq!(
-        restored(session.wake("vendas", true, NOW).await.unwrap_err()),
-        evidence
-    );
-    assert_eq!(
         restored(session.invite("vendas", &url, NOW).await.unwrap_err()),
         evidence
     );
@@ -1190,7 +1170,6 @@ async fn admin_on_a_database_with_no_mark_writes_nothing_and_creates_no_mark() {
     for refused in [
         session.hermes_add("novo", NOW).await.map(|_| ()),
         session.revoke("vendas", NOW).await.map(|_| ()),
-        session.wake("vendas", true, NOW).await.map(|_| ()),
     ] {
         assert!(
             matches!(refused, Err(AdminError::Restored(Evidence::MarkAbsent))),
@@ -1397,21 +1376,12 @@ async fn the_program_runs_the_commands_and_fails_when_nothing_was_done() {
         "{}",
         approve.out
     );
+    // The switch is gone (decision 0049): the command does not exist and nothing is written.
     let wake = run(None, &["admin", "wake", "vendas", "on"]).await;
-    assert!(
-        wake.ok
-            && wake
-                .out
-                .contains("Hermes vendas now can be woken by WhatsApp.")
-            && wake
-                .out
-                .contains("Notes from other Hermes do not depend on this"),
-        "{}",
-        wake.out
-    );
+    assert!(!wake.ok, "{}", wake.out);
     let audit = run(None, &["admin", "audit", "--tail", "3"]).await;
     assert!(
-        audit.ok && audit.out.contains("hermes.wake_changed"),
+        audit.ok && !audit.out.contains("hermes.wake_changed"),
         "{}",
         audit.out
     );

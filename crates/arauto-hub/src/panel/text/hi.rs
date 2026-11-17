@@ -443,8 +443,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Be woken", "जगाया जाना"),
     (
-        "the hub gives notice when a message arrives (requires reading)",
-        "संदेश आने पर हब सूचना देता है (पढ़ना ज़रूरी है)",
+        "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule.",
+        "संदेश आने पर हब सूचना देता है (पढ़ना ज़रूरी है)। इसे बंद करने पर यह इस एक्सेस की उन चैट में भी बंद हो जाता है जिनका अपना नियम है।",
     ),
     ("Wait", "प्रतीक्षा"),
     ("seconds of silence before waking", "जगाने से पहले चुप्पी के सेकंड"),
@@ -1236,14 +1236,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "फ़ोन पर: WhatsApp › लिंक किए गए डिवाइस › डिवाइस लिंक करें › इसके बजाय फ़ोन नंबर से लिंक करें, और यह कोड लिखें:",
     ),
     // decision 0045
-    ("Woken by WhatsApp", "WhatsApp से जगाया जाना"),
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "इस निशान के साथ, इस लिंक से भेजा गया नोट {name} को जगाता है, सूचना की सीमाओं के भीतर।",
-    ),
-    ("This Hermes, on every number", "यह Hermes, हर नंबर पर"),
-    (
-        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
-        "इसके बिना, कोई भी WhatsApp संदेश इस Hermes को किसी भी नंबर पर नहीं जगाता। दूसरे Hermes के नोट इस पर निर्भर नहीं हैं।",
     ),
 ];

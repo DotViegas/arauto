@@ -2,12 +2,11 @@
 //! (`docs/13-conversa-entre-hermes.md`; decision 0045).
 //!
 //! Each round has three Hermes with an active device and runs twice, with the same seed and the
-//! same explicit clock: the second run ("twin B") never touches the switch "woken by
-//! WhatsApp", and the first one flips it at random. A note wakes by the mark of its link and
-//! by nothing else, so the two normalized traces must be equal.
+//! same explicit clock. A note wakes by the mark of its link and by nothing else (there is no
+//! switch of the Hermes since decision 0049), so the two normalized traces must be equal.
 //!
-//! The steps: a link with or without the mark, a link removed, the switch (twin A only), a
-//! note, a lease, an answer (any of the five, none at all, or the same one twice), a repeated
+//! The steps: a link with or without the mark, a link removed, a step that does nothing (it
+//! was the switch), a note, a lease, an answer (any of the five, none at all, or the same one twice), a repeated
 //! lease, and time that moves by 0, 1, 5, 11 or 61 seconds or by an hour and a second.
 //!
 //! After every lease: a notice that leaves had, at that moment, a live link from its sender
@@ -159,7 +158,7 @@ impl Run {
         self.trace.push(line);
     }
 
-    async fn step(&mut self, rng: &mut SeededRng, switch: bool) {
+    async fn step(&mut self, rng: &mut SeededRng) {
         let a = usize::try_from(rng.below(3)).unwrap();
         let b = (a + 1 + usize::try_from(rng.below(2)).unwrap()) % 3;
         match rng.below(10) {
@@ -204,20 +203,9 @@ impl Run {
                 self.trace.push(format!("unlink {a}->{b}"));
             }
             3 => {
-                let on = rng.below(2) == 0;
-                if switch {
-                    repo::hermes::set_wake(
-                        self.world.pool(),
-                        &self.world.home.mark,
-                        self.world.org,
-                        &self.world.admin,
-                        &self.names[a],
-                        on,
-                        self.now,
-                    )
-                    .await
-                    .unwrap();
-                }
+                // Once the switch of the Hermes; it is gone (decision 0049). The draw stays so
+                // the seeds keep their rounds.
+                let _ = rng.below(2);
             }
             4..=6 => {
                 let text = MessageText::new(format!("note {}", rng.below(1_000))).unwrap();
@@ -333,25 +321,25 @@ impl Run {
     }
 }
 
-async fn play(seed: u64, switch: bool) -> Vec<String> {
+async fn play(seed: u64) -> Vec<String> {
     let mut rng = SeededRng::new(seed);
     let mut run = Run::new().await;
     for _ in 0..STEPS {
-        run.step(&mut rng, switch).await;
+        run.step(&mut rng).await;
     }
     run.limits().await;
     run.trace
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_notices_of_a_round_follow_the_marks_and_never_the_switch() {
+async fn the_notices_of_a_round_follow_the_marks_and_repeat_exactly() {
     let seed = number_from("ARAUTO_TEST_SEED").unwrap_or(DEFAULT_SEED);
     let rounds = number_from("ARAUTO_PEER_ROUNDS").unwrap_or(DEFAULT_ROUNDS);
     let mut woke = 0;
     for round in 0..rounds {
         let seed = seed.wrapping_add(round);
-        let with_switch = tokio::spawn(play(seed, true)).await;
-        let without = tokio::spawn(play(seed, false)).await;
+        let with_switch = tokio::spawn(play(seed)).await;
+        let without = tokio::spawn(play(seed)).await;
         let (Ok(with_switch), Ok(without)) = (with_switch, without) else {
             panic!(
                 "round {round} failed: replay with ARAUTO_TEST_SEED={seed} ARAUTO_PEER_ROUNDS=1"
@@ -363,7 +351,7 @@ async fn the_notices_of_a_round_follow_the_marks_and_never_the_switch() {
             .position(|(one, other)| one != other);
         assert!(
             at.is_none() && with_switch.len() == without.len(),
-            "the switch changed what a note did at step {at:?}: {:?} / {:?}: ARAUTO_TEST_SEED={seed} ARAUTO_PEER_ROUNDS=1",
+            "the same seed gave another trace at step {at:?}: {:?} / {:?}: ARAUTO_TEST_SEED={seed} ARAUTO_PEER_ROUNDS=1",
             at.map(|i| &with_switch[i]),
             at.map(|i| &without[i])
         );

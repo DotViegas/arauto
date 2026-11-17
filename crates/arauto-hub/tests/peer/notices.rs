@@ -7,8 +7,8 @@ use crate::world::{HOUR, MINUTE, SECOND, World, ok, peer_notice};
 
 const CANARY: &str = "CANARY-text-of-a-message-7f3a";
 
-/// A and B in session, and the link from A to B wakes. The WhatsApp switch of B stays off: the
-/// mark of the link is enough (decision 0045).
+/// A and B in session, and the link from A to B wakes: the mark of the link is enough
+/// (decisions 0045 and 0049).
 async fn marked() -> (World, crate::world::Agent, crate::world::Agent) {
     let world = World::new().await;
     let a = world.agent().await;
@@ -51,15 +51,13 @@ async fn a_notice_is_a_pointer_and_carries_no_text_and_no_thread() {
 }
 
 #[tokio::test]
-async fn a_link_without_the_wake_mark_never_wakes_whatever_the_switch() {
+async fn a_link_without_the_wake_mark_never_wakes() {
     let world = World::new().await;
     let mut a = world.agent().await;
     let mut b = world.agent().await;
     let mut c = world.agent().await;
-    // The link to B has no mark and B's switch is off; the link to C has no mark and C's
-    // switch is on.
+    // The links to B and to C have no mark.
     world.link(&a, &b, false).await;
-    world.may_be_woken(&c, true).await;
     world.link(&a, &c, false).await;
 
     ok(a.send_to(&b.name, "kept").await);
@@ -71,20 +69,17 @@ async fn a_link_without_the_wake_mark_never_wakes_whatever_the_switch() {
 }
 
 #[tokio::test]
-async fn the_wake_mark_alone_wakes_and_the_whatsapp_switch_is_not_consulted() {
+async fn the_wake_mark_alone_wakes() {
     let (world, mut a, mut b) = marked().await;
-    // The switch of B is off, and the note wakes it.
+    // The mark wakes B.
     let thread = a.thread_with(&b.name, "one").await;
     let first = b.next_notice().await;
     assert_eq!(peer_notice(&first), (a.name.clone(), 1));
     b.acknowledge(&first, AckOutcome::Accepted).await;
 
-    // A second notice waits its ten seconds; the switch goes on and off inside the gap: when
-    // the notice leaves, the switch is not consulted either.
+    // A second notice waits its ten seconds and then leaves.
     world.advance(SECOND);
     ok(a.send_in(&thread, "two").await);
-    world.may_be_woken(&b, true).await;
-    world.may_be_woken(&b, false).await;
     world.advance(10 * SECOND);
     let second = b.next_notice().await;
     assert_eq!(peer_notice(&second), (a.name.clone(), 1));

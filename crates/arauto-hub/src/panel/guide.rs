@@ -829,7 +829,6 @@ mod tests {
                 tone: crate::panel::view::Tone::Ok,
                 state: "x",
                 numbers: vec![],
-                woken: false,
                 connector: None,
                 seen: String::new(),
                 explain: None,

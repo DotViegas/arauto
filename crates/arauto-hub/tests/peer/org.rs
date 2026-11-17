@@ -145,7 +145,6 @@ async fn the_channel_says_the_same_after_a_publish_of_levels_and_roles() {
     let world = World::new().await;
     let mut a = world.agent().await;
     let mut b = world.agent().await;
-    world.may_be_woken(&b, true).await;
     world.link(&a, &b, true).await;
     a.next_tools().await;
     b.next_tools().await;
@@ -208,7 +207,6 @@ async fn the_links_of_a_publish_follow_the_rules_of_the_command() {
     let world = World::new().await;
     let mut a = world.agent().await;
     let mut b = world.agent().await;
-    world.may_be_woken(&b, true).await;
     world.link(&a, &b, true).await;
     a.next_tools().await;
     b.next_tools().await;

@@ -29,7 +29,9 @@ Three rules always apply:
 
 - Checking whether a telephone has WhatsApp stays in **send** because it asks WhatsApp about someone
   from outside the chats, and only makes sense for whoever is going to write.
-- **Be woken** requires **read** on the same line.
+- **Be woken** requires **read** on the same line. It is the only setting that decides whether a
+  WhatsApp message may wake the Hermes; there is no switch of the Hermes besides it (16/11/2026,
+  [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)).
 - **May start chats** requires **send** and scope "all".
 - There is no verb that lets a Hermes create, pair, restart, disconnect or remove a number. That
   belongs only to the admin, in the panel.
@@ -98,13 +100,18 @@ What Hermes does on waking is defined by the instructions of Hermes itself, not 
 The notice of a note between Hermes follows the same rules, with the ceilings of
 [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), section 6.
 
-It does not depend on the switch of the Hermes: the wake mark of the link is enough ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
+The wake mark of the link is enough ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
 
-The panel shows, per Hermes, whether WhatsApp may wake it ("Woken by WhatsApp": the switch of the
-Hermes, set in the access editor and by `arauto-hub admin wake NAME on|off`). A WhatsApp message
-wakes a Hermes only with that switch on and the verb "be woken" in the chat. Notes do not depend on
-the switch. Without the key of Hermes's local API ([11-conector.md](11-conector.md), section 6) no
-notice of either kind wakes it.
+A WhatsApp message wakes a Hermes when the verb "be woken" holds for the chat: on the access of the
+number, or on the line of the chat when the chat has its own rule. Nothing else about the Hermes is
+consulted; the other conditions stay (the kind of chat, the state of the number, an active device, the
+notice limits). There is no switch of the Hermes and no command `arauto-hub admin wake`: to stop
+waking by WhatsApp, turn "be woken" off on each access of the Hermes, or revoke it (16/11/2026,
+[decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md); it replaces the switch "Woken by
+WhatsApp" of decision 0045). In the access editor, turning the verb off also turns it off in the chats of
+that access that have their own rule. A waiting WhatsApp notice is discarded when the verb or the access
+is gone, or the number is not connected. Without the key of Hermes's local API
+([11-conector.md](11-conector.md), section 6) no notice of either kind wakes it.
 
 ## 5. What the hub does not decide
 

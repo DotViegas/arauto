@@ -2,7 +2,7 @@
 
 use arauto_hub::core::model::{DeviceState, InviteState, StateReason};
 use arauto_hub::repo::RepoError;
-use arauto_hub::repo::hermes::{self, CreateOutcome, RemoveOutcome, WakeOutcome};
+use arauto_hub::repo::hermes::{self, CreateOutcome, RemoveOutcome};
 use arauto_hub::repo::invite::{self, INVITE_VALIDITY_MS, IssueOutcome};
 use arauto_hub::repo::swap::IssueOutcome as SwapOutcome;
 use arauto_protocol::invite::Invite as InviteSecret;
@@ -45,7 +45,6 @@ async fn a_hermes_is_created_listed_and_its_name_is_never_reused() {
         panic!("not created: {created:?}");
     };
     assert_eq!(line.name, vendas);
-    assert!(!line.can_be_woken);
     assert_eq!((line.created_at, line.deleted_at), (world.now(), None));
     assert_eq!(world.actions_about(line.id).await, ["hermes.created"]);
 
@@ -186,17 +185,6 @@ async fn removing_a_hermes_takes_its_links_and_closes_what_is_connected() {
     }
     let active = world.active(&leaving).await;
     let issued = world.invite(&leaving).await;
-    hermes::set_wake(
-        world.pool(),
-        &world.home.mark,
-        world.org,
-        &world.admin,
-        &leaving,
-        true,
-        world.now(),
-    )
-    .await
-    .unwrap();
 
     let removed = hermes::remove(
         world.pool(),
@@ -229,12 +217,6 @@ async fn removing_a_hermes_takes_its_links_and_closes_what_is_connected() {
         (DeviceState::Revoked, Some(StateReason::Admin), None)
     );
     assert_eq!(invite_row(&world, issued.id).await.0, "cancelled");
-    let can_be_woken: bool = sqlx::query_scalar("SELECT can_be_woken FROM hermes WHERE id = $1")
-        .bind(leaving_id)
-        .fetch_one(world.pool())
-        .await
-        .unwrap();
-    assert!(!can_be_woken);
     let actions = world.actions_about(leaving_id).await;
     assert!(
         actions.contains(&"hermes.removed".to_owned()),
@@ -260,55 +242,6 @@ async fn removing_a_hermes_takes_its_links_and_closes_what_is_connected() {
     let connection = world.connect(active.device).await;
     let outcome = world.issue(&connection, Some(&active.sealed)).await;
     assert!(matches!(outcome, SwapOutcome::NotSwapped(_)), "{outcome:?}");
-}
-
-#[tokio::test]
-async fn can_be_woken_is_marked_and_unmarked() {
-    let world = World::shared().await;
-    let hermes_name = world.hermes().await;
-    let id = world.hermes_id(&hermes_name).await;
-    let set = |on: bool| {
-        hermes::set_wake(
-            world.pool(),
-            &world.home.mark,
-            world.org,
-            &world.admin,
-            &hermes_name,
-            on,
-            world.now(),
-        )
-    };
-    assert_eq!(set(false).await.unwrap(), WakeOutcome::Unchanged);
-    assert_eq!(set(true).await.unwrap(), WakeOutcome::Changed);
-    assert_eq!(set(true).await.unwrap(), WakeOutcome::Unchanged);
-    assert!(
-        hermes::find(world.pool(), world.org, &hermes_name)
-            .await
-            .unwrap()
-            .unwrap()
-            .can_be_woken
-    );
-    assert_eq!(set(false).await.unwrap(), WakeOutcome::Changed);
-    assert_eq!(
-        world.actions_about(id).await,
-        [
-            "hermes.created",
-            "hermes.wake_changed",
-            "hermes.wake_changed"
-        ]
-    );
-    let missing = hermes::set_wake(
-        world.pool(),
-        &world.home.mark,
-        world.org,
-        &world.admin,
-        &name("nobody"),
-        true,
-        world.now(),
-    )
-    .await
-    .unwrap();
-    assert_eq!(missing, WakeOutcome::NotFound);
 }
 
 #[tokio::test]

@@ -28,6 +28,18 @@ async fn table_exists(pool: &PgPool, table: &str) -> bool {
         .unwrap()
 }
 
+async fn column_exists(pool: &PgPool, table: &str, column: &str) -> bool {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
+         WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2)",
+    )
+    .bind(table)
+    .bind(column)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
 // ---------------------------------------------------------------------------- the pool
 
 #[tokio::test]
@@ -783,4 +795,153 @@ async fn the_database_refuses_what_the_chart_does_not_allow() {
             .is_ok()
     );
     assert!(member(hermes, ours.id(), board, 20, None).await.is_err());
+}
+
+/// Decision 0049: the switch of the Hermes goes away. A Hermes whose switch was off keeps being
+/// silent: its "be woken" is turned off on the access and on the line of a chat. A Hermes whose
+/// switch was on is untouched. The two columns are gone.
+#[tokio::test]
+async fn the_wake_switch_is_folded_into_the_verb_and_its_columns_are_dropped() {
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 18)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+    assert!(column_exists(&db.pool, "hermes", "can_be_woken").await);
+
+    let organization = uuid::Uuid::new_v4();
+    let admin = uuid::Uuid::new_v4();
+    let engine = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO organization (id, name, state, key_enc, created_at) \
+         VALUES ($1, 'one', 'active', decode('00', 'hex'), 1)",
+    )
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO admin (id, organization_id, name, kind, created_at) \
+         VALUES ($1, $2, 'a', 'local', 1)",
+    )
+    .bind(admin)
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO engine (id, organization_id, kind, address, events_url, events_secret_enc, \
+                             config_version, created_at, changed_at) \
+         VALUES ($1, $2, 'waha', 'http://192.0.2.10:3000', 'http://192.0.2.11:9000', \
+                 decode('00', 'hex'), 1, 1, 1)",
+    )
+    .bind(engine)
+    .bind(organization)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let number = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO number (id, organization_id, engine_id, session_name, phone_enc, \
+                             phone_digest, alias, state, state_since, created_at) \
+         VALUES ($1, $2, $3, 'sessionnamesession1', decode('00', 'hex'), \
+                 decode(repeat('01', 32), 'hex'), 'desk', 'connected', 1, 1)",
+    )
+    .bind(number)
+    .bind(organization)
+    .bind(engine)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let chat = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO chat (id, organization_id, number_id, kind, created_at) \
+         VALUES ($1, $2, $3, 'contact', 1)",
+    )
+    .bind(chat)
+    .bind(organization)
+    .bind(number)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    // Two Hermes with the verb on the access and on a line: A has the switch off, B on.
+    let mut accesses = Vec::new();
+    for (name, switch) in [("ana", false), ("bia", true)] {
+        let hermes = uuid::Uuid::new_v4();
+        let access = uuid::Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO hermes (id, organization_id, name, can_be_woken, created_at) \
+             VALUES ($1, $2, $3, $4, 1)",
+        )
+        .bind(hermes)
+        .bind(organization)
+        .bind(name)
+        .bind(switch)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO access (id, organization_id, hermes_id, number_id, scope, can_read, \
+                                 can_send, can_modify, can_wake, can_start_chats, created_by, \
+                                 created_at, changed_at) \
+             VALUES ($1, $2, $3, $4, 'all', TRUE, TRUE, FALSE, TRUE, FALSE, $5, 1, 1)",
+        )
+        .bind(access)
+        .bind(organization)
+        .bind(hermes)
+        .bind(number)
+        .bind(admin)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO access_chat (organization_id, access_id, number_id, chat_id, can_read, \
+                                      can_send, can_modify, can_wake, created_at, changed_at) \
+             VALUES ($1, $2, $3, $4, TRUE, TRUE, FALSE, TRUE, 1, 1)",
+        )
+        .bind(organization)
+        .bind(access)
+        .bind(number)
+        .bind(chat)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        accesses.push((name, access));
+    }
+
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+
+    for (name, access) in accesses {
+        let on_access: bool = sqlx::query_scalar("SELECT can_wake FROM access WHERE id = $1")
+            .bind(access)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        let on_line: bool =
+            sqlx::query_scalar("SELECT can_wake FROM access_chat WHERE access_id = $1")
+                .bind(access)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        // Only the verbs of the Hermes that was silent are turned off; the read verb stays.
+        assert_eq!(
+            (on_access, on_line),
+            (name == "bia", name == "bia"),
+            "{name}"
+        );
+        let read: bool = sqlx::query_scalar("SELECT can_read FROM access WHERE id = $1")
+            .bind(access)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert!(read, "{name}");
+    }
+    assert!(!column_exists(&db.pool, "hermes", "can_be_woken").await);
+    assert!(!column_exists(&db.pool, "hermes", "wake_reason").await);
 }

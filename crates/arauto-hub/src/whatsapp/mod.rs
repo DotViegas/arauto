@@ -156,6 +156,18 @@ pub(crate) async fn numbers_of(
     Ok((numbers, wake_verb))
 }
 
+/// Whether some access of the Hermes has the verb "be woken" now (not on a swapped number):
+/// the value of `woken_by.whatsapp` of `arauto_status` and of the field `wake` of `session`
+/// (decision 0049).
+pub(crate) async fn wakes_by_whatsapp(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    hermes: Uuid,
+) -> Result<bool, RepoError> {
+    let accesses = repo::access::of_hermes(hub.pool(), organization, hermes).await?;
+    Ok(accesses.iter().any(|access| access.anywhere(Verb::Wake)))
+}
+
 const fn verb_of(verb: WhatsappVerb) -> Verb {
     match verb {
         WhatsappVerb::Read => Verb::Read,

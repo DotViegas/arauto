@@ -141,7 +141,7 @@ is decided ([decisoes/0023](decisoes/0023-chave-da-api-local.md)), and the test 
 not work. Note of 15/11/2026: the first path was confirmed on **one** Hermes (v0.22.5, Docker
 install, Linux); other versions and systems are not proved
 ([decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)).
-The panel shows, per Hermes, "Woken by WhatsApp: yes or no", the switch of the Hermes. A note from another Hermes wakes it through a link with the wake mark, whatever that switch says ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
+A WhatsApp message wakes a Hermes when the verb "be woken" holds for that chat, on the access of the number or on the line of the chat; no other setting of the Hermes is consulted (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md); it replaces the switch "Woken by WhatsApp", which no longer exists). A note from another Hermes wakes it through a link with the wake mark ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026).
 
 ## 8. Operation
 

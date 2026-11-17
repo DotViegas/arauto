@@ -33,8 +33,6 @@ async fn a_hermes_row_reads_back() {
     assert_eq!(hermes.organization_id, organization.id());
     assert!(hermes.name.as_str().starts_with('h'));
     assert_eq!(hermes.mode, HermesMode::Fast);
-    assert!(!hermes.can_be_woken);
-    assert_eq!(hermes.wake_reason, None);
     assert_eq!((hermes.created_at, hermes.deleted_at), (NOW, None));
 }
 

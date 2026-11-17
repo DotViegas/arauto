@@ -121,14 +121,6 @@ enum InstalledCommand {
         /// The name of the Hermes.
         name: String,
     },
-    /// Says whether a Hermes may be woken by WhatsApp messages (for notes: the wake mark of
-    /// the link).
-    Wake {
-        /// The name of the Hermes.
-        name: String,
-        /// `on` or `off`.
-        state: OnOff,
-    },
     /// The alerts the panel would show.
     Alerts {
         /// Marks one alert as seen.
@@ -206,7 +198,7 @@ enum LinkCommand {
         from: String,
         /// The Hermes that receives.
         to: String,
-        /// A message of FROM wakes TO (the mark alone is enough; `admin wake` is for WhatsApp).
+        /// A message of FROM wakes TO (the mark alone is enough).
         #[arg(long)]
         wake: bool,
         /// The link back too, from TO to FROM, with the same wake mark.
@@ -448,12 +440,6 @@ enum HermesCommand {
         /// The name of the Hermes.
         name: String,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum OnOff {
-    On,
-    Off,
 }
 
 /// How many alerts `admin alerts` shows.
@@ -936,10 +922,6 @@ async fn run_installed(
         InstalledCommand::Revoke { name } => {
             render::revoked(&name, &session.revoke(&name, now).await?)
         }
-        InstalledCommand::Wake { name, state } => {
-            let on = state == OnOff::On;
-            render::wake(&name, on, session.wake(&name, on, now).await?)
-        }
         InstalledCommand::Alerts { ack: Some(id), .. } => {
             render::acknowledged(session.acknowledge(id, now).await?)
         }
@@ -1118,8 +1100,6 @@ mod tests {
             "arauto-hub admin approve vendas 123456 --not-recognized",
             "arauto-hub admin deny vendas",
             "arauto-hub admin revoke vendas",
-            "arauto-hub admin wake vendas on",
-            "arauto-hub admin wake vendas off",
             "arauto-hub admin alerts",
             "arauto-hub admin alerts --ack 00000000-0000-0000-0000-000000000001",
             "arauto-hub admin audit",
@@ -1171,7 +1151,8 @@ mod tests {
         }
         for line in [
             "arauto-hub admin approve vendas 123456 --recognized --not-recognized",
-            "arauto-hub admin wake vendas maybe",
+            "arauto-hub admin wake vendas on",
+            "arauto-hub admin wake vendas off",
             "arauto-hub admin alerts --ack not-an-id",
             "arauto-hub admin engine set-key s3cr3t-engine-key",
             "arauto-hub admin engine set --url http://192.0.2.10:3000",

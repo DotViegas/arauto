@@ -633,8 +633,10 @@ pub struct Session {
     pub hermes: HermesName,
     /// The released tools.
     pub tools: ToolList,
-    /// Whether a WhatsApp message may wake this Hermes: the switch of the Hermes. A note from
-    /// another Hermes does not depend on it (decision 0045).
+    /// Whether some access of this Hermes has the verb "be woken" when the session starts: the
+    /// same value as `woken_by.whatsapp` of `arauto_status` (decision 0049). It stays a required
+    /// boolean because every connector already installed requires it; a connector only shows
+    /// it. A note from another Hermes does not depend on it (decision 0045).
     pub wake: bool,
 }
 

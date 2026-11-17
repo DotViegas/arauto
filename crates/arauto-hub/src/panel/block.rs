@@ -162,8 +162,6 @@ mod tests {
                     organization_id: id,
                     name: HermesName::parse("kitchen").unwrap(),
                     mode: HermesMode::Fast,
-                    can_be_woken: false,
-                    wake_reason: None,
                     created_at: 0,
                     deleted_at: None,
                 },

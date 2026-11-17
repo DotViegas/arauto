@@ -10,9 +10,10 @@ In a trial on 15/11/2026 the admin drew links marked "wakes" on the org chart. A
 
 - Between Hermes, the wake mark of the link is enough to wake the receiver. The switch of the Hermes is not consulted for notes, neither when the note is kept nor when its notice leaves.
 - The switch governs only waking by WhatsApp messages, together with the verb "be woken" of the access, as before. In words it is "woken by WhatsApp". It is set in the access editor of the panel and by `arauto-hub admin wake NAME on|off`.
-- The database does not change: the column `hermes.can_be_woken`, the audit event `hermes.wake_changed` and its flag keep their names; only their scope narrows.
+  **Changed on 16/11/2026 by decision 0049 ([0049](0049-acordar-pelo-whatsapp-so-pelo-verbo.md)):** the switch, the checkbox, the command, the column `hermes.can_be_woken` and the writing of `hermes.wake_changed` are removed; the verb "be woken" alone decides waking by WhatsApp, and the field `wake` of `session` now carries "some access has the verb". The rule for notes stands.
+- The database does not change: the column `hermes.can_be_woken`, the audit event `hermes.wake_changed` and its flag keep their names; only their scope narrows. (Changed on 16/11/2026 by [0049](0049-acordar-pelo-whatsapp-so-pelo-verbo.md): see the note above.)
 - `arauto_status` says what can wake the Hermes: `woken_by.notes`, `woken_by.whatsapp`, and `can_be_woken` when either is true.
-- The channel protocol does not change. The field `wake` of `session` still carries the switch, now described as WhatsApp only. The connector never used it to decide whether to wake; it only shows it.
+- The channel protocol does not change. The field `wake` of `session` still carries the switch, now described as WhatsApp only. The connector never used it to decide whether to wake; it only shows it. (Changed on 16/11/2026 by [0049](0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the field stays and carries "some access has the verb be woken".)
 
 ## What still holds for a note to wake
 

@@ -291,7 +291,6 @@ pub(super) async fn hermes(
                 .filter(|access| access.hermes.as_str() == name)
                 .map(|access| access.number.as_str().to_owned())
                 .collect(),
-            woken: line.hermes.can_be_woken,
             connector: device.and_then(|device| device.connector_version.clone()),
             seen: if in_session {
                 text::tr(lang, k("now")).to_owned()

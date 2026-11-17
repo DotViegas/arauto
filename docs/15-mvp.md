@@ -59,7 +59,7 @@ the command are the same program and use the same write functions.
  arauto-hub admin invite NAME                 issues the invite and shows the connection sentence, or the block with --command (connect or reconnect)
  arauto-hub admin approve NAME [CODE]       the code is TYPED; without it, the command asks
  arauto-hub admin deny|revoke NAME
- arauto-hub admin wake NAME on|off            may be woken by WhatsApp (notes: the wake mark of the link)
+ (arauto-hub admin wake NAME on|off was removed on 16/11/2026, decision 0049: WhatsApp waking is the verb "be woken" of the access; notes: the wake mark of the link)
  arauto-hub admin peers allow|deny|list       the peer list (--wake, --both)
  arauto-hub admin threads [NAME]              threads: who, when and how much; never the text
  arauto-hub admin engine|number|access ...    engine, numbers and access matrix (M3)
@@ -109,7 +109,7 @@ the database in the clear (only its digest).
   and `leave`) or the system (quarantine, replacement and deadlines).
 
 **In the hub, on 11/11/2026.** There are `init`, `serve`, `migrate`, `dev-reset` and, in `admin`,
-`status`, `hermes`, `invite`, `approve`, `deny`, `revoke`, `wake`, `alerts` and `audit`. `peers` and
+`status`, `hermes`, `invite`, `approve`, `deny`, `revoke`, `wake`, `alerts` and `audit` (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): `wake` is removed). `peers` and
 `threads` come in M2; `engine`, `number` and `access`, in M3. What the command does and the text did
 not say:
 
@@ -222,7 +222,7 @@ Rules that hold for the database:
     do not generate one event each ([13](13-conversa-entre-hermes.md), section 7). In the hub, each
     event says whether it is a security one, and the list is closed and has a test. Security events
     are: the installation, the organization, the hub key, the admins, creating and deleting Hermes,
-    changing "woken by WhatsApp", invite used or cancelled, approving and denying, activating,
+    changing "woken by WhatsApp" (`hermes.wake_changed`: stays in the closed list, because old lines carry it, but is no longer written; 16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)), invite used or cancelled, approving and denying, activating,
     quarantine, replacement, revocation, confirmed swap, the links of the peer list and the restored
     mode. Not security events: the three events of the org chart (`org_level.changed`, `org_member.changed`, `org_chart.published`; the link events inside a publish are the usual security ones), invite issued, expired, refused or used
     by another identity,

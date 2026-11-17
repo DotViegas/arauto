@@ -416,85 +416,169 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
     }
 }
 
-/// The switch "woken by WhatsApp" of a Hermes, as the database has it.
-async fn woken_by_whatsapp(world: &World, name: &str) -> bool {
-    sqlx::query_scalar("SELECT can_be_woken FROM hermes WHERE name = $1")
-        .bind(name)
+/// Gives the access of `alias` a chat with a line of its own that wakes, and returns the chat.
+async fn chat_line_that_wakes(world: &World, alias: &str, hermes: &str) -> uuid::Uuid {
+    let pool = world.hub().pool();
+    let (access, organization, number): (uuid::Uuid, uuid::Uuid, uuid::Uuid) = sqlx::query_as(
+        "SELECT a.id, a.organization_id, a.number_id FROM access a \
+         JOIN number n ON n.id = a.number_id JOIN hermes h ON h.id = a.hermes_id \
+         WHERE n.alias = $1 AND h.name = $2",
+    )
+    .bind(alias)
+    .bind(hermes)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let chat = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO chat (id, organization_id, number_id, kind, created_at) \
+         VALUES ($1, $2, $3, 'contact', 0)",
+    )
+    .bind(chat)
+    .bind(organization)
+    .bind(number)
+    .execute(pool)
+    .await
+    .unwrap();
+    set_line_wake(world, access, chat, organization, number, true).await;
+    chat
+}
+
+async fn set_line_wake(
+    world: &World,
+    access: uuid::Uuid,
+    chat: uuid::Uuid,
+    organization: uuid::Uuid,
+    number: uuid::Uuid,
+    wake: bool,
+) {
+    sqlx::query(
+        "INSERT INTO access_chat (organization_id, access_id, number_id, chat_id, can_read, \
+         can_send, can_modify, can_wake, created_at, changed_at) \
+         VALUES ($1, $2, $3, $4, TRUE, FALSE, FALSE, $5, 0, 0) \
+         ON CONFLICT (access_id, chat_id) DO UPDATE SET can_wake = $5",
+    )
+    .bind(organization)
+    .bind(access)
+    .bind(number)
+    .bind(chat)
+    .bind(wake)
+    .execute(world.hub().pool())
+    .await
+    .unwrap();
+}
+
+/// The `can_wake` of the line of `chat`.
+async fn line_wakes(world: &World, chat: uuid::Uuid) -> bool {
+    sqlx::query_scalar("SELECT can_wake FROM access_chat WHERE chat_id = $1")
+        .bind(chat)
         .fetch_one(world.hub().pool())
         .await
         .unwrap()
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_editor_sets_woken_by_whatsapp_through_the_function_of_the_command() {
+async fn the_editor_has_one_checkbox_for_waking() {
     let world = World::new().await;
     let fixture = &world.fixture;
     let browser = Browser::of(fixture);
     let cookie = browser.signed_in(fixture).await;
     world.add("balcao", &phone(4)).await;
     let ana = fixture.hermes().await;
-    let edit = format!("/accesses/edit?hermes={ana}&number=balcao");
-    let form = |rest: &str| format!("hermes={ana}&number=balcao&{rest}");
-
-    // Reading shows the switch, off, with the marker, and changes nothing.
-    let editor = page(&browser, &cookie, &edit).await;
-    assert!(
-        editor.contains("name=\"whatsapp_wake\" value=\"on\">"),
-        "{editor}"
-    );
-    assert!(editor.contains("name=\"whatsapp_wake_shown\""));
-    assert!(!woken_by_whatsapp(&world, &ana).await);
-
-    // Without a session or with a bad origin, nothing changes.
-    let body = form("scope=all&read=on&whatsapp_wake_shown=1&whatsapp_wake=on");
-    let no_session = browser.post("/accesses/save", None, &body).await;
-    assert_eq!(no_session.status, 303);
-    let evil = http::post(
-        browser.panel,
-        "/accesses/save",
-        &[
-            ("Host", PANEL_HOST),
-            ("Cookie", cookie.as_str()),
-            ("Content-Type", "application/x-www-form-urlencoded"),
-            ("Origin", "http://evil.test"),
-        ],
-        body.as_bytes(),
-        PATIENCE,
+    let editor = page(
+        &browser,
+        &cookie,
+        &format!("/accesses/edit?hermes={ana}&number=balcao"),
     )
+    .await;
+    assert!(!editor.contains("whatsapp_wake"), "{editor}");
+    assert!(!editor.contains("Woken by WhatsApp"));
+    assert!(editor.contains("name=\"wake\" value=\"on\""));
+    assert!(editor.contains(
+        "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule."
+    ));
+    let list = page(&browser, &cookie, "/").await;
+    assert!(!list.contains("Woken by WhatsApp"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn saving_be_woken_off_turns_off_the_chat_lines_of_that_access_only() {
+    let world = World::new().await;
+    let fixture = &world.fixture;
+    let browser = Browser::of(fixture);
+    let cookie = browser.signed_in(fixture).await;
+    world.add("balcao", &phone(4)).await;
+    world.add("outro", &phone(5)).await;
+    let ana = fixture.hermes().await;
+    for alias in ["balcao", "outro"] {
+        let saved = browser
+            .post(
+                "/accesses/save",
+                Some(&cookie),
+                &format!("hermes={ana}&number={alias}&scope=all&read=on&wake=on"),
+            )
+            .await;
+        assert_eq!(saved.status, 303, "{}", saved.text());
+    }
+    let here = chat_line_that_wakes(&world, "balcao", &ana).await;
+    let there = chat_line_that_wakes(&world, "outro", &ana).await;
+
+    // Be woken on: the lines are left as they were.
+    let saved = browser
+        .post(
+            "/accesses/save",
+            Some(&cookie),
+            &format!("hermes={ana}&number=balcao&scope=all&read=on&send=on&wake=on"),
+        )
+        .await;
+    assert_eq!(saved.status, 303, "{}", saved.text());
+    assert!(line_wakes(&world, here).await);
+    assert!(line_wakes(&world, there).await);
+
+    // Be woken off: the lines of this access go off, in the same save, with an event each.
+    let before = rows(fixture, "audit").await.join("\n");
+    let saved = browser
+        .post(
+            "/accesses/save",
+            Some(&cookie),
+            &format!("hermes={ana}&number=balcao&scope=all&read=on&send=on"),
+        )
+        .await;
+    assert_eq!(saved.status, 303, "{}", saved.text());
+    assert!(!line_wakes(&world, here).await);
+    assert!(line_wakes(&world, there).await);
+    let audit = rows(fixture, "audit").await.join("\n");
+    assert_eq!(
+        audit.matches("access_chat.set").count(),
+        before.matches("access_chat.set").count() + 1,
+        "{audit}"
+    );
+    let at: Vec<(bool,)> = sqlx::query_as(
+        "SELECT can_wake FROM access WHERE number_id = (SELECT id FROM number WHERE alias = 'balcao')",
+    )
+    .fetch_all(world.hub().pool())
     .await
     .unwrap();
-    assert_eq!(evil.status, 403);
-    assert!(!woken_by_whatsapp(&world, &ana).await);
+    assert_eq!(at, vec![(false,)]);
 
-    // A form with the marker and the box on turns it on, by the function of the command.
-    let saved = browser.post("/accesses/save", Some(&cookie), &body).await;
+    // The access already unwoken and a line that wakes again (a group wakes only by its own
+    // line): saving with "be woken" still off leaves the line alone.
+    let (access, organization, number): (uuid::Uuid, uuid::Uuid, uuid::Uuid) = sqlx::query_as(
+        "SELECT access_id, organization_id, number_id FROM access_chat WHERE chat_id = $1",
+    )
+    .bind(here)
+    .fetch_one(world.hub().pool())
+    .await
+    .unwrap();
+    set_line_wake(&world, access, here, organization, number, true).await;
+    let saved = browser
+        .post(
+            "/accesses/save",
+            Some(&cookie),
+            &format!("hermes={ana}&number=balcao&scope=all&read=on&send=on"),
+        )
+        .await;
     assert_eq!(saved.status, 303, "{}", saved.text());
-    assert!(woken_by_whatsapp(&world, &ana).await);
-    let audit = rows(fixture, "audit").await.join("\n");
-    assert!(audit.contains("hermes.wake_changed"), "{audit}");
-    assert!(audit.contains("\"actor_note\":\"panel\""), "{audit}");
-    let editor = page(&browser, &cookie, &edit).await;
-    assert!(editor.contains("name=\"whatsapp_wake\" value=\"on\" checked>"));
-
-    // A form without the marker (an older page) never touches it.
-    let saved = browser
-        .post(
-            "/accesses/save",
-            Some(&cookie),
-            &form("scope=all&read=on&send=on"),
-        )
-        .await;
-    assert_eq!(saved.status, 303);
-    assert!(woken_by_whatsapp(&world, &ana).await);
-
-    // The marker and no box: off again.
-    let saved = browser
-        .post(
-            "/accesses/save",
-            Some(&cookie),
-            &form("scope=all&read=on&whatsapp_wake_shown=1"),
-        )
-        .await;
-    assert_eq!(saved.status, 303);
-    assert!(!woken_by_whatsapp(&world, &ana).await);
+    assert!(line_wakes(&world, here).await);
+    assert!(line_wakes(&world, there).await);
 }

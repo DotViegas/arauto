@@ -263,7 +263,7 @@ async fn the_security_write_commits_synchronously_and_carries_the_change_with_it
         .unwrap();
     assert_eq!(setting, "on");
     // The change and its event are one transaction.
-    sqlx::query("UPDATE hermes SET can_be_woken = TRUE WHERE id = $1")
+    sqlx::query("UPDATE hermes SET deleted_at = 1 WHERE id = $1")
         .bind(hermes)
         .execute(write.connection())
         .await
@@ -271,7 +271,7 @@ async fn the_security_write_commits_synchronously_and_carries_the_change_with_it
     write
         .record(
             NOW,
-            &Event::new(Action::HermesWakeChanged, Actor::System)
+            &Event::new(Action::HermesRemoved, Actor::System)
                 .in_organization(organization)
                 .about(TargetKind::Hermes, hermes),
         )
@@ -280,18 +280,18 @@ async fn the_security_write_commits_synchronously_and_carries_the_change_with_it
     drop(write);
 
     // Dropped without commit: neither the change nor the event, and the mark stays.
-    let can_be_woken: bool = sqlx::query_scalar("SELECT can_be_woken FROM hermes WHERE id = $1")
+    let deleted_at: Option<i64> = sqlx::query_scalar("SELECT deleted_at FROM hermes WHERE id = $1")
         .bind(hermes)
         .fetch_one(&db.pool)
         .await
         .unwrap();
-    assert!(!can_be_woken);
+    assert_eq!(deleted_at, None);
     assert_eq!(rows(&db.pool).await, 0);
     assert_eq!(home.mark.read().await.unwrap(), MarkValue::At(0));
 
     let mut write = audit::begin_security(&db.pool, &home.mark).await.unwrap();
     write
-        .record(NOW, &Event::new(Action::HermesWakeChanged, Actor::System))
+        .record(NOW, &Event::new(Action::HermesRemoved, Actor::System))
         .await
         .unwrap();
     write.rollback().await.unwrap();

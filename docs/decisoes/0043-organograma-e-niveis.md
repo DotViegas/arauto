@@ -20,6 +20,7 @@ Decision [0005](0005-comando-e-dado-sao-separados.md) (decided) and [0032](0032-
 - **On the screen** a sentence says that in this version the levels, the roles and the kinds of arrow are only shown there.
 - **Card.** It shows the numbers of the Hermes and whether it may send or only read, from the existing access data, and points to the Accesses tab. It does not edit them. "Can be woken" is shown, not edited; the command stays.
   **Changed on 15/11/2026 ([0045](0045-a-marca-da-ligacao-basta-para-acordar.md)):** the drawer no longer shows "Can be woken" nor the command; it shows "Woken by WhatsApp" in its numbers section, and the window of an arrow says that the wake mark is enough.
+  **Changed on 16/11/2026 by decision 0049 ([0049](0049-acordar-pelo-whatsapp-so-pelo-verbo.md)):** the drawer no longer shows "Woken by WhatsApp" either; the switch no longer exists. The window of an arrow is unchanged.
 - **Command twin.** `arauto-hub admin org show` and `arauto-hub admin org publish FILE --version HEX`, by the same functions.
 - **Audit.** `org_level.changed`, `org_member.changed` and `org_chart.published` are ordinary events, not security events; the link events inside a publish are the existing security ones.
 - **The page's script.** A second file, `org.js`, loaded only by this tab, writes no markup and calls nothing on the network; the live refresh of the tab is paused while a draft exists ([0040](0040-painel-dentro-do-hub.md), change of 14/11/2026).

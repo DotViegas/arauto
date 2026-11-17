@@ -461,8 +461,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Be woken", "Пробуждаться"),
     (
-        "the hub gives notice when a message arrives (requires reading)",
-        "хаб даёт уведомление, когда приходит сообщение (нужно право читать)",
+        "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule.",
+        "хаб даёт уведомление, когда приходит сообщение (нужно право читать). Если его выключить, он выключается и в чатах этого доступа, у которых есть собственное правило.",
     ),
     ("Wait", "Ожидание"),
     (
@@ -1296,17 +1296,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "На телефоне: WhatsApp › Связанные устройства › Привязка устройства › Привязать по номеру телефона, и введите этот код:",
     ),
     // decision 0045
-    ("Woken by WhatsApp", "Пробуждается через WhatsApp"),
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "С этой отметкой заметка по этой связи пробуждает {name} в пределах лимитов уведомлений.",
-    ),
-    (
-        "This Hermes, on every number",
-        "Этот Hermes, на каждом номере",
-    ),
-    (
-        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
-        "без этого ни одно сообщение WhatsApp не пробуждает этот Hermes, ни на одном номере. Заметки от других Hermes от этого не зависят.",
     ),
 ];

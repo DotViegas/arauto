@@ -53,8 +53,8 @@ on the server issues a new installation code.
 ## 3. Hermes and devices
 
 **hermes**: the line of the panel. `id`, `organizacao_id`, `nome` (unique in the organization), `modo`
-(quick, shielded), `pode_ser_acordado` and `motivo`, `criado_em`, `excluido_em` (the line is not
-erased). The name has a restricted format, does not change and is not reused
+(quick, shielded), `criado_em`, `excluido_em` (the line is not
+erased). (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the columns `pode_ser_acordado` and `motivo`, the switch of the Hermes and its reason, are removed. WhatsApp waking is read from the verb `acordar` of the accesses; a migration turns the verb off, on the accesses and on the chat lines, of every Hermes whose switch was off.) The name has a restricted format, does not change and is not reused
 ([13](13-conversa-entre-hermes.md), section 2).
 
 **aparelho**: an installation of the connector. `id`, `hermes_id`, `identidade_publica`, `estado`
@@ -126,7 +126,7 @@ resolves the engine session from the accesses of the Hermes of that device.
 `acordar`. Unique per pair.
 
 The rules are in [08-permissoes.md](08-permissoes.md). Every change produces an audit event with
-the before and the after.
+the before and the after. (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): turning `acordar` off on an access in the editor also turns it off on the chat lines of that access, in the same write, each with its event. The migration of 0049 that turns the verb off may not leave one event per line; whether it can is open, and the list given to the admin before the upgrade is then the record.)
 
 In the hub, on 12/11/2026 (proposal, [decision 0039](decisoes/0039-matriz-e-ferramentas-de-whatsapp-no-mvp.md)):
 the tables are `access` (`scope`, `can_read`, `can_send`, `can_modify`, `can_wake`,

@@ -65,8 +65,6 @@ pub struct Standing {
     pub hermes: Uuid,
     /// The name of the Hermes.
     pub name: HermesName,
-    /// Whether the Hermes may be woken by WhatsApp (the switch; notes do not depend on it).
-    pub can_be_woken: bool,
 }
 
 impl Standing {
@@ -90,10 +88,10 @@ impl Standing {
     }
 }
 
-type StandingRow = (Uuid, String, Option<String>, Uuid, String, bool);
+type StandingRow = (Uuid, String, Option<String>, Uuid, String);
 
 fn standing_of(row: StandingRow) -> Result<Standing, RepoError> {
-    let (device, state, reason, hermes, name, can_be_woken) = row;
+    let (device, state, reason, hermes, name) = row;
     Ok(Standing {
         device,
         state: DeviceState::parse(&state)
@@ -107,7 +105,6 @@ fn standing_of(row: StandingRow) -> Result<Standing, RepoError> {
         hermes,
         name: HermesName::parse(&name)
             .map_err(|_| RepoError::Inconsistent("a Hermes with an invalid name"))?,
-        can_be_woken,
     })
 }
 
@@ -126,7 +123,7 @@ pub async fn standings(
         return Ok(Vec::new());
     }
     let rows: Vec<StandingRow> = sqlx::query_as(
-        "SELECT d.id, d.state, d.state_reason, h.id, h.name, h.can_be_woken \
+        "SELECT d.id, d.state, d.state_reason, h.id, h.name \
          FROM device d \
          JOIN hermes h ON h.organization_id = d.organization_id AND h.id = d.hermes_id \
          WHERE d.organization_id = $1 AND d.id = ANY($2)",

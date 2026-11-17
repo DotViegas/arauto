@@ -74,7 +74,7 @@
     var accessesAddress = host.getAttribute('data-accesses') || '';
 
     var base = null;      // the stored chart as the hub wrote it
-    var info = {};        // by name of Hermes: what the hub says of it (state, numbers, the WhatsApp switch)
+    var info = {};        // by name of Hermes: what the hub says of it (state, numbers)
     var S = null;         // the draft: what Publish would write
     var hist = [];        // snapshots of the draft, for Undo
     var echoed = false;   // a refused draft was loaded: it is the draft, and the page holds still
@@ -120,7 +120,7 @@
       };
       info = {};
       stored.state.hermes.forEach(function (h) {
-        info[h.name] = { tone: h.tone, state: h.state, woken: h.woken, numbers: h.numbers };
+        info[h.name] = { tone: h.tone, state: h.state, numbers: h.numbers };
       });
     }
 
@@ -826,7 +826,7 @@
       moves.appendChild(button(say('move-left'), function () { moveSide(h.name, -MOVE_STEP); }));
       moves.appendChild(button(say('move-right'), function () { moveSide(h.name, MOVE_STEP); }));
       place.appendChild(moves);
-      var facts = info[h.name] || { woken: false, numbers: [] };
+      var facts = info[h.name] || { numbers: [] };
       grid.appendChild(place);
       drawer.appendChild(grid);
 
@@ -835,7 +835,6 @@
       chips(numbers, { name: h.name, auto: false });
       drawer.appendChild(numbers.firstChild || numbers);
       if (!facts.numbers.length) drawer.appendChild(node('p', 'hint', say('no-access')));
-      if (facts.numbers.length) drawer.appendChild(node('p', 'hint', say('woken-by-whatsapp') + ': ' + say(facts.woken ? 'yes' : 'no')));
       var link = node('a', 'footer-link', say('change-in-accesses'));
       link.setAttribute('href', accessesAddress);
       drawer.appendChild(link);

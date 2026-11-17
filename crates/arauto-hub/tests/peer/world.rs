@@ -80,15 +80,6 @@ impl World {
             .unwrap();
     }
 
-    /// `admin wake NAME on|off`.
-    pub async fn may_be_woken(&self, agent: &Agent, on: bool) {
-        self.fixture
-            .admin
-            .wake(&agent.name, on, self.now())
-            .await
-            .unwrap();
-    }
-
     /// The states of the notices of the messages of `from` to `to`, the oldest first.
     pub async fn notice_states(&self, from: &Agent, to: &Agent) -> Vec<(String, i32)> {
         sqlx::query_as(

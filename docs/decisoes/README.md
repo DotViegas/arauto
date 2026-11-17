@@ -52,3 +52,4 @@ prototype, or is **pending**.
 | 0046 | [The key through the entry, and a Hermes without a key](0046-chave-pela-entrada-e-hermes-sem-chave.md) | proposal |
 | 0047 | [The Arauto notes in the main memory of a Hermes](0047-notas-do-arauto-na-memoria.md) | proposal (the step and the three lines were approved on 15/11/2026) |
 | 0048 | [An answer in the conversation that asked](0048-resposta-na-conversa-que-perguntou.md) | proposal (the sentence, the field and two outputs were approved on 15/11/2026) |
+| 0049 | [Waking by WhatsApp is decided by the verb "be woken" alone](0049-acordar-pelo-whatsapp-so-pelo-verbo.md) | decided |

@@ -142,10 +142,7 @@ async fn line_1_nothing_at_generation_zero_is_accepted_and_the_first_saved_activ
         panic!("not confirmed: {confirmed:?}");
     };
     assert_eq!(activated, Some(Activated { replaced: None }));
-    assert_eq!(
-        (session.hermes, session.name, session.can_be_woken),
-        (hermes, name, false)
-    );
+    assert_eq!((session.hermes, session.name), (hermes, name));
     let device = world.device(request.device).await;
     assert_eq!(
         (

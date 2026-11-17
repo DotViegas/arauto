@@ -338,7 +338,7 @@ is too old presents itself this way at the leader's startup and, after that, onc
 | connector | `check_ok` | `nonce` | The same one. CONTROL flag. |
 | hub | `credential` | `generation`, `sealed` | The new credential, already written as pending. |
 | connector | `saved` | `generation`, `digest` (SHA-256 of the block received) | The "saved", after the write is guaranteed on disk. |
-| hub | `session` | `hermes` (name), `tools` (names released), `wake` (the switch "woken by WhatsApp"; a note does not depend on it, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)) | The promotion was written. The channel session starts here. |
+| hub | `session` | `hermes` (name), `tools` (names released), `wake` (required boolean: some access of this Hermes has the verb "be woken", the same value as `woken_by.whatsapp`; a note does not depend on it, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md). 16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the field is kept because every installed connector requires it; it used to carry the switch "woken by WhatsApp". It is sent once per channel session, so a connector shows an old value until it connects again) | The promotion was written. The channel session starts here. |
 | hub | `tools` | `tools` | The list of released tools changed. |
 | connector | `call` | `id`, `tool`, `args` | Tool call. |
 | hub | `result` | `id`, `ok`, and `content` or `code`; optional `retry_after_s` | Response. A refusal carries only the code; the sentence stays in the connector. |

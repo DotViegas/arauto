@@ -452,8 +452,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Be woken", "起動通知"),
     (
-        "the hub gives notice when a message arrives (requires reading)",
-        "メッセージが届くとハブが通知します(読み取りが必要)",
+        "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule.",
+        "メッセージが届くとハブが通知します(読み取りが必要)。オフにすると、このアクセスの中で独自のルールを持つチャットでもオフになります。",
     ),
     ("Wait", "待機時間"),
     (
@@ -1287,17 +1287,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "電話で: WhatsApp › リンク済みのデバイス › デバイスをリンク › 電話番号でリンク の順に進み、次のコードを入力してください：",
     ),
     // decision 0045
-    ("Woken by WhatsApp", "WhatsApp による起動通知"),
     (
         "With this mark, a note on this link wakes {name}, within the notice limits.",
         "この設定がある場合、このリンクで届いたメモは、通知の上限の範囲内で {name} に起動通知を送ります。",
-    ),
-    (
-        "This Hermes, on every number",
-        "この Hermes、すべての番号で",
-    ),
-    (
-        "without it, no WhatsApp message wakes this Hermes, on any number. Notes from other Hermes do not depend on it.",
-        "これがないと、どの番号でも、WhatsApp のメッセージはこの Hermes に起動通知を送りません。ほかの Hermes からのメモはこの設定に左右されません。",
     ),
 ];

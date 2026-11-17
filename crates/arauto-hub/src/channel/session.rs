@@ -217,10 +217,19 @@ pub(crate) async fn serve(
 ) -> CloseReason {
     let grants = grants_of(&hub, organization, start.hermes).await;
     entry.set_grants(grants);
+    // The field `wake` of `session` repeats `woken_by.whatsapp` of `arauto_status` (decision
+    // 0049): some access has the verb "be woken". Read once, when the session starts.
+    let wake = match crate::whatsapp::wakes_by_whatsapp(&hub, organization, start.hermes).await {
+        Ok(wake) => wake,
+        Err(error) => {
+            tracing::error!(%error, "the wake verb of a Hermes could not be read");
+            false
+        }
+    };
     let session = Message::Session(Session {
         hermes: start.name,
         tools: released_tools(&grants),
-        wake: start.can_be_woken,
+        wake,
     });
     if link.enter_session(&session).await.is_err() {
         return if hub.is_stopping() {
@@ -774,8 +783,8 @@ async fn peer_call(
 
 /// `arauto_status`, answered by the hub without the engine. No secret: the name of the
 /// Hermes, what can wake it (`woken_by.notes`: a link with the wake mark reaches it;
-/// `woken_by.whatsapp`: the switch "woken by WhatsApp" is on and some access has the verb "be
-/// woken"; `can_be_woken` is true when either is), its numbers (the alias, the state, the
+/// `woken_by.whatsapp`: some access has the verb "be woken" (decision 0049);
+/// `can_be_woken` is true when either is), its numbers (the alias, the state, the
 /// scope and the verbs; never the telephone or the session of the engine) and whether it has
 /// links with other Hermes.
 async fn status(hub: &Hub, organization: ResolvedOrg, standing: &Standing) -> CallOutcome {
@@ -794,7 +803,7 @@ async fn status(hub: &Hub, organization: ResolvedOrg, standing: &Standing) -> Ca
                 return refusal(ErrorCode::Ar205);
             }
         };
-    let whatsapp_wakes = standing.can_be_woken && wake_verb;
+    let whatsapp_wakes = wake_verb;
     let content = json!({
         "connected": true,
         "hermes": standing.name.as_str(),

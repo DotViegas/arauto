@@ -151,7 +151,6 @@ const SAY: &[(&str, &str)] = &[
     ("back", k("Back")),
     ("close", k("Close")),
     ("numbers", k("Numbers")),
-    ("woken-by-whatsapp", k("Woken by WhatsApp")),
     ("yes", k("yes")),
     ("no", k("no")),
     ("change-link-new", k("New link: {from} → {to} ({kind})")),
@@ -224,7 +223,6 @@ struct Card {
     role: String,
     tone: Tone,
     state: &'static str,
-    woken: bool,
     numbers: Vec<(String, Mode)>,
 }
 
@@ -267,17 +265,17 @@ async fn read_page(hub: &Hub, organization: ResolvedOrg) -> Result<OrgPage, Repo
         .iter()
         .map(|member| {
             let line = lines.iter().find(|line| line.hermes.id == member.id);
-            let (tone, state, woken) = match line {
+            let (tone, state) = match line {
                 Some(line) => {
                     let in_session = line
                         .in_use
                         .as_ref()
                         .is_some_and(|device| sessions.contains_key(&device.id));
                     let (tone, state) = data::standing(line, in_session);
-                    (tone, state, line.hermes.can_be_woken)
+                    (tone, state)
                 }
                 // Created or removed between the two reads: the version check catches it.
-                None => (Tone::Idle, k("No device"), false),
+                None => (Tone::Idle, k("No device")),
             };
             let numbers = accesses
                 .iter()
@@ -310,7 +308,6 @@ async fn read_page(hub: &Hub, organization: ResolvedOrg) -> Result<OrgPage, Repo
                     .map_or_else(String::new, |role| role.as_str().to_owned()),
                 tone,
                 state,
-                woken,
                 numbers,
             }
         })
@@ -342,7 +339,6 @@ fn state_json(page: &OrgPage, lang: Lang) -> String {
                 "role": card.role,
                 "tone": tone_class(card.tone),
                 "state": text::tr(lang, card.state),
-                "woken": card.woken,
                 "numbers": card
                     .numbers
                     .iter()
@@ -824,7 +820,6 @@ mod tests {
                 role: role.to_owned(),
                 tone: Tone::Ok,
                 state: k("Connected"),
-                woken: true,
                 numbers: vec![(HOSTILE.to_owned(), Mode::Answers)],
             }],
         }
@@ -900,14 +895,14 @@ mod tests {
         assert!(html.contains("<section class=\"org-static\">"));
         assert!(html.contains("Editing the org chart needs the script of the panel."));
         assert!(html.contains("keeps the books"));
-        // The switch is no business of this page: the mark of the link is enough to wake by a
-        // note, and the switch "woken by WhatsApp" is set in the access editor.
+        // The mark of the link is enough to wake by a note; waking by WhatsApp is the verb "be
+        // woken", set in the access editor.
         assert!(!html.contains("data-wake-command"));
         for gone in ["not-wakeable", "wake-command", "can-be-woken"] {
             assert!(!html.contains(&format!("data-say-{gone}=")), "{gone}");
         }
         assert!(html.contains("data-say-wake-hint=\"With this mark, a note on this link wakes"));
-        assert!(html.contains("data-say-woken-by-whatsapp=\"Woken by WhatsApp\""));
+        assert!(!html.contains("data-say-woken-by-whatsapp"));
         // The editor is hidden until the script shows it.
         assert!(html.contains("<div id=\"org\" class=\"frame org\" hidden "));
         assert_eq!(html.matches("<table class=\"list\">").count(), 3);

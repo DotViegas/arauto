@@ -294,7 +294,7 @@ The line no longer depends on the state of the channel. After a refusal or no an
 also prints the AR-602 phrase, and logs a warning that carries neither the key nor the body of the
 answer. `arauto_status` (the tool) carries one more field, `local_waking`, added by the connector: the
 connector of this Hermes received the key of the local API; when `false`, nothing wakes this Hermes
-whatever `can_be_woken` says ([09](09-contrato-mcp.md), [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)).
+whatever `can_be_woken` says ([09](09-contrato-mcp.md), [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): `can_be_woken` now means notes or the verb "be woken"; the switch it once followed is gone.)
 
 `arauto_status` carries one more field, `keep_in_memory`, also added by the connector (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)): a reminder sentence followed by the three Arauto lines that a Hermes keeps in its own main memory. It is fixed text, added only to a successful answer, and it overwrites any value of the hub. The connector never reads or writes the memory or the files of Hermes (principle 7), apart from the key of the local API that Hermes's own command saves in `join` (section 6): the Hermes saves the lines with its own tool, and the connector cannot know whether it did.
 

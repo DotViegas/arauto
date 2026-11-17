@@ -20,7 +20,7 @@ use crate::repo::approval::{ApproveOutcome, CODE_ATTEMPTS_MAX, DenyOutcome, Last
 use crate::repo::audit_log::AuditRow;
 use crate::repo::closing::Closed;
 use crate::repo::device::UnknownListed;
-use crate::repo::hermes::{HermesLine, Removed, WakeOutcome};
+use crate::repo::hermes::{HermesLine, Removed};
 use crate::restore::{Installation, Standing};
 
 use super::{Block, InitOutcome, Status, UNSEEN_COUNT_MAX};
@@ -303,11 +303,6 @@ pub fn hermes_list(lines: &[HermesLine]) -> Report {
     }
     let mut text = String::new();
     for line in lines {
-        let wake = if line.hermes.can_be_woken {
-            "woken by WhatsApp"
-        } else {
-            "not woken by WhatsApp"
-        };
         let last = line
             .in_use
             .as_ref()
@@ -321,7 +316,7 @@ pub fn hermes_list(lines: &[HermesLine]) -> Report {
             .unwrap_or_default();
         let _ = writeln!(
             text,
-            "{:<32}  {}; {wake}{last}",
+            "{:<32}  {}{last}",
             line.hermes.name.as_str(),
             label(line)
         );
@@ -383,30 +378,6 @@ pub fn revoked(name: &str, what: &Closed) -> Report {
         escape(name),
         closed(what)
     ))
-}
-
-/// `admin wake`.
-#[must_use]
-pub fn wake(name: &str, on: bool, outcome: WakeOutcome) -> Report {
-    let state = if on {
-        "can be woken by WhatsApp"
-    } else {
-        "is not woken by WhatsApp"
-    };
-    let mut text = match outcome {
-        WakeOutcome::Changed => format!("Hermes {} now {state}.\n", escape(name)),
-        WakeOutcome::Unchanged | WakeOutcome::NotFound => {
-            format!(
-                "Hermes {} already {state}. Nothing was changed.\n",
-                escape(name)
-            )
-        }
-    };
-    text.push_str(
-        "Notes from other Hermes do not depend on this: a link with the wake mark wakes its \
-         receiver (see `arauto-hub admin link list`).\n",
-    );
-    Report::done(text)
 }
 
 /// What `admin invite` shows of the invite.

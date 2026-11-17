@@ -112,16 +112,10 @@ async fn at_once(world: &World, agent: &Agent, alias: &str) {
         .unwrap();
 }
 
-/// A Hermes in session that may be woken.
+/// A Hermes in session. What wakes it by WhatsApp is the verb "be woken" alone (decision 0049),
+/// so a new Hermes needs nothing else besides the grant of each test.
 async fn wakeable(world: &World) -> Agent {
-    let agent = world.agent().await;
-    world
-        .fixture
-        .admin
-        .wake(&agent.name, true, world.now())
-        .await
-        .unwrap();
-    agent
+    world.agent().await
 }
 
 #[tokio::test]
@@ -200,7 +194,7 @@ async fn what_the_number_sent_and_what_is_no_message_wake_nobody() {
 }
 
 #[tokio::test]
-async fn only_who_has_the_verb_in_that_chat_and_may_be_woken_is_woken() {
+async fn only_who_has_the_verb_in_that_chat_is_woken() {
     let world = World::new().await;
     let number = world.connected("balcao", &phone(1)).await;
     let session = number.session.as_str();
@@ -208,7 +202,7 @@ async fn only_who_has_the_verb_in_that_chat_and_may_be_woken_is_woken() {
     let listed_chat = chat_of(102);
     let blocked_chat = chat_of(103);
 
-    // Every verb on the number, and may be woken: woken wherever no line says otherwise.
+    // Every verb on the number: woken wherever no line says otherwise.
     let mut whole = wakeable(&world).await;
     world.grant(&whole.name, "balcao", all(ALL_VERBS)).await;
     at_once(&world, &whole, "balcao").await;
@@ -231,9 +225,11 @@ async fn only_who_has_the_verb_in_that_chat_and_may_be_woken_is_woken() {
     let mut reader = wakeable(&world).await;
     world.grant(&reader.name, "balcao", all(READ_SEND)).await;
     at_once(&world, &reader, "balcao").await;
-    // Every verb, and the Hermes may not be woken.
+    // Every verb but "be woken".
     let mut asleep = world.agent().await;
-    world.grant(&asleep.name, "balcao", all(ALL_VERBS)).await;
+    world
+        .grant(&asleep.name, "balcao", all(verbs(true, true, true, false)))
+        .await;
     at_once(&world, &asleep, "balcao").await;
     // No access to the number at all.
     let mut stranger = wakeable(&world).await;
@@ -581,54 +577,124 @@ async fn a_chat_under_a_hidden_identifier_never_escapes_a_line_of_the_admin() {
     assert_eq!(pointer(&next_notice(&mut lined).await).1, hidden_chat);
 }
 
+/// SECURITY RULE: a WhatsApp notice that waits is judged again when it leaves, by the verb "be
+/// woken" alone (decision 0049). Turned off on the access, or on the line of the chat that had
+/// its own rule, the notice is discarded and nothing leaves.
 #[tokio::test]
-async fn a_waiting_whatsapp_notice_is_discarded_when_the_switch_goes_off() {
+async fn a_waiting_whatsapp_notice_is_discarded_when_be_woken_goes_off() {
     let clock = Arc::new(ManualClock::new(SystemClock.now_ms()));
     let world = World::with(|_| {}, clock.clone()).await;
     let number = world.connected("balcao", &phone(1)).await;
     let session = number.session.as_str();
-    let mut agent = wakeable(&world).await;
-    world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
-    at_once(&world, &agent, "balcao").await;
     let chat = chat_of(101);
-    let emit = |id: &'static str| {
-        let received = message(&chat, id, now_s(), false, "hello");
+    let line_chat = chat_of(102);
+    // (i) the access has the verb and no line; (ii) the access has the verb and the chat has a
+    // line of its own that wakes.
+    let mut by_access = wakeable(&world).await;
+    world.grant(&by_access.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &by_access, "balcao").await;
+    // The chat of the other one is blocked for it, so each Hermes is woken in one chat only.
+    world
+        .line(&by_access.name, "balcao", &line_chat, READ_SEND)
+        .await;
+    let mut by_line = wakeable(&world).await;
+    world.grant(&by_line.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &by_line, "balcao").await;
+    world.line(&by_line.name, "balcao", &chat, READ_SEND).await;
+    world
+        .line(
+            &by_line.name,
+            "balcao",
+            &line_chat,
+            verbs(true, false, false, true),
+        )
+        .await;
+    let emit = |chat: &str, id: &'static str| {
+        let received = message(chat, id, now_s(), false, "hello");
         world.fake.emit(session, "message.any", received)
     };
 
-    assert_eq!(emit("3EB0FF0001").await.unwrap(), 200);
-    let first = next_notice(&mut agent).await;
-    acknowledge(&mut agent, &first, AckOutcome::Accepted).await;
+    // The first notice of each leaves at once and is answered.
+    assert_eq!(emit(&chat, "3EB0FF0001").await.unwrap(), 200);
+    assert_eq!(emit(&line_chat, "3EB0FF0011").await.unwrap(), 200);
+    let first = next_notice(&mut by_access).await;
+    acknowledge(&mut by_access, &first, AckOutcome::Accepted).await;
+    let first = next_notice(&mut by_line).await;
+    acknowledge(&mut by_line, &first, AckOutcome::Accepted).await;
 
-    // A second one waits its ten seconds; the switch goes off meanwhile (the verb stays):
-    // when it would leave, the switch is read again and the notice is discarded.
-    assert_eq!(emit("3EB0FF0002").await.unwrap(), 200);
+    // A second one of each waits its ten seconds; "be woken" goes off meanwhile (the access
+    // keeps every other verb): when it would leave, the verb is read again and the notice is
+    // discarded.
+    assert_eq!(emit(&chat, "3EB0FF0002").await.unwrap(), 200);
+    assert_eq!(emit(&line_chat, "3EB0FF0012").await.unwrap(), 200);
     world
-        .fixture
-        .admin
-        .wake(&agent.name, false, world.now())
-        .await
-        .unwrap();
+        .grant(
+            &by_access.name,
+            "balcao",
+            all(verbs(true, true, true, false)),
+        )
+        .await;
+    world
+        .line(
+            &by_line.name,
+            "balcao",
+            &line_chat,
+            verbs(true, false, false, false),
+        )
+        .await;
     clock.advance(11_000);
-    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+    assert_eq!(notices_while_quiet(&mut by_access).await, 0);
+    assert_eq!(notices_while_quiet(&mut by_line).await, 0);
     let mut states: Vec<String> = notices(&world)
         .await
         .into_iter()
         .map(|(_, state, _)| state)
         .collect();
     states.sort();
-    assert_eq!(states, ["confirmed", "discarded"]);
+    assert_eq!(states, ["confirmed", "confirmed", "discarded", "discarded"]);
 }
 
+/// SECURITY RULE: a message that arrives in a chat whose line has "be woken" off creates no
+/// notice, even when the access has the verb.
 #[tokio::test]
-async fn the_switch_gates_whatsapp_and_never_notes() {
+async fn a_chat_line_without_be_woken_makes_no_notice_even_when_the_access_has_the_verb() {
     let world = World::new().await;
     let number = world.connected("balcao", &phone(1)).await;
     let session = number.session.as_str();
-    // Every verb on the number, the switch off, and a marked link from another agent.
+    let mut agent = wakeable(&world).await;
+    world.grant(&agent.name, "balcao", all(ALL_VERBS)).await;
+    at_once(&world, &agent, "balcao").await;
+    let quiet_chat = chat_of(101);
+    world
+        .line(
+            &agent.name,
+            "balcao",
+            &quiet_chat,
+            verbs(true, true, false, false),
+        )
+        .await;
+    let received = message(&quiet_chat, "3EB0FF0101", now_s(), false, "hello");
+    assert_eq!(
+        world
+            .fake
+            .emit(session, "message.any", received)
+            .await
+            .unwrap(),
+        200
+    );
+    assert_eq!(notices_while_quiet(&mut agent).await, 0);
+    assert!(notices(&world).await.is_empty());
+}
+
+#[tokio::test]
+async fn the_verb_gates_whatsapp_and_never_notes() {
+    let world = World::new().await;
+    let number = world.connected("balcao", &phone(1)).await;
+    let session = number.session.as_str();
+    // Reads and sends on the number, without "be woken", and a marked link from another agent.
     let mut target = world.agent().await;
     let mut sender = world.agent().await;
-    world.grant(&target.name, "balcao", all(ALL_VERBS)).await;
+    world.grant(&target.name, "balcao", all(READ_SEND)).await;
     at_once(&world, &target, "balcao").await;
     world
         .fixture
@@ -637,7 +703,7 @@ async fn the_switch_gates_whatsapp_and_never_notes() {
         .await
         .unwrap();
 
-    // A WhatsApp message wakes nobody: the switch is off.
+    // A WhatsApp message wakes nobody: the verb is off.
     let received = message(&chat_of(101), "3EB0FF1001", now_s(), false, "hello");
     assert_eq!(
         world

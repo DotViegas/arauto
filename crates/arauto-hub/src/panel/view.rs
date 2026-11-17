@@ -160,8 +160,6 @@ pub struct HermesRow {
     pub state: &'static str,
     /// The aliases of the numbers it reaches.
     pub numbers: Vec<String>,
-    /// Whether the switch "woken by WhatsApp" is on.
-    pub woken: bool,
     /// The version its connector declared. Not verified.
     pub connector: Option<String>,
     /// When the hub last saw it, in words.
@@ -722,8 +720,6 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         .raw("</th><th scope=\"col\">")
         .t(k("Numbers"))
         .raw("</th><th scope=\"col\">")
-        .t(k("Woken by WhatsApp"))
-        .raw("</th><th scope=\"col\">")
         .t(k("Connector"))
         .raw("</th><th scope=\"col\">")
         .t(k("Seen"))
@@ -731,7 +727,7 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         .t(k("Actions"))
         .raw("</span></th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"empty\"><td colspan=\"7\">")
+        html.raw("<tr class=\"empty\"><td colspan=\"6\">")
             .t(k(
                 "No Hermes yet. Connect the first one with the \"Connect Hermes\" button.",
             ))
@@ -744,9 +740,7 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         state(html, row.tone, row.state);
         html.raw("</td><td class=\"second-line\">");
         names(html, &row.numbers);
-        html.raw("</td><td class=\"wide-only\">")
-            .t(if row.woken { k("yes") } else { k("no") })
-            .raw("</td><td class=\"wide-only mono\">");
+        html.raw("</td><td class=\"wide-only mono\">");
         match &row.connector {
             Some(version) => html.text(version),
             None => html.raw("—"),
@@ -783,7 +777,7 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         }
         html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
-            html.raw("<tr class=\"explain\"><td colspan=\"7\">")
+            html.raw("<tr class=\"explain\"><td colspan=\"6\">")
                 .text(explain)
                 .raw("</td></tr>");
         }
@@ -1080,7 +1074,6 @@ mod tests {
                 tone: Tone::Bad,
                 state: k("In quarantine"),
                 numbers: vec![HOSTILE.to_owned(), HOSTILE.to_owned()],
-                woken: true,
                 connector: Some(HOSTILE.to_owned()),
                 seen: HOSTILE.to_owned(),
                 explain: Some(HOSTILE.to_owned()),

@@ -106,8 +106,8 @@ async fn a_connector_enters_with_the_invite_and_the_code_and_reaches_the_session
 }
 
 /// `arauto_status` is answered by the hub, without the engine: connected, the name, whether
-/// what can wake it (`woken_by`: a note through a marked link, WhatsApp through the switch and
-/// the verb), the numbers (none yet) and the links with other Hermes. No secret.
+/// what can wake it (`woken_by`: a note through a marked link, WhatsApp through the verb
+/// "be woken"), the numbers (none yet) and the links with other Hermes. No secret.
 #[tokio::test(flavor = "multi_thread")]
 async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
     let fixture = Fixture::new(settings()).await;
@@ -141,11 +141,6 @@ async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
     .execute(&fixture.pool)
     .await
     .unwrap();
-    fixture
-        .admin
-        .wake(&name, true, fixture.now())
-        .await
-        .unwrap();
     // The link gives it the tools that read: the hub tells the session.
     loop {
         match session
@@ -168,13 +163,12 @@ async fn arauto_status_answers_from_the_hub_and_says_no_secret() {
         "{text}"
     );
     assert!(text.contains(r#""can_be_woken":true"#), "{text}");
-    // The mark of the link wakes by notes; the switch is on but no access has the verb, so
-    // WhatsApp does not.
+    // The mark of the link wakes by notes; no access has the verb, so WhatsApp does not.
     assert!(
         text.contains(r#""woken_by":{"notes":true,"whatsapp":false}"#),
         "{text}"
     );
-    // The mark goes off: nothing wakes it, with the switch still on.
+    // The mark goes off: nothing wakes it.
     sqlx::query("UPDATE peer_link SET wake = FALSE")
         .execute(&fixture.pool)
         .await

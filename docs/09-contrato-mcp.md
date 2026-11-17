@@ -62,14 +62,14 @@ the engine, and the test checks that it carries no secret:
 |---|---|
 | `connected` | Always `true`: the answer only goes out through an open channel session. |
 | `hermes` | The name of the Hermes, in the restricted format. |
-| `can_be_woken` | Something the admin set up can wake this Hermes: `woken_by.notes` or `woken_by.whatsapp`. Until 15/11/2026 it was the switch alone. |
+| `can_be_woken` | Something the admin set up can wake this Hermes: `woken_by.notes` or `woken_by.whatsapp`. Until 15/11/2026 it was the switch alone; since 16/11/2026 ([decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)) there is no switch, and the name stays. |
 | `woken_by.notes` | A link from a live Hermes to this one has the wake mark: a note on it wakes this Hermes, within the notice limits. |
-| `woken_by.whatsapp` | The switch "woken by WhatsApp" is on and some access of this Hermes has the verb "be woken"; whether a given chat wakes still depends on its line, the kind of chat and the state of the number. |
+| `woken_by.whatsapp` | Some access of this Hermes has the verb "be woken" (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the switch "woken by WhatsApp" no longer exists; the name of the field does not change); whether a given chat wakes still depends on its line, the kind of chat and the state of the number. |
 | `numbers` | The numbers and the verbs. Empty until M3; the format of each item is a deliverable of M3. |
 | `peers.can_send` | There is a link from this Hermes to another. |
 | `peers.can_receive` | There is a link from another Hermes to this one. |
 | `peers.enabled` | Either of the two. |
-| `local_waking` | Added by the **connector**, not by the hub (proposal, 15/11/2026, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)): `true` when the connector of this Hermes received the key of Hermes's local API. When `false`, nothing wakes this Hermes whatever `can_be_woken` says. It overwrites any value of the hub. The tool description does not change. |
+| `local_waking` | Added by the **connector**, not by the hub (proposal, 15/11/2026, [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)): `true` when the connector of this Hermes received the key of Hermes's local API. When `false`, nothing wakes this Hermes whatever `can_be_woken` says (the field `can_be_woken` is computed from the notes and the verb; it is no longer a column, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)). It overwrites any value of the hub. The tool description does not change. |
 | `keep_in_memory` | Added by the **connector**, not by the hub (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)): one fixed text, a reminder sentence followed by the three Arauto lines, separated by line breaks. Only on a successful answer. It overwrites any value of the hub. The tool description does not change. The connector cannot know whether the lines are in the memory of Hermes. |
 
 Only the hub's answer is written. Without a channel session (pending request, channel down), the one

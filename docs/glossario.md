@@ -101,7 +101,7 @@
 | Term | What it is |
 |---|---|
 | **Access** | What a Hermes may do on a number. |
-| **Woken by WhatsApp** | The switch of a Hermes: without it no WhatsApp message wakes it. Notes do not depend on it ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)). |
+| **Be woken** | The verb that lets a WhatsApp message wake a Hermes: it holds on the access of the number, or on the line of the chat when the chat has its own rule. Nothing else about the Hermes is consulted. A note between Hermes wakes by the wake mark of the link instead (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the former switch of the Hermes, "Woken by WhatsApp", no longer exists; until then, with [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), it was a second condition for WhatsApp only). |
 | **Verb** | Each thing an access allows: read, send, modify, be woken. |
 | **Scope** | Whether the access applies to every chat of the number or only to the chosen ones. |
 | **Chat line** | An access exception for one chat. |

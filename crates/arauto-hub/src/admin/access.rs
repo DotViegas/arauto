@@ -143,6 +143,50 @@ impl Session {
         })
     }
 
+    /// The panel editor's save: like [`Session::access_grant`], and when the grant does not wake,
+    /// the chats of this access with their own "be woken" lose it in the same transaction. The
+    /// command keeps [`Session::access_grant`].
+    ///
+    /// # Errors
+    /// Those of [`Session::access_grant`].
+    pub async fn access_grant_quieting_lines(
+        &self,
+        hermes: &str,
+        number: &str,
+        grant: Grant,
+        now: i64,
+    ) -> Result<Granted, AdminError> {
+        grant.check().map_err(AdminError::AccessRule)?;
+        let name = hermes_name(hermes)?;
+        let alias = alias(number)?;
+        let changed = repo::access::grant_quieting_lines(
+            &self.pool,
+            &self.mark,
+            self.organization,
+            &self.admin,
+            &name,
+            &alias,
+            &grant,
+            now,
+        )
+        .await?;
+        match changed {
+            Changed::Done(before) => Ok(Granted {
+                grant,
+                before,
+                unchanged: false,
+                warnings: Vec::new(),
+            }),
+            Changed::Unchanged => Ok(Granted {
+                grant,
+                before: Some(grant),
+                unchanged: true,
+                warnings: Vec::new(),
+            }),
+            Changed::Missing(what) => Err(missing(what)),
+        }
+    }
+
     /// `admin access remove HERMES NUMBER`: the access ends, with the lines of its chats.
     /// Returns how many lines went with it.
     ///

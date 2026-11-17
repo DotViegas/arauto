@@ -118,7 +118,8 @@ type Call<'a> = std::pin::Pin<
 enum Op {
     Set(usize, usize, bool),
     Remove(usize, usize),
-    Wake(usize, bool),
+    /// Was the switch of a Hermes (decision 0049): does nothing, keeps the seeds.
+    Nothing,
     Create,
     RemoveHermes(usize),
     SecondPublish(Draft),
@@ -184,7 +185,10 @@ async fn replay(world: &World, seed: u64) -> Result<Seen, String> {
         let op = match rng.below(6) {
             0 => Op::Set(pick(&mut rng), pick(&mut rng), rng.below(2) == 0),
             1 => Op::Remove(pick(&mut rng), pick(&mut rng)),
-            2 => Op::Wake(pick(&mut rng), rng.below(2) == 0),
+            2 => {
+                let _ = (pick(&mut rng), rng.below(2));
+                Op::Nothing
+            }
             3 => Op::Create,
             4 => Op::RemoveHermes(pick(&mut rng)),
             _ => Op::SecondPublish(random_draft(&chart0, &mut rng, &format!("{tag}b"))),
@@ -232,11 +236,7 @@ async fn replay(world: &World, seed: u64) -> Result<Seen, String> {
                         .await
                         .map_err(|e| format!("link_remove: {e}"))?;
                 }
-                Op::Wake(a, on) => {
-                    hermes::set_wake(pool, mark, org_, admin, &name(a), on, world.now())
-                        .await
-                        .map_err(|e| format!("set_wake: {e}"))?;
-                }
+                Op::Nothing => {}
                 Op::Create => {
                     world.hermes().await;
                 }

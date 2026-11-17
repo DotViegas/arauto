@@ -287,7 +287,7 @@ pub async fn remove(
             .await?;
     }
     sqlx::query(
-        "UPDATE hermes SET deleted_at = $3, can_be_woken = FALSE, wake_reason = NULL \
+        "UPDATE hermes SET deleted_at = $3 \
          WHERE organization_id = $1 AND id = $2",
     )
     .bind(organization.id())
@@ -311,60 +311,4 @@ pub async fn remove(
         closed,
         links_removed: u64::try_from(links.len()).unwrap_or(u64::MAX),
     }))
-}
-
-/// The outcome of [`set_wake`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WakeOutcome {
-    /// The mark changed.
-    Changed,
-    /// It already was as asked. Nothing was written.
-    Unchanged,
-    /// There is no Hermes with that name.
-    NotFound,
-}
-
-/// Marks whether a Hermes may be woken by WhatsApp (the switch; notes do not depend on it): whether a WhatsApp notice may start a run of it.
-///
-/// # Errors
-/// [`RepoError::Restored`] when the database is behind the audit mark: nothing is written.
-pub async fn set_wake(
-    pool: &PgPool,
-    mark: &Mark,
-    organization: ResolvedOrg,
-    admin: &Admin,
-    name: &HermesName,
-    can_be_woken: bool,
-    now: i64,
-) -> Result<WakeOutcome, RepoError> {
-    let mut write = audit::begin_security(pool, mark).await?;
-    let Some(locked) = lock_hermes_by_name(write.connection(), organization, name).await? else {
-        write.rollback().await?;
-        return Ok(WakeOutcome::NotFound);
-    };
-    if locked.hermes.can_be_woken == can_be_woken {
-        write.rollback().await?;
-        return Ok(WakeOutcome::Unchanged);
-    }
-    sqlx::query(
-        "UPDATE hermes SET can_be_woken = $3, wake_reason = NULL \
-         WHERE organization_id = $1 AND id = $2",
-    )
-    .bind(organization.id())
-    .bind(locked.hermes.id)
-    .bind(can_be_woken)
-    .execute(write.connection())
-    .await?;
-    write
-        .record(
-            now,
-            &Event::new(Action::HermesWakeChanged, admin.actor())
-                .in_organization(organization)
-                .about(TargetKind::Hermes, locked.hermes.id)
-                .with(Details::new().flag("can_be_woken", can_be_woken)),
-        )
-        .await?;
-    notify_hub(write.connection(), organization, "hermes", locked.hermes.id).await?;
-    write.commit().await?;
-    Ok(WakeOutcome::Changed)
 }

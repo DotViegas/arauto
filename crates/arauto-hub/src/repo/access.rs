@@ -577,6 +577,116 @@ pub async fn grant(
     grant: &Grant,
     now: i64,
 ) -> Result<Changed<Option<Grant>>, RepoError> {
+    grant_with(
+        pool,
+        mark,
+        organization,
+        admin,
+        name,
+        alias,
+        grant,
+        false,
+        now,
+    )
+    .await
+}
+
+/// Like [`grant`], and when this write turns "be woken" off on the access (it had the verb and
+/// the grant does not), the lines of the chats of this access that have their own "be woken"
+/// lose it too, in the same transaction, each with its event like `set_chat` writes. In every
+/// other case the lines stay as they were: a grant that wakes, an access that already did not
+/// wake, an access that already was as asked. A group wakes only by a line of its own, so a
+/// save that changes something else must not silence it.
+///
+/// # Errors
+/// [`RepoError::Restored`] when the database is behind the audit mark: nothing is written.
+#[allow(clippy::too_many_arguments)]
+pub async fn grant_quieting_lines(
+    pool: &PgPool,
+    mark: &Mark,
+    organization: ResolvedOrg,
+    admin: &Admin,
+    name: &HermesName,
+    alias: &NumberAlias,
+    grant: &Grant,
+    now: i64,
+) -> Result<Changed<Option<Grant>>, RepoError> {
+    grant_with(
+        pool,
+        mark,
+        organization,
+        admin,
+        name,
+        alias,
+        grant,
+        true,
+        now,
+    )
+    .await
+}
+
+/// Turns "be woken" off on every line of the chats of `access` that has it on, one event each.
+/// Returns how many lines changed.
+async fn quiet_lines(
+    write: &mut SecurityWrite,
+    organization: ResolvedOrg,
+    admin: &Admin,
+    target: &Target,
+    access: Uuid,
+    now: i64,
+) -> Result<usize, RepoError> {
+    let rows: Vec<(Uuid, bool, bool, bool)> = sqlx::query_as(
+        "SELECT chat_id, can_read, can_send, can_modify FROM access_chat \
+         WHERE organization_id = $1 AND access_id = $2 AND can_wake \
+         ORDER BY chat_id FOR UPDATE",
+    )
+    .bind(organization.id())
+    .bind(access)
+    .fetch_all(write.connection())
+    .await?;
+    for (chat, read, send, modify) in &rows {
+        sqlx::query(
+            "UPDATE access_chat SET can_wake = FALSE, changed_at = $4 \
+             WHERE organization_id = $1 AND access_id = $2 AND chat_id = $3",
+        )
+        .bind(organization.id())
+        .bind(access)
+        .bind(chat)
+        .bind(now)
+        .execute(write.connection())
+        .await?;
+        let before = verbs_of(*read, *send, *modify, true);
+        let after = verbs_of(*read, *send, *modify, false);
+        write
+            .record(
+                now,
+                &Event::new(Action::AccessChatSet, admin.actor())
+                    .in_organization(organization)
+                    .about(TargetKind::Access, access)
+                    .with(
+                        about(target)
+                            .id("chat", *chat)
+                            .words("verbs", &after.words())
+                            .words("verbs_before", &before.words()),
+                    ),
+            )
+            .await?;
+    }
+    Ok(rows.len())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn grant_with(
+    pool: &PgPool,
+    mark: &Mark,
+    organization: ResolvedOrg,
+    admin: &Admin,
+    name: &HermesName,
+    alias: &NumberAlias,
+    grant: &Grant,
+    quiet_lines_too: bool,
+    now: i64,
+) -> Result<Changed<Option<Grant>>, RepoError> {
     let mut write = audit::begin_security(pool, mark).await?;
     let target = match target(write.connection(), organization, name, alias).await? {
         Ok(target) => target,
@@ -586,6 +696,11 @@ pub async fn grant(
         }
     };
     let before = locked_access(write.connection(), organization, &target).await?;
+    // The lines go quiet only when this write turns "be woken" from on to off. A save that leaves
+    // it off (or on) never touches them: a chat line may wake while its access does not.
+    let quiet = quiet_lines_too
+        && !grant.verbs.wake
+        && before.as_ref().is_some_and(|(_, old)| old.verbs.wake);
     let (id, action) = match &before {
         Some((_, old)) if old == grant => {
             write.rollback().await?;
@@ -645,6 +760,9 @@ pub async fn grant(
                 .with(grant_details(about(&target), grant, old.as_ref())),
         )
         .await?;
+    if quiet {
+        quiet_lines(&mut write, organization, admin, &target, id, now).await?;
+    }
     notify_hub(write.connection(), organization, "hermes", target.hermes).await?;
     write.commit().await?;
     Ok(Changed::Done(old))

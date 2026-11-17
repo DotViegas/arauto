@@ -11,7 +11,7 @@ error.
 there are T1, T4 and T6, read-only, the alert banner, and T2 with T3, in a single guide, in a window
 over the list: name, block, code and done. In T1 each line has the buttons to connect, continue or
 reconnect, and the one to revoke, which asks first; delete is still only in the
-command (15/11/2026, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md): the switch "woken by WhatsApp" is set in the access editor too). In T6 each cell opens the access editor, in a window; choosing the chats of the scope
+command (15/11/2026, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md) added the switch "woken by WhatsApp" to the access editor; 16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md) removed it). In T6 each cell opens the access editor, in a window; choosing the chats of the scope
 "only chosen chats" is still only in the command. The other screens are still
 design. T0 exists in part (see below): one gets in with a passkey, whose first registration is
 opened by an installation code. The panel session lasts 12 hours, or 30 minutes without use, and
@@ -113,8 +113,8 @@ click could lose a click that lands in the instant of a swap.
 ## T1. Hermes
 
 - **Shows:** counters ("5 connected, 1 waiting, 0 in alert") and one line per Hermes: name,
-  state ([10](10-maquinas-de-estado.md), section 3), numbers with access, whether WhatsApp may wake it ("Woken by WhatsApp"),
-  connector version, last seen.
+  state ([10](10-maquinas-de-estado.md), section 3), numbers with access,
+  connector version, last seen. (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the column "Woken by WhatsApp" is gone; whether WhatsApp may wake a Hermes is read from the verb "be woken" of its accesses.)
 - **Hermes card:** the limit of the protection; observed address, current and previous; what the
   device declared, marked as not verified; date of the connection; notices in the queue; latest
   events. Fixed text: "The tools appear on all of this Hermes's conversation platforms. Whoever can
@@ -292,7 +292,7 @@ R read · S send · M modify · W be woken
   chats", chat lines. The screen writes the resulting sentence: "Hermes Bento may read in 3
   chats of the number Counter. It does not send, does not modify and is not woken."
 - **Save** applies on the next call, without restarting anything.
-- The editor also holds the switch "Woken by WhatsApp" of the Hermes, for every number; notes do not depend on it ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md)).
+- The editor holds no switch of the Hermes: the checkbox "Woken by WhatsApp" added by [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md) is removed (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)). "Be woken" is the only checkbox for waking by WhatsApp; its hint says: "the hub gives notice when a message arrives (requires reading). Turning it off also turns it off in the chats of this access that have their own rule." Turning it off removes the verb from those chat lines in the same write; turning it on does not touch them. Notes do not depend on it.
 - **Warnings that do not block:** two Hermes woken or sending in the same chats; a restrictive chat
   line under the scope "all"; **send** granted on a number marked as "command".
 - **Empty:** "Connect a Hermes first"; "Add a WhatsApp first"; "Nobody has access to
@@ -339,5 +339,5 @@ It is in Settings.
 - **Without script:** three read-only lists (levels, Hermes, links) and a sentence saying that editing needs the script.
 - **Live refresh:** the tab refreshes the states like the others, but pauses while there is a draft.
 - **Narrow screens:** the view starts as a list; the map scrolls sideways.
-- **Does not do:** edit accesses to numbers (the card shows them and points to Accesses); edit the WhatsApp switch (the drawer shows it in its numbers section; it is set in the access editor and by the command); put people on the chart; put a Hermes in two levels; tell any Hermes about levels, roles or kinds (stage B, pending). The command twin is `arauto-hub admin org show` and `org publish`.
+- **Does not do:** edit accesses to numbers (the card shows them and points to Accesses); show or edit any WhatsApp waking setting (the drawer no longer has a line for it; 16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md), which removed the switch and the command `admin wake`); put people on the chart; put a Hermes in two levels; tell any Hermes about levels, roles or kinds (stage B, pending). The command twin is `arauto-hub admin org show` and `org publish`.
 - **Not guaranteed:** the draft is lost if the panel session ends before Publish; Publish does not ask for the passkey again (the note on top of this file covers it).

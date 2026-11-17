@@ -48,7 +48,7 @@ A link says: **from A to B**. It has two marks.
 | Mark | What it allows |
 |---|---|
 | **Send note** | A sends a note to B. Every link has it. |
-| **Wake** | A note from A wakes B. The mark is enough: the switch "woken by WhatsApp" of B is not consulted ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026). |
+| **Wake** | A note from A wakes B. The mark is enough: nothing else about B is consulted ([decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md), 15/11/2026). It once said that the switch "woken by WhatsApp" of B was not consulted; since 16/11/2026 the switch no longer exists ([decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)). |
 
 Rules:
 
@@ -170,7 +170,7 @@ Delivery rules:
   only add to the count. A queue full of notes never pushes out a WhatsApp notice.
 - The first notice leaves at once. The next one, from the same sender, only after 10 seconds.
 - The notice is re-evaluated at delivery: if the link lost the wake, if it left, or if either Hermes
-  was removed, it is discarded. The WhatsApp switch of B is not consulted.
+  was removed, it is discarded. The verb "be woken" for WhatsApp is not consulted (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): there is no switch of the Hermes any more).
 - Otherwise, the rules of every notice apply ([08](08-permissoes.md), section 4): at least once,
   with confirmation, for up to 24 hours.
 - A notice that the ceiling blocked is **discarded**, never postponed. If it were postponed, the

@@ -86,6 +86,7 @@ async fn the_list_of_tools_follows_the_matrix_in_the_session_and_in_tools() {
     assert_eq!(agent.started_with(), ["arauto_status"]);
     let status = ok(agent.call("arauto_status", json!({})).await);
     assert_eq!(status["numbers"], json!([]));
+    assert_eq!(status["woken_by"]["whatsapp"], json!(false));
 
     world.grant(&agent.name, "balcao", all(READ)).await;
     assert_eq!(agent.next_tools().await, expected(&[&READ_TOOLS]));
@@ -111,6 +112,9 @@ async fn the_list_of_tools_follows_the_matrix_in_the_session_and_in_tools() {
                 "verbs": ["read", "send", "modify", "wake"], "chat_verbs": [],
                 "can_start_chats": false}])
     );
+    // The verb "be woken" alone says that WhatsApp wakes it (decision 0049).
+    assert_eq!(status["woken_by"]["whatsapp"], json!(true));
+    assert_eq!(status["can_be_woken"], json!(true));
     let text = Value::Object(status).to_string();
     assert!(!text.contains(&phone(1)), "{text}");
 

@@ -16,8 +16,7 @@
 //! **A notice is a pointer.** It carries who sent and how many, never the text or the thread.
 //! One pending notice per sender: what comes next adds to its count. It is judged again when
 //! it leaves: without the link, without its wake mark, or when either Hermes was removed, it
-//! is discarded. The switch "woken by WhatsApp" of the recipient is not consulted (decision
-//! 0045).
+//! is discarded. No switch of the recipient is consulted (decisions 0045 and 0049).
 
 use arauto_protocol::errors::RetryAfter;
 use arauto_protocol::limits::{
@@ -1297,10 +1296,10 @@ pub enum NoticeTarget {
 /// the hub waits for the `notice_ack`. Before that it puts back the ones whose lease ended
 /// and expires the ones past their life. Each one is judged again. A notice of messages of a
 /// Hermes: without the link, without its wake mark, or when either Hermes was removed, it is
-/// discarded; the switch "woken by WhatsApp" is not consulted (decision 0045). A notice of
+/// discarded; no switch of the Hermes is consulted (decisions 0045 and 0049). A notice of
 /// WhatsApp: without the verb "be woken" in that chat (`repo::wake`), with a number that is
-/// not connected, or with a Hermes whose switch "woken by WhatsApp" went off, it is
-/// discarded.
+/// not connected, or with a Hermes that was removed, it is discarded. The verb alone decides
+/// (decision 0049); the Hermes has no switch.
 ///
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.
@@ -1375,7 +1374,7 @@ pub async fn lease(
     let left = i64::from(limit).saturating_sub(i64::try_from(judged.len()).unwrap_or(i64::MAX));
     let rows: Vec<(Uuid, i32, String, Uuid, bool)> = sqlx::query_as(
         "SELECT n.id, n.count, m.alias, n.chat_id, \
-                (h.can_be_woken AND m.state = 'connected' \
+                (h.deleted_at IS NULL AND m.state = 'connected' \
                  AND COALESCE(c.can_wake, \
                               a.scope = 'all' AND a.can_wake AND ch.kind = 'contact' \
                               AND NOT (ch.hidden_id AND EXISTS (SELECT 1 FROM access_chat x \
