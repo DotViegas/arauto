@@ -271,7 +271,7 @@ impl Hostile {
     }
 }
 
-/// The bytes of a `hello` of this build.
+/// The bytes of a `hello` that offers version 1 only, as a connector of the first version does.
 fn hello_bytes(purpose: Purpose) -> Result<Vec<u8>, KitError> {
     Ok(encode(&hello((1, 1), purpose)?)?)
 }

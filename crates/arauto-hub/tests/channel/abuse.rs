@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::frame::FLAG_FIN;
-use arauto_protocol::message::{HelloOk, Message, Ping, Purpose, Saved};
+use arauto_protocol::message::{HelloOk, Message, PROTOCOL_VERSION, Ping, Purpose, Saved};
 use arauto_testkit::connector::{TestConnector, hello, identity};
 use arauto_testkit::hostile::{self, HandshakeStep, Numbering, padded_hello, unknown_message};
 use arauto_testkit::{Ended, RawSocket};
@@ -25,7 +25,7 @@ async fn still_serves(hub: &TestHub) {
         .unwrap();
     assert_eq!(
         connector.hello(Purpose::Leave).await.unwrap(),
-        HelloOk::Agreed(1)
+        HelloOk::Agreed(PROTOCOL_VERSION)
     );
 }
 

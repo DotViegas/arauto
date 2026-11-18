@@ -272,6 +272,7 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         takes_orders_on: Some(Some(format!("+{own}"))),
         self_chat: false,
         orders_from: Some(vec![format!("+{contact}")]),
+        outside_whatsapp: false,
     };
     let recorded = world
         .fixture

@@ -259,7 +259,9 @@ pub const CATALOG: &[ToolSpec] = &[
                       identifier of a chat or group as a listing gave it. `reply_to` answers a \
                       message by its `message_id`; `mentions` marks people of a group by their \
                       telephones. Returns the identifiers of the chat and of the new message. \
-                      At most 20 sendings per minute per number.",
+                      At most 20 sendings per minute per number. Do not write through Arauto in \
+                      a chat where you take orders: reply or report in that chat the way its \
+                      orders reach you, outside Arauto.",
         schema: whatsapp::send_text_schema,
     },
     ToolSpec {
@@ -269,7 +271,9 @@ pub const CATALOG: &[ToolSpec] = &[
                       file in base64, up to 3 MB, and `mimetype` its media type; `caption` goes \
                       with an image or a document. `to` is a telephone with the code of the \
                       country, or the identifier of a chat or group. At most 20 sendings per \
-                      minute per number.",
+                      minute per number. Do not write through Arauto in a chat where you take \
+                      orders: reply or report in that chat the way its orders reach you, \
+                      outside Arauto.",
         schema: whatsapp::send_file_schema,
     },
     ToolSpec {
@@ -300,7 +304,9 @@ pub const CATALOG: &[ToolSpec] = &[
         description: "Forwards a message, given by its `message_id`, to another chat of the \
                       same number: `to` is a telephone with the code of the country, or the \
                       identifier of a chat or group. Needs reading in the chat of the message \
-                      and sending in the other. At most 20 sendings per minute per number.",
+                      and sending in the other. At most 20 sendings per minute per number. Do \
+                      not write through Arauto in a chat where you take orders: reply or report \
+                      in that chat the way its orders reach you, outside Arauto.",
         schema: whatsapp::forward_schema,
     },
     // ------------------------------------------------------------------ WhatsApp: modify
@@ -728,6 +734,30 @@ mod tests {
     // -----------------------------------------------------------------------------------------
     // Catalog
     // -----------------------------------------------------------------------------------------
+
+    /// Decision 0051 (18/11/2026, R2): the three tools that choose where a message goes tell every
+    /// Hermes, up front, not to write through Arauto in a chat where it takes orders. No other
+    /// tool says it.
+    #[test]
+    fn the_tools_that_choose_a_destination_say_where_not_to_write() {
+        const SENTENCE: &str = "Do not write through Arauto in a chat where you take orders: reply or report in that chat the way its orders reach you, outside Arauto.";
+        for tool in CATALOG {
+            let expected =
+                [WHATSAPP_SEND_TEXT, WHATSAPP_SEND_FILE, WHATSAPP_FORWARD].contains(&tool.name);
+            assert_eq!(
+                tool.description.ends_with(SENTENCE),
+                expected,
+                "{}",
+                tool.name
+            );
+            assert_eq!(
+                tool.description.matches(SENTENCE).count(),
+                usize::from(expected),
+                "{}",
+                tool.name
+            );
+        }
+    }
 
     #[test]
     fn names_are_unique_and_in_the_format() {

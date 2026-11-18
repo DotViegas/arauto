@@ -1114,3 +1114,51 @@ async fn the_record_of_who_gives_a_hermes_orders_comes_empty_and_the_schema_keep
             .unwrap();
     assert_eq!(left, 0);
 }
+
+/// Orders from outside WhatsApp (migration 0023): the table comes to a database that has data,
+/// empty, with one row per Hermes and only for a Hermes that exists.
+#[tokio::test]
+async fn the_answer_of_orders_from_outside_whatsapp_comes_empty_and_keeps_one_row_per_hermes() {
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 23)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+    assert!(!table_exists(&db.pool, "hermes_orders_outside_whatsapp").await);
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+    assert!(table_exists(&db.pool, "hermes_orders_outside_whatsapp").await);
+    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM hermes_orders_outside_whatsapp")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0, "the table starts empty");
+
+    let home = TestHome::new();
+    let organization = common::organization(&db.pool, &home).await;
+    let hermes = common::hermes(&db.pool, organization).await;
+    let insert = |hermes: uuid::Uuid| {
+        let pool = db.pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO hermes_orders_outside_whatsapp \
+                     (organization_id, hermes_id, created_at) VALUES ($1, $2, 1)",
+            )
+            .bind(organization.id())
+            .bind(hermes)
+            .execute(&pool)
+            .await
+        }
+    };
+    assert!(insert(hermes).await.is_ok());
+    assert!(insert(hermes).await.is_err(), "one row per Hermes");
+    assert!(
+        insert(uuid::Uuid::new_v4()).await.is_err(),
+        "only for a Hermes that exists"
+    );
+}

@@ -1496,4 +1496,21 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
         "已保存。在 WhatsApp 上向 {hermes} 下指令的是：{orders}。",
     ),
+    (
+        "Outside WhatsApp: another conversation platform, like Telegram",
+        "WhatsApp 之外：另一个聊天平台，例如 Telegram",
+    ),
+    (
+        "Arauto then refuses nothing for {hermes}. The hub cannot check it: if {hermes} also takes orders on a WhatsApp, record that WhatsApp instead.",
+        "这样 Arauto 不会为 {hermes} 拒绝任何内容。中心无法核实这一点：如果 {hermes} 也在某个 WhatsApp 上接收指令，请改为记录那个 WhatsApp。",
+    ),
+    (
+        "Orders from outside WhatsApp take no telephone: choose It has no WhatsApp, and leave These telephones and Other telephones empty. Nothing was saved.",
+        "来自 WhatsApp 之外的指令不需要电话：请选择“它没有 WhatsApp”，并将“这些电话”和“其他电话”留空。未保存任何内容。",
+    ),
+    ("outside WhatsApp", "WhatsApp 之外"),
+    (
+        "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
+        "已保存。{hermes} 的指令来自 WhatsApp 之外：Arauto 不会为它拒绝任何内容。",
+    ),
 ];

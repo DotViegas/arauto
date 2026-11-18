@@ -1538,4 +1538,21 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
         "सहेजा गया। {hermes} को WhatsApp पर आदेश कौन देता है: {orders}।",
     ),
+    (
+        "Outside WhatsApp: another conversation platform, like Telegram",
+        "WhatsApp के बाहर: कोई और बातचीत का प्लेटफ़ॉर्म, जैसे Telegram",
+    ),
+    (
+        "Arauto then refuses nothing for {hermes}. The hub cannot check it: if {hermes} also takes orders on a WhatsApp, record that WhatsApp instead.",
+        "तब Arauto {hermes} के लिए कुछ भी मना नहीं करता। हब इसे जाँच नहीं सकता: अगर {hermes} किसी WhatsApp पर भी आदेश लेता है, तो उसके बजाय वह WhatsApp दर्ज करें।",
+    ),
+    (
+        "Orders from outside WhatsApp take no telephone: choose It has no WhatsApp, and leave These telephones and Other telephones empty. Nothing was saved.",
+        "WhatsApp के बाहर से आने वाले आदेशों में कोई टेलीफ़ोन नहीं होता: उसके पास WhatsApp नहीं है चुनें, और ये फ़ोन तथा अन्य फ़ोन खाली छोड़ें। कुछ सहेजा नहीं गया।",
+    ),
+    ("outside WhatsApp", "WhatsApp के बाहर"),
+    (
+        "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
+        "सहेजा गया। {hermes} अपने आदेश WhatsApp के बाहर से लेता है: Arauto उसके लिए कुछ भी मना नहीं करता।",
+    ),
 ];

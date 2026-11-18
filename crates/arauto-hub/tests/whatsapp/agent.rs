@@ -7,7 +7,7 @@ use arauto_hub::core::access::{Grant, Scope, Verbs};
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::message::{CallOutcome, Message, ToolList};
 use arauto_testkit::KitError;
-use arauto_testkit::device::SessionClient;
+use arauto_testkit::device::{Faults, SessionClient};
 use serde_json::{Map, Value};
 
 use crate::world::World;
@@ -186,6 +186,20 @@ impl World {
             tools: Vec::new(),
             next: 0,
         }
+    }
+
+    /// A new Hermes in session through a connector that offers protocol version 1 only, as every
+    /// connector built before 18/11/2026 does.
+    pub async fn agent_of_version_1(&self) -> Agent {
+        let (name, device) = self.fixture.approved().await;
+        let session = device
+            .speaking((1, 1))
+            .channel(Faults::default())
+            .await
+            .unwrap()
+            .session()
+            .unwrap();
+        Agent::from_session(name, session)
     }
 
     /// `admin access grant`.

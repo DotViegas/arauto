@@ -111,7 +111,7 @@ fn golden() -> Vec<(Message, String)> {
     vec![
         (
             hello(Purpose::Channel),
-            r#"{"t":"hello","proto":[1,1],"connector":"0.1.0","purpose":"channel"}"#.to_owned(),
+            r#"{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"channel"}"#.to_owned(),
         ),
         (
             Message::Hello(Hello {
@@ -123,7 +123,7 @@ fn golden() -> Vec<(Message, String)> {
         ),
         (
             hello(Purpose::Leave),
-            r#"{"t":"hello","proto":[1,1],"connector":"0.1.0","purpose":"leave"}"#.to_owned(),
+            r#"{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"leave"}"#.to_owned(),
         ),
         (Message::HelloOk(HelloOk::Agreed(1)), r#"{"t":"hello_ok","proto":1}"#.to_owned()),
         (
@@ -250,6 +250,13 @@ fn golden() -> Vec<(Message, String)> {
             r#"{"t":"result","id":3,"ok":false,"code":"AR-711"}"#.to_owned(),
         ),
         (
+            Message::Result(CallResult {
+                id: call_id(4),
+                outcome: CallOutcome::Refused { code: ErrorCode::Ar714, retry_after: None },
+            }),
+            r#"{"t":"result","id":4,"ok":false,"code":"AR-714"}"#.to_owned(),
+        ),
+        (
             Message::Notice(NoticeMsg::new(
                 notice_id(),
                 &Notice::Peer {
@@ -338,12 +345,12 @@ fn the_golden_list_covers_every_type_of_message() {
 
 #[test]
 fn the_hello_of_the_document() {
-    let text = r#"{"t":"hello","proto":[1,1],"connector":"0.1.0","purpose":"channel"}"#;
+    let text = r#"{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"channel"}"#;
     let message = read(text).unwrap();
     let Message::Hello(hello) = &message else {
         panic!("not a hello: {message:?}")
     };
-    assert_eq!((hello.proto.min(), hello.proto.max()), (1, 1));
+    assert_eq!((hello.proto.min(), hello.proto.max()), (1, 2));
     assert_eq!(hello.connector.as_str(), "0.1.0");
     assert_eq!(hello.purpose, Purpose::Channel);
     assert_eq!(write(&message), text);
@@ -384,7 +391,7 @@ fn unknown_fields_are_ignored() {
     );
     assert!(matches!(read(&text), Ok(Message::Enroll(_))));
     // And in a different order, with white space around.
-    let text = " {\n  \"purpose\": \"channel\",\n  \"connector\": \"0.1.0\",\n  \"proto\": [1, 1],\n  \"t\": \"hello\"\n}\n";
+    let text = " {\n  \"purpose\": \"channel\",\n  \"connector\": \"0.1.0\",\n  \"proto\": [1, 2],\n  \"t\": \"hello\"\n}\n";
     assert_eq!(read(text), Ok(hello(Purpose::Channel)));
 }
 
@@ -1158,7 +1165,9 @@ fn the_connector_checks_the_agreed_version_against_what_it_offered() {
     assert!(HelloOk::Outdated.fits(ProtoRange::CURRENT));
     assert!(ProtoRange::CURRENT.contains(PROTOCOL_VERSION));
     assert!(!ProtoRange::CURRENT.contains(0));
-    assert!(!ProtoRange::CURRENT.contains(2));
+    assert!(ProtoRange::CURRENT.contains(1));
+    assert!(ProtoRange::CURRENT.contains(2));
+    assert!(!ProtoRange::CURRENT.contains(3));
     assert!(range(u32::MAX, u32::MAX).contains(u32::MAX));
     assert!(range(1, u32::MAX).contains(1));
 
@@ -2050,14 +2059,14 @@ fn protocol_versions_are_negotiated_to_the_highest_in_common() {
     assert_eq!(ProtoRange::new(0, 1), None);
     assert_eq!(ProtoRange::new(2, 1), None);
     assert_eq!(ProtoRange::new(0, 0), None);
-    assert_eq!(ProtoRange::CURRENT, range(1, 1));
+    assert_eq!(ProtoRange::CURRENT, range(1, 2));
     assert_eq!(
         (
             PROTOCOL_VERSION,
             ProtoRange::CURRENT.min(),
             ProtoRange::CURRENT.max()
         ),
-        (1, 1, 1)
+        (2, 1, 2)
     );
 
     let hub = range(3, 5);
@@ -2073,7 +2082,20 @@ fn protocol_versions_are_negotiated_to_the_highest_in_common() {
     assert_eq!(hub.negotiate(range(6, 6)), Negotiation::ConnectorTooNew);
     assert_eq!(
         ProtoRange::CURRENT.negotiate(ProtoRange::CURRENT),
+        Negotiation::Agreed(2)
+    );
+    // A connector of the first version keeps working.
+    assert_eq!(
+        ProtoRange::CURRENT.negotiate(range(1, 1)),
         Negotiation::Agreed(1)
+    );
+    assert_eq!(
+        ProtoRange::CURRENT.negotiate(range(2, 2)),
+        Negotiation::Agreed(2)
+    );
+    assert_eq!(
+        ProtoRange::CURRENT.negotiate(range(3, 3)),
+        Negotiation::ConnectorTooNew
     );
 }
 

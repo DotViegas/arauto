@@ -78,6 +78,13 @@ const ITS_WHATSAPP_TAG: &str = k("its WhatsApp");
 const OTHER_TELEPHONES: &str = k("Other telephones");
 const OTHER_TELEPHONES_HINT: &str =
     k("Telephones that are not numbers of Arauto, one per line. At most 16 telephones in all.");
+const OUTSIDE: &str = k("Outside WhatsApp: another conversation platform, like Telegram");
+const OUTSIDE_HINT: &str = k(
+    "Arauto then refuses nothing for {hermes}. The hub cannot check it: if {hermes} also takes orders on a WhatsApp, record that WhatsApp instead.",
+);
+const OUTSIDE_WITH_A_TELEPHONE: &str = k(
+    "Orders from outside WhatsApp take no telephone: choose It has no WhatsApp, and leave These telephones and Other telephones empty. Nothing was saved.",
+);
 const CHOSEN: &str = k("{alias} is chosen. Nothing is saved until you save.");
 const CHOSEN_AS_BRIDGE: &str =
     k("{alias} is chosen as its WhatsApp, in place of {before}. Nothing is saved until you save.");
@@ -165,6 +172,17 @@ pub enum Takes {
     Unchosen,
 }
 
+/// The choice of "Orders come from".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    /// Its own WhatsApp, in the chat with itself.
+    Own,
+    /// "These telephones".
+    List,
+    /// Outside WhatsApp: another conversation platform.
+    Outside,
+}
+
 /// What the form has in it, as it was sent: kept as text so that a refusal gives it back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Typed {
@@ -172,8 +190,8 @@ pub struct Typed {
     pub takes: Takes,
     /// The "Another telephone" field, trimmed; carried whatever `takes` is.
     pub takes_other: String,
-    /// "Its own WhatsApp": `self-chat`.
-    pub own: bool,
+    /// The choice of "Orders come from".
+    pub source: Source,
     /// The numbers checked under "These telephones", by alias.
     pub gives: Vec<String>,
     /// "Other telephones", one per line; a line break is always `\n`.
@@ -215,7 +233,13 @@ impl Typed {
         Self {
             takes,
             takes_other,
-            own: record.self_chat,
+            source: if record.outside_whatsapp {
+                Source::Outside
+            } else if record.self_chat {
+                Source::Own
+            } else {
+                Source::List
+            },
             gives,
             from: from.join("\n"),
             to_numbers,
@@ -271,7 +295,11 @@ impl Typed {
         Ok(Self {
             takes,
             takes_other: text("takes_other").trim().to_owned(),
-            own: text("source") == "self",
+            source: match text("source").as_str() {
+                "self" => Source::Own,
+                "outside" => Source::Outside,
+                _ => Source::List,
+            },
             gives,
             from: text("from"),
             to_numbers: text("return") == "whatsapps",
@@ -314,6 +342,8 @@ pub enum Problem {
     TooMany(usize),
     /// Another Hermes takes orders on that telephone.
     Taken(String),
+    /// Outside WhatsApp with a telephone, self-chat or a list.
+    OutsideWithATelephone,
     /// Typed telephones that need a look: how many.
     Check(usize),
     /// The database came back from a backup.
@@ -351,6 +381,7 @@ impl Problem {
             Invalid::NoTelephoneOfTheHermes => Problem::NeedsBridge,
             Invalid::TooMany => Problem::TooMany(after.orders_from.len()),
             Invalid::BridgeAmongGivers => analysis.bridge_among_givers(),
+            Invalid::OutsideWithATelephone => Problem::OutsideWithATelephone,
         }
     }
 }
@@ -607,13 +638,14 @@ impl Analysis {
 
     /// The edit the command would be given: every field of the form is the whole answer. The list
     /// is sent also with its own chat, so that the rule refuses the two together.
-    fn edit(&self, own: bool) -> OrdersEdit {
+    fn edit(&self, source: Source) -> OrdersEdit {
         let mut from: Vec<String> = self.gives.iter().map(|g| plus(&g.phone)).collect();
         from.extend(self.lines.iter().map(|line| line.text.clone()));
         OrdersEdit {
             takes_orders_on: Some(self.takes_text.clone()),
-            self_chat: own,
+            self_chat: source == Source::Own,
             orders_from: Some(from),
+            outside_whatsapp: source == Source::Outside,
         }
     }
 
@@ -835,7 +867,15 @@ fn carry(html: &mut Html, hermes: &str, typed: &Typed, ack: Option<&str>) {
         Takes::Unchosen => {}
     }
     hidden(html, "takes_other", &typed.takes_other);
-    hidden(html, "source", if typed.own { "self" } else { "list" });
+    hidden(
+        html,
+        "source",
+        match typed.source {
+            Source::Own => "self",
+            Source::Outside => "outside",
+            Source::List => "list",
+        },
+    );
     for alias in &typed.gives {
         hidden(html, "gives", alias);
     }
@@ -863,6 +903,7 @@ fn say(html: &mut Html, hermes: &str, problem: &Problem) {
         Problem::SelfChatWithAList => html.t(SELF_WITH_LIST),
         Problem::NeedsBridge => html.fill(NEEDS_BRIDGE, &[("hermes", Arg::Text(hermes))]),
         Problem::BridgeAmongGivers { .. } => html.t(BRIDGE_GIVES),
+        Problem::OutsideWithATelephone => html.t(OUTSIDE_WITH_A_TELEPHONE),
         Problem::TooMany(n) => html.fill(TOO_MANY, &[("n", Arg::Number(*n))]),
         Problem::Taken(other) => html.fill(TAKEN, &[("other", Arg::Text(other))]),
         Problem::Check(1) => html.t(CHECK_ONE),
@@ -888,6 +929,10 @@ struct Marks {
 fn marks(problem: Option<&Problem>, typed: &Typed, readback: Option<&Readback>) -> Marks {
     let mut marks = Marks::default();
     match problem {
+        Some(Problem::OutsideWithATelephone) => {
+            marks.takes = true;
+            marks.source = true;
+        }
         Some(
             Problem::TakesUnchosen | Problem::NeedsBridge | Problem::GoneNumber { takes: true, .. },
         ) => marks.takes = true,
@@ -1172,13 +1217,21 @@ fn source_fieldset(html: &mut Html, window: &Window<'_>, marks: &Marks) {
     html.raw("><legend>")
         .t(k("Orders come from"))
         .raw("</legend><label class=\"option\"><input type=\"radio\" name=\"source\" value=\"self\"")
-        .raw(if typed.own { " checked" } else { "" })
+        .raw(if typed.source == Source::Own {
+            " checked"
+        } else {
+            ""
+        })
         .raw("><span>")
         .t(k(
             "Its own WhatsApp, in the chat with itself (self-chat mode)",
         ))
         .raw("</span></label><label class=\"option\"><input type=\"radio\" name=\"source\" value=\"list\"")
-        .raw(if typed.own { "" } else { " checked" })
+        .raw(if typed.source == Source::List {
+            " checked"
+        } else {
+            ""
+        })
         .raw("><span>")
         .t(THESE_TELEPHONES)
         .raw("</span></label><div class=\"orders-sub orders-list\">");
@@ -1252,7 +1305,18 @@ fn source_fieldset(html: &mut Html, window: &Window<'_>, marks: &Marks) {
             .fill(COUNT, &[("n", Arg::Number(read.count))])
             .raw("</p>");
     }
-    html.raw("</div></div></fieldset>");
+    html.raw("</div></div>")
+        .raw("<label class=\"option\"><input type=\"radio\" name=\"source\" value=\"outside\"")
+        .raw(if typed.source == Source::Outside {
+            " checked"
+        } else {
+            ""
+        })
+        .raw(" aria-describedby=\"orders-outside-hint\"><span>")
+        .t(OUTSIDE)
+        .raw("</span></label><p class=\"hint\" id=\"orders-outside-hint\">")
+        .fill(OUTSIDE_HINT, &[("hermes", Arg::Text(window.hermes))])
+        .raw("</p></fieldset>");
 }
 
 /// The window of a Hermes, over the page behind it.
@@ -1346,7 +1410,7 @@ impl Risk {
 
     fn of(before: &OrdersRecord, after: &OrdersRecord) -> Self {
         Self {
-            nothing_protected: after.protects_nothing(),
+            nothing_protected: after.needs_the_warning(),
             removes: before.loses_a_pair_in(after),
         }
     }
@@ -1715,14 +1779,20 @@ async fn open(cx: &Cx<'_>, query: Option<&str>) -> Result<Response<Body>, RepoEr
         if picks.iter().all(|pick| pick.alias != alias) {
             problem = Some(Problem::GoneNumber { alias, takes });
         } else if !takes {
-            typed.own = false;
+            typed.source = Source::List;
             if !typed.gives.contains(&alias) {
                 typed.gives.push(alias.clone());
             }
             notice = Some(Notice::Chosen(alias));
         } else if typed.takes == Takes::Number(alias.clone()) {
+            if typed.source == Source::Outside {
+                typed.source = Source::List;
+            }
             notice = Some(Notice::Chosen(alias));
         } else {
+            if typed.source == Source::Outside {
+                typed.source = Source::List;
+            }
             let before = match &typed.takes {
                 Takes::Number(current) => picks
                     .iter()
@@ -1865,7 +1935,7 @@ async fn save(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoErro
     if let Some(problem) = analysis.first_problem() {
         return cx.refuse(hermes, &typed, &picks, &analysis, &problem).await;
     }
-    let edit = analysis.edit(typed.own);
+    let edit = analysis.edit(typed.source);
     let after = match preview(&before, &edit) {
         Ok(after) => after,
         Err(error) => {
@@ -2014,7 +2084,7 @@ mod tests {
         Typed {
             takes: Takes::Other,
             takes_other: HOSTILE.to_owned(),
-            own: false,
+            source: Source::List,
             gives: vec![HOSTILE.to_owned()],
             from: format!("{HOSTILE}\n+5511900000002"),
             to_numbers: false,
@@ -2086,6 +2156,7 @@ mod tests {
             Problem::BadLine(2),
             Problem::SelfChatWithAList,
             Problem::NeedsBridge,
+            Problem::OutsideWithATelephone,
             Problem::BridgeAmongGivers {
                 aliases: vec![HOSTILE.to_owned()],
                 lines: vec![1],
@@ -2158,6 +2229,7 @@ mod tests {
             takes_orders_on: Some(bridge.clone()),
             self_chat: false,
             orders_from: vec![Phone::parse(&phone(1)).unwrap(), bridge.clone()],
+            outside_whatsapp: false,
         };
         let after = OrdersRecord {
             takes_orders_on: Some(bridge),
@@ -2220,7 +2292,7 @@ mod tests {
         let mut typed = Typed {
             takes: Takes::Number("ponte".to_owned()),
             takes_other: String::new(),
-            own: false,
+            source: Source::List,
             gives: Vec::new(),
             from: from.join("\n"),
             to_numbers: false,
@@ -2259,7 +2331,7 @@ mod tests {
             &Typed {
                 takes: Takes::Number("ponte".to_owned()),
                 takes_other: String::new(),
-                own: true,
+                source: Source::Own,
                 gives: Vec::new(),
                 from: "+5511900000002".to_owned(),
                 to_numbers: false,
@@ -2267,7 +2339,7 @@ mod tests {
             &[pick("ponte", 1)],
             &OrdersRecord::default(),
         );
-        let own = a.edit(true);
+        let own = a.edit(Source::Own);
         assert!(own.self_chat);
         assert_eq!(
             own.orders_from,
@@ -2282,7 +2354,7 @@ mod tests {
             &Typed {
                 takes: Takes::None,
                 takes_other: String::new(),
-                own: false,
+                source: Source::List,
                 gives: Vec::new(),
                 from: " +5511900000002 \n\n+5511900000003\n".to_owned(),
                 to_numbers: false,
@@ -2290,7 +2362,7 @@ mod tests {
             &[],
             &OrdersRecord::default(),
         )
-        .edit(false);
+        .edit(Source::List);
         assert_eq!(listed.takes_orders_on, Some(None));
         assert_eq!(
             listed.orders_from,
@@ -2307,6 +2379,7 @@ mod tests {
             takes_orders_on: takes.then(|| Phone::parse("+5511900000001").unwrap()),
             self_chat: false,
             orders_from: from.iter().map(|p| Phone::parse(p).unwrap()).collect(),
+            outside_whatsapp: false,
         };
         let none = record(false, &[]);
         let one = record(true, &["+5511900000002"]);
@@ -2317,6 +2390,29 @@ mod tests {
         assert!(!Risk::of(&none, &one).asks());
         assert!(!Risk::of(&one, &two).asks(), "protecting more does not ask");
         assert!(!Risk::of(&one, &one).asks());
+        let outside = OrdersRecord {
+            outside_whatsapp: true,
+            ..OrdersRecord::default()
+        };
+        assert!(
+            !Risk::of(&none, &outside).asks(),
+            "outside from nothing asks nothing"
+        );
+        let from_one = Risk::of(&one, &outside);
+        assert!(from_one.asks() && from_one.removes && !from_one.nothing_protected);
+    }
+
+    #[test]
+    fn the_outside_choice_is_read_and_carried() {
+        let outside = Typed::of_form(&form("takes=none&source=outside")).unwrap();
+        assert_eq!(outside.source, Source::Outside);
+        let mut html = Html::new(Lang::En);
+        carry(&mut html, "ana", &outside, None);
+        let shown = html.finish();
+        assert!(
+            shown.contains("name=\"source\" value=\"outside\""),
+            "{shown}"
+        );
     }
 
     #[test]
@@ -2419,7 +2515,7 @@ mod tests {
             .unwrap();
         assert_eq!(two.takes, Takes::Number("ponte".to_owned()));
         assert_eq!(two.gives, ["a", "b"], "a repeated alias is kept once");
-        assert!(two.own && two.to_numbers);
+        assert!(two.source == Source::Own && two.to_numbers);
         assert!(!shape("takes=none&return=elsewhere").unwrap().to_numbers);
     }
 
@@ -2433,7 +2529,7 @@ mod tests {
         let typed = Typed {
             takes: Takes::None,
             takes_other: String::new(),
-            own: false,
+            source: Source::List,
             gives: Vec::new(),
             from: format!(
                 "+{}\n\nabc\n+{}\n11987600005\n{}\nnone",

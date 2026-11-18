@@ -1604,4 +1604,21 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
         "保存しました。WhatsApp で {hermes} に指示できる相手: {orders}。",
     ),
+    (
+        "Outside WhatsApp: another conversation platform, like Telegram",
+        "WhatsApp の外: Telegram など、別の会話プラットフォーム",
+    ),
+    (
+        "Arauto then refuses nothing for {hermes}. The hub cannot check it: if {hermes} also takes orders on a WhatsApp, record that WhatsApp instead.",
+        "この場合、Arauto は {hermes} について何も拒否しません。ハブはこれを確認できません。{hermes} が WhatsApp でも指示を受ける場合は、代わりにその WhatsApp を登録してください。",
+    ),
+    (
+        "Orders from outside WhatsApp take no telephone: choose It has no WhatsApp, and leave These telephones and Other telephones empty. Nothing was saved.",
+        "WhatsApp の外からの指示には電話番号は不要です。「WhatsApp はありません」を選び、「これらの電話」と「その他の電話」は空のままにしてください。何も保存されていません。",
+    ),
+    ("outside WhatsApp", "WhatsApp の外"),
+    (
+        "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
+        "保存しました。{hermes} は WhatsApp の外から指示を受けます。Arauto はこれについて何も拒否しません。",
+    ),
 ];

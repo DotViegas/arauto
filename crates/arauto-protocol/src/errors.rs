@@ -103,9 +103,21 @@ error_codes! {
     Ar711 = "AR-711", "Invalid argument. Check the description of the tool and call again.";
     Ar712 = "AR-712", "Message not found: it does not exist, is outside what this Hermes can use, or WhatsApp no longer allows it.";
     Ar713 = "AR-713", "The result of the sending is unknown: the message may have been sent. Read the chat before sending it again.";
+    Ar714 = "AR-714", "This chat is your command channel, as the admin recorded it, so Arauto does not write in it. Reply or report in it through your own WhatsApp, outside Arauto.";
 }
 
 impl ErrorCode {
+    /// The lowest version of the channel protocol in which the hub may answer this code in a
+    /// `result` (`docs/14-protocolo-do-canal.md`, section 5.1). A connector that speaks only an
+    /// older version cannot read the code, so the hub answers another one there.
+    #[must_use]
+    pub const fn since(self) -> u32 {
+        match self {
+            ErrorCode::Ar714 => 2,
+            _ => 1,
+        }
+    }
+
     /// The fixed phrase of the code, starting with the code itself.
     ///
     /// `retry_after` only matters to the two limits, AR-704 and AR-706, whose phrase then says
@@ -202,12 +214,12 @@ mod tests {
     use std::collections::HashSet;
 
     /// The catalog of `docs/11-conector.md`, section 8, written a second time.
-    const CATALOG: [&str; 39] = [
+    const CATALOG: [&str; 40] = [
         "AR-101", "AR-102", "AR-104", "AR-105", "AR-201", "AR-202", "AR-203", "AR-204", "AR-205",
         "AR-206", "AR-207", "AR-208", "AR-301", "AR-302", "AR-303", "AR-401", "AR-402", "AR-501",
         "AR-502", "AR-503", "AR-504", "AR-505", "AR-506", "AR-507", "AR-601", "AR-602", "AR-701",
         "AR-702", "AR-703", "AR-704", "AR-705", "AR-706", "AR-707", "AR-708", "AR-709", "AR-710",
-        "AR-711", "AR-712", "AR-713",
+        "AR-711", "AR-712", "AR-713", "AR-714",
     ];
 
     fn every_phrase() -> Vec<(ErrorCode, String)> {
@@ -424,6 +436,35 @@ mod tests {
             assert_eq!(code.phrase(wait), code.phrase(None), "{code}");
             assert!(!code.phrase(wait).contains("1234"), "{code}");
             assert!(matches!(code.phrase(wait), Cow::Borrowed(_)), "{code}");
+        }
+    }
+
+    #[test]
+    fn the_phrases_of_the_chat_where_a_hermes_takes_orders_are_fixed() {
+        assert_eq!(
+            ErrorCode::Ar714.phrase(None),
+            "AR-714: This chat is your command channel, as the admin recorded it, so Arauto does not write in it. Reply or report in it through your own WhatsApp, outside Arauto."
+        );
+        assert_eq!(
+            ErrorCode::Ar705.phrase(None),
+            "AR-705: Chat not found: it does not exist or is outside what this Hermes can use."
+        );
+        assert_eq!(
+            ErrorCode::Ar712.phrase(None),
+            "AR-712: Message not found: it does not exist, is outside what this Hermes can use, or WhatsApp no longer allows it."
+        );
+    }
+
+    #[test]
+    fn only_ar714_needs_version_2() {
+        use crate::message::{PROTOCOL_VERSION, PROTOCOL_VERSION_MIN};
+        for code in ErrorCode::ALL {
+            let expected = if *code == ErrorCode::Ar714 { 2 } else { 1 };
+            assert_eq!(code.since(), expected, "{code}");
+            assert!(
+                (PROTOCOL_VERSION_MIN..=PROTOCOL_VERSION).contains(&code.since()),
+                "{code}"
+            );
         }
     }
 

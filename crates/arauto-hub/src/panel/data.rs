@@ -346,7 +346,9 @@ pub(super) async fn hermes(
 
 /// How the orders of a Hermes read in a list, and whether any are recorded.
 pub(super) fn orders_summary(lang: Lang, record: &OrdersRecord) -> (String, bool) {
-    let summary = if record.self_chat {
+    let summary = if record.outside_whatsapp {
+        text::tr(lang, k("outside WhatsApp")).to_owned()
+    } else if record.self_chat {
         text::tr(lang, k("its own chat")).to_owned()
     } else if record.orders_from.len() == 1 {
         text::tr(lang, k("1 telephone")).to_owned()
@@ -359,7 +361,10 @@ pub(super) fn orders_summary(lang: Lang, record: &OrdersRecord) -> (String, bool
             &[("n", &record.orders_from.len().to_string())],
         )
     };
-    (summary, record.self_chat || !record.orders_from.is_empty())
+    (
+        summary,
+        record.self_chat || record.outside_whatsapp || !record.orders_from.is_empty(),
+    )
 }
 
 /// What the screen of a Hermes was drawn from, so that a form that issues an invite can say
@@ -405,6 +410,16 @@ pub(super) async fn orders_said(
     };
     let key = hub.organization_key(organization).await?;
     let record = repo::orders::get(hub.pool(), organization, &key, line.hermes.id).await?;
+    if record.outside_whatsapp {
+        return Ok(Some(StatusLine {
+            kind: StatusKind::Done(Tone::Ok),
+            sentence: k(
+                "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
+            ),
+            texts: vec![("hermes", name.as_str().to_owned())],
+            codes: Vec::new(),
+        }));
+    }
     let (orders, _) = orders_summary(lang, &record);
     Ok(Some(StatusLine {
         kind: StatusKind::Done(Tone::Ok),

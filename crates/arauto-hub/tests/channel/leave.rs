@@ -13,7 +13,7 @@ use arauto_hub::mark::Mark;
 use arauto_hub::restore;
 use arauto_protocol::clock::SystemClock;
 use arauto_protocol::errors::ErrorCode;
-use arauto_protocol::message::{HelloOk, Left, LeftStatus, Message, Purpose};
+use arauto_protocol::message::{HelloOk, Left, LeftStatus, Message, PROTOCOL_VERSION, Purpose};
 use arauto_protocol::noise::StaticKeypair;
 use arauto_testkit::connector::{TestConnector, hello, identity};
 use sqlx::postgres::PgPool;
@@ -30,7 +30,7 @@ async fn leave(hub: &TestHub, identity: &StaticKeypair) -> LeftStatus {
         .unwrap();
     assert_eq!(
         connector.hello(Purpose::Leave).await.unwrap(),
-        HelloOk::Agreed(1)
+        HelloOk::Agreed(PROTOCOL_VERSION)
     );
     connector.send(&Message::Leave).await.unwrap();
     let Message::Left(Left { status }) = connector.recv(PATIENCE).await.unwrap() else {
@@ -131,7 +131,7 @@ async fn hello_agrees_on_the_highest_common_version_or_closes_with_ar402() {
             .await
             .unwrap();
         connector
-            .send(&hello((2, 3), purpose).unwrap())
+            .send(&hello((3, 4), purpose).unwrap())
             .await
             .unwrap();
         let ended = connector.ended(PATIENCE).await.unwrap();
@@ -142,6 +142,21 @@ async fn hello_agrees_on_the_highest_common_version_or_closes_with_ar402() {
             .unwrap();
         connector
             .send(&hello((1, 5), purpose).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                connector.recv(PATIENCE).await.unwrap(),
+                Message::HelloOk(HelloOk::Agreed(PROTOCOL_VERSION))
+            ),
+            "{purpose:?}"
+        );
+        // A connector of the first version keeps working.
+        let mut connector = TestConnector::connect(hub.addr(), &identity().unwrap(), &hub.hub_key)
+            .await
+            .unwrap();
+        connector
+            .send(&hello((1, 1), purpose).unwrap())
             .await
             .unwrap();
         assert!(

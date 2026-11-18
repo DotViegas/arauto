@@ -438,8 +438,7 @@ enum HermesCommand {
         /// The name of the Hermes.
         name: String,
     },
-    /// Records the telephone a Hermes's WhatsApp runs on and who gives it orders there. No
-    /// Hermes can write in that chat through Arauto.
+    /// Records the telephone a Hermes's WhatsApp runs on and who gives it orders there, or that its orders come from outside WhatsApp. No Hermes can write in that chat through Arauto.
     Whatsapp {
         /// The name of the Hermes.
         name: String,
@@ -447,11 +446,17 @@ enum HermesCommand {
         #[arg(long = "takes-orders-on", value_name = "PHONE|none")]
         takes_orders_on: Option<String>,
         /// Its own WhatsApp gives it orders, in the chat with itself.
-        #[arg(long = "self-chat", conflicts_with = "orders_from")]
+        #[arg(
+            long = "self-chat",
+            conflicts_with_all = ["orders_from", "orders_outside_whatsapp"]
+        )]
         self_chat: bool,
         /// A telephone that gives the Hermes orders, not the one its WhatsApp runs on. Repeat it; none clears the list.
         #[arg(long = "orders-from", value_name = "PHONE|none")]
         orders_from: Vec<String>,
+        /// Its orders come from outside WhatsApp (another conversation platform, like Telegram): Arauto refuses nothing for it. It clears the recorded telephones.
+        #[arg(long = "orders-outside-whatsapp", conflicts_with_all = ["self_chat", "orders_from"])]
+        orders_outside_whatsapp: bool,
     },
 }
 
@@ -903,7 +908,7 @@ async fn run_installed(
                     Ok(vault) => session
                         .hermes_orders_show(&vault, &name)
                         .await
-                        .is_ok_and(|shown| !shown.after.is_empty()),
+                        .is_ok_and(|shown| !shown.after.protects_nothing()),
                     Err(_) => false,
                 };
                 let mut report = render::hermes_removed(&session.hermes_remove(&name, now).await?);
@@ -917,12 +922,14 @@ async fn run_installed(
                 takes_orders_on,
                 self_chat,
                 orders_from,
+                orders_outside_whatsapp,
             } => {
                 let vault = vault(storage).await?;
                 let edit = OrdersEdit {
                     takes_orders_on: takes_orders_on.map(Some),
                     self_chat,
                     orders_from: (!orders_from.is_empty()).then_some(orders_from),
+                    outside_whatsapp: orders_outside_whatsapp,
                 };
                 let asked = !edit.is_empty();
                 let outcome = if asked {
@@ -1144,6 +1151,8 @@ mod tests {
             "arauto-hub admin hermes whatsapp vendas --takes-orders-on +5511900000001 --orders-from +5511900000002 --orders-from +5511900000003",
             "arauto-hub admin hermes whatsapp vendas --orders-from none",
             "arauto-hub admin hermes whatsapp vendas --takes-orders-on none",
+            "arauto-hub admin hermes whatsapp vendas --orders-outside-whatsapp",
+            "arauto-hub admin hermes whatsapp vendas --takes-orders-on none --orders-outside-whatsapp",
             "arauto-hub admin invite vendas",
             "arauto-hub admin approve vendas",
             "arauto-hub admin approve vendas 123-456",
@@ -1202,6 +1211,8 @@ mod tests {
         for line in [
             "arauto-hub admin approve vendas 123456 --recognized --not-recognized",
             "arauto-hub admin hermes whatsapp vendas --self-chat --orders-from +5511900000002",
+            "arauto-hub admin hermes whatsapp vendas --orders-outside-whatsapp --self-chat",
+            "arauto-hub admin hermes whatsapp vendas --orders-outside-whatsapp --orders-from +5511900000002",
             "arauto-hub admin hermes whatsapp",
             "arauto-hub admin wake vendas on",
             "arauto-hub admin wake vendas off",

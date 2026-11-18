@@ -563,9 +563,9 @@ async fn a_connector_too_old_presents_itself_and_shows_ar401() {
     connector.shutdown().await;
     let device = folder.current().unwrap();
     let identity = folder.public(&device);
-    // The hub comes back speaking only a version above the one of this connector.
+    // The hub now speaks only a version above every version of this connector.
     fixture.stop().await;
-    fixture.settings.versions = arauto_protocol::message::ProtoRange::new(2, 2).unwrap();
+    fixture.settings.versions = arauto_protocol::message::ProtoRange::new(3, 3).unwrap();
     fixture.start().await;
     let path = folder.device_path(&device).join("hub.json");
     let mut moved = folder.hub_json(&device);

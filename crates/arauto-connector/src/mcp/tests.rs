@@ -569,6 +569,7 @@ async fn a_refusal_is_a_result_with_the_phrase_of_the_catalog() {
         (ErrorCode::Ar502, None),
         (ErrorCode::Ar701, None),
         (ErrorCode::Ar710, None),
+        (ErrorCode::Ar714, None),
         (ErrorCode::Ar706, wait),
         (ErrorCode::Ar203, wait),
     ] {

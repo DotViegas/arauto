@@ -426,8 +426,9 @@ impl Serving<'_> {
                 let link = self.link.handle();
                 let in_flight = Arc::clone(&self.in_flight);
                 let (organization, device) = (self.organization, self.device);
+                let proto = self.record.proto;
                 self.calls.spawn(async move {
-                    answer(&hub, &link, &in_flight, organization, device, call).await;
+                    answer(&hub, &link, &in_flight, organization, device, proto, call).await;
                 });
                 None
             }
@@ -698,17 +699,19 @@ fn refusal(code: ErrorCode) -> CallOutcome {
     }
 }
 
-/// Runs one call and sends its `result`.
+/// Runs one call and sends its `result`. `proto` is the version agreed in `hello_ok` for this
+/// connection.
 async fn answer(
     hub: &Hub,
     link: &LinkHandle,
     in_flight: &InFlight,
     organization: ResolvedOrg,
     device: Uuid,
+    proto: u32,
     call: Call,
 ) {
     let id = call.id;
-    let answered = run_call(hub, organization, device, &call).await;
+    let answered = run_call(hub, organization, device, proto, &call).await;
     drop(call);
     // Free before the connector can have the answer.
     lock(in_flight).remove(&id.get());
@@ -728,7 +731,13 @@ async fn answer(
     }
 }
 
-async fn run_call(hub: &Hub, organization: ResolvedOrg, device: Uuid, call: &Call) -> Answer {
+async fn run_call(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    device: Uuid,
+    proto: u32,
+    call: &Call,
+) -> Answer {
     // C8: the state of the device is read at every call, before anything else. A device that
     // no longer serves gets its code, whatever it asked, and the connection closes after it.
     let standing = match repo::device::standing(hub.pool(), organization, device).await {
@@ -754,7 +763,7 @@ async fn run_call(hub: &Hub, organization: ResolvedOrg, device: Uuid, call: &Cal
         ToolCall::ArautoStatus => status(hub, organization, &standing).await.into(),
         // The access is read again at this call, inside: AR-701 when nothing releases it.
         ToolCall::Whatsapp(call) => {
-            crate::whatsapp::answer(hub, organization, standing.hermes, &call)
+            crate::whatsapp::answer(hub, organization, standing.hermes, proto, &call)
                 .await
                 .into()
         }

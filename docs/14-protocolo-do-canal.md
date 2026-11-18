@@ -261,7 +261,7 @@ the hundredth closes with AR-204.
 The first message is the connector's:
 
 ```json
-{"t":"hello","proto":[1,1],"connector":"0.1.0","purpose":"channel"}
+{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"channel"}
 ```
 
 | Field | Content |
@@ -285,6 +285,8 @@ In the hub, the `leave` of a connector that is too new also receives AR-402: the
 
 What decides AR-401 is the version of the **protocol**. The list of versions of the program, with
 revocation, is left for after the MVP.
+
+**Version 2** (18/11/2026, decision 0051, proposal: built, covered by automatic tests against a fake engine and a fake Hermes, not tried on a real Hermes). Version 2 is version 1 with one addition: a `result` may carry the code AR-714. The hub sends AR-714 only on a connection where version 2 was agreed; on a connection of version 1 it sends AR-705 or AR-712 in its place, as before. Both programs speak versions 1 to 2, so an installed connector of version 1 keeps working with this hub. A connector of version 1 cannot read AR-714: an unknown code makes the whole `result` invalid. Not guaranteed: a newer copy of the connector that leads older copies on the same machine (section 11) passes AR-714 on, and an older copy answers AR-207 for that call.
 
 **Frozen forever**, so that a connector of any age still receives the right error: the handshake
 and the prologue, the frame header, and the messages `hello`, `hello_ok`, `state`, `present`,
@@ -341,7 +343,7 @@ is too old presents itself this way at the leader's startup and, after that, onc
 | hub | `session` | `hermes` (name), `tools` (names released), `wake` (required boolean: some access of this Hermes has the verb "be woken", the same value as `woken_by.whatsapp`; a note does not depend on it, [decision 0045](decisoes/0045-a-marca-da-ligacao-basta-para-acordar.md). 16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): the field is kept because every installed connector requires it; it used to carry the switch "woken by WhatsApp". It is sent once per channel session, so a connector shows an old value until it connects again) | The promotion was written. The channel session starts here. |
 | hub | `tools` | `tools` | The list of released tools changed. |
 | connector | `call` | `id`, `tool`, `args` | Tool call. |
-| hub | `result` | `id`, `ok`, and `content` or `code`; optional `retry_after_s` | Response. A refusal carries only the code; the sentence stays in the connector. |
+| hub | `result` | `id`, `ok`, and `content` or `code`; optional `retry_after_s` | Response. A refusal carries only the code; the sentence stays in the connector. AR-714 only on a connection of version 2 (section 5.1). |
 | hub | `notice` | `id`, `kind`, and the fields of the kind | Notice: a pointer, with no third-party text. |
 | connector | `notice_ack` | `id`, `outcome` | After Hermes's local API accepts, or after a waiting `await-reply` was told (decision 0048, proposal, 15/11/2026). |
 | hub | `rotate` | | The 24-hour swap starts. |

@@ -27,13 +27,18 @@ pub struct OrdersEdit {
     pub self_chat: bool,
     /// `--orders-from PHONE` (repeated; `none` clears the list): `Some(vec![])` clears it.
     pub orders_from: Option<Vec<String>>,
+    /// `--orders-outside-whatsapp`.
+    pub outside_whatsapp: bool,
 }
 
 impl OrdersEdit {
     /// Whether no flag was given: the command only shows the record.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.takes_orders_on.is_none() && !self.self_chat && self.orders_from.is_none()
+        self.takes_orders_on.is_none()
+            && !self.self_chat
+            && self.orders_from.is_none()
+            && !self.outside_whatsapp
     }
 }
 
@@ -85,6 +90,23 @@ fn parsed(edit: &OrdersEdit) -> Result<Parsed, AdminError> {
     Ok((takes, from))
 }
 
+/// Outside WhatsApp with a telephone, self-chat or a list is two answers: refused before
+/// anything else.
+fn check_outside(
+    edit: &OrdersEdit,
+    takes: Option<&Option<Phone>>,
+    from: Option<&[Phone]>,
+) -> Result<(), AdminError> {
+    if edit.outside_whatsapp
+        && (matches!(takes, Some(Some(_)))
+            || edit.self_chat
+            || from.is_some_and(|list| !list.is_empty()))
+    {
+        return Err(AdminError::OrdersRule(Invalid::OutsideWithATelephone));
+    }
+    Ok(())
+}
+
 /// What an edit makes of the record a Hermes has. The one place that says it: the write and
 /// the preview of the panel both go through it.
 fn applied(
@@ -92,18 +114,30 @@ fn applied(
     takes: Option<&Option<Phone>>,
     from: Option<&[Phone]>,
     self_chat: bool,
+    outside: bool,
 ) -> OrdersRecord {
     let mut after = before.clone();
     if let Some(takes) = takes {
         after.takes_orders_on.clone_from(takes);
+        if takes.is_some() {
+            after.outside_whatsapp = false;
+        }
     }
     if let Some(from) = from {
         after.self_chat = false;
+        after.outside_whatsapp = false;
         after.orders_from = from.to_vec();
     }
     if self_chat {
         after.self_chat = true;
         after.orders_from.clear();
+        after.outside_whatsapp = false;
+    }
+    if outside {
+        after.takes_orders_on = None;
+        after.self_chat = false;
+        after.orders_from.clear();
+        after.outside_whatsapp = true;
     }
     after
 }
@@ -116,10 +150,18 @@ fn applied(
 /// [`AdminError::InvalidPhone`]; [`AdminError::OrdersRule`] for `self-chat` with a list.
 pub fn preview(before: &OrdersRecord, edit: &OrdersEdit) -> Result<OrdersRecord, AdminError> {
     let (takes, from) = parsed(edit)?;
+    check_outside(edit, takes.as_ref(), from.as_deref())?;
     if edit.self_chat && from.as_ref().is_some_and(|list| !list.is_empty()) {
         return Err(AdminError::OrdersRule(Invalid::SelfChatWithAList));
     }
-    Ok(applied(before, takes.as_ref(), from.as_deref(), edit.self_chat).normalized())
+    Ok(applied(
+        before,
+        takes.as_ref(),
+        from.as_deref(),
+        edit.self_chat,
+        edit.outside_whatsapp,
+    )
+    .normalized())
 }
 
 impl Session {
@@ -164,7 +206,9 @@ impl Session {
     ) -> Result<OrdersOutcome, AdminError> {
         let name = HermesName::parse(name).map_err(|_| AdminError::NoSuchHermes)?;
         let (takes, from) = parsed(edit)?;
+        check_outside(edit, takes.as_ref(), from.as_deref())?;
         let self_chat = edit.self_chat;
+        let outside = edit.outside_whatsapp;
         if self_chat && from.as_ref().is_some_and(|list| !list.is_empty()) {
             return Err(AdminError::OrdersRule(Invalid::SelfChatWithAList));
         }
@@ -176,7 +220,7 @@ impl Session {
             &self.admin,
             &key,
             &name,
-            |before| applied(before, takes.as_ref(), from.as_deref(), self_chat),
+            |before| applied(before, takes.as_ref(), from.as_deref(), self_chat, outside),
             now,
         )
         .await?;
@@ -209,7 +253,7 @@ impl Session {
     pub async fn orders_for_the_list(&self) -> Result<OrdersOfNumbers, AdminError> {
         Ok(OrdersOfNumbers {
             tags: repo::orders::tags(&self.pool, self.organization).await?,
-            some_hermes_protects_a_chat: repo::orders::some_hermes_protects_a_chat(
+            some_hermes_is_recorded: repo::orders::some_hermes_is_recorded(
                 &self.pool,
                 self.organization,
             )
@@ -223,8 +267,8 @@ impl Session {
 pub struct OrdersOfNumbers {
     /// Each number that takes part in a record.
     pub tags: Vec<repo::orders::Tag>,
-    /// Whether some Hermes has a chat protected.
-    pub some_hermes_protects_a_chat: bool,
+    /// Whether some Hermes has an answer that counts.
+    pub some_hermes_is_recorded: bool,
 }
 
 /// The text of a rule of the record, for the admin.
@@ -242,6 +286,9 @@ pub const fn rule_text(rule: Invalid) -> &'static str {
             "The telephone the Hermes's WhatsApp runs on cannot also give it orders: that chat is the self-chat mode (use --self-chat), or leave it out of --orders-from"
         }
         Invalid::TooMany => "At most 16 telephones can give a Hermes orders",
+        Invalid::OutsideWithATelephone => {
+            "Outside WhatsApp and a telephone of a WhatsApp are two answers: give --orders-outside-whatsapp alone (it clears the telephones), or the telephones without it"
+        }
     }
 }
 
@@ -266,9 +313,78 @@ mod tests {
             takes_orders_on: Some(Some("+5511900000001".to_owned())),
             self_chat: false,
             orders_from: Some(lines[1..].to_vec()),
+            outside_whatsapp: false,
         };
         let after = preview(&before, &edit).unwrap();
         assert_eq!(after.orders_from.len(), 16, "one in both forms counts once");
         assert_eq!(after.check(), Ok(()));
+    }
+
+    #[test]
+    fn orders_from_outside_whatsapp_take_no_telephone() {
+        let before = OrdersRecord::default();
+        let phone_text = "+5511900000001".to_owned();
+        let outside = OrdersEdit {
+            outside_whatsapp: true,
+            ..OrdersEdit::default()
+        };
+        let with_takes = OrdersEdit {
+            takes_orders_on: Some(Some(phone_text.clone())),
+            ..outside.clone()
+        };
+        assert!(matches!(
+            preview(&before, &with_takes),
+            Err(AdminError::OrdersRule(Invalid::OutsideWithATelephone))
+        ));
+        let with_list = OrdersEdit {
+            orders_from: Some(vec!["+5511900000002".to_owned()]),
+            ..outside.clone()
+        };
+        assert!(matches!(
+            preview(&before, &with_list),
+            Err(AdminError::OrdersRule(Invalid::OutsideWithATelephone))
+        ));
+        let with_self = OrdersEdit {
+            self_chat: true,
+            ..outside.clone()
+        };
+        assert!(matches!(
+            preview(&before, &with_self),
+            Err(AdminError::OrdersRule(Invalid::OutsideWithATelephone))
+        ));
+        let with_none = OrdersEdit {
+            takes_orders_on: Some(Some("none".to_owned())),
+            orders_from: Some(Vec::new()),
+            ..outside.clone()
+        };
+        assert!(preview(&before, &with_none).unwrap().outside_whatsapp);
+        assert!(preview(&before, &outside).unwrap().outside_whatsapp);
+
+        let bridge = Phone::parse(&phone_text).unwrap();
+        let other = Phone::parse("+5511900000002").unwrap();
+        let full = OrdersRecord {
+            takes_orders_on: Some(bridge.clone()),
+            orders_from: vec![other],
+            ..OrdersRecord::default()
+        };
+        let cleared = applied(&full, None, None, false, true);
+        assert!(cleared.outside_whatsapp);
+        assert!(cleared.takes_orders_on.is_none() && cleared.orders_from.is_empty());
+        let own = OrdersRecord {
+            takes_orders_on: Some(bridge.clone()),
+            self_chat: true,
+            ..OrdersRecord::default()
+        };
+        assert!(!applied(&own, None, None, false, true).self_chat);
+        let outside_record = OrdersRecord {
+            outside_whatsapp: true,
+            ..OrdersRecord::default()
+        };
+        let takes = Some(Some(bridge));
+        assert!(!applied(&outside_record, takes.as_ref(), None, false, false).outside_whatsapp);
+        assert!(!applied(&outside_record, None, Some(&[]), false, false).outside_whatsapp);
+        assert!(!applied(&outside_record, None, None, true, false).outside_whatsapp);
+        let none = Some(None);
+        assert!(applied(&outside_record, none.as_ref(), None, false, false).outside_whatsapp);
     }
 }

@@ -185,7 +185,7 @@ pub fn number_list(numbers: &[(Number, Option<Phone>)], orders: &OrdersOfNumbers
         }
         text.push('\n');
     }
-    if !orders.some_hermes_protects_a_chat {
+    if !orders.some_hermes_is_recorded {
         text.push_str(
             "No Hermes has recorded who gives it orders on WhatsApp: until then a Hermes can \
              pass for that person. See: arauto-hub admin hermes whatsapp NAME\n",

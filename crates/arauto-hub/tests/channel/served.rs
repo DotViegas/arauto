@@ -420,9 +420,9 @@ async fn a_connector_too_old_is_looked_at_and_told_ar401() {
     let (_, reused) = fixture.connected().await;
     let reused = reused.device().clone();
 
-    // The hub now speaks only a version this connector does not.
+    // The hub now speaks only a version above every version of this connector.
     fixture.stop().await;
-    fixture.settings.versions = ProtoRange::new(2, 2).unwrap();
+    fixture.settings.versions = ProtoRange::new(3, 3).unwrap();
     fixture.start().await;
     let device = device.at(fixture.addr());
     let reused = reused.at(fixture.addr());

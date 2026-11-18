@@ -44,8 +44,12 @@ use crate::tools::{ToolArgError, ToolCall, ToolName};
 #[cfg(test)]
 mod tests;
 
-/// The protocol version this build speaks.
-pub const PROTOCOL_VERSION: u32 = 1;
+/// The highest protocol version this build speaks. Version 2 is version 1 with one addition: a
+/// `result` may carry AR-714 ([`ErrorCode::since`]; `docs/14-protocolo-do-canal.md`, section 5.1).
+pub const PROTOCOL_VERSION: u32 = 2;
+
+/// The lowest protocol version this build speaks: a program of version 1 still works with it.
+pub const PROTOCOL_VERSION_MIN: u32 = 1;
 
 // ---------------------------------------------------------------------------------------------
 // Field types
@@ -192,9 +196,9 @@ pub enum Negotiation {
 }
 
 impl ProtoRange {
-    /// The versions this build speaks.
+    /// The versions this build speaks: from [`PROTOCOL_VERSION_MIN`] to [`PROTOCOL_VERSION`].
     pub const CURRENT: ProtoRange = ProtoRange {
-        min: PROTOCOL_VERSION,
+        min: PROTOCOL_VERSION_MIN,
         max: PROTOCOL_VERSION,
     };
 

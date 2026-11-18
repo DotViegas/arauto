@@ -114,6 +114,7 @@ async fn set(rig: &Rig, hermes: &str, takes: Option<u32>, from: &[u32], self_cha
         takes_orders_on: Some(takes.map(plus)),
         self_chat,
         orders_from: (!self_chat).then(|| from.iter().map(|n| plus(*n)).collect()),
+        outside_whatsapp: false,
     };
     rig.world
         .fixture
@@ -472,6 +473,7 @@ async fn a_save_through_the_panel_writes_what_the_command_writes() {
                 takes_orders_on: Some(Some(plus(4))),
                 self_chat: false,
                 orders_from: Some(vec![plus(1), plus(3)]),
+                outside_whatsapp: false,
             },
             rig.world.now(),
         )
@@ -1008,6 +1010,7 @@ async fn the_other_form_of_a_recorded_telephone_chosen_by_alias_writes_nothing()
                 takes_orders_on: Some(Some(plus(2))),
                 self_chat: false,
                 orders_from: Some(vec![format!("+{}", other_form(1))]),
+                outside_whatsapp: false,
             },
             rig.world.now(),
         )
@@ -1377,6 +1380,7 @@ async fn sixteen_are_counted_after_the_ninth_digit_merge_as_the_command_counts()
                 takes_orders_on: Some(Some(plus(4))),
                 self_chat: false,
                 orders_from: Some(merged.clone()),
+                outside_whatsapp: false,
             },
             rig.world.now(),
         )
@@ -1855,4 +1859,126 @@ async fn the_window_that_asks_names_the_chats_and_its_x_goes_back() {
         "{warnings}"
     );
     assert!(warnings.contains(&format!("<span class=\"mono\">{}</span>", plus(3))));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn orders_from_outside_whatsapp_are_chosen_in_the_window_and_ask_nothing() {
+    let rig = ready().await;
+    let ana = rig.world.fixture.hermes().await;
+    let saved = rig
+        .post(
+            "/hermes/whatsapp",
+            &form(&ana, "none", "", "outside", &[], "", ""),
+        )
+        .await;
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
+    assert_eq!(audited(&rig.world.fixture, CHANGED).await, 1);
+    assert!(record(&rig, &ana).await.outside_whatsapp);
+
+    let said = rig.get(&format!("/?orders={ana}")).await.text();
+    assert!(
+        said.contains(&format!(
+            "Saved. {ana} takes its orders outside WhatsApp: Arauto refuses nothing for it."
+        )),
+        "{said}"
+    );
+    let list = rig.get("/").await.text();
+    assert!(
+        list.contains(&format!(
+            "<a class=\"value\" href=\"/hermes/whatsapp?name={ana}\">outside WhatsApp</a>"
+        )),
+        "{list}"
+    );
+    let window = rig.get(&window_path(&ana)).await.text();
+    assert!(
+        window.contains(
+            "name=\"source\" value=\"outside\" checked aria-describedby=\"orders-outside-hint\">"
+        ),
+        "{window}"
+    );
+    assert!(window.contains(&format!(
+        "Arauto then refuses nothing for {ana}. The hub cannot check it: if {ana} also takes orders on a WhatsApp, record that WhatsApp instead."
+    )));
+    assert!(window.contains(RISK_SENTENCE), "{window}");
+    assert!(
+        window.contains("name=\"source\" value=\"list\">"),
+        "{window}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn outside_whatsapp_with_a_telephone_is_refused_and_nothing_is_written() {
+    let rig = ready().await;
+    let ana = rig.world.fixture.hermes().await;
+    let before = everything(&rig.world.fixture).await;
+    let from = plus(3);
+    for body in [
+        form(&ana, "number:ponte", "", "outside", &[], "", ""),
+        form(&ana, "none", "", "outside", &["operador"], "", ""),
+        form(&ana, "none", "", "outside", &[], &from, ""),
+    ] {
+        let refused = rig.post("/hermes/whatsapp", &body).await;
+        assert_eq!(refused.status, 200);
+        said_first(
+            &refused.text(),
+            "Orders from outside WhatsApp take no telephone",
+        );
+        assert_eq!(before, everything(&rig.world.fixture).await);
+    }
+    assert_eq!(audited(&rig.world.fixture, CHANGED).await, 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_protected_list_switched_to_outside_whatsapp_names_the_chats_and_asks_first() {
+    let rig = ready().await;
+    let ana = rig.world.fixture.hermes().await;
+    set(&rig, &ana, Some(2), &[1], false).await;
+    let outside = form(&ana, "none", "", "outside", &[], "", "");
+    let asked = rig.post("/hermes/whatsapp", &outside).await;
+    assert_eq!(asked.status, 200);
+    let asked = asked.text();
+    assert!(asked.contains(WINDOW_TITLE), "{asked}");
+    assert!(
+        asked.contains("These chats stop being protected"),
+        "{asked}"
+    );
+    assert!(asked.contains("Remove the protection"), "{asked}");
+    assert!(!asked.contains("Nothing is blocked:"), "{asked}");
+    assert!(!record(&rig, &ana).await.outside_whatsapp);
+    assert_eq!(record(&rig, &ana).await.orders_from.len(), 1);
+
+    let saved = rig
+        .post("/hermes/whatsapp", &format!("{outside}&confirmed=1"))
+        .await;
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
+    assert!(record(&rig, &ana).await.outside_whatsapp);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn choosing_a_number_as_its_whatsapp_leaves_outside_whatsapp() {
+    let rig = ready().await;
+    let ana = rig.world.fixture.hermes().await;
+    rig.post(
+        "/hermes/whatsapp",
+        &form(&ana, "none", "", "outside", &[], "", ""),
+    )
+    .await;
+    assert!(record(&rig, &ana).await.outside_whatsapp);
+    let window = rig
+        .get(&format!(
+            "/hermes/whatsapp?name={ana}&alias=ponte&role=takes"
+        ))
+        .await
+        .text();
+    assert!(
+        window.contains("name=\"source\" value=\"list\" checked>"),
+        "{window}"
+    );
+    assert!(!window.contains("value=\"outside\" checked"), "{window}");
 }

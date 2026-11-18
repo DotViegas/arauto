@@ -7,6 +7,8 @@
 //! The setting: Hermes `h` takes orders on the telephone `BRIDGE` (its own WhatsApp bridge),
 //! and the telephone `OPERATOR` gives it orders. Both are numbers of the hub, `operador` and
 //! `ponte`. `g` is another Hermes. Both may read, send, modify and start chats on both numbers.
+//! The Hermes whose record it is (`h`) is told AR-714 on a connector of protocol version 2; every
+//! other Hermes gets AR-705 or AR-712.
 
 use std::collections::HashMap;
 
@@ -200,6 +202,7 @@ async fn record(
         takes_orders_on: Some(takes.map(plus)),
         self_chat,
         orders_from: Some(from.iter().map(|n| plus(*n)).collect()),
+        outside_whatsapp: false,
     };
     world
         .fixture
@@ -230,6 +233,7 @@ fn requests(world: &World, needle: &str) -> usize {
 
 const AR705: Option<ErrorCode> = Some(ErrorCode::Ar705);
 const AR712: Option<ErrorCode> = Some(ErrorCode::Ar712);
+const AR714: Option<ErrorCode> = Some(ErrorCode::Ar714);
 
 // ------------------------------------------------------------------------------------ the gate
 
@@ -249,7 +253,7 @@ async fn the_chat_where_a_hermes_takes_orders_is_refused_to_every_hermes() {
     // The admin records it between two calls: the very next call is refused, for G and for H.
     record_the_usual(&r.world, &r.h.name).await;
     assert_eq!(send(&mut r.g, "operador", &bridge).await, AR705);
-    assert_eq!(send(&mut r.h, "operador", &bridge).await, AR705);
+    assert_eq!(send(&mut r.h, "operador", &bridge).await, AR714);
     assert_eq!(sent(&r.world), 1, "nothing reached the engine");
     // Every other chat of the number stays as the accesses say.
     assert_eq!(send(&mut r.g, "operador", &ana).await, None);
@@ -272,7 +276,7 @@ async fn the_chat_of_the_bridge_with_the_operator_is_refused_too() {
     assert_eq!(send(&mut r.g, "ponte", &operator).await, None);
     record_the_usual(&r.world, &r.h.name).await;
     assert_eq!(send(&mut r.g, "ponte", &operator).await, AR705);
-    assert_eq!(send(&mut r.h, "ponte", &operator).await, AR705);
+    assert_eq!(send(&mut r.h, "ponte", &operator).await, AR714);
     // The customer chats of the bridge's number stay open.
     assert_eq!(send(&mut r.g, "ponte", &bia).await, None);
 }
@@ -298,23 +302,38 @@ async fn a_sending_by_telephone_is_refused_before_the_limit_and_the_engine() {
     )
     .await;
     assert_eq!(refused(&file), AR705);
+    for round in 0..25 {
+        let to = &forms[round % forms.len()];
+        assert_eq!(send(&mut r.h, "operador", to).await, AR714, "{to}");
+    }
+    let file = go(
+        &mut r.h,
+        "whatsapp_send_file",
+        "operador",
+        json!({"to": plus(BRIDGE), "kind": "document", "mimetype": "application/pdf",
+               "filename": "a.pdf", "data": data_encoding::BASE64.encode(b"%PDF")}),
+    )
+    .await;
+    assert_eq!(refused(&file), AR714);
     assert_eq!(
         requests(&r.world, "check-exists"),
         0,
         "the engine was not asked"
     );
     assert_eq!(sent(&r.world), 0);
-    // The limit is intact: twenty sendings to a customer by telephone all go through.
-    for n in 0..20 {
-        let to = plus(NEW_CUSTOMER);
-        let outcome = go(
-            &mut r.g,
-            "whatsapp_send_text",
-            "operador",
-            json!({"to": to, "text": format!("m{n}")}),
-        )
-        .await;
-        assert_eq!(refused(&outcome), None, "sending {n}");
+    // The limit is intact: twenty sendings to a customer by telephone all go through, for each.
+    for agent in [&mut r.g, &mut r.h] {
+        for n in 0..20 {
+            let to = plus(NEW_CUSTOMER);
+            let outcome = go(
+                agent,
+                "whatsapp_send_text",
+                "operador",
+                json!({"to": to, "text": format!("m{n}")}),
+            )
+            .await;
+            assert_eq!(refused(&outcome), None, "sending {n}");
+        }
     }
 }
 
@@ -329,7 +348,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
     let in_ana = messages(&mut r.g, "operador", &ana).await;
     record_the_usual(&r.world, &r.h.name).await;
 
-    for agent in [&mut r.g, &mut r.h] {
+    for (agent, chat_code, message_code) in [(&mut r.g, AR705, AR712), (&mut r.h, AR714, AR714)] {
         let file = go(
             agent,
             "whatsapp_send_file",
@@ -338,7 +357,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
                    "filename": "a.pdf", "data": data_encoding::BASE64.encode(b"%PDF")}),
         )
         .await;
-        assert_eq!(refused(&file), AR705, "send_file");
+        assert_eq!(refused(&file), chat_code, "send_file");
         let forward = go(
             agent,
             "whatsapp_forward",
@@ -346,7 +365,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
             json!({"message_id": in_ana["hi"], "to": bridge}),
         )
         .await;
-        assert_eq!(refused(&forward), AR705, "forward into the chat");
+        assert_eq!(refused(&forward), chat_code, "forward into the chat");
         let seen = go(
             agent,
             "whatsapp_mark_read",
@@ -354,7 +373,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
             json!({"chat": bridge}),
         )
         .await;
-        assert_eq!(refused(&seen), AR705, "mark_read");
+        assert_eq!(refused(&seen), chat_code, "mark_read");
         let typing = go(
             agent,
             "whatsapp_set_typing",
@@ -362,7 +381,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
             json!({"chat": bridge, "on": true}),
         )
         .await;
-        assert_eq!(refused(&typing), AR705, "set_typing");
+        assert_eq!(refused(&typing), chat_code, "set_typing");
         let react = go(
             agent,
             "whatsapp_react",
@@ -370,7 +389,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
             json!({"message_id": in_bridge["an order"], "reaction": "\u{1F44D}"}),
         )
         .await;
-        assert_eq!(refused(&react), AR712, "react");
+        assert_eq!(refused(&react), message_code, "react");
         let edit = go(
             agent,
             "whatsapp_edit_message",
@@ -378,7 +397,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
             json!({"message_id": in_bridge["my note"], "text": "x"}),
         )
         .await;
-        assert_eq!(refused(&edit), AR712, "edit");
+        assert_eq!(refused(&edit), message_code, "edit");
         let delete = go(
             agent,
             "whatsapp_delete_message",
@@ -386,7 +405,7 @@ async fn every_verb_that_writes_is_refused_in_that_chat() {
             json!({"message_id": in_bridge["my note"]}),
         )
         .await;
-        assert_eq!(refused(&delete), AR712, "delete");
+        assert_eq!(refused(&delete), message_code, "delete");
     }
     assert!(r.world.fake.sent().is_empty(), "nothing was sent");
     assert!(r.world.fake.edited().is_empty() && r.world.fake.deleted().is_empty());
@@ -566,8 +585,9 @@ async fn in_self_chat_mode_the_chat_with_itself_is_refused_and_no_other() {
     let ponte = chats(&mut r.g, "ponte").await;
     let operador = chats(&mut r.g, "operador").await;
     assert_eq!(send(&mut r.g, "ponte", &ponte["Myself"]).await, AR705);
-    assert_eq!(send(&mut r.h, "ponte", &ponte["Myself"]).await, AR705);
+    assert_eq!(send(&mut r.h, "ponte", &ponte["Myself"]).await, AR714);
     assert_eq!(send(&mut r.g, "ponte", &plus(BRIDGE)).await, AR705);
+    assert_eq!(send(&mut r.h, "ponte", &plus(BRIDGE)).await, AR714);
     // A customer chat of the same number, and the chat with the bridge on the other number
     // (the operator's number has no record): both are usable.
     assert_eq!(send(&mut r.g, "ponte", &ponte["Bia"]).await, None);
@@ -601,6 +621,7 @@ async fn a_hidden_contact_chat_is_held_for_writing_alone_when_the_engine_does_no
     record_the_usual(&r.world, &r.h.name).await;
     // The engine does not know it: refused, for G and for H. Reading is untouched.
     assert_eq!(send(&mut r.g, "operador", &hidden0).await, AR705);
+    // The hub cannot tell whose chat it is: H gets the ordinary answer.
     assert_eq!(send(&mut r.h, "operador", &hidden0).await, AR705);
     assert!(requests(&r.world, "/lids/") > 0, "the engine was asked");
     for agent in [&mut r.g, &mut r.h] {
@@ -624,10 +645,12 @@ async fn a_hidden_contact_chat_is_held_for_writing_alone_when_the_engine_does_no
     // ... or says it is the bridge: refused.
     r.world.fake.add_lid(hidden[0], &id(BRIDGE));
     assert_eq!(send(&mut r.g, "operador", &hidden0).await, AR705);
+    assert_eq!(send(&mut r.h, "operador", &hidden0).await, AR714);
     // The engine fails: refused, in that chat alone.
     r.world.fake.add_lid(hidden[0], &id(CUSTOMER));
     r.world.fake.fail("/lids/", Fault::ServerError);
     assert_eq!(send(&mut r.g, "operador", &hidden0).await, AR705);
+    assert_eq!(send(&mut r.h, "operador", &hidden0).await, AR705);
     assert_eq!(send(&mut r.g, "operador", &by_name["Ana"]).await, None);
     r.world.fake.heal();
     assert_eq!(send(&mut r.g, "operador", &hidden0).await, None);
@@ -678,7 +701,7 @@ async fn a_refusal_is_audited_with_its_reason_and_without_any_telephone() {
     for _ in 0..5 {
         assert_eq!(send(&mut r.g, "operador", &by_name["Bridge"]).await, AR705);
     }
-    assert_eq!(send(&mut r.h, "operador", &by_name["Bridge"]).await, AR705);
+    assert_eq!(send(&mut r.h, "operador", &by_name["Bridge"]).await, AR714);
     assert_eq!(send(&mut r.g, "operador", &by_name["Hidden0"]).await, AR705);
     assert_eq!(send(&mut r.g, "operador", &plus(BRIDGE)).await, AR705);
     let rows: Vec<(String, String)> = sqlx::query_as(
@@ -700,6 +723,17 @@ async fn a_refusal_is_audited_with_its_reason_and_without_any_telephone() {
         })
         .collect();
     assert_eq!(whys, ["matched", "matched", "hidden", "matched"]);
+    let parsed: Vec<Value> = rows
+        .iter()
+        .map(|(_, details)| serde_json::from_str(details).unwrap())
+        .collect();
+    let own: Vec<bool> = parsed
+        .iter()
+        .map(|d| d["own_chat"].as_bool().unwrap())
+        .collect();
+    let codes: Vec<&str> = parsed.iter().map(|d| d["code"].as_str().unwrap()).collect();
+    assert_eq!(own, [false, true, false, false]);
+    assert_eq!(codes, ["AR-705", "AR-714", "AR-705", "AR-705"]);
     for (actor, details) in &rows {
         assert_eq!(actor, "system");
         for needle in [
@@ -761,7 +795,309 @@ async fn a_chat_with_a_second_identifier_that_is_protected_is_refused() {
     .await
     .unwrap();
     assert_eq!(send(&mut r.g, "operador", &ana).await, AR705);
-    assert_eq!(send(&mut r.h, "operador", &ana).await, AR705);
+    assert_eq!(send(&mut r.h, "operador", &ana).await, AR714);
+}
+
+// ------------------------------------------------------------------- AR-714 (decision 0051)
+
+/// What the matrix reads before the record exists: the chats and messages of both numbers.
+struct Seen {
+    operador: HashMap<String, String>,
+    ponte: HashMap<String, String>,
+    bridge: HashMap<String, Value>,
+    ana: HashMap<String, Value>,
+    operator: HashMap<String, Value>,
+    bia: HashMap<String, Value>,
+}
+
+async fn seen(g: &mut Agent) -> Seen {
+    let operador = chats(g, "operador").await;
+    let ponte = chats(g, "ponte").await;
+    let bridge = messages(g, "operador", &operador["Bridge"]).await;
+    let ana = messages(g, "operador", &operador["Ana"]).await;
+    let operator = messages(g, "ponte", &ponte["Operator"]).await;
+    let bia = messages(g, "ponte", &ponte["Bia"]).await;
+    Seen {
+        operador,
+        ponte,
+        bridge,
+        ana,
+        operator,
+        bia,
+    }
+}
+
+fn refusal(code: ErrorCode) -> CallOutcome {
+    CallOutcome::Refused {
+        code,
+        retry_after: None,
+    }
+}
+
+/// Every call that writes in one protected chat, by one Hermes: `chat_code` for a chat or a
+/// destination, `message_code` for a message of it.
+async fn matrix(
+    agent: &mut Agent,
+    number: &str,
+    own: u32,
+    chat: &str,
+    customer_message: &Value,
+    chat_message: &Value,
+    codes: (ErrorCode, ErrorCode),
+) {
+    let (chat_code, message_code) = codes;
+    let file = |to: &str| {
+        json!({"to": to, "kind": "document", "mimetype": "application/pdf",
+               "filename": "a.pdf", "data": data_encoding::BASE64.encode(b"%PDF")})
+    };
+    for to in [chat.to_owned(), plus(own), without_ninth(own), phone(own)] {
+        let out = go(
+            agent,
+            "whatsapp_send_text",
+            number,
+            json!({"to": to, "text": "x"}),
+        )
+        .await;
+        assert_eq!(out, refusal(chat_code), "send_text {to}");
+    }
+    for to in [chat.to_owned(), plus(own)] {
+        let out = go(agent, "whatsapp_send_file", number, file(&to)).await;
+        assert_eq!(out, refusal(chat_code), "send_file {to}");
+        let out = go(
+            agent,
+            "whatsapp_forward",
+            number,
+            json!({"message_id": customer_message, "to": to}),
+        )
+        .await;
+        assert_eq!(out, refusal(chat_code), "forward {to}");
+    }
+    let out = go(agent, "whatsapp_mark_read", number, json!({"chat": chat})).await;
+    assert_eq!(out, refusal(chat_code), "mark_read");
+    let out = go(
+        agent,
+        "whatsapp_set_typing",
+        number,
+        json!({"chat": chat, "on": true}),
+    )
+    .await;
+    assert_eq!(out, refusal(chat_code), "set_typing");
+    let out = go(
+        agent,
+        "whatsapp_react",
+        number,
+        json!({"message_id": chat_message, "reaction": "\u{1F44D}"}),
+    )
+    .await;
+    assert_eq!(out, refusal(message_code), "react");
+    let out = go(
+        agent,
+        "whatsapp_edit_message",
+        number,
+        json!({"message_id": chat_message, "text": "x"}),
+    )
+    .await;
+    assert_eq!(out, refusal(message_code), "edit");
+    let out = go(
+        agent,
+        "whatsapp_delete_message",
+        number,
+        json!({"message_id": chat_message}),
+    )
+    .await;
+    assert_eq!(out, refusal(message_code), "delete");
+}
+
+/// Both numbers, with their matrix, for one Hermes.
+async fn both_matrices(agent: &mut Agent, s: &Seen, chat_code: ErrorCode, message_code: ErrorCode) {
+    let codes = (chat_code, message_code);
+    matrix(
+        agent,
+        "operador",
+        BRIDGE,
+        &s.operador["Bridge"],
+        &s.ana["hi"],
+        &s.bridge["an order"],
+        codes,
+    )
+    .await;
+    matrix(
+        agent,
+        "ponte",
+        OPERATOR,
+        &s.ponte["Operator"],
+        &s.bia["hi"],
+        &s.operator["an order"],
+        codes,
+    )
+    .await;
+}
+
+/// SECURITY RULE (decision 0051, 18/11/2026): AR-714 depends on the record of the Hermes that
+/// calls; every other Hermes keeps exactly AR-705 or AR-712. Fails when the ownership check is
+/// removed or inverted.
+#[tokio::test(flavor = "multi_thread")]
+async fn only_the_hermes_whose_command_channel_it_is_is_told_so() {
+    let mut r = ready(true).await;
+    let s = seen(&mut r.g).await;
+    record_the_usual(&r.world, &r.h.name).await;
+    both_matrices(&mut r.g, &s, ErrorCode::Ar705, ErrorCode::Ar712).await;
+    both_matrices(&mut r.h, &s, ErrorCode::Ar714, ErrorCode::Ar714).await;
+    assert!(r.world.fake.sent().is_empty(), "nothing was sent");
+    assert!(r.world.fake.edited().is_empty() && r.world.fake.deleted().is_empty());
+    assert_eq!(requests(&r.world, "check-exists"), 0);
+    for agent in [&mut r.g, &mut r.h] {
+        for n in 0..20 {
+            let out = go(
+                agent,
+                "whatsapp_send_text",
+                "operador",
+                json!({"to": plus(NEW_CUSTOMER), "text": format!("m{n}")}),
+            )
+            .await;
+            assert_eq!(refused(&out), None, "sending {n}");
+        }
+        for n in 0..20 {
+            let out = go(
+                agent,
+                "whatsapp_send_text",
+                "ponte",
+                json!({"to": s.ponte["Bia"], "text": format!("m{n}")}),
+            )
+            .await;
+            assert_eq!(refused(&out), None, "to Bia {n}");
+        }
+    }
+}
+
+/// SECURITY RULE: AR-714 never reaches a connector that cannot read it. Fails when the version
+/// gate is removed.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_connector_of_version_1_keeps_ar705_and_ar712_for_the_hermes_whose_chat_it_is() {
+    let mut r = ready(true).await;
+    let mut old = r.world.agent_of_version_1().await;
+    r.world.grant(&old.name, "operador", grant()).await;
+    r.world.grant(&old.name, "ponte", grant()).await;
+    let s = seen(&mut r.g).await;
+    record_the_usual(&r.world, &old.name).await;
+    both_matrices(&mut old, &s, ErrorCode::Ar705, ErrorCode::Ar712).await;
+    both_matrices(&mut r.g, &s, ErrorCode::Ar705, ErrorCode::Ar712).await;
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT details::text FROM audit WHERE action = 'whatsapp.order_chat_refused' \
+         AND target_id = (SELECT id FROM hermes WHERE name = $1) ORDER BY seq",
+    )
+    .bind(&old.name)
+    .fetch_all(r.world.hub().pool())
+    .await
+    .unwrap();
+    assert!(!rows.is_empty());
+    for (details,) in rows {
+        let d: Value = serde_json::from_str(&details).unwrap();
+        assert_eq!(d["own_chat"], json!(true), "{details}");
+        assert!(
+            matches!(d["code"].as_str(), Some("AR-705" | "AR-712")),
+            "{details}"
+        );
+    }
+}
+
+/// A chat in the records of two Hermes: each of them is told, nobody else.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_command_channel_of_another_hermes_is_not_the_callers_own() {
+    let mut r = ready(true).await;
+    let mut k = r.world.agent().await;
+    r.world.grant(&k.name, "operador", grant()).await;
+    r.world.grant(&k.name, "ponte", grant()).await;
+    let s = seen(&mut r.g).await;
+    record_the_usual(&r.world, &r.h.name).await;
+    record(
+        &r.world,
+        &k.name,
+        Some(OPERATOR),
+        &[BRIDGE, CUSTOMER],
+        false,
+    )
+    .await
+    .unwrap();
+    let to = |name: &str| s.operador[name].clone();
+    assert_eq!(send(&mut r.h, "operador", &to("Bridge")).await, AR714);
+    assert_eq!(send(&mut k, "operador", &to("Bridge")).await, AR714);
+    assert_eq!(send(&mut r.g, "operador", &to("Bridge")).await, AR705);
+    assert_eq!(send(&mut k, "operador", &to("Ana")).await, AR714);
+    assert_eq!(send(&mut r.h, "operador", &to("Ana")).await, AR705);
+    assert_eq!(send(&mut r.g, "operador", &to("Ana")).await, AR705);
+    assert_eq!(send(&mut k, "operador", &plus(CUSTOMER)).await, AR714);
+    assert_eq!(send(&mut r.h, "operador", &plus(CUSTOMER)).await, AR705);
+    let op = s.ponte["Operator"].clone();
+    assert_eq!(send(&mut r.h, "ponte", &op).await, AR714);
+    assert_eq!(send(&mut k, "ponte", &op).await, AR714);
+    assert_eq!(send(&mut r.g, "ponte", &op).await, AR705);
+    let bia = s.ponte["Bia"].clone();
+    for agent in [&mut r.h, &mut k, &mut r.g] {
+        assert_eq!(send(agent, "ponte", &bia).await, None);
+    }
+}
+
+/// The ordinary rules come first: AR-714 is said only to a Hermes that could write there.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_hermes_whose_chat_it_is_keeps_its_ordinary_answer_first() {
+    let mut r = ready(true).await;
+    let mut owner = r.world.agent().await;
+    r.world
+        .grant(
+            &owner.name,
+            "operador",
+            arauto_hub::core::access::Grant {
+                scope: arauto_hub::core::access::Scope::All,
+                verbs: READ,
+                can_start_chats: false,
+            },
+        )
+        .await;
+    r.world.grant(&owner.name, "ponte", all(ALL_VERBS)).await;
+    let s = seen(&mut r.g).await;
+    record_the_usual(&r.world, &owner.name).await;
+    let in_bridge = messages(&mut owner, "operador", &s.operador["Bridge"]).await;
+    assert_eq!(
+        send(&mut owner, "operador", &s.operador["Bridge"]).await,
+        Some(ErrorCode::Ar701)
+    );
+    r.world.fake.register(&phone(BRIDGE), &id(BRIDGE));
+    assert_eq!(
+        send(&mut owner, "operador", &plus(BRIDGE)).await,
+        Some(ErrorCode::Ar701)
+    );
+    let react = go(
+        &mut owner,
+        "whatsapp_react",
+        "operador",
+        json!({"message_id": in_bridge["an order"], "reaction": "x"}),
+    )
+    .await;
+    assert_eq!(refused(&react), Some(ErrorCode::Ar701));
+
+    record(&r.world, &owner.name, None, &[], false)
+        .await
+        .unwrap();
+    let mut lister = r.world.agent().await;
+    r.world
+        .grant(
+            &lister.name,
+            "operador",
+            list(arauto_hub::core::access::Verbs {
+                read: false,
+                send: true,
+                modify: false,
+                wake: false,
+            }),
+        )
+        .await;
+    record_the_usual(&r.world, &lister.name).await;
+    assert_eq!(
+        send(&mut lister, "operador", &s.operador["Bridge"]).await,
+        AR705
+    );
+    assert_eq!(send(&mut lister, "operador", &plus(BRIDGE)).await, AR705);
 }
 
 /// Test 11: a removed Hermes loses its record in the same write, audited; the refusal ends.
@@ -950,6 +1286,7 @@ async fn the_record_is_audited_with_counts_and_its_rules_hold() {
         takes_orders_on: Some(Some(plus(BRIDGE))),
         self_chat: true,
         orders_from: Some(vec![plus(OPERATOR)]),
+        outside_whatsapp: false,
     };
     assert!(matches!(
         admin
@@ -1197,4 +1534,177 @@ async fn the_command_says_the_risk_and_number_list_has_its_closing_line() {
     assert!(list_text().await.contains(closing));
     // The telephone is never printed.
     assert!(!text.contains(&phone(BRIDGE)));
+}
+
+/// R3 (decision 0051, 18/11/2026). SECURITY RULE: outside WhatsApp never coexists with a
+/// telephone, self-chat or a list: the two answers to one question are refused, and the record
+/// that says "outside" refuses nothing and silences the warnings.
+#[tokio::test(flavor = "multi_thread")]
+async fn orders_from_outside_whatsapp_refuse_nothing_and_silence_the_warning() {
+    use arauto_hub::admin::render::{orders as render_orders, whatsapp as render_whatsapp};
+    let mut r = ready(true).await;
+    let admin = &r.world.fixture.admin;
+    let list_text = || async {
+        let mut listed = Vec::new();
+        for number in admin.number_list(false).await.unwrap() {
+            let phone = admin.number_phone(&r.world.vault, &number).await.ok();
+            listed.push((number, phone));
+        }
+        let orders = admin.orders_for_the_list().await.unwrap();
+        render_whatsapp::number_list(&listed, &orders).text
+    };
+    let closing = "No Hermes has recorded who gives it orders on WhatsApp";
+    assert!(list_text().await.contains(closing));
+
+    let pool = r.world.hub().pool().clone();
+    let count = |table: &'static str| {
+        let pool = pool.clone();
+        async move {
+            let sql = format!("SELECT count(*) FROM {table}");
+            sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    let audits = || count("audit");
+
+    let outside = OrdersEdit {
+        outside_whatsapp: true,
+        ..OrdersEdit::default()
+    };
+    let set = admin
+        .hermes_orders_set(&r.world.vault, &r.h.name, &outside, r.world.now())
+        .await
+        .unwrap();
+    assert!(set.written && set.after.outside_whatsapp);
+    let text = render_orders::orders(&set, true).text;
+    assert!(
+        text.contains("its orders come from outside WhatsApp"),
+        "{text}"
+    );
+    assert!(text.contains("Note: the hub cannot check this."), "{text}");
+    assert!(!text.contains("Warning"), "{text}");
+    let listed = list_text().await;
+    assert!(!listed.contains(closing), "{listed}");
+    assert!(!listed.contains("takes orders here"), "{listed}");
+    assert!(!listed.contains("gives orders to"), "{listed}");
+    let details: String = sqlx::query_scalar(
+        "SELECT details::text FROM audit WHERE action = 'hermes.whatsapp_orders_changed' \
+         ORDER BY seq DESC LIMIT 1",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let d: Value = serde_json::from_str(&details).unwrap();
+    assert_eq!(d["mode_after"], json!("outside_whatsapp"), "{details}");
+    assert_eq!(d["telephones_after"], json!(0), "{details}");
+    for needle in [phone(BRIDGE), phone(OPERATOR)] {
+        assert!(!details.contains(&needle), "{details}");
+    }
+    // Nothing is refused, for G or for H, in either chat.
+    let bridge = chats(&mut r.g, "operador").await["Bridge"].clone();
+    let operator = chats(&mut r.g, "ponte").await["Operator"].clone();
+    assert_eq!(send(&mut r.g, "operador", &bridge).await, None);
+    assert_eq!(send(&mut r.h, "operador", &bridge).await, None);
+    assert_eq!(send(&mut r.g, "ponte", &operator).await, None);
+    assert_eq!(send(&mut r.h, "ponte", &operator).await, None);
+
+    // The two answers together are refused, and nothing is written.
+    let audit_before = audits().await;
+    let refused = |edit: OrdersEdit| {
+        let (world, name) = (&r.world, &r.h.name);
+        async move {
+            let result = world
+                .fixture
+                .admin
+                .hermes_orders_set(&world.vault, name, &edit, world.now())
+                .await;
+            assert!(
+                matches!(
+                    result,
+                    Err(AdminError::OrdersRule(Invalid::OutsideWithATelephone))
+                ),
+                "{result:?}"
+            );
+        }
+    };
+    refused(OrdersEdit {
+        takes_orders_on: Some(Some(plus(BRIDGE))),
+        outside_whatsapp: true,
+        ..OrdersEdit::default()
+    })
+    .await;
+    refused(OrdersEdit {
+        orders_from: Some(vec![plus(OPERATOR)]),
+        outside_whatsapp: true,
+        ..OrdersEdit::default()
+    })
+    .await;
+    refused(OrdersEdit {
+        self_chat: true,
+        outside_whatsapp: true,
+        ..OrdersEdit::default()
+    })
+    .await;
+    assert_eq!(audits().await, audit_before);
+    assert_eq!(count("hermes_orders_outside_whatsapp").await, 1);
+    assert_eq!(count("hermes_whatsapp_phone").await, 0);
+    // "none" with it is the same answer: nothing changes.
+    let same = OrdersEdit {
+        takes_orders_on: Some(None),
+        outside_whatsapp: true,
+        ..OrdersEdit::default()
+    };
+    let same = r
+        .world
+        .fixture
+        .admin
+        .hermes_orders_set(&r.world.vault, &r.h.name, &same, r.world.now())
+        .await
+        .unwrap();
+    assert!(!same.written);
+
+    // A telephone alone replaces it, and the warning is back.
+    let takes = OrdersEdit {
+        takes_orders_on: Some(Some(plus(BRIDGE))),
+        ..OrdersEdit::default()
+    };
+    let changed = r
+        .world
+        .fixture
+        .admin
+        .hermes_orders_set(&r.world.vault, &r.h.name, &takes, r.world.now())
+        .await
+        .unwrap();
+    assert!(!changed.after.outside_whatsapp);
+    let text = render_orders::orders(&changed, true).text;
+    assert!(text.contains("Warning: nothing is recorded"), "{text}");
+    assert_eq!(count("hermes_orders_outside_whatsapp").await, 0);
+
+    // Back to outside, then the Hermes is removed: the row goes with it, with its event.
+    r.world
+        .fixture
+        .admin
+        .hermes_orders_set(&r.world.vault, &r.h.name, &outside, r.world.now())
+        .await
+        .unwrap();
+    assert_eq!(count("hermes_orders_outside_whatsapp").await, 1);
+    r.world
+        .fixture
+        .admin
+        .hermes_remove(&r.h.name, r.world.now())
+        .await
+        .unwrap();
+    assert_eq!(count("hermes_orders_outside_whatsapp").await, 0);
+    let details: String = sqlx::query_scalar(
+        "SELECT details::text FROM audit WHERE action = 'hermes.whatsapp_orders_changed' \
+         ORDER BY seq DESC LIMIT 1",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let d: Value = serde_json::from_str(&details).unwrap();
+    assert_eq!(d["reason"], json!("hermes_removed"), "{details}");
+    assert_eq!(d["mode_before"], json!("outside_whatsapp"), "{details}");
 }

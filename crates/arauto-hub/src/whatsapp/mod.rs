@@ -12,7 +12,7 @@
 //! | `number` names no number this Hermes has an access to (or is left out with more than one) | AR-701 (AR-711) |
 //! | The telephone of the number was swapped: its accesses wait for the admin | AR-702 |
 //! | The verb on the number, or in the chat (its line, or the scope) | AR-701, AR-705 |
-//! | A write in the chat where a Hermes takes orders (decision 0051) | AR-705, AR-712 |
+//! | A write in the chat where a Hermes takes orders (decision 0051) | AR-705, AR-712; AR-714 to the Hermes whose command channel it is, on protocol version 2 |
 //! | The number is not connected to WhatsApp | AR-702 |
 //! | The engine is not there | AR-703 |
 //! | The send limit | AR-704, with `retry_after_s` |
@@ -108,9 +108,10 @@ pub(crate) async fn answer(
     hub: &Hub,
     organization: ResolvedOrg,
     hermes: Uuid,
+    proto: u32,
     call: &WhatsappCall,
 ) -> CallOutcome {
-    match run(hub, organization, hermes, call).await {
+    match run(hub, organization, hermes, proto, call).await {
         Ok(Value::Object(content)) => CallOutcome::Ok(Payload::new(content)),
         Ok(_) => CallOutcome::Refused {
             code: ErrorCode::Ar205,
@@ -197,7 +198,13 @@ fn chosen<'a>(
     }
 }
 
-async fn run(hub: &Hub, organization: ResolvedOrg, hermes: Uuid, call: &WhatsappCall) -> Answer {
+async fn run(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    hermes: Uuid,
+    proto: u32,
+    call: &WhatsappCall,
+) -> Answer {
     let accesses = repo::access::of_hermes(hub.pool(), organization, hermes)
         .await
         .map_err(|error| failed(&error, "the accesses of a Hermes could not be read"))?;
@@ -217,6 +224,7 @@ async fn run(hub: &Hub, organization: ResolvedOrg, hermes: Uuid, call: &Whatsapp
         hub,
         organization,
         hermes,
+        proto,
         access,
         key: &key,
     };
@@ -228,6 +236,9 @@ struct Call<'a> {
     hub: &'a Hub,
     organization: ResolvedOrg,
     hermes: Uuid,
+    /// The protocol version agreed on the channel of this call: AR-714 needs version 2
+    /// ([`ErrorCode::since`]).
+    proto: u32,
     access: &'a HermesAccess,
     key: &'a OrganizationKey,
 }
@@ -243,21 +254,26 @@ struct Authorized<'a> {
 /// and why.
 struct Held {
     record: Option<Uuid>,
+    /// The chat is in the record of the Hermes that calls.
+    own: bool,
     why: &'static str,
 }
 
 impl Held {
-    const fn matched(record: Option<Uuid>) -> Self {
+    const fn matched(record: Option<Uuid>, own: bool) -> Self {
         Self {
             record,
+            own,
             why: "matched",
         }
     }
 
-    /// A hidden contact chat the engine did not translate: held because it could not be told.
+    /// A hidden contact chat the engine did not translate: held because it could not be told
+    /// (and the hub cannot tell whose chat it is).
     const fn hidden() -> Self {
         Self {
             record: None,
+            own: false,
             why: "hidden",
         }
     }
@@ -404,6 +420,9 @@ impl<'a> Call<'a> {
     /// only by a hidden identifier is asked of the engine, and when the engine does not say,
     /// the writing in that chat alone is refused (it fails closed), on a number that has a
     /// recorded counterpart. No line is created, and no other chat is touched.
+    ///
+    /// The Hermes whose own record the chat is in is told so with AR-714, on a channel that can
+    /// read it ([`Self::order_chat_code`]); every other Hermes gets `code`.
     async fn hold_order_chat(
         &self,
         chat: Option<Uuid>,
@@ -418,11 +437,15 @@ impl<'a> Call<'a> {
         if counterparts.is_empty() {
             return Ok(());
         }
-        let mut held = ids
-            .iter()
-            .filter_map(EngineChatId::phone)
-            .find_map(|phone| self.counterpart_of(&counterparts, &phone))
-            .map(|record| Held::matched(Some(record)));
+        let mut held: Option<Held> = None;
+        for phone in ids.iter().filter_map(EngineChatId::phone) {
+            if let Some(found) = self.counterpart_of(&counterparts, &phone) {
+                held = Some(match held {
+                    None => Held::matched(Some(found.record), found.own),
+                    Some(first) => Held::matched(first.record, first.own || found.own),
+                });
+            }
+        }
         let gives_a_phone = ids.iter().any(|id| id.phone().is_some());
         if held.is_none() && !gives_a_phone {
             let hidden: Vec<&EngineChatId> = ids
@@ -437,9 +460,21 @@ impl<'a> Call<'a> {
         let Some(held) = held else {
             return Ok(());
         };
-        self.note_refusal(chat.or(held.record), chat, verb, held.why)
+        let code = self.order_chat_code(held.own, code);
+        self.note_refusal(chat.or(held.record), chat, verb, &held, code)
             .await;
         Err(code.into())
+    }
+
+    /// The code of a refusal in the chat where a Hermes takes orders (decision 0051,
+    /// 18/11/2026): AR-714 to the Hermes whose own command channel it is, on a channel whose
+    /// version can read it; `ordinary` (AR-705 or AR-712) otherwise, exactly as before.
+    fn order_chat_code(&self, own: bool, ordinary: ErrorCode) -> ErrorCode {
+        if own && self.proto >= ErrorCode::Ar714.since() {
+            ErrorCode::Ar714
+        } else {
+            ordinary
+        }
     }
 
     /// The counterparts of this number, read now (rule 9).
@@ -454,8 +489,8 @@ impl<'a> Call<'a> {
         &self,
         counterparts: &repo::orders::Counterparts,
         phone: &Phone,
-    ) -> Option<Uuid> {
-        counterparts.matching(self.key, self.organization, phone)
+    ) -> Option<repo::orders::Matched> {
+        counterparts.matching(self.key, self.organization, phone, self.hermes)
     }
 
     /// A chat under hidden identifiers only: asks the engine for the telephone of each. A
@@ -476,8 +511,8 @@ impl<'a> Call<'a> {
                 .await
             {
                 Ok(Some(phone)) => {
-                    if let Some(record) = self.counterpart_of(counterparts, &phone) {
-                        return Some(Held::matched(Some(record)));
+                    if let Some(found) = self.counterpart_of(counterparts, &phone) {
+                        return Some(Held::matched(Some(found.record), found.own));
                     }
                 }
                 Ok(None) | Err(_) => return Some(Held::hidden()),
@@ -493,7 +528,8 @@ impl<'a> Call<'a> {
         subject: Option<Uuid>,
         chat: Option<Uuid>,
         verb: Verb,
-        why: &'static str,
+        held: &Held,
+        code: ErrorCode,
     ) {
         let now = self.hub.now_ms();
         let subject = subject.unwrap_or_else(Uuid::nil);
@@ -503,7 +539,9 @@ impl<'a> Call<'a> {
         let mut details = Details::new()
             .alias("alias", &self.access.number.alias)
             .word("verb", verb.as_str())
-            .word("why", why);
+            .word("why", held.why)
+            .flag("own_chat", held.own)
+            .word("code", code.as_str());
         if let Some(chat) = chat {
             details = details.id("chat", chat);
         }
@@ -534,16 +572,28 @@ impl<'a> Call<'a> {
         if counterparts.is_empty() {
             return Ok(());
         }
-        let Some(record) = phone
-            .forms()
-            .iter()
-            .find_map(|form| self.counterpart_of(&counterparts, form))
-        else {
+        let mut held: Option<Held> = None;
+        for form in phone.forms() {
+            if let Some(found) = self.counterpart_of(&counterparts, &form) {
+                held = Some(match held {
+                    None => Held::matched(Some(found.record), found.own),
+                    Some(first) => Held::matched(first.record, first.own || found.own),
+                });
+            }
+        }
+        let Some(held) = held else {
             return Ok(());
         };
-        self.note_refusal(Some(record), None, Verb::Send, "matched")
+        // A "list" scope answers AR-705 for every chat it has no line for: by telephone, the
+        // owner keeps that answer too.
+        let code = if self.access.grant.scope == Scope::List {
+            ErrorCode::Ar705
+        } else {
+            self.order_chat_code(held.own, ErrorCode::Ar705)
+        };
+        self.note_refusal(held.record, None, Verb::Send, &held, code)
             .await;
-        Err(ErrorCode::Ar705.into())
+        Err(code.into())
     }
 
     /// A sending to a telephone asks WhatsApp about that telephone before anything else,

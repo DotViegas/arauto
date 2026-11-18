@@ -10,6 +10,9 @@
 //! `number.phone_digest`, so a recorded telephone compares with a number of the hub without
 //! being read. The sealed block is opened only for the admin command; nothing here ever puts
 //! a telephone in an audit row, a log or an error.
+//!
+//! A refusal tells the Hermes whose record it is that the chat is its own command channel
+//! (AR-714), on a channel that can read the code; every other Hermes gets AR-705 or AR-712.
 
 use std::collections::BTreeMap;
 
@@ -36,6 +39,9 @@ pub struct OrdersRecord {
     pub self_chat: bool,
     /// The telephones that give it orders (`bot` mode). Empty with `self_chat`.
     pub orders_from: Vec<Phone>,
+    /// Its orders come from outside WhatsApp (another conversation platform): no telephone,
+    /// nothing refused (18/11/2026).
+    pub outside_whatsapp: bool,
 }
 
 /// Why a record cannot be kept.
@@ -50,6 +56,9 @@ pub enum Invalid {
     BridgeAmongGivers,
     /// More than [`MAX_ORDERS_FROM`] telephones.
     TooMany,
+    /// Outside WhatsApp together with a telephone of a WhatsApp, self-chat or a list: two
+    /// answers to the same question.
+    OutsideWithATelephone,
 }
 
 fn same(a: &Phone, b: &Phone) -> bool {
@@ -60,13 +69,22 @@ impl OrdersRecord {
     /// Whether nothing is recorded.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.takes_orders_on.is_none() && !self.self_chat && self.orders_from.is_empty()
+        self.takes_orders_on.is_none()
+            && !self.self_chat
+            && self.orders_from.is_empty()
+            && !self.outside_whatsapp
     }
 
     /// The word for the mode, in the audit.
     #[must_use]
     pub const fn mode_word(&self) -> &'static str {
-        if self.self_chat { "self_chat" } else { "bot" }
+        if self.outside_whatsapp {
+            "outside_whatsapp"
+        } else if self.self_chat {
+            "self_chat"
+        } else {
+            "bot"
+        }
     }
 
     /// The chats this record protects: each `(telephone the bridge runs on, telephone that
@@ -91,6 +109,13 @@ impl OrdersRecord {
         self.pairs().is_empty()
     }
 
+    /// Whether the risk of nothing protected is said: nothing is protected and the admin did not
+    /// answer that its orders come from outside WhatsApp.
+    #[must_use]
+    pub fn needs_the_warning(&self) -> bool {
+        self.protects_nothing() && !self.outside_whatsapp
+    }
+
     /// The chats of this record that `after` leaves unprotected, in the order of
     /// [`Self::pairs`].
     #[must_use]
@@ -113,6 +138,11 @@ impl OrdersRecord {
     /// # Errors
     /// [`Invalid`] says which one is broken.
     pub fn check(&self) -> Result<(), Invalid> {
+        if self.outside_whatsapp
+            && (self.takes_orders_on.is_some() || self.self_chat || !self.orders_from.is_empty())
+        {
+            return Err(Invalid::OutsideWithATelephone);
+        }
         if self.self_chat && !self.orders_from.is_empty() {
             return Err(Invalid::SelfChatWithAList);
         }
@@ -147,6 +177,7 @@ impl OrdersRecord {
         let a = self.clone().normalized();
         let b = other.clone().normalized();
         a.self_chat == b.self_chat
+            && a.outside_whatsapp == b.outside_whatsapp
             && a.takes_orders_on.as_ref().map(Phone::digits)
                 == b.takes_orders_on.as_ref().map(Phone::digits)
             && a.orders_from
@@ -193,8 +224,9 @@ async fn read_in(
     )
     .bind(organization.id())
     .bind(hermes)
-    .fetch_all(connection)
+    .fetch_all(&mut *connection)
     .await?;
+    let any_phone = !rows.is_empty();
     let mut record = OrdersRecord::default();
     for row in rows {
         let opened = key
@@ -213,6 +245,16 @@ async fn read_in(
             _ => return Err(RepoError::Inconsistent("the role of a recorded telephone")),
         }
     }
+    let outside: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM hermes_orders_outside_whatsapp \
+         WHERE organization_id = $1 AND hermes_id = $2)",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .fetch_one(connection)
+    .await?;
+    // A hand edit that left both: the telephones win, the refusing side.
+    record.outside_whatsapp = outside && !any_phone;
     Ok(record.normalized())
 }
 
@@ -337,6 +379,13 @@ pub async fn set(
         .bind(hermes)
         .execute(write.connection())
         .await?;
+    sqlx::query(
+        "DELETE FROM hermes_orders_outside_whatsapp WHERE organization_id = $1 AND hermes_id = $2",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .execute(write.connection())
+    .await?;
     if let Some(takes) = &after.takes_orders_on {
         let mode = if after.self_chat { "self_chat" } else { "bot" };
         insert(
@@ -362,6 +411,17 @@ pub async fn set(
             from,
             now,
         )
+        .await?;
+    }
+    if after.outside_whatsapp {
+        sqlx::query(
+            "INSERT INTO hermes_orders_outside_whatsapp (organization_id, hermes_id, created_at) \
+             VALUES ($1, $2, $3)",
+        )
+        .bind(organization.id())
+        .bind(hermes)
+        .bind(now)
+        .execute(write.connection())
         .await?;
     }
     write
@@ -451,7 +511,15 @@ pub(crate) async fn end_with_the_hermes(
     .bind(hermes)
     .fetch_one(write.connection())
     .await?;
-    if rows == 0 {
+    let outside: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM hermes_orders_outside_whatsapp \
+         WHERE organization_id = $1 AND hermes_id = $2",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .fetch_one(write.connection())
+    .await?;
+    if rows == 0 && outside == 0 {
         return Ok(());
     }
     sqlx::query("DELETE FROM hermes_whatsapp_phone WHERE organization_id = $1 AND hermes_id = $2")
@@ -459,31 +527,66 @@ pub(crate) async fn end_with_the_hermes(
         .bind(hermes)
         .execute(write.connection())
         .await?;
+    sqlx::query(
+        "DELETE FROM hermes_orders_outside_whatsapp WHERE organization_id = $1 AND hermes_id = $2",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .execute(write.connection())
+    .await?;
+    let details = if rows == 0 {
+        Details::new()
+            .flag("bridge_telephone_before", false)
+            .flag("bridge_telephone_after", false)
+            .word("mode_before", "outside_whatsapp")
+            .number("telephones_before", 0)
+            .number("telephones_after", 0)
+            .word("reason", "hermes_removed")
+    } else {
+        Details::new()
+            .flag("bridge_telephone_before", true)
+            .flag("bridge_telephone_after", false)
+            .number("telephones_before", givers)
+            .number("telephones_after", 0)
+            .word("reason", "hermes_removed")
+    };
     write
         .record(
             now,
             &Event::new(Action::HermesWhatsappOrdersChanged, admin.actor())
                 .in_organization(organization)
                 .about(TargetKind::Hermes, hermes)
-                .with(
-                    Details::new()
-                        .flag("bridge_telephone_before", true)
-                        .flag("bridge_telephone_after", false)
-                        .number("telephones_before", givers)
-                        .number("telephones_after", 0)
-                        .word("reason", "hermes_removed"),
-                ),
+                .with(details),
         )
         .await?;
     Ok(())
+}
+
+/// One record row at the other end of the chats of a number: whose record it is, and the digest
+/// of each form of its telephone.
+#[derive(Debug, Clone)]
+struct Counterpart {
+    hermes: Uuid,
+    digests: Vec<[u8; 32]>,
+}
+
+/// A telephone that is a counterpart of the number, as the Hermes that calls sees it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Matched {
+    /// The first record row it matches, in the order of the rows: the key of the hourly memory.
+    pub record: Uuid,
+    /// Some row it matches is of the record of the Hermes that calls: the chat is that Hermes's
+    /// own command channel (decision 0051, 18/11/2026).
+    pub own: bool,
 }
 
 /// The telephones at the other end of the chats this number must not be written in, read at
 /// a call that writes (rule 9: against the current state).
 #[derive(Debug, Clone, Default)]
 pub struct Counterparts {
-    /// The record row each telephone comes from, with the digest of each of its forms.
-    by_record: BTreeMap<Uuid, Vec<[u8; 32]>>,
+    /// The record row each telephone comes from, with the Hermes whose record it is and the
+    /// digest of each form.
+    by_record: BTreeMap<Uuid, Counterpart>,
 }
 
 impl Counterparts {
@@ -493,19 +596,27 @@ impl Counterparts {
         self.by_record.is_empty()
     }
 
-    /// The record row whose telephone is `phone`, when it is a counterpart.
+    /// The record row whose telephone is `phone`, when it is a counterpart, and whether some
+    /// row it matches is of the record of `caller`.
     #[must_use]
     pub fn matching(
         &self,
         key: &OrganizationKey,
         organization: ResolvedOrg,
         phone: &Phone,
-    ) -> Option<Uuid> {
+        caller: Uuid,
+    ) -> Option<Matched> {
         let digest = digest_of(key, organization, phone);
-        self.by_record
+        let mut hits = self
+            .by_record
             .iter()
-            .find(|(_, digests)| digests.contains(&digest))
-            .map(|(record, _)| *record)
+            .filter(|(_, c)| c.digests.contains(&digest));
+        let (record, first) = hits.next()?;
+        let own = first.hermes == caller || hits.any(|(_, c)| c.hermes == caller);
+        Some(Matched {
+            record: *record,
+            own,
+        })
     }
 }
 
@@ -523,7 +634,7 @@ pub async fn counterparts(
     organization: ResolvedOrg,
     number: Uuid,
 ) -> Result<Counterparts, RepoError> {
-    let rows: Vec<(Uuid, Vec<u8>)> = sqlx::query_as(
+    let rows: Vec<(Uuid, Uuid, Vec<u8>)> = sqlx::query_as(
         "WITH mine AS ( \
              SELECT p.id, p.hermes_id, p.role, p.whatsapp_mode \
              FROM number n \
@@ -536,7 +647,7 @@ pub async fn counterparts(
               AND h.deleted_at IS NULL \
              WHERE n.organization_id = $1 AND n.id = $2 \
          ) \
-         SELECT DISTINCT o.id, od.digest \
+         SELECT DISTINCT o.id, o.hermes_id, od.digest \
          FROM mine \
          JOIN hermes_whatsapp_phone o \
            ON o.organization_id = $1 AND o.hermes_id = mine.hermes_id \
@@ -551,12 +662,19 @@ pub async fn counterparts(
     .bind(number)
     .fetch_all(pool)
     .await?;
-    let mut by_record: BTreeMap<Uuid, Vec<[u8; 32]>> = BTreeMap::new();
-    for (record, digest) in rows {
+    let mut by_record: BTreeMap<Uuid, Counterpart> = BTreeMap::new();
+    for (record, hermes, digest) in rows {
         let digest: [u8; 32] = digest
             .try_into()
             .map_err(|_| RepoError::Inconsistent("a digest of a recorded telephone"))?;
-        by_record.entry(record).or_default().push(digest);
+        by_record
+            .entry(record)
+            .or_insert_with(|| Counterpart {
+                hermes,
+                digests: Vec::new(),
+            })
+            .digests
+            .push(digest);
     }
     Ok(Counterparts { by_record })
 }
@@ -605,12 +723,13 @@ pub async fn tags(pool: &PgPool, organization: ResolvedOrg) -> Result<Vec<Tag>, 
         .collect()
 }
 
-/// Whether some Hermes that was not removed has a chat protected: a telephone that gives it
-/// orders, or `self-chat`. While none has, `number list` says so.
+/// Whether some Hermes that was not removed has an answer that counts: a chat protected (a
+/// telephone that gives it orders, or self-chat) or orders from outside WhatsApp. While none
+/// has, `number list` says so.
 ///
 /// # Errors
 /// [`RepoError::Database`] when the database refuses.
-pub async fn some_hermes_protects_a_chat(
+pub async fn some_hermes_is_recorded(
     pool: &PgPool,
     organization: ResolvedOrg,
 ) -> Result<bool, RepoError> {
@@ -620,7 +739,12 @@ pub async fn some_hermes_protects_a_chat(
              JOIN hermes h ON h.organization_id = p.organization_id AND h.id = p.hermes_id \
               AND h.deleted_at IS NULL \
              WHERE p.organization_id = $1 \
-               AND (p.role = 'gives_orders' OR p.whatsapp_mode = 'self_chat'))",
+               AND (p.role = 'gives_orders' OR p.whatsapp_mode = 'self_chat')) \
+         OR EXISTS ( \
+             SELECT 1 FROM hermes_orders_outside_whatsapp o \
+             JOIN hermes h ON h.organization_id = o.organization_id AND h.id = o.hermes_id \
+              AND h.deleted_at IS NULL \
+             WHERE o.organization_id = $1)",
     )
     .bind(organization.id())
     .fetch_one(pool)
@@ -641,6 +765,7 @@ mod tests {
             takes_orders_on: Some(phone("+5511900000001")),
             self_chat: false,
             orders_from: vec![phone("+5511900000002")],
+            outside_whatsapp: false,
         };
         assert_eq!(record.check(), Ok(()));
         record.self_chat = true;
@@ -653,6 +778,7 @@ mod tests {
             takes_orders_on: None,
             self_chat: false,
             orders_from: vec![phone("+5511900000002")],
+            outside_whatsapp: false,
         };
         assert_eq!(list.check(), Err(Invalid::NoTelephoneOfTheHermes));
         let many = OrdersRecord {
@@ -661,6 +787,7 @@ mod tests {
             orders_from: (0..17)
                 .map(|n| phone(&format!("+55119000001{n:02}")))
                 .collect(),
+            outside_whatsapp: false,
         };
         assert_eq!(many.check(), Err(Invalid::TooMany));
         assert!(OrdersRecord::default().protects_nothing());
@@ -668,6 +795,7 @@ mod tests {
             takes_orders_on: Some(phone("+5511987654321")),
             self_chat: false,
             orders_from: vec![phone("+5511987654321")],
+            outside_whatsapp: false,
         };
         assert_eq!(among.check(), Err(Invalid::BridgeAmongGivers));
         let other_form = OrdersRecord {
@@ -690,6 +818,7 @@ mod tests {
             takes_orders_on: Some(phone("+5511900000001")),
             self_chat: false,
             orders_from: vec![with],
+            outside_whatsapp: false,
         };
         let after = OrdersRecord {
             orders_from: vec![without],
@@ -711,6 +840,7 @@ mod tests {
             takes_orders_on: Some(bridge.clone()),
             self_chat: false,
             orders_from: vec![phone("+5511900000002"), phone("+5511900000003")],
+            outside_whatsapp: false,
         };
         let after = OrdersRecord {
             orders_from: vec![phone("+5511900000002")],
@@ -721,5 +851,55 @@ mod tests {
         assert_eq!(lost[0].0.digits(), bridge.digits());
         assert_eq!(lost[0].1.digits(), "5511900000003");
         assert!(after.lost_in(&before).is_empty());
+    }
+
+    #[test]
+    fn orders_from_outside_whatsapp_are_an_answer_alone() {
+        let outside = OrdersRecord {
+            outside_whatsapp: true,
+            ..OrdersRecord::default()
+        };
+        assert_eq!(outside.check(), Ok(()));
+        let bridge = OrdersRecord {
+            takes_orders_on: Some(phone("+5511900000001")),
+            ..outside.clone()
+        };
+        assert_eq!(bridge.check(), Err(Invalid::OutsideWithATelephone));
+        let own = OrdersRecord {
+            self_chat: true,
+            ..outside.clone()
+        };
+        assert_eq!(own.check(), Err(Invalid::OutsideWithATelephone));
+        let list = OrdersRecord {
+            orders_from: vec![phone("+5511900000002")],
+            ..outside.clone()
+        };
+        assert_eq!(list.check(), Err(Invalid::OutsideWithATelephone));
+        let several = OrdersRecord {
+            self_chat: true,
+            orders_from: vec![phone("+5511900000002")],
+            ..outside.clone()
+        };
+        assert_eq!(several.check(), Err(Invalid::OutsideWithATelephone));
+        assert!(outside.protects_nothing());
+        assert!(!outside.needs_the_warning());
+        assert!(!outside.is_empty());
+        assert_eq!(outside.mode_word(), "outside_whatsapp");
+        assert!(OrdersRecord::default().needs_the_warning());
+        let lone_bridge = OrdersRecord {
+            takes_orders_on: Some(phone("+5511900000001")),
+            ..OrdersRecord::default()
+        };
+        assert!(lone_bridge.needs_the_warning());
+        let before = OrdersRecord {
+            takes_orders_on: Some(phone("+5511900000001")),
+            orders_from: vec![phone("+5511900000002")],
+            ..OrdersRecord::default()
+        };
+        let lost = before.lost_in(&outside);
+        assert_eq!(lost.len(), 1);
+        assert_eq!(lost[0].1.digits(), "5511900000002");
+        assert!(outside.equals(&outside.clone()));
+        assert!(!outside.equals(&OrdersRecord::default()));
     }
 }

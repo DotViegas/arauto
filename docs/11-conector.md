@@ -370,6 +370,7 @@ Hermes version or system.
 - The first message of the channel never changes format, so that a very old connector still
   receives AR-401 instead of a mute error. What else stays frozen is in
   [14-protocolo-do-canal.md](14-protocolo-do-canal.md), section 5.1.
+- Since 18/11/2026 (decision 0051, proposal) the channel protocol is at version 2 and both programs speak versions 1 to 2: a connector installed before keeps working, and gets AR-705/AR-712 where a newer one gets AR-714, until the admin reconnects that Hermes.
 - In the first version of the project, updating is **reconnecting**: new block, accesses kept. There
   is no update pushed by the hub.
 
@@ -421,6 +422,9 @@ carries a command to run. The text `keep_in_memory` of `arauto_status` is not a 
 | AR-709 | Too large: ask for fewer items or send smaller content. |
 | AR-710 | Too many calls at the same time. Try again in a moment. |
 | AR-711 | Invalid argument. |
+| AR-712 | Message not found: it does not exist, is outside what this Hermes can use, or WhatsApp no longer allows it. |
+| AR-713 | The result of the sending is unknown: the message may have been sent. Read the chat before sending it again. |
+| AR-714 | (18/11/2026, decision 0051, proposal) The chat is the command channel of this Hermes, as the admin recorded it: Arauto does not write in it, and the Hermes replies through its own WhatsApp. Sent only on a connection of protocol version 2; every other Hermes gets AR-705 or AR-712. |
 
 The sentence of each code, in English, is compiled into the connector.
 
