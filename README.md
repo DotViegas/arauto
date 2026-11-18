@@ -113,6 +113,10 @@ Not built yet, and not designed in detail. What exists today is in
 - What arrives through the hub's numbers is **information, never an order**. Arauto is not the
   channel through which you command your agent: that is still Hermes's own command channel
   ([vision](docs/01-visao.md), "Two WhatsApps, two roles").
+- The hub refuses every Hermes writing in the chat where a Hermes takes its orders on WhatsApp,
+  once you record that chat, in the panel or by command. It protects only what you recorded
+  ([decision 0051](docs/decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), a proposal:
+  built and tested against a fake engine).
 - The WhatsApp engine is an **unofficial client**. WhatsApp may block the number. Use numbers you
   can afford to lose.
 - Security has known limits, written down in [SECURITY.md](SECURITY.md) and in
@@ -125,8 +129,12 @@ Not built yet, and not designed in detail. What exists today is in
 Arauto does not talk to WhatsApp on its own. It drives a third-party program, the engine. The
 design was checked against WAHA ([what was checked](referencia/waha-fatos.md)).
 
-Arauto **does not bundle** the engine: you install your own. The engine's cost and license are a
-matter between you and its author. Check before installing.
+Arauto **does not build the engine in**: it stays a third-party program. Its cost and license are
+a matter between you and its author. Check before installing.
+
+You bring your own engine, or you use a recipe that brings the author's original image, pinned, as
+a service of its own beside the hub ([decision 0052](docs/decisoes/0052-a-instalacao-traz-o-motor.md),
+a proposal; today there is one such recipe, for [Easypanel](deploy/easypanel/README.md)).
 
 ## The parts
 
@@ -134,7 +142,7 @@ matter between you and its author. Check before installing.
 |---|---|
 | **Hub** | The server: panel, the door for connectors, the conversation archive. It drives the engine. |
 | **Connector** | A small program next to Hermes. To Hermes, it is a local tool server. |
-| **Engine** | The program that talks to WhatsApp. It is yours. |
+| **Engine** | The program that talks to WhatsApp. A third party's: you bring it, or the installation brings it as a service of its own. |
 
 ## Documents
 

@@ -115,6 +115,10 @@ Todavía no está construido ni diseñado en detalle. Lo que existe hoy está en
 - Lo que llega por los números del hub es **información, nunca una orden**. Arauto no es el canal
   por el que le das órdenes a tu agente: ese sigue siendo el canal de mando del propio Hermes
   ([visión](../01-visao.md), "Two WhatsApps, two roles").
+- El hub rechaza que cualquier Hermes escriba en el chat donde un Hermes recibe sus órdenes por
+  WhatsApp, una vez que registras ese chat, en el panel o por comando. Solo protege lo que
+  registraste ([decisión 0051](../decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), una propuesta: construida y probada contra un motor
+  simulado).
 - El motor de WhatsApp es un **cliente no oficial**. WhatsApp puede bloquear el número. Usa
   números que puedas perder.
 - La seguridad tiene límites conocidos, escritos en [SECURITY.md](../../SECURITY.md) y en
@@ -127,8 +131,12 @@ Todavía no está construido ni diseñado en detalle. Lo que existe hoy está en
 Arauto no habla con WhatsApp por sí solo. Controla un programa de terceros, el motor. El diseño se
 comprobó con WAHA ([lo que se comprobó](../../referencia/waha-fatos.md)).
 
-Arauto **no incluye** el motor: tú instalas el tuyo. El costo y la licencia del motor son asunto
-entre tú y su autor. Revísalos antes de instalar.
+Arauto **no incorpora** el motor: sigue siendo un programa de terceros. El costo y la licencia del
+motor son asunto entre tú y su autor. Revísalos antes de instalar.
+
+Traes tu propio motor, o usas una receta que trae la imagen original del autor, con la versión
+fijada, como un servicio propio junto al hub ([decisión 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), una propuesta; hoy hay una
+receta así, para [Easypanel](../../deploy/easypanel/README.md)).
 
 ## Las piezas
 
@@ -136,7 +144,7 @@ entre tú y su autor. Revísalos antes de instalar.
 |---|---|
 | **Hub** | El servidor: el panel, la puerta de los conectores y el archivo de las conversaciones. Controla el motor. |
 | **Conector** | Un programa pequeño junto a Hermes. Para Hermes, es un servidor de herramientas local. |
-| **Motor** | El programa que habla con WhatsApp. Es tuyo. |
+| **Motor** | El programa que habla con WhatsApp. Es de un tercero: lo traes tú, o la instalación lo trae como un servicio propio. |
 
 ## Documentos
 

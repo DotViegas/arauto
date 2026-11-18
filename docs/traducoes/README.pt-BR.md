@@ -114,6 +114,10 @@ Ainda não construído, e ainda não desenhado em detalhe. O que existe hoje est
 - O que chega pelos números do hub é **informação, nunca ordem**. O Arauto não é o canal por
   onde você comanda o seu agente: esse continua sendo o canal de comando do próprio Hermes
   ([visão](../01-visao.md), "Two WhatsApps, two roles").
+- O hub recusa qualquer Hermes de escrever na conversa onde um Hermes recebe ordens no WhatsApp,
+  depois que você registra essa conversa, no painel ou por comando. Ele só protege o que você
+  registrou ([decisão 0051](../decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), uma proposta: construída e testada contra um motor
+  simulado).
 - O motor de WhatsApp é um **cliente não oficial**. O WhatsApp pode bloquear o número. Use números
   que você pode perder.
 - A segurança tem limites conhecidos, escritos em [SECURITY.md](../../SECURITY.md) e em
@@ -126,8 +130,12 @@ Ainda não construído, e ainda não desenhado em detalhe. O que existe hoje est
 O Arauto não fala com o WhatsApp sozinho. Ele comanda um programa de terceiro, o motor. O
 desenho foi conferido com o WAHA ([o que foi conferido](../../referencia/waha-fatos.md)).
 
-O Arauto **não embute** o motor: você instala o seu. O custo e a licença do motor são com o
-autor dele. Confira antes de instalar.
+O Arauto **não embute** o motor: ele continua sendo um programa de terceiros. O custo e a licença
+do motor são com o autor dele. Confira antes de instalar.
+
+Você traz o seu motor, ou usa uma receita que traz a imagem original do autor, com a versão
+fixada, como um serviço próprio ao lado do hub ([decisão 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), uma proposta; hoje existe
+uma receita assim, para o [Easypanel](../../deploy/easypanel/README.md)).
 
 ## As peças
 
@@ -135,7 +143,7 @@ autor dele. Confira antes de instalar.
 |---|---|
 | **Hub** | O servidor: painel, porta dos conectores, arquivo das conversas. Comanda o motor. |
 | **Conector** | Programa pequeno ao lado do Hermes. Para o Hermes, é um servidor de ferramentas local. |
-| **Motor** | O programa que fala com o WhatsApp. É seu. |
+| **Motor** | O programa que fala com o WhatsApp. É de terceiros: você traz o seu, ou a instalação o traz como um serviço próprio. |
 
 ## Documentos
 

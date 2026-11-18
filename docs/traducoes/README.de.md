@@ -117,6 +117,10 @@ Noch nicht gebaut und noch nicht im Detail entworfen. Was es heute gibt, steht i
 - Was über die Nummern des Hubs ankommt, ist **Information, niemals ein Befehl**. Arauto ist nicht
   der Kanal, über den du deinem Agenten Befehle gibst: Das bleibt der Befehlskanal von Hermes
   selbst ([Vision](../01-visao.md), „Two WhatsApps, two roles“).
+- Der Hub verweigert jedem Hermes das Schreiben in dem Chat, in dem ein Hermes seine Befehle über
+  WhatsApp erhält, sobald du diesen Chat eingetragen hast, im Panel oder per Befehl. Geschützt ist
+  nur, was du eingetragen hast ([Entscheidung 0051](../decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), ein Vorschlag: gebaut und gegen eine
+  nachgebildete Engine getestet).
 - Die WhatsApp-Engine ist ein **inoffizieller Client**. WhatsApp kann die Nummer sperren. Nimm
   Nummern, deren Verlust du verschmerzen kannst.
 - Die Sicherheit hat bekannte Grenzen, beschrieben in [SECURITY.md](../../SECURITY.md) und in
@@ -129,8 +133,13 @@ Noch nicht gebaut und noch nicht im Detail entworfen. Was es heute gibt, steht i
 Arauto spricht nicht selbst mit WhatsApp. Es steuert ein Programm eines Dritten, die Engine. Der
 Entwurf wurde mit WAHA geprüft ([was geprüft wurde](../../referencia/waha-fatos.md)).
 
-Arauto **liefert die Engine nicht mit**: Du installierst deine eigene. Kosten und Lizenz der
+Arauto **baut die Engine nicht ein**: Sie bleibt das Programm eines Dritten. Kosten und Lizenz der
 Engine sind Sache zwischen dir und ihrem Autor. Prüfe das vor der Installation.
+
+Du bringst deine eigene Engine mit, oder du nutzt ein Rezept, das das Original-Image des Autors,
+auf eine feste Version gesetzt, als eigenen Dienst neben dem Hub mitbringt
+([Entscheidung 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), ein Vorschlag; bisher gibt es ein solches Rezept, für
+[Easypanel](../../deploy/easypanel/README.md)).
 
 ## Die Teile
 
@@ -138,7 +147,7 @@ Engine sind Sache zwischen dir und ihrem Autor. Prüfe das vor der Installation.
 |---|---|
 | **Hub** | Der Server: das Panel, die Tür für die Connectoren und das Archiv der Unterhaltungen. Er steuert die Engine. |
 | **Connector** | Ein kleines Programm neben Hermes. Für Hermes ist es ein lokaler Tool-Server. |
-| **Engine** | Das Programm, das mit WhatsApp spricht. Es gehört dir. |
+| **Engine** | Das Programm, das mit WhatsApp spricht. Es stammt von einem Dritten: Du bringst es mit, oder die Installation bringt es als eigenen Dienst mit. |
 
 ## Dokumente
 

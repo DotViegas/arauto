@@ -116,6 +116,10 @@ Pas encore construit, et pas encore conçu dans le détail. Ce qui existe aujour
 - Ce qui arrive par les numéros du hub est une **information, jamais un ordre**. Arauto n'est pas
   le canal par lequel vous commandez votre agent : cela reste le canal de commande de Hermes
   lui-même ([vision](../01-visao.md), « Two WhatsApps, two roles »).
+- Le hub refuse à tout Hermes d'écrire dans la conversation où un Hermes reçoit ses ordres sur
+  WhatsApp, une fois que vous avez enregistré cette conversation, dans le panneau ou par commande.
+  Il ne protège que ce que vous avez enregistré ([décision 0051](../decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), une proposition :
+  construite et testée contre un moteur simulé).
 - Le moteur WhatsApp est un **client non officiel**. WhatsApp peut bloquer le numéro. Utilisez des
   numéros que vous pouvez vous permettre de perdre.
 - La sécurité a des limites connues, décrites dans [SECURITY.md](../../SECURITY.md) et dans
@@ -128,8 +132,12 @@ Pas encore construit, et pas encore conçu dans le détail. Ce qui existe aujour
 Arauto ne parle pas à WhatsApp tout seul. Il pilote un programme tiers, le moteur. La conception a
 été vérifiée avec WAHA ([ce qui a été vérifié](../../referencia/waha-fatos.md)).
 
-Arauto **n'embarque pas** le moteur : vous installez le vôtre. Le coût et la licence du moteur
+Arauto **n'intègre pas** le moteur : il reste un programme tiers. Le coût et la licence du moteur
 sont une affaire entre vous et son auteur. Vérifiez avant d'installer.
+
+Vous apportez votre propre moteur, ou vous utilisez une recette qui apporte l'image d'origine de
+l'auteur, à version fixée, comme un service à part à côté du hub ([décision 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), une
+proposition ; il existe aujourd'hui une telle recette, pour [Easypanel](../../deploy/easypanel/README.md)).
 
 ## Les pièces
 
@@ -137,7 +145,7 @@ sont une affaire entre vous et son auteur. Vérifiez avant d'installer.
 |---|---|
 | **Hub** | Le serveur : le panneau, la porte des connecteurs et l'archive des conversations. Il pilote le moteur. |
 | **Connecteur** | Un petit programme à côté de Hermes. Pour Hermes, c'est un serveur d'outils local. |
-| **Moteur** | Le programme qui parle à WhatsApp. C'est le vôtre. |
+| **Moteur** | Le programme qui parle à WhatsApp. Il vient d'un tiers : vous l'apportez, ou l'installation l'apporte comme un service à part. |
 
 ## Documents
 
