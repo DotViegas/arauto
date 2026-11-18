@@ -353,7 +353,7 @@ mod tests {
     }
 
     /// The code of the panel that writes sentences, as text: this test reads it.
-    const SOURCES: [(&str, &str); 13] = [
+    const SOURCES: [(&str, &str); 14] = [
         ("view.rs", include_str!("../view.rs")),
         ("guide.rs", include_str!("../guide.rs")),
         ("editor.rs", include_str!("../editor.rs")),
@@ -367,6 +367,7 @@ mod tests {
         ("numbers.rs", include_str!("../numbers.rs")),
         ("pairing.rs", include_str!("../pairing.rs")),
         ("orders.rs", include_str!("../orders.rs")),
+        ("actions.rs", include_str!("../actions.rs")),
     ];
 
     /// Every sentence the code marks with `k("...")`, outside the tests of each file.

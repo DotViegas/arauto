@@ -504,9 +504,16 @@ async fn pairing_by_code_shows_the_code_in_its_window_only() {
     assert!(seen.contains("being paired in another window"), "{seen}");
     assert!(!seen.contains("ABCD-EFGH"));
     let list = rig.browser.get("/whatsapps", Some(&other)).await.text();
-    assert!(list.contains("See the pairing") && !list.contains("ABCD-EFGH"));
+    assert!(!list.contains("ABCD-EFGH"));
+    // The way to it is in the window of actions of the number, and the code is not there either.
+    let window = rig
+        .browser
+        .get("/whatsapps/actions?alias=vendas", Some(&other))
+        .await
+        .text();
+    assert!(window.contains("See the pairing") && !window.contains("ABCD-EFGH"));
     assert!(
-        rig.get("/whatsapps")
+        rig.get("/whatsapps/actions?alias=vendas")
             .await
             .text()
             .contains("Continue pairing")
