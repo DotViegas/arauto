@@ -134,7 +134,8 @@ a matter between you and its author. Check before installing.
 
 You bring your own engine, or you use a recipe that brings the author's original image, pinned, as
 a service of its own beside the hub ([decision 0052](docs/decisoes/0052-a-instalacao-traz-o-motor.md),
-a proposal; today there is one such recipe, for [Easypanel](deploy/easypanel/README.md)).
+a proposal; today there is one such recipe, for [Easypanel](deploy/easypanel/README.md), not
+tried on Easypanel yet).
 
 ## The parts
 

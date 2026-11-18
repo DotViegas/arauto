@@ -135,7 +135,7 @@ do motor são com o autor dele. Confira antes de instalar.
 
 Você traz o seu motor, ou usa uma receita que traz a imagem original do autor, com a versão
 fixada, como um serviço próprio ao lado do hub ([decisão 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), uma proposta; hoje existe
-uma receita assim, para o [Easypanel](../../deploy/easypanel/README.md)).
+uma receita assim, para o [Easypanel](../../deploy/easypanel/README.md), ainda não experimentada no Easypanel).
 
 ## As peças
 

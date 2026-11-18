@@ -139,7 +139,7 @@ Engine sind Sache zwischen dir und ihrem Autor. Prüfe das vor der Installation.
 Du bringst deine eigene Engine mit, oder du nutzt ein Rezept, das das Original-Image des Autors,
 auf eine feste Version gesetzt, als eigenen Dienst neben dem Hub mitbringt
 ([Entscheidung 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), ein Vorschlag; bisher gibt es ein solches Rezept, für
-[Easypanel](../../deploy/easypanel/README.md)).
+[Easypanel](../../deploy/easypanel/README.md), auf Easypanel noch nicht ausprobiert).
 
 ## Die Teile
 

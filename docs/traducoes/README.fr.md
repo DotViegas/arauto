@@ -137,7 +137,7 @@ sont une affaire entre vous et son auteur. Vérifiez avant d'installer.
 
 Vous apportez votre propre moteur, ou vous utilisez une recette qui apporte l'image d'origine de
 l'auteur, à version fixée, comme un service à part à côté du hub ([décision 0052](../decisoes/0052-a-instalacao-traz-o-motor.md), une
-proposition ; il existe aujourd'hui une telle recette, pour [Easypanel](../../deploy/easypanel/README.md)).
+proposition ; il existe aujourd'hui une telle recette, pour [Easypanel](../../deploy/easypanel/README.md), pas encore essayée sur Easypanel).
 
 ## Les pièces
 

@@ -110,7 +110,7 @@ Arauto 自己并不与 WhatsApp 通信。它驱动一个第三方程序，即引
 
 Arauto **不把引擎做进自身**：引擎仍然是第三方程序。引擎的费用和许可证由你与其作者之间解决。安装前请先确认。
 
-你可以自带引擎，也可以使用一份配方：它把作者的原始镜像（固定版本）作为 hub 旁边的一个独立服务带进来（[决定 0052](../decisoes/0052-a-instalacao-traz-o-motor.md)，一项提议；目前有一份这样的配方，用于 [Easypanel](../../deploy/easypanel/README.md)）。
+你可以自带引擎，也可以使用一份配方：它把作者的原始镜像（固定版本）作为 hub 旁边的一个独立服务带进来（[决定 0052](../decisoes/0052-a-instalacao-traz-o-motor.md)，一项提议；目前有一份这样的配方，用于 [Easypanel](../../deploy/easypanel/README.md)，尚未在 Easypanel 上试过）。
 
 ## 组成部分
 
