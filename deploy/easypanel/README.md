@@ -6,6 +6,7 @@ on the server for the first access.
 | File | What it is |
 |---|---|
 | [`compose.yaml`](compose.yaml) | The hub and PostgreSQL 16, with the volumes and the networks. |
+| [`compose.engine.yaml`](compose.engine.yaml) | **Not tried yet.** The same, and the WhatsApp engine as a third service. See "The recipe that brings the engine" below. |
 | [`defaults.env`](defaults.env) | The values the recipe starts with. What you set in Environment wins. |
 
 ## What is left to prove
@@ -157,6 +158,91 @@ This erases the database and the data folder for good: the passkeys, every Herme
 the master key. A Hermes that was connected to the old hub keeps a connector that only trusts the
 old key: it has to leave first (`arauto-connector leave`, or `leave --local` when the hub is
 already gone) and be connected again with a new invite.
+
+## The recipe that brings the engine (not tried yet)
+
+[`compose.engine.yaml`](compose.engine.yaml) is a second recipe, written for
+[decision 0052](../../docs/decisoes/0052-a-instalacao-traz-o-motor.md). It has **never run on an
+Easypanel**: it is a proposal until a manual run on a test server, with a test number, records
+what it does. `compose.yaml` is not changed by it and stays the recipe where you bring your own
+engine.
+
+Use it by typing `deploy/easypanel/compose.engine.yaml` as the path of the Compose file in
+**Source**; everything else in "Create the service" is the same. It adds:
+
+- A service `engine`: the image of the engine's author, pinned by tag and digest
+  (`devlikeapro/waha:gows-2026.10.1@sha256:1f7f...`, amd64 only), with no published port and no
+  domain. Give it no domain in Domains.
+- The key of the engine is drawn by the hub. The engine gets only its SHA-512 digest, in a file
+  of a volume the hub writes and the engine mounts read-only (`arauto-engine-digest`). The key
+  itself never appears on a screen or in a log. The hub variables `ARAUTO_ENGINE_URL`,
+  `ARAUTO_ENGINE_EVENTS_URL` and `ARAUTO_ENGINE_DIGEST_DIR` are set by the recipe, all three
+  together; do not set them in Environment.
+- Two more volumes, so four in all: `arauto-engine-digest` and `arauto-engine-sessions`. The
+  second one holds the WhatsApp sessions of the paired numbers.
+- A network `engine` shared only by the hub and the engine, with no fixed name, so two
+  installations never share it. It is not internal: the engine has to reach WhatsApp.
+
+How the engine starts: it waits for the digest file. Until the hub has written it, the engine
+container is up and only a line in its log says it is waiting; the engine itself is not started
+and its port is not open. When the file appears and has exactly the format of a digest, the
+engine starts. A file that is there and is not a digest of that format, a link instead of a file,
+or one of the switches that let calls in without a key (`WAHA_NO_API_KEY`,
+`WHATSAPP_API_KEY_EXCLUDE_PATH`) makes the container exit, and Easypanel restarts it. The engine
+service waits for the health of the hub (`depends_on`), without restarting when the hub does.
+
+### Upgrading, and an installation that already has an engine
+
+- **Do not switch an installation that already has an engine typed by an admin.** The hub never
+  replaces an engine address an admin set, and writes no digest for it: the new `engine` service
+  would wait for ever, after a download of about 0.7 GiB. Switching the Source file also takes the
+  hub off the fixed network `arauto-engine` of the old recipe, so the engine you brought would
+  stop being reachable by the hub.
+- **A version with a new migration:** a Deploy of a version that needs a migration leaves the hub
+  restarting until `arauto-hub migrate --i-have-a-backup` is run (see "What is not guaranteed").
+  The engine service waits for a healthy hub, so with this recipe it is probably created and not
+  started on that Deploy: run the migration, then Deploy again. Not checked.
+- **Raising the pinned version** needs a backup of the sessions volume first (engine stopped);
+  a rollback after the engine migrated its store was not checked. The copy holds the credentials
+  of the numbers: keep it like the master key.
+
+### What is not guaranteed in this recipe
+
+- **Not tried on a real Easypanel.** Nothing below was observed there: the shared volume between
+  two services, the `entrypoint:` override, the ownership of the new volume, the start order, and
+  the engine reading the digest file are all proposals. The wrapper was only read through by hand
+  and run in a shell on a Windows machine, not in the image.
+- **The engine is an unofficial WhatsApp client.** Its author's terms and WhatsApp's apply, and
+  a number can be banned.
+- **A root container of a third party runs beside the hub.** The image has no `User`. It can
+  reach the internal ports of the hub (8443, 8444 and, here, 8445 of the panel) without going
+  through the proxy.
+- **The engine is reachable although no port is published:** from the host through its bridge
+  address, and from every container on its network. The key is still required. Whether Easypanel
+  also attaches the engine or the hub to its shared network is not known; if it does, other
+  projects' containers could reach the engine, and the name `engine` could resolve to a container
+  that is not this one. Before real use, check from inside the hub that `getent hosts engine`
+  gives one address, and from the engine that `getent hosts hub` gives one.
+- **Memory and disk.** The author recommends at least 2 CPU and 4 GB of memory for the engine,
+  even for one session. On a throwaway container of the image (18/11/2026), idle, without a
+  number paired, it used about 417 MiB; the image is about 3.2 GB on disk and about 0.7 GiB to
+  download. The recipe sets no memory limit. The memory of the hub and of PostgreSQL was not
+  measured.
+- **arm64 was not tested.** The pinned digest is the amd64 image.
+- **Restart and Stop on Easypanel act on every container of the service,** the engine included.
+  The engine reads its key only when it starts, so after the hub draws or changes the key the
+  engine has to be restarted.
+- **A kept sessions volume carries sessions the hub does not know.** Destroying the service
+  keeps its volumes; a service created again with the same name takes them back, and the engine
+  restarts the WhatsApp sessions it finds there. Their numbers stay connected and the new hub
+  does not see them. Log the numbers out in the panel before destroying, and remove the four
+  volumes (`arauto-data`, `arauto-postgres`, `arauto-engine-digest`, `arauto-engine-sessions`)
+  to start from zero. Nothing in the recipe detects this.
+- **The engine's settings are pinned:** its dashboard, swagger, apps, metrics, debug endpoints
+  and QR in the log are off, and its access log is set to `debug`, so that the lines that carry
+  phone numbers do not appear at the default `info`. That last effect is a reading of the
+  engine's source, not observed in this recipe.
+- Beyond that, everything in "What is not guaranteed" below holds here too.
 
 ## What to check
 

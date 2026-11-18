@@ -1,0 +1,191 @@
+# NOT TRIED YET. This recipe has never run on a real Easypanel: it is a proposal until the manual
+# run (docs/decisoes/0052). Do not use it for a hub that matters.
+#
+# The Arauto hub, its database and its WhatsApp engine, for a Compose service of Easypanel.
+# It is the recipe of decision 0052: the installation brings the engine as a third service.
+# compose.yaml beside this file is the other recipe, where you bring your own engine; it is
+# not changed by this one.
+#
+# Everything is set on the screens of Easypanel: this file goes in "Source", the two
+# addresses go in "Environment" (with "Create .env file" on) and in "Domains". No command is
+# needed before the first start: the hub installs itself on the empty database, writes an
+# installation code in its log, draws the key of the engine and hands the engine only its
+# digest. See README.md beside this file.
+#
+# The engine is the image of its author, pinned to the version the project tested. It is an
+# unofficial WhatsApp client. It has no published port and no domain, and it runs as root.
+
+services:
+  hub:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # What can be changed, in this order: the defaults of this recipe, then what is set in
+    # Environment of Easypanel, which it writes in the `.env` at the root of the repository
+    # (turn on "Create .env file"). The two addresses of the hub are set there.
+    env_file:
+      - path: defaults.env
+        required: true
+      - path: ../../.env
+        required: false
+    environment:
+      # The password in this address is the one the database is born with: the same for
+      # everyone, and reachable only from the network of this composition. At the first
+      # access of the admin the hub replaces it with one nobody sees and keeps the new one in
+      # its data folder. Leave the line below as it is.
+      ARAUTO_DATABASE_URL: postgres://arauto:arauto-first-start@postgres:5432/arauto
+      ARAUTO_LISTEN_PANEL: 0.0.0.0:8445
+      # Behind the proxy of Easypanel the address of each connector comes in a header.
+      ARAUTO_CLIENT_IP_SOURCE: forwarded
+      # The engine of this composition. The three go together: all set, or none. They only
+      # fill a missing engine of the first organization; an address set by an admin is never
+      # replaced.
+      ARAUTO_ENGINE_URL: http://engine:3000
+      ARAUTO_ENGINE_EVENTS_URL: http://hub:8444
+      ARAUTO_ENGINE_DIGEST_DIR: /run/arauto-engine
+    volumes:
+      # The master key, the audit mark and the password of the database. NOT the volume of
+      # the database, and NOT in its backup.
+      - arauto-data:/var/lib/arauto
+      # The digest of the key the hub drew for the engine, and nothing else. Never the key.
+      - arauto-engine-digest:/run/arauto-engine
+    networks:
+      - internal
+      # The network the WhatsApp engine shares: it reaches http://hub:8444, never published.
+      - engine
+    # Each connector holds one connection open.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # The hub lets the calls in progress answer for up to 10 seconds before it stops.
+    stop_grace_period: 20s
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arauto
+      # Only used when the database is created. See ARAUTO_DATABASE_URL above.
+      POSTGRES_PASSWORD: arauto-first-start
+      POSTGRES_DB: arauto
+    # The hub refuses a database that does not force its writes to disk: leave fsync on.
+    command: ["postgres", "-c", "fsync=on", "-c", "synchronous_commit=on", "-c", "full_page_writes=on"]
+    volumes:
+      - arauto-postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arauto -d arauto"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 60s
+
+  engine:
+    # Tag and digest: the tag says which version, the digest says which bytes. amd64 only.
+    image: devlikeapro/waha:gows-2026.10.1@sha256:1f7faeb0227ad5edb5711f7058bfce807ea65e5f92234af0778e4db140f6eb46
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    # The engine starts only with the digest the hub wrote: without it, WAHA would draw a key
+    # and print it in its log. Until the file exists the wrapper WAITS (it does not exit, and
+    # the engine does not start). A file that is there and is wrong makes it exit with 78.
+    # Every dollar sign is doubled, so that Compose leaves it to the shell (dash).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        digest_file=/run/arauto-engine/api-key.sha512
+        if [ -n "$${WAHA_NO_API_KEY:-}" ] || [ -n "$${WHATSAPP_API_KEY_EXCLUDE_PATH:-}" ]; then
+          echo "arauto: the engine does not start: a switch that lets calls in without the key is set" >&2
+          exit 78
+        fi
+        unset WHATSAPP_API_KEY WAHA_API_KEY WAHA_API_KEY_PLAIN DEBUG
+        # While it waits this shell is the first process: without the trap a stop would be ignored.
+        trap 'exit 143' TERM INT
+        waiting=0
+        while [ ! -e "$$digest_file" ] && [ ! -L "$$digest_file" ]; do
+          if [ "$$waiting" -eq 0 ]; then
+            echo "arauto: the engine is waiting for the hub to write the key digest" >&2
+            waiting=1
+          fi
+          sleep 2
+        done
+        if [ -L "$$digest_file" ] || [ ! -f "$$digest_file" ]; then
+          echo "arauto: the engine does not start: the key digest is a link or not a regular file" >&2
+          exit 78
+        fi
+        if [ "$$(wc -c < "$$digest_file")" -ne 135 ]; then
+          echo "arauto: the engine does not start: the key digest file is not in the expected format" >&2
+          exit 78
+        fi
+        digest=$$(cat "$$digest_file")
+        if ! printf '%s\n' "$$digest" | grep -Eqx 'sha512:[0-9a-f]{128}'; then
+          echo "arauto: the engine does not start: the key digest file is not in the expected format" >&2
+          exit 78
+        fi
+        export WAHA_API_KEY="$$digest"
+        exec "$$@"
+      - arauto-engine
+      - /usr/bin/tini
+      - --
+      - /entrypoint.sh
+    # No env_file and no interpolation here: nothing from the .env of Easypanel reaches the engine.
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: "GOWS"
+      WHATSAPP_API_PORT: "3000"
+      WAHA_DASHBOARD_ENABLED: "false"
+      WAHA_DASHBOARD_NO_PASSWORD: "true"
+      WHATSAPP_SWAGGER_ENABLED: "false"
+      WHATSAPP_SWAGGER_NO_PASSWORD: "true"
+      WAHA_APPS_ENABLED: "false"
+      WAHA_PROMETHEUS_ENABLED: "false"
+      WAHA_DEBUG_MODE: "false"
+      WAHA_PRINT_QR: "false"
+      WAHA_LOG_LEVEL: "info"
+      WAHA_HTTP_LOG_LEVEL: "debug"
+      WAHA_LOCAL_STORE_BASE_DIR: "/app/.sessions"
+    volumes:
+      # Read-only, and nocopy so that this mount never copies ownership from the image.
+      - type: volume
+        source: arauto-engine-digest
+        target: /run/arauto-engine
+        read_only: true
+        volume:
+          nocopy: true
+      # The engine sessions of the paired numbers. Outside the backup of the database.
+      - type: volume
+        source: arauto-engine-sessions
+        target: /app/.sessions
+    networks:
+      - engine
+    # Until the hub writes the digest the engine is not up, and this check fails: nothing
+    # depends on it.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    stop_grace_period: 30s
+
+volumes:
+  arauto-data:
+  arauto-postgres:
+  arauto-engine-digest:
+  arauto-engine-sessions:
+
+networks:
+  # The hub and its database, and nothing else. No port of the database is published.
+  internal:
+    internal: true
+  # The hub and the engine, and nothing else. No fixed name: Compose scopes it to this
+  # installation, so two installations never share it. Not internal: the engine reaches WhatsApp.
+  engine: {}

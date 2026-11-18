@@ -44,11 +44,14 @@ RUN apt-get update \
 # ---------------------------------------------------------------------------- run
 FROM debian:bookworm-slim
 # An unprivileged user with a fixed number, so the volume of the data folder can be given to it.
+# /run/arauto-engine: the mount point of the volume shared with the engine, which mounts it
+# read-only. It holds the digest of the engine key, never the key.
 RUN groupadd --system --gid 10001 arauto \
  && useradd --system --uid 10001 --gid arauto --home-dir /var/lib/arauto --shell /usr/sbin/nologin arauto \
- && mkdir -p /var/lib/arauto /usr/share/arauto/download \
- && chown arauto:arauto /var/lib/arauto \
- && chmod 700 /var/lib/arauto
+ && mkdir -p /var/lib/arauto /usr/share/arauto/download /run/arauto-engine \
+ && chown arauto:arauto /var/lib/arauto /run/arauto-engine \
+ && chmod 700 /var/lib/arauto \
+ && chmod 755 /run/arauto-engine
 COPY --from=build /out/arauto-hub /usr/local/bin/arauto-hub
 COPY --from=build /out/download/ /usr/share/arauto/download/
 

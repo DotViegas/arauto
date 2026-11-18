@@ -5,7 +5,7 @@ to all of them is on this page.
 
 | Folder | For whom | Status |
 |---|---|---|
-| [`easypanel/`](easypanel/README.md) | A server with Easypanel, set up on its screens, with no terminal. | Followed from start to end once, on 14/11/2026, on Easypanel 2.38.0. One run, one server. |
+| [`easypanel/`](easypanel/README.md) | A server with Easypanel, set up on its screens, with no terminal. | Followed from start to end once, on 14/11/2026, on Easypanel 2.38.0. One run, one server. A second recipe, `compose.engine.yaml`, that also brings the engine: **not tried yet**. |
 | [`docker/`](docker/README.md) | A server with Docker and Docker Compose. It is the recommended path. | Written. **Not yet built or tested on a server**: see "What is left to prove", in the guide. |
 | [`proxy/`](proxy/README.md) | Whoever needs an example of a proxy in front of the hub (Caddy or NGINX). | Examples written, not tested. |
 | [`kubernetes/`](kubernetes/README.md) | Whoever runs on Kubernetes. | Only the list of what the manifests need to guarantee. The manifests have not been written. |
