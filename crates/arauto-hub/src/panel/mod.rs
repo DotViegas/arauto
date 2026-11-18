@@ -61,6 +61,7 @@ use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use arauto_protocol::names::HermesName;
 use axum::body::Body;
 use axum::http::{HeaderMap, Method, Request, Response, StatusCode, header};
 use dashmap::DashMap;
@@ -1009,6 +1010,13 @@ async fn page(
             let mut numbers = data::numbers(hub, organization, lang, session.id).await?;
             // After a write, the address names the number: the page says what it is now.
             numbers.said = numbers::said(hub, organization, lang, query).await?;
+            // After a save of who gives a Hermes orders, the address names the Hermes.
+            if numbers.said.is_none() && http::query_field(query, "alias").is_none() {
+                let orders = http::query_field(query, "orders");
+                numbers.said =
+                    data::orders_said(hub, organization, lang, orders.as_ref().map(|s| s.as_str()))
+                        .await?;
+            }
             view::numbers(&frame, &numbers)
         }
         "/accesses" => {
@@ -1017,7 +1025,31 @@ async fn page(
             accesses.saved = editor::saved_sentence(hub, organization, lang, query).await?;
             view::accesses(&frame, &accesses)
         }
-        _ => view::hermes(&frame, &data::hermes(hub, organization, lang).await?),
+        _ => {
+            let mut hermes = data::hermes(hub, organization, lang).await?;
+            // After a write of a Hermes, the address names it: the page says what it is now.
+            let named = http::query_field(query, "hermes")
+                .and_then(|typed| HermesName::parse(typed.trim()).ok())
+                .and_then(|name| hermes.rows.iter().find(|row| row.name == name.as_str()))
+                .map(|row| view::StatusLine {
+                    kind: view::StatusKind::Done(row.tone),
+                    sentence: text::k("Hermes {name}: {state}."),
+                    texts: vec![
+                        ("name", row.name.clone()),
+                        ("state", text::tr(lang, row.state).to_owned()),
+                    ],
+                    codes: Vec::new(),
+                });
+            hermes.said = match named {
+                Some(said) => Some(said),
+                None => {
+                    let orders = http::query_field(query, "orders");
+                    data::orders_said(hub, organization, lang, orders.as_ref().map(|s| s.as_str()))
+                        .await?
+                }
+            };
+            view::hermes(&frame, &hermes)
+        }
     };
     Ok(http::page(StatusCode::OK, html))
 }
@@ -1416,5 +1448,51 @@ mod tests {
         // The sheet reaches for nothing outside the panel.
         assert!(!sheet.contains("http://") && !sheet.contains("https://"));
         assert!(!sheet.contains("@import"));
+    }
+
+    #[test]
+    fn the_current_step_is_marked_without_motion() {
+        let sheet = include_str!("assets/panel.css");
+        assert!(sheet.contains(
+            ".path li.current::after { transform: scaleX(1); animation: path-fill .5s ease both; }"
+        ));
+        assert!(sheet.contains(
+            ".path li.current .dot { border-color: var(--purple); background: var(--purple); color: var(--on-purple); animation: dot-light .3s ease .25s both; }"
+        ));
+    }
+
+    #[test]
+    fn order_tags_and_names_can_wrap() {
+        let sheet = include_str!("assets/panel.css");
+        assert!(sheet.contains(".list .name { overflow-wrap: anywhere; }"));
+        assert!(
+            sheet.contains(
+                ".tags { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; }"
+            )
+        );
+        assert!(sheet.contains(
+            ".tags .tag { display: inline-block; margin: 0; padding: 3px 0; white-space: normal; overflow-wrap: anywhere; }"
+        ));
+        assert!(!sheet.contains(".tags { display: block; margin-top: 2px; }"));
+    }
+
+    #[test]
+    fn the_sheet_shows_a_name_in_a_label_in_its_own_case() {
+        let sheet = include_str!("assets/panel.css");
+        assert!(
+            sheet.contains(".field label strong { text-transform: none; letter-spacing: normal; }")
+        );
+        assert!(sheet.contains(".field label b { text-transform: none; letter-spacing: normal; }"));
+    }
+
+    #[test]
+    fn the_sheet_keeps_the_foot_of_a_window_on_a_short_screen() {
+        let sheet = include_str!("assets/panel.css");
+        let at = sheet
+            .find("@media (max-height: 600px)")
+            .expect("a rule for short screens");
+        let after = &sheet[at..];
+        assert!(after.contains(".modal { overflow-y: auto; }"));
+        assert!(after.contains(".modal-body { min-height: 96px; }"));
     }
 }

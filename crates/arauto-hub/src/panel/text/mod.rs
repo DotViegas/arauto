@@ -541,7 +541,7 @@ mod tests {
                     "Its WhatsApp, where it takes orders",
                 ),
                 ("These telephones", "Other telephones"),
-                ("Start pairing", "Cancel"),
+                ("Start pairing", "Pair later"),
                 ("Add and pair", "Cancel"),
                 ("Cancel the pairing", "Refresh now"),
                 ("QR code", "Pairing code"),

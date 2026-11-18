@@ -482,9 +482,21 @@ async fn no_secret_of_the_panel_reaches_the_log_the_audit_or_the_rows() {
     let first_page = post(&fixture, "/hermes/connect", Some(&last), "name=canario")
         .await
         .text();
-    let second_page = post(&fixture, "/hermes/invite", Some(&last), "name=canario")
+    // The form of the wait page says what it replaces: an expiry in milliseconds, not a secret.
+    let waiting = get(&fixture, "/hermes/wait?name=canario", Some(&last))
         .await
         .text();
+    let mark = "name=\"replaces\" value=\"";
+    let from = waiting.find(mark).expect("the wait page has the field") + mark.len();
+    let replaces = &waiting[from..from + waiting[from..].find('"').unwrap()];
+    let second_page = post(
+        &fixture,
+        "/hermes/invite",
+        Some(&last),
+        &format!("name=canario&replaces={replaces}"),
+    )
+    .await
+    .text();
     let replaced = invite_of(&first_page);
     let invite = invite_of(&second_page);
     assert_ne!(replaced, invite);

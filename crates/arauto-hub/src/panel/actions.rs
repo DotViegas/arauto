@@ -58,6 +58,9 @@ enum Go<'a> {
     Run(&'a str, &'a str),
     /// A form that posts one field.
     Post(&'static str, &'static str, &'a str),
+    /// The form that issues an invite: only a row with no request and no invite offers it, so
+    /// what it replaces is `none`.
+    Invite(&'a str),
 }
 
 /// One line of the list of actions.
@@ -109,6 +112,13 @@ fn entry(html: &mut Html, one: &Item<'_>, subject: &str) {
             inner(html, one, subject);
             html.raw("</a>");
         }
+        Go::Invite(name) => {
+            html.raw("<form method=\"post\" action=\"/hermes/invite\"><input type=\"hidden\" name=\"name\" value=\"")
+                .text(name)
+                .raw("\"><input type=\"hidden\" name=\"replaces\" value=\"none\"><button type=\"submit\">");
+            inner(html, one, subject);
+            html.raw("</button></form>");
+        }
         Go::Post(action, field, value) => {
             html.raw("<form method=\"post\" action=\"")
                 .raw(action)
@@ -141,7 +151,7 @@ fn window(
         .t(k("Close"))
         .raw("\">")
         .raw(CLOSE)
-        .raw("</a></div><div class=\"modal-body\"><div class=\"whohead\">");
+        .raw("</a></div><div class=\"modal-body short\"><div class=\"whohead\">");
     head(html);
     html.raw("</div>");
     if !keep.is_empty() {
@@ -181,14 +191,14 @@ fn hermes_items(row: &HermesRow) -> (Vec<Item<'_>>, Vec<Item<'_>>) {
             label: k("Connect"),
             value: None,
             why: W_CONNECT,
-            go: Go::Post("/hermes/invite", "name", name),
+            go: Go::Invite(name),
         },
         view::RowAction::Reconnect => Item {
             icon: REDO,
             label: k("Reconnect"),
             value: None,
             why: W_RECONNECT,
-            go: Go::Post("/hermes/invite", "name", name),
+            go: Go::Invite(name),
         },
     };
     let keep = vec![
@@ -284,7 +294,7 @@ pub fn hermes_page(frame: &Frame, page: &HermesPage, name: &str) -> Option<Strin
         "/",
         |html| {
             view::state(html, row.tone, row.state);
-            html.raw("<span>");
+            html.raw("<span>").t(k("Numbers")).raw(": ");
             view::names(html, &row.numbers);
             html.raw("</span>");
         },

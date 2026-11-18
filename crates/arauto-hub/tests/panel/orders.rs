@@ -279,8 +279,25 @@ async fn a_save_that_protects_nothing_asks_first_and_saves_nothing_until_confirm
     let saved = rig
         .post("/hermes/whatsapp", &format!("{alone}&confirmed=1"))
         .await;
-    assert_eq!((saved.status, saved.header("location")), (303, Some("/")));
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
     assert_eq!(audited(&rig.world.fixture, CHANGED).await, 1);
+    // The list says what the save left.
+    let said = format!("/?orders={ana}");
+    let list = rig.get(&said).await.text();
+    assert!(
+        list.contains(&format!(
+            "Saved. Who gives {ana} orders on WhatsApp: not recorded."
+        )),
+        "{list}"
+    );
+    let numbers = rig.get(&format!("/whatsapps?orders={ana}")).await.text();
+    assert!(numbers.contains(&format!("Saved. Who gives {ana} orders on WhatsApp: ")));
+    // A name that is not a Hermes, or a telephone, says nothing.
+    let nothing = rig.get("/?orders=ninguem").await.text();
+    assert!(!nothing.contains("Saved. Who gives"));
     let now = record(&rig, &ana).await;
     assert_eq!(now.takes_orders_on.unwrap().digits(), phone(2));
     assert!(now.orders_from.is_empty());
@@ -294,7 +311,7 @@ async fn a_save_that_protects_nothing_asks_first_and_saves_nothing_until_confirm
         .await;
     assert_eq!(
         (protected.status, protected.header("location")),
-        (303, Some("/"))
+        (303, Some(format!("/?orders={ana}").as_str()))
     );
     assert_eq!(audited(&rig.world.fixture, CHANGED).await, 2);
 }
@@ -440,7 +457,10 @@ async fn a_save_through_the_panel_writes_what_the_command_writes() {
             ),
         )
         .await;
-    assert_eq!((saved.status, saved.header("location")), (303, Some("/")));
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
     // The command, with the same words.
     rig.world
         .fixture
@@ -893,7 +913,10 @@ async fn a_number_of_the_hub_is_chosen_by_alias_and_the_record_keeps_telephones(
             &form(&ana, "number:ponte", "", "list", &["operador"], "", ""),
         )
         .await;
-    assert_eq!((saved.status, saved.header("location")), (303, Some("/")));
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
     let now = record(&rig, &ana).await;
     assert_eq!(now.takes_orders_on.unwrap().digits(), phone(2));
     assert_eq!(
@@ -1005,7 +1028,10 @@ async fn the_other_form_of_a_recorded_telephone_chosen_by_alias_writes_nothing()
             &form(&ana, "number:ponte", "", "list", &["operador"], "", ""),
         )
         .await;
-    assert_eq!((saved.status, saved.header("location")), (303, Some("/")));
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
     assert_eq!(audited(&rig.world.fixture, CHANGED).await, changed);
     let now = record(&rig, &ana).await;
     assert_eq!(now.orders_from[0].digits(), other_form(1));
@@ -1048,7 +1074,10 @@ async fn a_typed_telephone_without_plus_stops_save_once_and_saving_again_keeps_i
     let again = rig
         .post("/hermes/whatsapp", &format!("{body}&ack={ack}"))
         .await;
-    assert_eq!((again.status, again.header("location")), (303, Some("/")));
+    assert_eq!(
+        (again.status, again.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
     let now = record(&rig, &ana).await;
     assert_eq!(now.orders_from[0].digits(), "11987600005");
 
@@ -1060,7 +1089,10 @@ async fn a_typed_telephone_without_plus_stops_save_once_and_saving_again_keeps_i
             &form(&bia, "other", &plus(8), "list", &[], &plus(3), ""),
         )
         .await;
-    assert_eq!((plain.status, plain.header("location")), (303, Some("/")));
+    assert_eq!(
+        (plain.status, plain.header("location")),
+        (303, Some(format!("/?orders={bia}").as_str()))
+    );
 
     // The other field: a telephone typed without "+" stops once, with its read under the input.
     let cia = rig.world.fixture.hermes().await;
@@ -1299,7 +1331,10 @@ async fn self_chat_with_a_list_is_refused_and_nothing_is_dropped() {
             &form(&ana, "number:ponte", "", "self", &[], "", ""),
         )
         .await;
-    assert_eq!((own.status, own.header("location")), (303, Some("/")));
+    assert_eq!(
+        (own.status, own.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
     assert!(record(&rig, &ana).await.self_chat);
 }
 
@@ -1659,7 +1694,7 @@ async fn the_flow_from_the_whatsapps_tab_returns_there() {
     let saved = rig.post("/hermes/whatsapp", &body).await;
     assert_eq!(
         (saved.status, saved.header("location")),
-        (303, Some("/whatsapps"))
+        (303, Some(format!("/whatsapps?orders={ana}").as_str()))
     );
     let asks = form(
         &ana,
@@ -1692,7 +1727,7 @@ async fn the_flow_from_the_whatsapps_tab_returns_there() {
         .await;
     assert_eq!(
         (kept.status, kept.header("location")),
-        (303, Some("/whatsapps"))
+        (303, Some(format!("/whatsapps?orders={ana}").as_str()))
     );
     // Another value goes to the first page.
     let other = form(
@@ -1705,7 +1740,10 @@ async fn the_flow_from_the_whatsapps_tab_returns_there() {
         "&return=elsewhere",
     );
     let saved = rig.post("/hermes/whatsapp", &other).await;
-    assert_eq!((saved.status, saved.header("location")), (303, Some("/")));
+    assert_eq!(
+        (saved.status, saved.header("location")),
+        (303, Some(format!("/?orders={ana}").as_str()))
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

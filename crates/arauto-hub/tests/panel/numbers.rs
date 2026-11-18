@@ -520,6 +520,29 @@ async fn pairing_by_code_shows_the_code_in_its_window_only() {
     );
     let page = rig.until(&rig.cookie, &path, "Paired:").await;
     assert!(!page.contains("ABCD-EFGH"), "gone after the end");
+    assert!(
+        page.contains("<li class=\"current\" aria-current=\"step\"><span class=\"dot\">4</span>"),
+        "a paired number reaches Done: {page}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_second_step_says_the_number_is_added_and_leaves_by_pair_later() {
+    let rig = rig().await;
+    rig.add("vendas", &phone(111)).await;
+    let method = rig.get("/whatsapps/pair?alias=vendas").await.text();
+    assert!(method.contains("vendas</b> is in the list now"), "{method}");
+    assert!(
+        method.contains("href=\"/whatsapps?alias=vendas\">Pair later</a>"),
+        "{method}"
+    );
+    assert!(
+        !method.contains("href=\"/whatsapps\">Cancel</a>"),
+        "{method}"
+    );
+    // Step 1 wrote nothing yet: it keeps its Cancel.
+    let first = rig.get("/whatsapps/add").await.text();
+    assert!(first.contains(">Cancel</a>"), "{first}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -542,12 +565,36 @@ async fn another_phone_waits_for_the_decision() {
             .await;
         assert!(page.contains("Keep this one"));
         assert_eq!(rig.world.state(alias).await, NumberState::NumberSwapped);
-        assert_eq!(
-            rig.get(&format!("/whatsapps/decide?alias={alias}"))
-                .await
-                .status,
-            200
+        // Both telephones are said, and neither answer is the main button.
+        let (given, paired) = (
+            format!("+{}", phone(expected)),
+            format!("+{}", phone(expected + 20)),
         );
+        assert!(page.contains(&given), "{page}");
+        assert!(page.contains(&paired), "{page}");
+        assert!(page.contains("Telephone that paired"), "{page}");
+        assert!(!dialog(&page).contains("button primary"), "{page}");
+        let decide = rig.get(&format!("/whatsapps/decide?alias={alias}")).await;
+        assert_eq!(decide.status, 200);
+        let decide = decide.text();
+        assert!(decide.contains(&given), "{decide}");
+        assert!(decide.contains(&paired), "{decide}");
+        let foot = decide
+            .split("<div class=\"modal-foot\">")
+            .nth(1)
+            .expect("the window has a foot");
+        assert!(foot.contains("form=\"confirm-form\""), "{decide}");
+        assert!(foot.contains("form=\"undo-form\""), "{decide}");
+        assert!(!dialog(&decide).contains("button primary"), "{decide}");
+        // No address in either page holds a telephone.
+        for page in [&page, &decide] {
+            for marker in ["href=\"", "action=\""] {
+                for part in page.split(marker).skip(1) {
+                    let address = part.split('"').next().unwrap_or_default();
+                    assert!(!address.contains("55119876"), "{address}");
+                }
+            }
+        }
         // The pairing screen of a swapped number leads to the decision.
         assert_eq!(
             rig.get(&format!("/whatsapps/pair?alias={alias}"))
@@ -590,6 +637,12 @@ async fn a_pairing_nobody_uses_expires_and_stops_the_engine_session() {
         )
         .await;
     assert!(page.contains("Pair again") && !page.contains("<svg class=\"qr\""));
+    // A pairing that did not pair keeps the path on "Phone": only a paired number reaches "Done".
+    assert!(
+        page.contains("<li class=\"current\" aria-current=\"step\"><span class=\"dot\">3</span>"),
+        "{page}"
+    );
+    assert_eq!(page.matches("<li class=\"done\">").count(), 2, "{page}");
     assert_eq!(rig.world.state("vendas").await, NumberState::Unpaired);
     assert_eq!(
         rig.world.fake.status(session.as_str()).as_deref(),
@@ -614,6 +667,11 @@ async fn cancelling_ends_the_run_stops_the_engine_session_and_unpairs() {
         .await;
     assert_eq!(answer.status, 303);
     assert_eq!(answer.header("location"), Some("/whatsapps?alias=first"));
+    let list = rig.get("/whatsapps?alias=first").await.text();
+    assert!(
+        list.contains("<p class=\"status idle\" role=\"status\">Number first: Not paired.</p>"),
+        "{list}"
+    );
     assert_eq!(rig.world.state("first").await, NumberState::Unpaired);
     assert_eq!(
         rig.world.fake.status(a.as_str()).as_deref(),
@@ -841,15 +899,32 @@ async fn restart_disconnect_and_remove_from_the_panel() {
         !dialog(&window).contains("checked"),
         "no choice is made for the admin"
     );
+    assert!(
+        window.contains("value=\"keep\" required><span>") && !dialog(&window).contains(" checked"),
+        "{window}"
+    );
     let answer = rig
         .post("/whatsapps/remove", "alias=online&typed=online")
         .await;
-    assert!(answer.text().contains("Choose what happens to its session"));
+    let text = answer.text();
+    assert!(text.contains("Choose what happens to its session"));
+    // A refused form keeps what matched: the alias typed.
+    assert!(
+        text.contains("id=\"typed\"") && text.contains("required value=\"online\">"),
+        "{text}"
+    );
     assert_eq!(rig.world.state("online").await, NumberState::Disconnected);
     let answer = rig
         .post("/whatsapps/remove", "alias=online&typed=nope&removal=keep")
         .await;
-    assert!(answer.text().contains("The alias typed does not match"));
+    let text = answer.text();
+    assert!(text.contains("The alias typed does not match"));
+    // The choice stays; the alias is typed again on purpose.
+    assert!(text.contains("value=\"keep\" checked"), "{text}");
+    assert!(
+        text.contains("id=\"typed\"") && text.contains("required value=\"\">"),
+        "{text}"
+    );
     let answer = rig
         .post(
             "/whatsapps/remove",
@@ -857,6 +932,7 @@ async fn restart_disconnect_and_remove_from_the_panel() {
         )
         .await;
     assert_eq!(answer.status, 303, "{}", answer.text());
+    assert_eq!(answer.header("location"), Some("/whatsapps?alias=online"));
     assert!(
         rig.world.fake.status(online.session.as_str()).is_some(),
         "kept in the engine"
@@ -868,6 +944,7 @@ async fn restart_disconnect_and_remove_from_the_panel() {
         )
         .await;
     assert_eq!(answer.status, 303, "{}", answer.text());
+    assert_eq!(answer.header("location"), Some("/whatsapps?alias=erased"));
     assert_eq!(
         rig.world.fake.status(erased.session.as_str()),
         None,
@@ -982,12 +1059,111 @@ async fn a_change_the_engine_did_not_do_is_said_on_the_list() {
     let answer = rig
         .post("/whatsapps/disconnect", "alias=online&typed=online")
         .await;
-    assert_eq!(answer.status, 200, "{}", answer.text());
-    assert!(answer.text().contains("but WAHA did not answer"));
-    assert!(answer.text().contains("arauto-hub admin engine health"));
+    assert_eq!(answer.status, 303, "{}", answer.text());
+    assert_eq!(
+        answer.header("location"),
+        Some("/whatsapps?alias=online&said=engine")
+    );
+    // The list at that address says it, as a warning and not as a success.
+    for refresh in [false, true] {
+        let mut headers = vec![("Host", PANEL_HOST), ("Cookie", rig.cookie.as_str())];
+        if refresh {
+            headers.push(("X-Arauto-Refresh", "1"));
+        }
+        let list = http::get(
+            rig.browser.panel,
+            "/whatsapps?alias=online&said=engine",
+            &headers,
+            PATIENCE,
+        )
+        .await
+        .unwrap();
+        assert_eq!(list.status, 200);
+        let list = list.text();
+        assert!(
+            list.contains(
+                "<div class=\"warnings\" role=\"status\"><p>The hub changed the number online, but WAHA did not answer"
+            ),
+            "{list}"
+        );
+        assert!(
+            list.contains("<code>arauto-hub admin engine health</code>"),
+            "{list}"
+        );
+        assert!(!list.contains("<p class=\"status\""), "{list}");
+    }
     // The change in the hub holds.
     assert_eq!(rig.world.state("online").await, NumberState::Disconnected);
     let _ = online;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_refused_restart_is_said_as_a_refusal_at_a_list_address() {
+    let rig = rig().await;
+    rig.world.connected("online", &phone(110)).await;
+    let answer = rig.post("/whatsapps/restart", "alias=online").await;
+    assert_eq!(answer.status, 303, "{}", answer.text());
+    assert_eq!(
+        answer.header("location"),
+        Some("/whatsapps?alias=online&said=not-now")
+    );
+    let list = rig.get("/whatsapps?alias=online&said=not-now").await;
+    assert_eq!(list.status, 200);
+    let list = list.text();
+    assert!(
+        list.contains("<p class=\"error\" role=\"status\">"),
+        "{list}"
+    );
+    assert!(list.contains("Nothing was done."), "{list}");
+    assert!(list.contains("Connected"), "{list}");
+    assert!(!list.contains("<p class=\"status\""), "{list}");
+    // The address of the form is not a page, and nothing was restarted.
+    assert_eq!(rig.get("/whatsapps/restart").await.status, 404);
+    assert!(
+        !rig.world
+            .fake
+            .received()
+            .iter()
+            .any(|r| r.path.ends_with("/restart"))
+    );
+    assert_eq!(rig.world.state("online").await, NumberState::Connected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_removed_number_is_said_removed_and_the_engine_silence_after_a_removal_too() {
+    let rig = rig().await;
+    rig.world.connected("online", &phone(111)).await;
+    rig.world.connected("second", &phone(112)).await;
+    let answer = rig
+        .post(
+            "/whatsapps/remove",
+            "alias=online&typed=online&removal=keep",
+        )
+        .await;
+    assert_eq!(answer.status, 303, "{}", answer.text());
+    assert_eq!(answer.header("location"), Some("/whatsapps?alias=online"));
+    let list = rig.get("/whatsapps?alias=online").await.text();
+    assert!(
+        list.contains("<p class=\"status idle\" role=\"status\">Number online was removed.</p>"),
+        "{list}"
+    );
+    rig.world.fake.fail("stop", Fault::ServerError);
+    let answer = rig
+        .post(
+            "/whatsapps/remove",
+            "alias=second&typed=second&removal=keep",
+        )
+        .await;
+    assert_eq!(answer.status, 303, "{}", answer.text());
+    assert_eq!(
+        answer.header("location"),
+        Some("/whatsapps?alias=second&said=engine")
+    );
+    let list = rig.get("/whatsapps?alias=second&said=engine").await.text();
+    assert!(
+        list.contains("The hub changed the number second, but WAHA did not answer"),
+        "{list}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1001,6 +1177,10 @@ async fn reading_the_number_windows_changes_nothing() {
     let reads = [
         "/whatsapps",
         "/whatsapps?alias=vendas",
+        "/whatsapps?alias=vendas&said=engine",
+        "/whatsapps?alias=vendas&said=not-now",
+        "/whatsapps?alias=vendas&said=%3Cscript%3E",
+        "/whatsapps?alias=nobody&said=engine",
         "/whatsapps/add",
         "/whatsapps/pair?alias=vendas",
         "/whatsapps/pair?alias=nobody",
@@ -1024,6 +1204,16 @@ async fn reading_the_number_windows_changes_nothing() {
         }
     }
     assert_eq!(snapshot(&rig).await, before);
+    // A word outside the closed set says what the number is, and nothing of what was sent.
+    let hostile = rig
+        .get("/whatsapps?alias=vendas&said=%3Cscript%3E")
+        .await
+        .text();
+    assert!(hostile.contains("Number vendas: Not paired."), "{hostile}");
+    assert!(!hostile.contains("%3Cscript"), "{hostile}");
+    assert!(!hostile.contains("<script>"), "{hostile}");
+    let nobody = rig.get("/whatsapps?alias=nobody&said=engine").await.text();
+    assert!(!nobody.contains("role=\"status\""), "{nobody}");
     // With a run live: the reads add no request that changes the engine, and the deadline of
     // the pairing does not move.
     let run = rig.start("filial", "qr").await;

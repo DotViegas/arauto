@@ -1017,6 +1017,13 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Decide", "対応を選ぶ"),
     ("Number {alias}: {state}.", "番号 {alias}: {state}。"),
     (
+        "Number {alias} was removed.",
+        "番号 {alias} は削除されました。",
+    ),
+    ("Telephone given", "指定された電話"),
+    ("Telephone that paired", "ペアリングした電話"),
+    ("Undo…", "元に戻す…"),
+    (
         "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
         "ハブは番号 {alias} を変更しましたが、WAHA から応答がありませんでした。WAHA 側のセッションは元のままかもしれません。ハブのサーバーで {command} を実行して WAHA を確認してください。",
     ),
@@ -1105,6 +1112,11 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "電話にコードを入力します。この画面をスキャンできない場合に使います",
     ),
     ("Start pairing", "ペアリングを開始"),
+    (
+        "{alias} is in the list now. Pair it now, or later from its line.",
+        "{alias} は一覧に追加されました。今ペアリングするか、後でその行からペアリングできます。",
+    ),
+    ("Pair later", "後でペアリング"),
     (
         "WAHA has not created the session of this number yet. Starting the pairing tries again.",
         "WAHA はまだこの番号のセッションを作成していません。ペアリングを開始すると再試行します。",
@@ -1562,4 +1574,34 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Dismiss", "非表示にする"),
     ("Dismiss: {title}", "非表示にする: {title}"),
+    (
+        "The message of this invite cannot be shown again. If it did not reach the Hermes, issue another invite: this one then stops working.",
+        "この招待のメッセージは再表示できません。Hermes に届かなかった場合は、別の招待を発行してください。この招待は使えなくなります。",
+    ),
+    ("Nothing has arrived yet", "まだ何も届いていません"),
+    (
+        "The Hermes may be waiting for your approval to run the command, in the command channel.",
+        "Hermes が、コマンドチャネルでコマンドの実行に対するあなたの承認を待っている可能性があります。",
+    ),
+    (
+        "The Hermes may not reach this hub: check that its machine reaches the address of the hub.",
+        "Hermes がこのハブに接続できない可能性があります。そのマシンがハブのアドレスに届くか確認してください。",
+    ),
+    (
+        "The message may have gone to another chat: it only works in the command channel of this Hermes.",
+        "メッセージが別のチャットに送られた可能性があります。この Hermes のコマンドチャネルでのみ機能します。",
+    ),
+    (
+        "Type the name {name} to confirm.",
+        "確認のため、名前 {name} を入力してください。",
+    ),
+    (
+        "The name typed does not match. Nothing was done.",
+        "入力した名前が一致しません。何も実行されていません。",
+    ),
+    ("Hermes {name}: {state}.", "Hermes {name}: {state}。"),
+    (
+        "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
+        "保存しました。WhatsApp で {hermes} に指示できる相手: {orders}。",
+    ),
 ];

@@ -354,6 +354,9 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
         assert!(question.contains(&format!("<h2 id=\"revoke-title\">Revoke {name}</h2>")));
         assert!(question.contains("The accesses are kept"));
         assert!(question.contains("<div class=\"page\" inert>"));
+        // The name is typed to confirm; the button is the one of the form.
+        assert!(question.contains(&format!("Type the name <b>{name}</b> to confirm.")));
+        assert!(question.contains("form=\"revoke-form\""));
     }
     assert_eq!(fixture.state_of(&device).await.0, "active");
     assert_eq!(browser.get(&asks, None).await.status, 303);
@@ -367,7 +370,7 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
         assert_eq!(answer.header("location"), Some("/"));
     }
     // A form without the session or without the origin of the panel revokes nothing.
-    let body = format!("name={name}");
+    let body = format!("name={name}&typed={name}");
     assert_eq!(
         browser
             .post("/hermes/revoke", None, &body)
@@ -392,10 +395,18 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
     assert_eq!(answer.status, 403);
     assert_eq!(fixture.state_of(&device).await.0, "active");
 
+    // The name not typed, or typed wrong: the question again, and nothing is revoked.
+    for wrong in [format!("name={name}"), format!("name={name}&typed=other")] {
+        let answer = browser.post("/hermes/revoke", Some(&cookie), &wrong).await;
+        assert_eq!(answer.status, 200, "{wrong}");
+        assert!(answer.text().contains("The name typed does not match"));
+        assert_eq!(fixture.state_of(&device).await.0, "active");
+    }
     // The form: revoked, the channel falls, and the list says so.
     let revoked = browser.post("/hermes/revoke", Some(&cookie), &body).await;
     assert_eq!(revoked.status, 303, "{}", revoked.text());
-    assert_eq!(revoked.header("location"), Some("/"));
+    let said = format!("/?hermes={name}");
+    assert_eq!(revoked.header("location"), Some(said.as_str()));
     assert_eq!(fixture.state_of(&device).await.0, "revoked");
     assert!(
         session.ended(PATIENCE).await.is_ok(),
@@ -403,12 +414,19 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
     );
     let list = page(&browser, &cookie, "/").await;
     assert!(list.contains("<span class=\"state idle\">No device</span>"));
+    let after = page(&browser, &cookie, &said).await;
+    assert!(
+        after.contains(&format!(
+            "<p class=\"status idle\" role=\"status\">Hermes {name}: No device.</p>"
+        )),
+        "{after}"
+    );
     let actions = page(&browser, &cookie, &format!("/hermes/actions?name={name}")).await;
     assert!(!actions.contains("/hermes/revoke?name="));
     let audit = rows(&fixture, "audit").await.join("\n");
     assert!(audit.contains("\"actor_note\":\"panel\""));
     // Revoking again, or someone who does not exist, changes nothing.
-    for body in [body.as_str(), "name=ninguem", "other=1"] {
+    for body in [body.as_str(), "name=ninguem&typed=ninguem", "other=1"] {
         assert_eq!(
             browser
                 .post("/hermes/revoke", Some(&cookie), body)

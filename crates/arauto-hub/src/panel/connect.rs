@@ -15,6 +15,11 @@
 //!
 //! - **The invite appears once**, in the answer to the form that issued it. No address read
 //!   with `GET` issues, shows or spends one.
+//! - **A form that issues an invite says what it replaces** (`replaces`: the request, the
+//!   invite or `none` the screen was drawn from). A resent or stale form issues nothing and
+//!   leads to the wait. This is a guard against a stale form, not a security boundary: two
+//!   simultaneous posts with the same fresh value can still both issue (the second cancels
+//!   the first, as it always did).
 //! - **The verification code is typed and never shown**, not even back to whoever typed it.
 //! - **An answer about the last use counts for the use that was on the screen**: if the
 //!   device was used meanwhile, nothing is approved and the new one is shown.
@@ -238,9 +243,13 @@ async fn approve(
     let outcome = admin
         .approve(name.as_str(), &typed, recognition, hub.now_ms())
         .await;
+    let replaces = data::replaces_now(hub, organization, name)
+        .await?
+        .unwrap_or_else(|| "none".to_owned());
     let ended = |why| Screen::Ended {
         name: name.as_str().to_owned(),
         why,
+        replaces: replaces.clone(),
     };
     match outcome {
         Ok(ApproveOutcome::Approved(_) | ApproveOutcome::NoRequest) => Ok(wait_of(name)),
@@ -404,10 +413,21 @@ pub(super) async fn answer(
         return Ok(http::see_other("/"));
     };
     match path {
-        "/hermes/invite" => issue(hub, panel, organization, lang, &admin, &name).await,
+        "/hermes/invite" => {
+            // A stale or resent form (Back, reload, an old tab) issues nothing: it leads to
+            // the wait of that Hermes.
+            let Some(current) = data::replaces_now(hub, organization, &name).await? else {
+                return Ok(http::see_other("/"));
+            };
+            if form.field("replaces").as_deref().map(String::as_str) != Some(current.as_str()) {
+                return Ok(wait_of(&name));
+            }
+            issue(hub, panel, organization, lang, &admin, &name).await
+        }
         "/hermes/approve" => approve(hub, organization, lang, &admin, &name, &form).await,
         _ => match admin.deny(name.as_str(), now).await {
-            Ok(_) | Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
+            Ok(_) => Ok(http::see_other_to(&format!("/?hermes={}", name.as_str()))),
+            Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
             Err(error) => failed(hub, organization, lang, error).await,
         },
     }

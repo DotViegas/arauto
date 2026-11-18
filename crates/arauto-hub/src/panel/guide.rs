@@ -14,6 +14,10 @@ use zeroize::Zeroizing;
 use super::html::{Arg, Html};
 use super::text::k;
 use super::view::{self, Frame, HermesPage, Over};
+use crate::repo::invite::INVITE_VALIDITY_MS;
+
+/// After how many seconds without a device the Waiting screen lists what may be wrong.
+const QUIET_S: i64 = 90;
 
 /// The mascot, drawn by the project frame by frame: no value of anyone goes inside it.
 const DANCING: &str = include_str!("assets/mascot-dancing.svg");
@@ -124,6 +128,8 @@ pub enum Screen {
         seconds: i64,
         /// The Hermes has a device in use.
         reconnect: bool,
+        /// What the screen was drawn from: the form that issues another invite carries it.
+        replaces: String,
     },
     /// Step 3: a device used the invite and the admin types its code.
     Code {
@@ -144,6 +150,8 @@ pub enum Screen {
         name: String,
         /// Why.
         why: Ended,
+        /// What the screen was drawn from: the form that issues another invite carries it.
+        replaces: String,
     },
     /// Step 4: approved, or already connected.
     Done {
@@ -381,7 +389,7 @@ fn body(html: &mut Html, screen: &Screen) {
                 )
                 .raw("</p>");
         }
-        Screen::Waiting { name, .. } => {
+        Screen::Waiting { name, seconds, .. } => {
             html.raw("<h3>")
                 .fill(
                     k("Waiting for the Hermes {name}"),
@@ -395,6 +403,29 @@ fn body(html: &mut Html, screen: &Screen) {
                     "Each step lights up when the hub actually observes it. If the Hermes asks for approval to run the command, you are the one who approves, in the command channel.",
                 ),
             );
+            hint(
+                html,
+                k(
+                    "The message of this invite cannot be shown again. If it did not reach the Hermes, issue another invite: this one then stops working.",
+                ),
+            );
+            if INVITE_VALIDITY_MS / 1_000 - *seconds >= QUIET_S {
+                html.raw("<div class=\"warnings\"><p><b>")
+                    .t(k("Nothing has arrived yet"))
+                    .raw("</b></p><ul><li>")
+                    .t(k(
+                        "The Hermes may be waiting for your approval to run the command, in the command channel.",
+                    ))
+                    .raw("</li><li>")
+                    .t(k(
+                        "The Hermes may not reach this hub: check that its machine reaches the address of the hub.",
+                    ))
+                    .raw("</li><li>")
+                    .t(k(
+                        "The message may have gone to another chat: it only works in the command channel of this Hermes.",
+                    ))
+                    .raw("</li></ul></div>");
+            }
         }
         Screen::Code {
             name,
@@ -457,7 +488,7 @@ fn body(html: &mut Html, screen: &Screen) {
                         &[("when", Arg::Text(&last.when))],
                     ),
                 };
-                html.raw("</legend><label class=\"option\"><input type=\"radio\" name=\"use\" value=\"recognized\"><span>")
+                html.raw("</legend><label class=\"option\"><input type=\"radio\" name=\"use\" value=\"recognized\" required><span>")
                     .t(k("I recognize it"))
                     .raw("</span></label><label class=\"option\"><input type=\"radio\" name=\"use\" value=\"not-recognized\"><span>")
                     .t(k("I do not recognize it"))
@@ -484,7 +515,7 @@ fn body(html: &mut Html, screen: &Screen) {
                     .raw("</p>");
             }
         }
-        Screen::Ended { name, why } => {
+        Screen::Ended { name, why, .. } => {
             let (title, said) = match why {
                 Ended::Denied => (
                     k("The request of {name} was denied"),
@@ -579,8 +610,19 @@ fn footer(html: &mut Html, screen: &Screen) {
                 )
                 .raw("</span>");
         }
-        Screen::Waiting { seconds, .. } => {
-            html.raw("<span>")
+        Screen::Waiting {
+            name,
+            seconds,
+            replaces,
+            ..
+        } => {
+            html.raw("<form method=\"post\" action=\"/hermes/invite\">");
+            named(html, name);
+            html.raw("<input type=\"hidden\" name=\"replaces\" value=\"")
+                .text(replaces)
+                .raw("\"><button class=\"button\" type=\"submit\">")
+                .t(k("Issue another invite"))
+                .raw("</button></form><span>")
                 .fill(
                     k("The invite is valid for another {time}. This screen refreshes by itself."),
                     &[("time", Arg::Clock(*seconds))],
@@ -599,10 +641,12 @@ fn footer(html: &mut Html, screen: &Screen) {
                 )
                 .raw("</span>");
         }
-        Screen::Ended { name, .. } => {
+        Screen::Ended { name, replaces, .. } => {
             html.raw("<form method=\"post\" action=\"/hermes/invite\">");
             named(html, name);
-            html.raw("<button class=\"button primary\" type=\"submit\">")
+            html.raw("<input type=\"hidden\" name=\"replaces\" value=\"")
+                .text(replaces)
+                .raw("\"><button class=\"button primary\" type=\"submit\">")
                 .t(k("Issue another invite"))
                 .raw("</button></form><a class=\"button\" href=\"/\">")
                 .t(k("Close"))
@@ -745,6 +789,7 @@ mod tests {
                 name: hostile(),
                 seconds: 5,
                 reconnect: false,
+                replaces: "none".to_owned(),
             },
             Screen::Code {
                 name: hostile(),
@@ -756,6 +801,7 @@ mod tests {
             Screen::Ended {
                 name: hostile(),
                 why: Ended::Nothing,
+                replaces: "none".to_owned(),
             },
             Screen::Done {
                 name: hostile(),
@@ -768,11 +814,66 @@ mod tests {
     }
 
     #[test]
+    fn the_recognition_question_is_required_in_the_form() {
+        let last_use = LastUse {
+            device: Uuid::nil(),
+            at: Some(7),
+            state: "active",
+            when: "now".to_owned(),
+            address: None,
+        };
+        let page = shown(&Screen::Code {
+            name: "ana".to_owned(),
+            facts: Box::new(Facts {
+                address: None,
+                when: "now".to_owned(),
+                hostname: "pc".to_owned(),
+                os: "linux".to_owned(),
+                hermes: "0.22".to_owned(),
+            }),
+            last_use: Some(Box::new(last_use)),
+            error: None,
+            seconds: 0,
+        });
+        assert!(
+            page.contains("name=\"use\" value=\"recognized\" required"),
+            "{page}"
+        );
+    }
+
+    #[test]
+    fn the_waiting_screen_says_the_message_is_gone_and_offers_another_invite() {
+        let waiting = |seconds| {
+            shown(&Screen::Waiting {
+                name: "ana".to_owned(),
+                seconds,
+                reconnect: false,
+                replaces: "invite-1234".to_owned(),
+            })
+        };
+        // Just issued: the hint and the way on, and no list of causes yet.
+        let fresh = waiting(900);
+        assert!(fresh.contains("The message of this invite cannot be shown again."));
+        assert!(fresh.contains("action=\"/hermes/invite\""));
+        assert!(fresh.contains("name=\"replaces\" value=\"invite-1234\""));
+        assert!(fresh.contains("Issue another invite"));
+        assert!(!fresh.contains("Nothing has arrived yet"));
+        // 89 seconds in: still quiet. 91 seconds in: the three causes, with no script.
+        assert!(!waiting(811).contains("Nothing has arrived yet"));
+        let late = waiting(809);
+        assert!(late.contains("<div class=\"warnings\"><p><b>Nothing has arrived yet</b></p><ul>"));
+        assert!(late.contains("may be waiting for your approval"));
+        assert!(late.contains("may not reach this hub"));
+        assert!(late.contains("command channel of this Hermes."));
+    }
+
+    #[test]
     fn the_path_marks_the_step_and_only_a_page_that_waits_asks_again() {
         let waiting = shown(&Screen::Waiting {
             name: "ana".to_owned(),
             seconds: 61,
             reconnect: false,
+            replaces: "none".to_owned(),
         });
         assert!(waiting.contains("<meta http-equiv=\"refresh\" content=\"3\">"));
         assert!(waiting.contains("<b data-seconds=\"61\">01:01</b>"));

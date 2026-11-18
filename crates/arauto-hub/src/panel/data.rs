@@ -16,7 +16,7 @@ use super::text::{self, Lang, k};
 use super::guide::{Ended, Facts, LastUse, Screen};
 use super::view::{
     AccessPage, AccessRow, Cell, EngineLine, Frame, HermesPage, HermesRow, LineAction, Notice,
-    NumberRow, NumbersPage, OrderTag, RowAction, Tone,
+    NumberRow, NumbersPage, OrderTag, RowAction, StatusKind, StatusLine, Tone,
 };
 use crate::admin::render;
 use crate::channel::Hub;
@@ -28,6 +28,7 @@ use crate::engine::Phone;
 use crate::repo::access::Listed;
 use crate::repo::alert::{Alert, AlertFilter, AlertKind};
 use crate::repo::hermes::HermesLine;
+use crate::repo::orders::OrdersRecord;
 use crate::repo::{self, RepoError};
 use crate::restore;
 
@@ -306,19 +307,7 @@ pub(super) async fn hermes(
         });
         let device = line.in_use.as_ref().or(line.request.as_ref());
         let record = repo::orders::get(hub.pool(), organization, &key, line.hermes.id).await?;
-        let orders = if record.self_chat {
-            text::tr(lang, k("its own chat")).to_owned()
-        } else if record.orders_from.len() == 1 {
-            text::tr(lang, k("1 telephone")).to_owned()
-        } else if record.orders_from.is_empty() {
-            text::tr(lang, k("not recorded")).to_owned()
-        } else {
-            text::fill(
-                lang,
-                k("{n} telephones"),
-                &[("n", &record.orders_from.len().to_string())],
-            )
-        };
+        let (orders, orders_recorded) = orders_summary(lang, &record);
         page.rows.push(HermesRow {
             name: name.to_owned(),
             tone,
@@ -342,7 +331,7 @@ pub(super) async fn hermes(
             },
             explain,
             orders,
-            orders_recorded: record.self_chat || !record.orders_from.is_empty(),
+            orders_recorded,
             action: if line.request.is_some() || line.invite_expires_at.is_some() {
                 RowAction::Continue
             } else if line.in_use.is_some() {
@@ -353,6 +342,76 @@ pub(super) async fn hermes(
         });
     }
     Ok(page)
+}
+
+/// How the orders of a Hermes read in a list, and whether any are recorded.
+pub(super) fn orders_summary(lang: Lang, record: &OrdersRecord) -> (String, bool) {
+    let summary = if record.self_chat {
+        text::tr(lang, k("its own chat")).to_owned()
+    } else if record.orders_from.len() == 1 {
+        text::tr(lang, k("1 telephone")).to_owned()
+    } else if record.orders_from.is_empty() {
+        text::tr(lang, k("not recorded")).to_owned()
+    } else {
+        text::fill(
+            lang,
+            k("{n} telephones"),
+            &[("n", &record.orders_from.len().to_string())],
+        )
+    };
+    (summary, record.self_chat || !record.orders_from.is_empty())
+}
+
+/// What the screen of a Hermes was drawn from, so that a form that issues an invite can say
+/// what it replaces: `request-{id}` when a request is in progress, `invite-{ms}` when an
+/// invite is still accepted, else `none`.
+pub(super) fn replaces(line: &HermesLine, now: i64) -> String {
+    if let Some(request) = &line.request {
+        format!("request-{}", request.id.hyphenated())
+    } else if let Some(until) = line.invite_expires_at.filter(|until| *until > now) {
+        format!("invite-{until}")
+    } else {
+        "none".to_owned()
+    }
+}
+
+/// [`replaces`] of the Hermes `name` now. `None` when there is no such Hermes.
+pub(super) async fn replaces_now(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    name: &HermesName,
+) -> Result<Option<String>, RepoError> {
+    let lines = repo::hermes::list(hub.pool(), organization, false).await?;
+    let now = hub.now_ms();
+    Ok(lines
+        .iter()
+        .find(|line| line.hermes.name == *name)
+        .map(|line| replaces(line, now)))
+}
+
+/// What a write of the orders of a Hermes did, for the line above a list. Only reads.
+pub(super) async fn orders_said(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    lang: Lang,
+    named: Option<&str>,
+) -> Result<Option<StatusLine>, RepoError> {
+    let Some(name) = named.and_then(|named| HermesName::parse(named.trim()).ok()) else {
+        return Ok(None);
+    };
+    let lines = repo::hermes::list(hub.pool(), organization, false).await?;
+    let Some(line) = lines.iter().find(|line| line.hermes.name == name) else {
+        return Ok(None);
+    };
+    let key = hub.organization_key(organization).await?;
+    let record = repo::orders::get(hub.pool(), organization, &key, line.hermes.id).await?;
+    let (orders, _) = orders_summary(lang, &record);
+    Ok(Some(StatusLine {
+        kind: StatusKind::Done(Tone::Ok),
+        sentence: k("Saved. Who gives {hermes} orders on WhatsApp: {orders}."),
+        texts: vec![("hermes", name.as_str().to_owned()), ("orders", orders)],
+        codes: Vec::new(),
+    }))
 }
 
 /// Where the guide of the Hermes `name` is, by what the hub observed so far. `None` when
@@ -413,6 +472,7 @@ pub(super) async fn guide(
                 return Ok(Some(Screen::Ended {
                     name,
                     why: Ended::Copied,
+                    replaces: replaces(line, now),
                 }));
             }
             _ => {}
@@ -424,6 +484,7 @@ pub(super) async fn guide(
             name,
             seconds: left(line.invite_expires_at),
             reconnect,
+            replaces: replaces(line, now),
         }));
     }
     let connected = line
@@ -440,6 +501,7 @@ pub(super) async fn guide(
         Screen::Ended {
             name,
             why: Ended::Nothing,
+            replaces: replaces(line, now),
         }
     }))
 }
@@ -491,6 +553,20 @@ pub(super) async fn phone_of(
 ) -> Option<String> {
     let key = hub.organization_key(organization).await.ok()?;
     let phone = number.phone(&key).ok()?;
+    Some(format!("+{}", phone.digits()))
+}
+
+/// The telephone that paired a swapped number (`+digits`), when the key of the organization
+/// opens it.
+pub(super) async fn paired_phone_of(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    number: &repo::number::Number,
+) -> Option<String> {
+    let key = hub.organization_key(organization).await.ok()?;
+    let phone = repo::number::paired_phone(hub.pool(), organization, &key, number.id)
+        .await
+        .ok()??;
     Some(format!("+{}", phone.digits()))
 }
 

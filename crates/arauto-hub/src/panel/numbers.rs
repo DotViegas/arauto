@@ -37,8 +37,8 @@ use zeroize::Zeroizing;
 
 use super::html::{Arg, Html};
 use super::pairing::{End, NotStarted, Now, PAIRINGS_PER_ORGANIZATION, Refusal, Run};
-use super::text::{self, Lang, k, tr};
-use super::view::{self, Over};
+use super::text::{Lang, k, tr};
+use super::view::{self, Over, StatusKind, StatusLine, Tone};
 use super::{PanelState, data, http, pairing, session_of};
 use crate::admin::qr::QrCode;
 use crate::admin::whatsapp::{Changed, PairMethod, PairOutcome, Removal};
@@ -175,20 +175,6 @@ fn state_label(lang: Lang, state: Option<NumberState>) -> &'static str {
     state.map_or("", |state| tr(lang, data::number_state(state).1))
 }
 
-/// A refusal, as the plain text of the line above the list.
-fn plain(lang: Lang, refusal: &Refusal) -> String {
-    text::fill(
-        lang,
-        refusal.sentence,
-        &[
-            ("state", state_label(lang, refusal.state)),
-            ("command", command_of(refusal.sentence)),
-            ("key_command", KEY_SET),
-            ("n", &PAIRINGS_PER_ORGANIZATION.to_string()),
-        ],
-    )
-}
-
 /// A refusal, in a window: one line that says it.
 fn say(html: &mut Html, refusal: &Refusal) {
     let label = state_label(html.lang(), refusal.state);
@@ -204,31 +190,117 @@ fn say(html: &mut Html, refusal: &Refusal) {
     html.raw("</p>");
 }
 
-/// What the page of the numbers says about one number, after a write: `?alias=`. Only reads;
-/// a name that is not one, or a number that does not exist, says nothing.
+/// The sentence of the engine that did not answer, after a change the hub did make.
+const ENGINE_SILENT: &str = k(
+    "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+);
+
+/// The closed set of words `said=` may carry after a refusal, and the sentence each one
+/// stands for. Any other word says nothing more than the state of the number.
+const REFUSAL_WORDS: [(&str, &str); 10] = [
+    ("not-now", N47),
+    ("no-engine", N27),
+    ("no-key", N28),
+    ("unreachable", N67),
+    ("key-refused", N68),
+    ("engine-error", N69),
+    ("limited", N70),
+    ("engine-refused", N71),
+    ("failed", N72),
+    ("restored", RESTORED),
+];
+
+/// A refusal said above the list: its sentence, with the state of the number in the language of
+/// the page and the commands as code.
+fn refusal_line(lang: Lang, sentence: &'static str, state: Option<NumberState>) -> StatusLine {
+    StatusLine {
+        kind: StatusKind::Refusal,
+        sentence,
+        texts: vec![
+            ("state", state_label(lang, state).to_owned()),
+            ("n", PAIRINGS_PER_ORGANIZATION.to_string()),
+        ],
+        codes: vec![("command", command_of(sentence)), ("key_command", KEY_SET)],
+    }
+}
+
+/// The word of a refusal in an address: a sentence this table does not know is `failed`.
+fn word_of(sentence: &str) -> &'static str {
+    REFUSAL_WORDS
+        .iter()
+        .find(|(_, known)| *known == sentence)
+        .map_or("failed", |(word, _)| word)
+}
+
+/// What the page of the numbers says about one number, after a write: `?alias=` and, when a
+/// write did not go all the way, `&said=` with one word of a closed set. Only reads; a name
+/// that is not one, a number that does not exist and a word that is not in the set say
+/// nothing more.
 pub(super) async fn said(
     hub: &Hub,
     organization: ResolvedOrg,
     lang: Lang,
     query: Option<&str>,
-) -> Result<Option<String>, RepoError> {
+) -> Result<Option<StatusLine>, RepoError> {
     let Some(alias) =
         http::query_field(query, "alias").and_then(|alias| NumberAlias::parse(alias.trim()).ok())
     else {
         return Ok(None);
     };
-    Ok(repo::number::by_alias(hub.pool(), organization, &alias)
+    let Some((number, removed)) = number_or_removed(hub, organization, &alias).await? else {
+        return Ok(None);
+    };
+    let word = http::query_field(query, "said");
+    let word = word.as_ref().map(|word| word.trim());
+    let alias = number.alias.as_str().to_owned();
+    if word == Some("engine") {
+        return Ok(Some(StatusLine {
+            kind: StatusKind::Warning,
+            sentence: ENGINE_SILENT,
+            texts: vec![("alias", alias)],
+            codes: vec![("command", ENGINE_HEALTH)],
+        }));
+    }
+    let refusal = REFUSAL_WORDS
+        .iter()
+        .find(|(known, _)| Some(*known) == word)
+        .map(|(_, sentence)| *sentence);
+    if let Some(sentence) = refusal {
+        return Ok(Some(refusal_line(lang, sentence, Some(number.state))));
+    }
+    if removed {
+        return Ok(Some(StatusLine {
+            kind: StatusKind::Done(Tone::Idle),
+            sentence: k("Number {alias} was removed."),
+            texts: vec![("alias", alias)],
+            codes: Vec::new(),
+        }));
+    }
+    let (tone, label) = data::number_state(number.state);
+    Ok(Some(StatusLine {
+        kind: StatusKind::Done(tone),
+        sentence: k("Number {alias}: {state}."),
+        texts: vec![("alias", alias), ("state", tr(lang, label).to_owned())],
+        codes: Vec::new(),
+    }))
+}
+
+/// The number with this alias: a live one, or else one that was removed (and `true`).
+async fn number_or_removed(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    alias: &NumberAlias,
+) -> Result<Option<(Number, bool)>, RepoError> {
+    if let Some(number) = repo::number::by_alias(hub.pool(), organization, alias).await? {
+        return Ok(Some((number, false)));
+    }
+    Ok(repo::number::list(hub.pool(), organization, true)
         .await?
-        .map(|number| {
-            text::fill(
-                lang,
-                k("Number {alias}: {state}."),
-                &[
-                    ("alias", number.alias.as_str()),
-                    ("state", tr(lang, data::number_state(number.state).1)),
-                ],
-            )
-        }))
+        .into_iter()
+        .find(|number| {
+            number.alias.as_str() == alias.as_str() && number.state == NumberState::Removed
+        })
+        .map(|number| (number, true)))
 }
 
 /// Everything a handler needs about the request.
@@ -253,15 +325,6 @@ impl Cx<'_> {
         repo::number::by_alias(self.pool(), self.organization, &alias).await
     }
 
-    /// The page of the numbers, with what a write just said above the table.
-    async fn list(
-        &self,
-        status: StatusCode,
-        said: Option<String>,
-    ) -> Result<Response<Body>, RepoError> {
-        self.over(status, Over::Nothing, said, |_| {}).await
-    }
-
     /// The page of the numbers with a window over it.
     async fn window(
         &self,
@@ -269,20 +332,17 @@ impl Cx<'_> {
         over: Over,
         write: impl FnOnce(&mut Html),
     ) -> Result<Response<Body>, RepoError> {
-        self.over(status, over, None, write).await
+        self.over(status, over, write).await
     }
 
     async fn over(
         &self,
         status: StatusCode,
         over: Over,
-        said: Option<String>,
         write: impl FnOnce(&mut Html),
     ) -> Result<Response<Body>, RepoError> {
         let frame = data::frame(self.hub, self.organization, self.lang).await?;
-        let mut list =
-            data::numbers(self.hub, self.organization, self.lang, self.session.id).await?;
-        list.said = said;
+        let list = data::numbers(self.hub, self.organization, self.lang, self.session.id).await?;
         let mut html = Html::new(self.lang);
         view::numbers_into(&mut html, &frame, &list, over);
         write(&mut html);
@@ -375,9 +435,8 @@ fn hidden(html: &mut Html, name: &'static str, value: &str) {
 fn choice(
     html: &mut Html,
     kind: &'static str,
-    name: &'static str,
-    value: &'static str,
-    checked: bool,
+    (name, value): (&'static str, &'static str),
+    (checked, required): (bool, bool),
     lead: Option<&'static str>,
     label: &'static str,
 ) {
@@ -387,11 +446,10 @@ fn choice(
         .raw(name)
         .raw("\" value=\"")
         .raw(value)
-        .raw(if checked {
-            "\" checked><span>"
-        } else {
-            "\"><span>"
-        });
+        .raw("\"")
+        .raw(if checked { " checked" } else { "" })
+        .raw(if required { " required" } else { "" })
+        .raw("><span>");
     if let Some(lead) = lead {
         html.raw("<b>").t(lead).raw("</b>: ");
     }
@@ -406,6 +464,8 @@ struct AddView {
     phone: String,
     /// The organization never had a number: the acceptance is asked.
     first: bool,
+    /// The form that came back had the acceptance ticked: it stays ticked.
+    accepted: bool,
     engine: EngineState,
     error: Option<Refusal>,
 }
@@ -463,7 +523,9 @@ fn add_window(html: &mut Html, view: &AddView) {
                         .t(k("Before the first number"))
                         .raw("</legend><p>")
                         .t(k("The engine is an unofficial WhatsApp client. WhatsApp may block the number. Use numbers you can afford to lose."))
-                        .raw("</p><label class=\"option\"><input type=\"checkbox\" name=\"accept\" value=\"on\" required><span>")
+                        .raw("</p><label class=\"option\"><input type=\"checkbox\" name=\"accept\" value=\"on\"")
+                        .raw(if view.accepted { " checked" } else { "" })
+                        .raw(" required><span>")
                         .t(k("I understand and accept. The hub records this acceptance in the audit."))
                         .raw("</span></label></fieldset>");
                 }
@@ -502,6 +564,7 @@ async fn add_view(cx: &Cx<'_>, typed: Option<(String, String)>) -> Result<AddVie
         alias,
         phone,
         first,
+        accepted: false,
         engine,
         error: None,
     })
@@ -524,6 +587,7 @@ async fn add(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoError
     let (alias, phone) = (field("alias"), field("phone"));
     let accept = form.field("accept").is_some();
     let mut view = add_view(cx, Some((alias.clone(), phone.clone()))).await?;
+    view.accepted = accept;
     if !matches!(view.engine, EngineState::Ready { .. }) {
         return add_page(cx, view).await;
     }
@@ -583,7 +647,12 @@ fn method_window(
             } else if let Some(error) = error.filter(|e| e.sentence == N47) {
                 say(html, error);
             } else {
-                html.raw("<p>")
+                html.raw("<p class=\"hint\">")
+                    .fill(
+                        k("{alias} is in the list now. Pair it now, or later from its line."),
+                        &[("alias", Arg::Strong(alias))],
+                    )
+                    .raw("</p><p>")
                     .fill(
                         k("Have the phone of {phone} at hand, with WhatsApp open. The pairing lasts up to {minutes} minutes."),
                         &[("phone", Arg::Strong(phone)), ("minutes", Arg::Number(minutes))],
@@ -604,18 +673,16 @@ fn method_window(
                 choice(
                     html,
                     "radio",
-                    "method",
-                    "qr",
-                    true,
+                    ("method", "qr"),
+                    (true, false),
                     Some(k("QR code")),
                     k("scan it with the phone's camera, from inside WhatsApp"),
                 );
                 choice(
                     html,
                     "radio",
-                    "method",
-                    "code",
-                    false,
+                    ("method", "code"),
+                    (false, false),
                     Some(k("Pairing code")),
                     k("type a code on the phone, for when it cannot scan this screen"),
                 );
@@ -629,8 +696,11 @@ fn method_window(
             if running.is_none() && error.is_none_or(|e| e.sentence != N47) {
                 html.raw("<button class=\"button primary\" type=\"submit\" form=\"method-form\">")
                     .t(k("Start pairing"))
-                    .raw("</button>");
-                cancel_link(html);
+                    .raw("</button><a class=\"button\" href=\"/whatsapps?alias=")
+                    .text(alias)
+                    .raw("\">")
+                    .t(k("Pair later"))
+                    .raw("</a>");
             } else {
                 close_link(html);
             }
@@ -792,15 +862,21 @@ fn snap(run: &Run, shown: Option<u32>) -> Snap {
 }
 
 /// What a pairing that ended says, and where it leads.
-fn end_window(html: &mut Html, number: &Number, phone: &str, end: &End) {
+fn end_window(html: &mut Html, number: &Number, phone: &str, paired: &str, end: &End) {
     let alias = number.alias.as_str();
+    // Only a paired number reaches "Done"; any other end stays on "Phone".
+    let step = if matches!(end, End::Outcome(PairOutcome::Connected)) {
+        3
+    } else {
+        2
+    };
     let retry = |html: &mut Html, label: &'static str| {
         link(html, "button primary", "/whatsapps/pair", alias, label);
         close_link(html);
     };
     shell(
         html,
-        Some(3),
+        Some(step),
         |html| {
             html.fill(k("Pair {alias}"), &[("alias", Arg::Text(alias))]);
         },
@@ -823,6 +899,7 @@ fn end_window(html: &mut Html, number: &Number, phone: &str, end: &End) {
                         .raw("</p><p>")
                         .t(k("Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped."))
                         .raw("</p>");
+                    telephones(html, phone, paired);
                 }
                 End::Outcome(PairOutcome::Expired) => {
                     html.raw("<p>")
@@ -858,10 +935,10 @@ fn end_window(html: &mut Html, number: &Number, phone: &str, end: &End) {
             End::Outcome(PairOutcome::Swapped) => {
                 html.raw("<form method=\"post\" action=\"/whatsapps/confirm\">");
                 hidden(html, "alias", alias);
-                html.raw("<button class=\"button primary\" type=\"submit\">")
+                html.raw("<button class=\"button\" type=\"submit\">")
                     .t(k("Keep this one"))
                     .raw("</button></form>");
-                link(html, "button", "/whatsapps/decide", alias, k("Decide"));
+                link(html, "button", "/whatsapps/decide", alias, k("Undo…"));
             }
             End::Outcome(PairOutcome::Expired | PairOutcome::Failed | PairOutcome::Cancelled) => {
                 retry(html, k("Pair again"));
@@ -979,9 +1056,16 @@ async fn own_wait(
         let phone = data::phone_of(cx.hub, cx.organization, number)
             .await
             .unwrap_or_else(|| "—".to_owned());
+        let paired = if matches!(end, End::Outcome(PairOutcome::Swapped)) {
+            data::paired_phone_of(cx.hub, cx.organization, number)
+                .await
+                .unwrap_or_else(|| "—".to_owned())
+        } else {
+            "—".to_owned()
+        };
         return cx
             .window(StatusCode::OK, Over::Guide { refresh: None }, |html| {
-                end_window(html, number, &phone, end);
+                end_window(html, number, &phone, &paired, end);
             })
             .await;
     }
@@ -999,7 +1083,13 @@ async fn derived_wait(cx: &Cx<'_>, number: &Number) -> Result<Response<Body>, Re
                 .await
                 .unwrap_or_else(|| "—".to_owned());
             cx.window(StatusCode::OK, Over::Guide { refresh: None }, |html| {
-                end_window(html, number, &phone, &End::Outcome(PairOutcome::Connected));
+                end_window(
+                    html,
+                    number,
+                    &phone,
+                    "—",
+                    &End::Outcome(PairOutcome::Connected),
+                );
             })
             .await
         }
@@ -1012,7 +1102,7 @@ async fn derived_wait(cx: &Cx<'_>, number: &Number) -> Result<Response<Body>, Re
             cx.window(StatusCode::OK, Over::Guide { refresh: None }, |html| {
                 shell(
                     html,
-                    Some(3),
+                    Some(2),
                     |html| {
                         html.fill(k("Pair {alias}"), &[("alias", Arg::Text(alias))]);
                     },
@@ -1071,7 +1161,26 @@ async fn cancel(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoEr
 
 // ------------------------------------------------------------------ decide, restart
 
-fn decide_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
+/// The two telephones of a swapped number, side by side: the one given and the one that paired.
+fn telephones(html: &mut Html, given: &str, paired: &str) {
+    html.raw("<dl class=\"facts\"><dt>")
+        .t(k("Telephone given"))
+        .raw("</dt><dd class=\"mono\">")
+        .text(given)
+        .raw("</dd><dt>")
+        .t(k("Telephone that paired"))
+        .raw("</dt><dd class=\"mono\">")
+        .text(paired)
+        .raw("</dd></dl>");
+}
+
+fn decide_window(
+    html: &mut Html,
+    number: &Number,
+    given: &str,
+    paired: &str,
+    error: Option<&Refusal>,
+) {
     let alias = number.alias.as_str();
     shell(
         html,
@@ -1087,24 +1196,29 @@ fn decide_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
                 .t(k("The phone that paired belongs to a number different from the one given."))
                 .raw("</p><p>")
                 .t(k("Until you decide, the number is in the state \"Number swapped\" and its accesses stay stopped."))
-                .raw("</p><form method=\"post\" action=\"/whatsapps/confirm\">");
+                .raw("</p>");
+            telephones(html, given, paired);
+            html.raw("<form id=\"confirm-form\" method=\"post\" action=\"/whatsapps/confirm\">");
             hidden(html, "alias", alias);
-            html.raw("<div><button class=\"button primary\" type=\"submit\">")
-                .t(k("Keep this one"))
-                .raw("</button></div></form><form method=\"post\" action=\"/whatsapps/undo\"><p>")
+            html.raw("</form><form id=\"undo-form\" method=\"post\" action=\"/whatsapps/undo\"><p>")
                 .t(k("Undoing takes WAHA out of that phone's WhatsApp (it leaves its linked devices) and erases the history WAHA keeps of this number."))
                 .raw("</p>");
             hidden(html, "alias", alias);
             html.raw("<label class=\"option\"><input type=\"checkbox\" name=\"erase\" value=\"on\" required><span>")
                 .t(k("I understand that WAHA erases its history of this number."))
-                .raw("</span></label><div><button class=\"button danger\" type=\"submit\">")
-                .t(k("Undo"))
-                .raw("</button></div></form>");
+                .raw("</span></label></form>");
             if let Some(error) = error {
                 say(html, error);
             }
         },
-        cancel_link,
+        |html| {
+            html.raw("<button class=\"button\" type=\"submit\" form=\"confirm-form\">")
+                .t(k("Keep this one"))
+                .raw("</button><button class=\"button danger\" type=\"submit\" form=\"undo-form\">")
+                .t(k("Undo"))
+                .raw("</button>");
+            cancel_link(html);
+        },
     );
 }
 
@@ -1113,8 +1227,14 @@ async fn decide_page(
     number: &Number,
     error: Option<Refusal>,
 ) -> Result<Response<Body>, RepoError> {
+    let given = data::phone_of(cx.hub, cx.organization, number)
+        .await
+        .unwrap_or_else(|| "—".to_owned());
+    let paired = data::paired_phone_of(cx.hub, cx.organization, number)
+        .await
+        .unwrap_or_else(|| "—".to_owned());
     cx.window(StatusCode::OK, Over::Guide { refresh: None }, |html| {
-        decide_window(html, number, error.as_ref());
+        decide_window(html, number, &given, &paired, error.as_ref());
     })
     .await
 }
@@ -1132,29 +1252,15 @@ async fn decide(cx: &Cx<'_>, query: Option<&str>) -> Result<Response<Body>, Repo
     decide_page(cx, &number, None).await
 }
 
-/// After a change that also went to the engine: the list, and when the engine did not do its
-/// part, the line that says so.
-async fn changed(cx: &Cx<'_>, done: &Changed) -> Result<Response<Body>, RepoError> {
+/// After a change that also went to the engine: the address of the list, and when the engine
+/// did not do its part, the word that makes the list say so.
+fn changed(done: &Changed) -> Response<Body> {
+    let alias = done.number.alias.as_str();
     if let Err(error) = &done.engine {
         tracing::warn!(%error, "the engine did not do its part of a change of a number");
-        return cx
-            .list(
-                StatusCode::OK,
-                Some(text::fill(
-                    cx.lang,
-                    k("The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server."),
-                    &[
-                        ("alias", done.number.alias.as_str()),
-                        ("command", ENGINE_HEALTH),
-                    ],
-                )),
-            )
-            .await;
+        return http::see_other_to(&format!("/whatsapps?alias={alias}&said=engine"));
     }
-    Ok(http::see_other_to(&format!(
-        "/whatsapps?alias={}",
-        done.number.alias.as_str()
-    )))
+    http::see_other_to(&format!("/whatsapps?alias={alias}"))
 }
 
 async fn confirm(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoError> {
@@ -1188,7 +1294,7 @@ async fn undo(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoErro
         .number_unpair(cx.hub.vault(), number.alias.as_str(), cx.hub.now_ms())
         .await
     {
-        Ok(done) => changed(cx, &done).await,
+        Ok(done) => Ok(changed(&done)),
         Err(AdminError::NoSuchNumber) => Ok(http::see_other("/whatsapps")),
         Err(error) => decide_page(cx, &number, Some(refusal_of(&error))).await,
     }
@@ -1203,12 +1309,15 @@ async fn restart(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoE
         .number_restart(cx.hub.vault(), number.alias.as_str(), cx.hub.now_ms())
         .await
     {
-        Ok(done) => changed(cx, &done).await,
+        Ok(done) => Ok(changed(&done)),
         Err(AdminError::NoSuchNumber) => Ok(http::see_other("/whatsapps")),
         Err(error) => {
             let refusal = refusal_of(&error);
-            cx.list(status_of(&refusal), Some(plain(cx.lang, &refusal)))
-                .await
+            Ok(http::see_other_to(&format!(
+                "/whatsapps?alias={}&said={}",
+                number.alias.as_str(),
+                word_of(refusal.sentence)
+            )))
         }
     }
 }
@@ -1216,16 +1325,18 @@ async fn restart(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoE
 // ------------------------------------------------------------------ disconnect, remove
 
 /// The field that asks for the alias typed.
-fn typed_field(html: &mut Html, alias: &str) {
+fn typed_field(html: &mut Html, alias: &str, value: &str) {
     html.raw("<div class=\"field\"><label for=\"typed\">")
         .fill(
             k("Type the alias {alias} to confirm."),
             &[("alias", Arg::Strong(alias))],
         )
-        .raw("</label><input id=\"typed\" name=\"typed\" type=\"text\" maxlength=\"64\" autocomplete=\"off\" spellcheck=\"false\" autocapitalize=\"none\" required></div>");
+        .raw("</label><input id=\"typed\" name=\"typed\" type=\"text\" maxlength=\"64\" autocomplete=\"off\" spellcheck=\"false\" autocapitalize=\"none\" required value=\"")
+        .text(value)
+        .raw("\"></div>");
 }
 
-fn disconnect_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
+fn disconnect_window(html: &mut Html, number: &Number, typed: &str, error: Option<&Refusal>) {
     let alias = number.alias.as_str();
     shell(
         html,
@@ -1238,7 +1349,7 @@ fn disconnect_window(html: &mut Html, number: &Number, error: Option<&Refusal>) 
                 .t(k("Disconnecting stops the session of this number in WAHA. It does not take WAHA out of WhatsApp, and WAHA keeps its history. While it is disconnected, no Hermes reads or sends through it. To use it again, pair it again."))
                 .raw("</p><form id=\"typed-form\" method=\"post\" action=\"/whatsapps/disconnect\" autocomplete=\"off\">");
             hidden(html, "alias", alias);
-            typed_field(html, alias);
+            typed_field(html, alias, typed);
             html.raw("</form>");
             if let Some(error) = error {
                 say(html, error);
@@ -1253,7 +1364,13 @@ fn disconnect_window(html: &mut Html, number: &Number, error: Option<&Refusal>) 
     );
 }
 
-fn remove_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
+fn remove_window(
+    html: &mut Html,
+    number: &Number,
+    chosen: Option<&str>,
+    typed: &str,
+    error: Option<&Refusal>,
+) {
     let alias = number.alias.as_str();
     shell(
         html,
@@ -1269,22 +1386,20 @@ fn remove_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
             html.raw("<fieldset><legend>")
                 .t(k("What happens to its session in WAHA"))
                 .raw("</legend>");
-            // None is checked: the choice is made, never assumed.
+            // None is checked until the admin chooses: a refused form keeps the choice it sent.
             choice(
                 html,
                 "radio",
-                "removal",
-                "keep",
-                false,
+                ("removal", "keep"),
+                (chosen == Some("keep"), true),
                 None,
                 k("Stop it and keep it in WAHA, with the history WAHA keeps"),
             );
             choice(
                 html,
                 "radio",
-                "removal",
-                "erase",
-                false,
+                ("removal", "erase"),
+                (chosen == Some("erase"), false),
                 None,
                 k("Take WAHA out of WhatsApp and delete it: WAHA erases the history it keeps"),
             );
@@ -1293,7 +1408,7 @@ fn remove_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
                     "Arauto has no message archive yet: the history is only what WAHA keeps.",
                 ))
                 .raw("</p></fieldset>");
-            typed_field(html, alias);
+            typed_field(html, alias, typed);
             html.raw("</form>");
             if let Some(error) = error {
                 say(html, error);
@@ -1308,17 +1423,27 @@ fn remove_window(html: &mut Html, number: &Number, error: Option<&Refusal>) {
     );
 }
 
+/// What a refused form sends back into its window.
+#[derive(Default)]
+struct Kept<'a> {
+    /// The removal radio that was chosen (`keep` or `erase`).
+    chosen: Option<&'a str>,
+    /// The alias that was typed, when it matched.
+    typed: &'a str,
+}
+
 async fn typed_window(
     cx: &Cx<'_>,
     number: &Number,
     removing: bool,
+    kept: &Kept<'_>,
     error: Option<Refusal>,
 ) -> Result<Response<Body>, RepoError> {
     cx.window(StatusCode::OK, Over::Guide { refresh: None }, |html| {
         if removing {
-            remove_window(html, number, error.as_ref());
+            remove_window(html, number, kept.chosen, kept.typed, error.as_ref());
         } else {
-            disconnect_window(html, number, error.as_ref());
+            disconnect_window(html, number, kept.typed, error.as_ref());
         }
     })
     .await
@@ -1332,7 +1457,7 @@ async fn typed_get(
     let Some(number) = cx.number(http::query_field(query, "alias")).await? else {
         return Ok(http::see_other("/whatsapps"));
     };
-    typed_window(cx, &number, removing, None).await
+    typed_window(cx, &number, removing, &Kept::default(), None).await
 }
 
 fn typed_matches(form: &http::Form, number: &Number) -> bool {
@@ -1345,16 +1470,20 @@ async fn disconnect(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, Re
         return Ok(http::see_other("/whatsapps"));
     };
     if !typed_matches(form, &number) {
-        return typed_window(cx, &number, false, Some(refused(N84))).await;
+        return typed_window(cx, &number, false, &Kept::default(), Some(refused(N84))).await;
     }
+    let kept = Kept {
+        chosen: None,
+        typed: number.alias.as_str(),
+    };
     match cx
         .admin
         .number_disconnect(cx.hub.vault(), number.alias.as_str(), cx.hub.now_ms())
         .await
     {
-        Ok(done) => changed(cx, &done).await,
+        Ok(done) => Ok(changed(&done)),
         Err(AdminError::NoSuchNumber) => Ok(http::see_other("/whatsapps")),
-        Err(error) => typed_window(cx, &number, false, Some(refusal_of(&error))).await,
+        Err(error) => typed_window(cx, &number, false, &kept, Some(refusal_of(&error))).await,
     }
 }
 
@@ -1362,13 +1491,23 @@ async fn remove(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoEr
     let Some(number) = cx.number(form.field("alias")).await? else {
         return Ok(http::see_other("/whatsapps"));
     };
+    let chosen = match form.field("removal").as_deref().map(String::as_str) {
+        Some("keep") => Some("keep"),
+        Some("erase") => Some("erase"),
+        _ => None,
+    };
     if !typed_matches(form, &number) {
-        return typed_window(cx, &number, true, Some(refused(N84))).await;
+        let kept = Kept { chosen, typed: "" };
+        return typed_window(cx, &number, true, &kept, Some(refused(N84))).await;
     }
-    let removal = match form.field("removal").as_deref().map(String::as_str) {
+    let kept = Kept {
+        chosen,
+        typed: number.alias.as_str(),
+    };
+    let removal = match chosen {
         Some("keep") => Removal::KeepInEngine,
         Some("erase") => Removal::EraseEngineHistory,
-        _ => return typed_window(cx, &number, true, Some(refused(N91))).await,
+        _ => return typed_window(cx, &number, true, &kept, Some(refused(N91))).await,
     };
     match cx
         .admin
@@ -1380,10 +1519,13 @@ async fn remove(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoEr
         )
         .await
     {
-        Ok(done) if done.engine.is_ok() => Ok(http::see_other("/whatsapps")),
-        Ok(done) => changed(cx, &done).await,
+        Ok(done) if done.engine.is_ok() => Ok(http::see_other_to(&format!(
+            "/whatsapps?alias={}",
+            done.number.alias.as_str()
+        ))),
+        Ok(done) => Ok(changed(&done)),
         Err(AdminError::NoSuchNumber) => Ok(http::see_other("/whatsapps")),
-        Err(error) => typed_window(cx, &number, true, Some(refusal_of(&error))).await,
+        Err(error) => typed_window(cx, &number, true, &kept, Some(refusal_of(&error))).await,
     }
 }
 
@@ -1510,6 +1652,7 @@ mod tests {
             alias: HOSTILE.to_owned(),
             phone: HOSTILE.to_owned(),
             first: true,
+            accepted: false,
             engine: EngineState::Ready { answered: false },
             error: Some(refused(N33)),
         };
@@ -1517,7 +1660,24 @@ mod tests {
         add_window(&mut html, &view);
         let page = html.finish();
         clean(&page);
-        assert!(page.contains("name=\"accept\""));
+        assert!(page.contains("name=\"accept\" value=\"on\" required"));
+        assert!(!page.contains("checked"), "{page}");
+        let mut html = Html::new(Lang::En);
+        add_window(
+            &mut html,
+            &AddView {
+                accepted: true,
+                alias: String::new(),
+                phone: String::new(),
+                first: true,
+                engine: EngineState::Ready { answered: true },
+                error: None,
+            },
+        );
+        assert!(
+            html.finish()
+                .contains("name=\"accept\" value=\"on\" checked required")
+        );
         assert!(!page.contains("name=\"command\""));
         // With no engine, no form at all, and the command that sets it.
         let mut html = Html::new(Lang::En);
@@ -1571,14 +1731,45 @@ mod tests {
         assert_eq!(status_of(&refused(RESTORED)), StatusCode::CONFLICT);
         assert_eq!(status_of(&refused(N84)), StatusCode::OK);
         // The refused key is answered for both origins: a restart, or the key typed again.
-        let key = plain(Lang::En, &refused(N68));
+        let key = written(&refusal_line(Lang::En, N68, None));
         assert!(
             key.contains("restart the engine: it reads its key only when it starts"),
             "{key}"
         );
         assert!(key.contains("arauto-hub admin engine set-key"), "{key}");
         // The text of the line above the list fills the state in the language of the page.
-        let said = plain(Lang::En, &not_now);
-        assert!(said.contains("\"Connected\""), "{said}");
+        let said = written(&refusal_line(Lang::En, not_now.sentence, not_now.state));
+        assert!(said.contains("&quot;Connected&quot;"), "{said}");
+        assert!(
+            said.contains("<p class=\"error\" role=\"status\">"),
+            "{said}"
+        );
+    }
+
+    fn written(line: &StatusLine) -> String {
+        let mut html = Html::new(Lang::En);
+        view::status_line(&mut html, line);
+        html.finish()
+    }
+
+    #[test]
+    fn every_refusal_has_a_word_and_the_word_leads_back_to_its_sentence() {
+        for (word, sentence) in REFUSAL_WORDS {
+            assert_eq!(word_of(sentence), word);
+        }
+        assert_eq!(word_of(N84), "failed");
+        assert_eq!(word_of(N47), "not-now");
+    }
+
+    #[test]
+    fn the_typed_alias_is_shown_in_its_own_case() {
+        let mut html = Html::new(Lang::En);
+        typed_field(&mut html, "compras", "");
+        let written = html.finish();
+        assert!(
+            written
+                .contains("<label for=\"typed\">Type the alias <b>compras</b> to confirm.</label>"),
+            "{written}"
+        );
     }
 }

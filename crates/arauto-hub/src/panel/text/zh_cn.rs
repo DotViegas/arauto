@@ -938,6 +938,10 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Restart", "重启"),
     ("Decide", "处理"),
     ("Number {alias}: {state}.", "号码 {alias}：{state}。"),
+    ("Number {alias} was removed.", "号码 {alias} 已移除。"),
+    ("Telephone given", "填写的电话"),
+    ("Telephone that paired", "完成配对的电话"),
+    ("Undo…", "撤销…"),
     (
         "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
         "hub 已更改号码 {alias}，但 WAHA 没有响应：它在 WAHA 中的会话可能仍是原样。请在 hub 服务器上用 {command} 检查 WAHA。",
@@ -1024,6 +1028,11 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "在手机上输入一个代码，适用于手机无法扫描此屏幕的情况",
     ),
     ("Start pairing", "开始配对"),
+    (
+        "{alias} is in the list now. Pair it now, or later from its line.",
+        "{alias} 已加入列表。现在配对，或稍后从它所在的行配对。",
+    ),
+    ("Pair later", "稍后配对"),
     (
         "WAHA has not created the session of this number yet. Starting the pairing tries again.",
         "WAHA 还没有创建此号码的会话。开始配对会再试一次。",
@@ -1457,4 +1466,34 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Dismiss", "忽略"),
     ("Dismiss: {title}", "忽略：{title}"),
+    (
+        "The message of this invite cannot be shown again. If it did not reach the Hermes, issue another invite: this one then stops working.",
+        "此邀请的消息无法再次显示。如果它没有送达 Hermes，请签发新的邀请：这一个随即失效。",
+    ),
+    ("Nothing has arrived yet", "尚未收到任何内容"),
+    (
+        "The Hermes may be waiting for your approval to run the command, in the command channel.",
+        "Hermes 可能在指令通道中等待您批准运行该命令。",
+    ),
+    (
+        "The Hermes may not reach this hub: check that its machine reaches the address of the hub.",
+        "Hermes 可能无法连到此 hub：请检查其机器能否访问 hub 的地址。",
+    ),
+    (
+        "The message may have gone to another chat: it only works in the command channel of this Hermes.",
+        "消息可能发到了别的聊天：它只在此 Hermes 的指令通道中有效。",
+    ),
+    (
+        "Type the name {name} to confirm.",
+        "请输入名称 {name} 以确认。",
+    ),
+    (
+        "The name typed does not match. Nothing was done.",
+        "输入的名称不匹配。没有执行任何操作。",
+    ),
+    ("Hermes {name}: {state}.", "Hermes {name}：{state}。"),
+    (
+        "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
+        "已保存。在 WhatsApp 上向 {hermes} 下指令的是：{orders}。",
+    ),
 ];

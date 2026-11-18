@@ -1022,6 +1022,10 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Restart", "Перезапустить"),
     ("Decide", "Решить"),
     ("Number {alias}: {state}.", "Номер {alias}: {state}."),
+    ("Number {alias} was removed.", "Номер {alias} удалён."),
+    ("Telephone given", "Указанный телефон"),
+    ("Telephone that paired", "Телефон, который подключился"),
+    ("Undo…", "Отменить…"),
     (
         "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
         "Хаб изменил номер {alias}, но WAHA не ответил: его сеанс там мог остаться прежним. Проверьте WAHA командой {command} на сервере хаба.",
@@ -1111,6 +1115,11 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "введите код на телефоне, если он не может отсканировать этот экран",
     ),
     ("Start pairing", "Начать привязку"),
+    (
+        "{alias} is in the list now. Pair it now, or later from its line.",
+        "{alias} теперь в списке. Привяжите его сейчас или позже из его строки.",
+    ),
+    ("Pair later", "Привязать позже"),
     (
         "WAHA has not created the session of this number yet. Starting the pairing tries again.",
         "WAHA ещё не создал сеанс этого номера. При запуске привязки попытка повторится.",
@@ -1571,4 +1580,34 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Dismiss", "Скрыть"),
     ("Dismiss: {title}", "Скрыть: {title}"),
+    (
+        "The message of this invite cannot be shown again. If it did not reach the Hermes, issue another invite: this one then stops working.",
+        "Сообщение этого приглашения нельзя показать снова. Если оно не дошло до Hermes, выпустите другое приглашение: это перестанет работать.",
+    ),
+    ("Nothing has arrived yet", "Пока ничего не пришло"),
+    (
+        "The Hermes may be waiting for your approval to run the command, in the command channel.",
+        "Возможно, Hermes ждёт вашего разрешения выполнить команду, в командном канале.",
+    ),
+    (
+        "The Hermes may not reach this hub: check that its machine reaches the address of the hub.",
+        "Возможно, Hermes не достаёт до этого хаба: проверьте, что его машина доходит до адреса хаба.",
+    ),
+    (
+        "The message may have gone to another chat: it only works in the command channel of this Hermes.",
+        "Возможно, сообщение ушло в другой чат: оно работает только в командном канале этого Hermes.",
+    ),
+    (
+        "Type the name {name} to confirm.",
+        "Введите имя {name} для подтверждения.",
+    ),
+    (
+        "The name typed does not match. Nothing was done.",
+        "Введённое имя не совпадает. Ничего не сделано.",
+    ),
+    ("Hermes {name}: {state}.", "Hermes {name}: {state}."),
+    (
+        "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
+        "Сохранено. Кто отдаёт приказы {hermes} в WhatsApp: {orders}.",
+    ),
 ];

@@ -119,11 +119,13 @@ click could lose a click that lands in the instant of a swap.
   device declared, marked as not verified; date of the connection; notices in the queue; latest
   events. Fixed text: "The tools appear on all of this Hermes's conversation platforms. Whoever can
   give it orders can use the granted numbers."
-- **Who gives it orders (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), part B, proposal: built and tested against a fake engine, not tried in a browser):** every line has the action "Who gives it orders", with its state in the muted style: "not recorded", "its own chat", "1 telephone" or "{n} telephones". It opens a window over the list, "Who gives {hermes} orders on WhatsApp", at `/hermes/whatsapp?name=`. (18/11/2026, option B of the window, proposal: built and tested against a fake engine, **not tried in a browser**.) The numbers of the hub are offered as choices, each by its alias with its telephone. "Its WhatsApp" is a radio: it has no WhatsApp, one of the numbers (a list box above 8 numbers; a number where another Hermes already takes orders cannot be chosen), or another telephone, typed. "Orders come from" is its own chat or "These telephones": a box per number of the hub, and "Other telephones", one per line, for telephones that are not numbers of Arauto; at most 16 telephones in all, counted as the command counts them (both forms of a Brazilian mobile once). The form sends aliases; the hub reads their telephones and saves telephones. A typed telephone that does not start with "+" stops the save once: the window comes back, with nothing saved, saying how the hub read each line (the telephone, the number of Arauto it is or that it is not one, a repeated line, a line that is not a telephone, "n of 16"); saving again with the same lines keeps them as read. The error is at the top of the window, tied to its field. Another Hermes taking orders on the chosen telephone is said before the window that asks. Its own chat together with a list is refused, as in the command. The window says that Arauto refuses every Hermes, the Hermes included, writing in that chat, and carries one fixed sentence about the risk **whatever is recorded**. Saving calls the same function as `arauto-hub admin hermes whatsapp` (same rules, same audit, same refusals). A save that leaves no chat protected (a first save with everything empty included) or that unprotects a chat first shows a window over the first one, "A Hermes could give {hermes} orders", naming the chats that stop being protected (alias first), with "Remove the protection" or "Save without protection" and "Go back"; its close button goes back too; "Go back" returns with every choice and what was typed, and **nothing is saved before the answer**. A save that protects more asks nothing. The window that asks for a telephone the connector reported (part E) is **not built**. Not built either: a Hermes removal in the panel (the panel only revokes; the line "Arauto stops refusing writes in the chat where {hermes} takes orders." is printed by `arauto-hub admin hermes remove` when the Hermes had a record).
+- **Who gives it orders (17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), part B, proposal: built and tested against a fake engine, not tried in a browser):** every line has the action "Who gives it orders", with its state in the muted style: "not recorded", "its own chat", "1 telephone" or "{n} telephones". It opens a window over the list, "Who gives {hermes} orders on WhatsApp", at `/hermes/whatsapp?name=`. (18/11/2026, option B of the window, proposal: built and tested against a fake engine, **not tried in a browser**.) The numbers of the hub are offered as choices, each by its alias with its telephone. "Its WhatsApp" is a radio: it has no WhatsApp, one of the numbers (a list box above 8 numbers; a number where another Hermes already takes orders cannot be chosen), or another telephone, typed. "Orders come from" is its own chat or "These telephones": a box per number of the hub (the box of its own WhatsApp, marked "its WhatsApp", comes disabled unless it came back checked after a refusal, 18/11/2026), and "Other telephones", one per line, for telephones that are not numbers of Arauto, in a box tall enough for every telephone recorded (up to 12 lines); at most 16 telephones in all, counted as the command counts them (both forms of a Brazilian mobile once). The form sends aliases; the hub reads their telephones and saves telephones. A typed telephone that does not start with "+" stops the save once: the window comes back, with nothing saved, saying how the hub read each line (the telephone, the number of Arauto it is or that it is not one, a repeated line, a line that is not a telephone, "n of 16"); saving again with the same lines keeps them as read. The error is at the top of the window, tied to its field. Another Hermes taking orders on the chosen telephone is said before the window that asks. Its own chat together with a list is refused, as in the command. The window says that Arauto refuses every Hermes, the Hermes included, writing in that chat, and carries one fixed sentence about the risk **whatever is recorded**. Saving calls the same function as `arauto-hub admin hermes whatsapp` (same rules, same audit, same refusals). A save that leaves no chat protected (a first save with everything empty included) or that unprotects a chat first shows a window over the first one, "A Hermes could give {hermes} orders", naming the chats that stop being protected (alias first), with "Remove the protection" or "Save without protection" and "Go back"; its close button goes back too; "Go back" returns with every choice and what was typed, and **nothing is saved before the answer**. A save that protects more asks nothing. The window that asks for a telephone the connector reported (part E) is **not built**. Not built either: a Hermes removal in the panel (the panel only revokes; the line "Arauto stops refusing writes in the chat where {hermes} takes orders." is printed by `arauto-hub admin hermes remove` when the Hermes had a record).
 - **One "Actions" button per line (19/11/2026, option 2 of the row actions: built, not tested, not tried in a browser):** the lists of Hermes (T1) and of WhatsApps (T4) show, in each line, one button, "Actions" (three dots and the word), a plain link to a window over the list: `GET /hermes/actions?name=` and `GET /whatsapps/actions?alias=`. The window has the name or alias as title, the state (and the numbers of a Hermes, or the telephone of a number) and the list of every action the line offered before, in its current state, each with an icon, its label, the value it has now (only "Who gives it orders") and one line that says what it does. The actions that end something (Revoke, Disconnect, Remove) come last, in a group of their own, and lead to the same questions as before; an action that posted a form still posts it. The window adds no question and changes nothing an action does; opening it writes nothing. "Who gives it orders" is a column of the Hermes list, its value a link to the window of T1; the tags of a number sit on a second line under its alias. An unknown name or alias goes back to the list.
-- **Actions:** Connect Hermes; Accesses; Reconnect; Rename; Revoke (asks for the name typed);
-  Delete (only with no invite issued and no device pending, approved, active, suspended or in
-  quarantine).
+- **Actions:** Connect Hermes; Accesses; Reconnect; Rename; Revoke (asks for the name typed;
+  18/11/2026: built and tested against a fake engine, not tried in a browser); Delete (only with no
+  invite issued and no device pending, approved, active, suspended or in quarantine). After revoke,
+  deny or a save of who gives it orders, the list says what the Hermes is now, in the line between
+  the heading and the table (same date and status).
 - **Empty:** "No Hermes connected. You send a message to Hermes's command channel and type here
   the verification code it answers."
 - **Quarantine:** "The hub no longer trusts the credential of {name}. Reason: a credential already
@@ -174,13 +176,18 @@ Click the message to copy it.    Cancel invite
   instruction page it points to keeps serving until the request is decided or the invite expires
   ([14](14-protocolo-do-canal.md), section 1).
 - **Status: proposal.** The sentence and the page were not tried on a real Hermes yet.
+- *Built (18/11/2026, tested against a fake engine, not tried in a browser):* the waiting screen
+  says that the message cannot be shown again and offers "Issue another invite", which cancels the
+  one before. A form that issues an invite carries what it replaces; a resent or stale one (browser
+  Back, reload, an old tab) issues nothing and leads to the waiting screen.
 - **There is no "send by e-mail" or "send by WhatsApp".** A sentence or block that reached Hermes through
   a number of the hub would arrive as data, and must be refused.
 - **If Hermes asks for approval to run the command,** the one who approves is you, in the command
   channel.
 - **Timed help:** 90 seconds without an enrollment open "Nothing has arrived yet", with the three
   causes: Hermes is waiting for your approval; Hermes does not reach the hub; the message was sent
-  somewhere else.
+  somewhere else (built, same date and status; shown from 90 seconds after the invite was issued,
+  also without script).
 
 ## T3. Confirm connection
 
@@ -230,11 +237,15 @@ Type the verification code Hermes answered in the command channel:
   Add window offered and could not change afterwards, is gone. Who gives a Hermes orders is recorded
   per Hermes, by the command `arauto-hub admin hermes whatsapp` and, since part B (built and tested against a fake engine, not tried in a browser), by the window of T1. Each number that takes part in a record carries a tag, linked to the window of that Hermes: "gives orders to {hermes}" (the number is a telephone that gives it orders) or "{hermes} takes orders here" (the Hermes's own WhatsApp runs on it). Each line also has the action "Orders" (a number that is not removed), at any time after the number is in the list: a short form asks which Hermes (each with what the number is for it now) and whether the number gives it orders or is its WhatsApp, with nothing chosen beforehand, and opens that Hermes's window with the number already chosen (18/11/2026); the tags and this way in return to this tab after a save or a cancel. The address names the alias, never a telephone. That is only a fill: nothing is saved until the admin saves, and the window that asks first applies as in T1.)
 - **The alert band (19/11/2026: built, not tested, not tried in a browser):** each alert of the band above the menu has a "Dismiss" button, a form that posts the id of the alert (never in an address) to `POST /alerts/dismiss`. It calls the function behind `arauto-hub admin alerts --ack`, which only marks the alert as seen; neither the command nor the button writes an audit event or treats a kind apart, so every listed alert has the button. The answer goes back to the list the admin was on (only `/`, `/whatsapps` or `/accesses`), else to `/`.
+- **What a write says (18/11/2026: built and tested against a fake engine, not tried in a browser):** every form of a number ends on the list address, `/whatsapps?alias=` (with `&said=` and one fixed word when WAHA did not answer or the hub refused), so a reload or the refresh of the list never sends the form again. The line between the heading and the table takes the tone of what it says: the state of the number in its own color, a WAHA that did not answer in the amber band, a refusal in red, the command in it as code. A removed number is said removed.
 - **Disconnect and Remove ask for the alias typed, and not the passkey again.** The passkey on every
   action (decision 0019) is not built (decision 0040, pending decision 2). The alias typed, the
   `POST` with the panel's `Origin` and the full panel session are the strictest check that needs no
   new mechanism. Remove also needs one choice, with none preselected: keep the history in the
-  engine, or erase it there. The message archive is not built.
+  engine, or erase it there. The message archive is not built. The alias typed is shown as it is
+  spelled; the label around it keeps its style. A refused Remove keeps the choice that was made;
+  the alias is typed again only when it did not match (18/11/2026: built and tested against a fake
+  engine, not tried in a browser).
 - **First number:** acceptance recorded in the audit: "The engine is an unofficial WhatsApp
   client. WhatsApp may block the number. Use numbers you can afford to lose." In the panel it is
   asked only for the first number the organization ever had (removed ones count) and is recorded
@@ -254,13 +265,19 @@ Built in the hub on 15/11/2026, in windows over the list (decision 0044, proposa
 
 - **Step 1:** alias and number with country code (the box "command" was removed on 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)). For the first number the
   organization ever had, also the acceptance sentence of T4, which must be ticked.
-- **Step 2:** the choice of QR or pairing code.
+- **Step 2:** the choice of QR or pairing code. It says the number is already in the list; its way
+  out is "Pair later", which leaves the number unpaired and says so on the list (18/11/2026: built
+  and tested against a fake engine, not tried in a browser).
 - **Step 3:** the QR, drawn by the hub as an image in the page, which renews itself in the window,
   or the pairing code with the path on the phone and the time left (the hub's deadline, 3 minutes;
   the validity on WhatsApp's side is not known). Then "Paired: +00 00 00000-0000." If the paired
-  number is another one: "The phone that paired belongs to a number different from the one given.
-  Keep this one | Undo." Undo needs a checkbox that confirms erasing the engine session's history.
+  number is another one: "The phone that paired belongs to a number different from the one given.",
+  then the telephone given and the telephone that paired, side by side. "Keep this one | Undo…";
+  neither is the main button. Undo needs a checkbox that confirms erasing the engine session's
+  history. (18/11/2026: built and tested against a fake engine, not tried in a browser.)
   While the admin does not decide, the state is "number swapped" and the accesses stay stopped.
+  A pairing that ends without pairing keeps the path on "Phone"; only a paired number reaches
+  "Done" (18/11/2026: built and tested against a fake engine, not tried in a browser).
 - **Cancel the pairing** stops the engine session and puts the number back to unpaired. **Closing
   the window does not cancel**: the pairing runs until its deadline, and the line offers "Continue
   pairing" to the session that started it. Another panel session sees that a pairing is running

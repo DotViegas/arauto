@@ -971,6 +971,10 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Restart", "रीस्टार्ट करें"),
     ("Decide", "तय करें"),
     ("Number {alias}: {state}.", "नंबर {alias}: {state}।"),
+    ("Number {alias} was removed.", "नंबर {alias} हटा दिया गया।"),
+    ("Telephone given", "दिया गया फ़ोन"),
+    ("Telephone that paired", "जिस फ़ोन ने पेयर किया"),
+    ("Undo…", "पूर्ववत करें…"),
     (
         "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
         "हब ने नंबर {alias} बदल दिया, लेकिन WAHA ने जवाब नहीं दिया: वहाँ उसका सेशन शायद पहले जैसा ही हो। हब के सर्वर पर {command} से WAHA जाँचें।",
@@ -1057,6 +1061,11 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "फ़ोन पर एक कोड लिखें, जब वह इस स्क्रीन को स्कैन न कर सके",
     ),
     ("Start pairing", "पेयरिंग शुरू करें"),
+    (
+        "{alias} is in the list now. Pair it now, or later from its line.",
+        "{alias} अब सूची में है। इसे अभी पेयर करें, या बाद में इसकी पंक्ति से।",
+    ),
+    ("Pair later", "बाद में पेयर करें"),
     (
         "WAHA has not created the session of this number yet. Starting the pairing tries again.",
         "WAHA ने अभी तक इस नंबर का सेशन नहीं बनाया है। पेयरिंग शुरू करने पर वह फिर कोशिश करता है।",
@@ -1499,4 +1508,34 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Dismiss", "हटाएँ"),
     ("Dismiss: {title}", "हटाएँ: {title}"),
+    (
+        "The message of this invite cannot be shown again. If it did not reach the Hermes, issue another invite: this one then stops working.",
+        "इस आमंत्रण का संदेश दोबारा नहीं दिखाया जा सकता। अगर वह Hermes तक नहीं पहुँचा, तो दूसरा आमंत्रण जारी करें: तब यह वाला काम करना बंद कर देगा।",
+    ),
+    ("Nothing has arrived yet", "अभी तक कुछ नहीं पहुँचा"),
+    (
+        "The Hermes may be waiting for your approval to run the command, in the command channel.",
+        "हो सकता है Hermes कमांड चलाने के लिए आपकी स्वीकृति का इंतज़ार कर रहा हो, कमांड चैनल में।",
+    ),
+    (
+        "The Hermes may not reach this hub: check that its machine reaches the address of the hub.",
+        "हो सकता है Hermes इस हब तक न पहुँच पा रहा हो: जाँचें कि उसकी मशीन हब के पते तक पहुँचती है।",
+    ),
+    (
+        "The message may have gone to another chat: it only works in the command channel of this Hermes.",
+        "हो सकता है संदेश किसी दूसरी चैट में चला गया हो: वह केवल इस Hermes के कमांड चैनल में काम करता है।",
+    ),
+    (
+        "Type the name {name} to confirm.",
+        "पुष्टि के लिए नाम {name} लिखें।",
+    ),
+    (
+        "The name typed does not match. Nothing was done.",
+        "लिखा गया नाम मेल नहीं खाता। कुछ भी नहीं किया गया।",
+    ),
+    ("Hermes {name}: {state}.", "Hermes {name}: {state}।"),
+    (
+        "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
+        "सहेजा गया। {hermes} को WhatsApp पर आदेश कौन देता है: {orders}।",
+    ),
 ];

@@ -347,11 +347,17 @@ pub fn revoke_page(
             .t(error)
             .raw("</p>");
     }
-    html.raw("</div><div class=\"modal-foot\"><form method=\"post\" action=\"/hermes/revoke\"><input type=\"hidden\" name=\"name\" value=\"")
+    html.raw("<form id=\"revoke-form\" method=\"post\" action=\"/hermes/revoke\" autocomplete=\"off\"><input type=\"hidden\" name=\"name\" value=\"")
         .text(name)
-        .raw("\"><button class=\"button danger\" type=\"submit\">")
+        .raw("\"><div class=\"field\"><label for=\"typed\">")
+        .fill(
+            k("Type the name {name} to confirm."),
+            &[("name", Arg::Strong(name))],
+        )
+        .raw("</label><input id=\"typed\" name=\"typed\" type=\"text\" maxlength=\"64\" autocomplete=\"off\" spellcheck=\"false\" autocapitalize=\"none\" required></div></form>")
+        .raw("</div><div class=\"modal-foot\"><button class=\"button danger\" type=\"submit\" form=\"revoke-form\">")
         .t(k("Revoke"))
-        .raw("</button></form><a class=\"button\" href=\"/\">")
+        .raw("</button><a class=\"button\" href=\"/\">")
         .t(k("Cancel"))
         .raw("</a></div></dialog>")
         .raw(view::TAIL);
@@ -637,8 +643,22 @@ pub(super) async fn answer(
     let Some(name) = name else {
         return Ok(http::see_other("/"));
     };
+    // Asked for the name typed: a resent or stray form revokes nothing.
+    let typed = form.field("typed");
+    if typed.as_ref().map(|typed| typed.trim()) != Some(name.as_str()) {
+        return revoking(
+            hub,
+            organization,
+            lang,
+            StatusCode::OK,
+            &name,
+            Some(k("The name typed does not match. Nothing was done.")),
+        )
+        .await;
+    }
     match admin.revoke(name.as_str(), hub.now_ms()).await {
-        Ok(_) | Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
+        Ok(_) => Ok(http::see_other_to(&format!("/?hermes={}", name.as_str()))),
+        Err(AdminError::NoSuchHermes) => Ok(http::see_other("/")),
         Err(error) => {
             let (status, sentence) = refusal(&error);
             revoking(hub, organization, lang, status, &name, Some(sentence)).await

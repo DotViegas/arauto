@@ -292,6 +292,38 @@ pub async fn by_alias(
     row.map(Number::try_from).transpose()
 }
 
+/// The telephone that paired a swapped number, opened with the key of the organization.
+/// `None` when the number holds none (it is not swapped).
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses; [`RepoError::Inconsistent`] when what is
+/// held does not open or is not a telephone.
+pub async fn paired_phone(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    key: &OrganizationKey,
+    number: Uuid,
+) -> Result<Option<Phone>, RepoError> {
+    let enc: Option<Option<Vec<u8>>> = sqlx::query_scalar(
+        "SELECT paired_phone_enc FROM number WHERE organization_id = $1 AND id = $2",
+    )
+    .bind(organization.id())
+    .bind(number)
+    .fetch_optional(pool)
+    .await?;
+    let Some(enc) = enc.flatten() else {
+        return Ok(None);
+    };
+    let opened = key
+        .open_whatsapp(WhatsappField::Phone, number, &enc)
+        .map_err(|_| RepoError::Inconsistent("the telephone that paired does not open"))?;
+    let text = std::str::from_utf8(&opened)
+        .map_err(|_| RepoError::Inconsistent("the telephone that paired is not text"))?;
+    Phone::parse(text)
+        .map(Some)
+        .map_err(|_| RepoError::Inconsistent("the telephone that paired"))
+}
+
 /// The number of the session `session` of the engine `engine`, when it was not removed.
 ///
 /// # Errors

@@ -207,6 +207,8 @@ pub struct HermesPage {
     pub waiting: usize,
     /// How many are in quarantine or suspended.
     pub stopped: usize,
+    /// What a write of a Hermes just did, above the table.
+    pub said: Option<StatusLine>,
 }
 
 /// One line of the list of numbers.
@@ -280,7 +282,58 @@ pub struct NumbersPage {
     /// The engine, when there is one.
     pub engine: Option<EngineLine>,
     /// What a write just did, above the table.
-    pub said: Option<String>,
+    pub said: Option<StatusLine>,
+}
+
+/// What a write just did, in the line between the heading and the table of a list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusLine {
+    /// What kind of line it is, and so how it looks.
+    pub kind: StatusKind,
+    /// The sentence: a key of the screens.
+    pub sentence: &'static str,
+    /// Placeholders written as text; a word of the screens is already in the page's language.
+    pub texts: Vec<(&'static str, String)>,
+    /// Placeholders written as `<code>`: commands fixed by the code.
+    pub codes: Vec<(&'static str, &'static str)>,
+}
+
+/// How a line of a write looks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusKind {
+    /// What was done, in the tone of what it left.
+    Done(Tone),
+    /// The hub did its part and the engine did not answer.
+    Warning,
+    /// The hub refused: nothing was done.
+    Refusal,
+}
+
+/// Writes the line of a write, with the markup of its kind.
+pub(super) fn status_line(html: &mut Html, line: &StatusLine) {
+    html.raw(match line.kind {
+        StatusKind::Done(Tone::Ok) => "<p class=\"status\" role=\"status\">",
+        StatusKind::Done(Tone::Wait) => "<p class=\"status wait\" role=\"status\">",
+        StatusKind::Done(Tone::Bad) => "<p class=\"status bad\" role=\"status\">",
+        StatusKind::Done(Tone::Idle) => "<p class=\"status idle\" role=\"status\">",
+        StatusKind::Warning => "<div class=\"warnings\" role=\"status\"><p>",
+        StatusKind::Refusal => "<p class=\"error\" role=\"status\">",
+    });
+    let mut args: Vec<(&str, Arg<'_>)> = line
+        .texts
+        .iter()
+        .map(|(name, value)| (*name, Arg::Text(value)))
+        .collect();
+    args.extend(
+        line.codes
+            .iter()
+            .map(|(name, value)| (*name, Arg::Code(value))),
+    );
+    html.fill(line.sentence, &args);
+    html.raw(match line.kind {
+        StatusKind::Warning => "</p></div>",
+        _ => "</p>",
+    });
 }
 
 /// What a Hermes may do on a number.
@@ -753,7 +806,11 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         )
         .raw("</p></div><a class=\"button primary\" href=\"/hermes/connect\">")
         .t(k("Connect Hermes"))
-        .raw("</a></div><div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">Hermes</th><th scope=\"col\">")
+        .raw("</a></div>");
+    if let Some(said) = &page.said {
+        status_line(html, said);
+    }
+    html.raw("<div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">Hermes</th><th scope=\"col\">")
         .t(k("State"))
         .raw("</th><th scope=\"col\">")
         .t(k("Numbers"))
@@ -862,9 +919,7 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
         .t(k("Connect WhatsApp (native · in test)"))
         .raw("</a></div></div>");
     if let Some(said) = &page.said {
-        html.raw("<p class=\"status\" role=\"status\">")
-            .text(said)
-            .raw("</p>");
+        status_line(html, said);
     }
     html.raw("<div class=\"frame\"><table class=\"list\"><thead><tr><th scope=\"col\">")
         .t(k("Alias"))
@@ -1096,6 +1151,7 @@ mod tests {
             connected: 0,
             waiting: 0,
             stopped: 1,
+            said: None,
         };
         let page = hermes(&frame, &hermes_page);
         clean(&page);
@@ -1132,7 +1188,12 @@ mod tests {
                 tone: Tone::Wait,
                 text: HOSTILE.to_owned(),
             }),
-            said: Some(HOSTILE.to_owned()),
+            said: Some(StatusLine {
+                kind: StatusKind::Warning,
+                sentence: k("Number {alias}: {state}."),
+                texts: vec![("alias", HOSTILE.to_owned()), ("state", HOSTILE.to_owned())],
+                codes: Vec::new(),
+            }),
         };
         clean(&numbers(&frame, &numbers_page));
 
@@ -1398,5 +1459,59 @@ mod tests {
             html.contains("<b>R</b> read · <b>S</b> send · <b>M</b> modify · <b>W</b> be woken.")
         );
         assert!(!html.contains("class=\"warnings\""));
+    }
+
+    #[test]
+    fn the_status_line_takes_the_tone_it_is_given() {
+        let write = |kind| {
+            let mut html = Html::new(Lang::En);
+            status_line(
+                &mut html,
+                &StatusLine {
+                    kind,
+                    sentence: k(
+                        "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
+                    ),
+                    texts: vec![("alias", "vendas".to_owned())],
+                    codes: vec![("command", "arauto-hub admin engine health")],
+                },
+            );
+            html.finish()
+        };
+        let body = "The hub changed the number vendas, but WAHA did not answer: its session there may still be as it was. Check WAHA with <code>arauto-hub admin engine health</code> on the hub&#39;s server.";
+        for (kind, open, close) in [
+            (
+                StatusKind::Done(Tone::Ok),
+                "<p class=\"status\" role=\"status\">",
+                "</p>",
+            ),
+            (
+                StatusKind::Done(Tone::Wait),
+                "<p class=\"status wait\" role=\"status\">",
+                "</p>",
+            ),
+            (
+                StatusKind::Done(Tone::Bad),
+                "<p class=\"status bad\" role=\"status\">",
+                "</p>",
+            ),
+            (
+                StatusKind::Done(Tone::Idle),
+                "<p class=\"status idle\" role=\"status\">",
+                "</p>",
+            ),
+            (
+                StatusKind::Warning,
+                "<div class=\"warnings\" role=\"status\"><p>",
+                "</p></div>",
+            ),
+            (
+                StatusKind::Refusal,
+                "<p class=\"error\" role=\"status\">",
+                "</p>",
+            ),
+        ] {
+            assert_eq!(write(kind), format!("{open}{body}{close}"));
+        }
     }
 }

@@ -378,7 +378,7 @@ async fn a_form_of_the_guide_needs_a_session_and_the_origin_of_the_panel() {
 
     let forms = [
         ("/hermes/connect", "name=novo".to_owned()),
-        ("/hermes/invite", format!("name={name}")),
+        ("/hermes/invite", format!("name={name}&replaces=none")),
         ("/hermes/approve", format!("name={name}&code=123-456")),
         ("/hermes/deny", format!("name={name}")),
     ];
@@ -603,8 +603,15 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
         actions.contains("<a href=\"/hermes/wait?name=vendas\">"),
         "{actions}"
     );
+    // The form of the wait page says what it replaces: the invite shown before.
+    let replaces = hidden(&wait_page(&browser, &cookie, "vendas").await, "replaces");
+    assert!(replaces.starts_with("invite-"), "{replaces}");
     let second = browser
-        .post("/hermes/invite", Some(&cookie), "name=vendas")
+        .post(
+            "/hermes/invite",
+            Some(&cookie),
+            &format!("name=vendas&replaces={replaces}"),
+        )
         .await;
     assert_eq!(second.status, 200);
     assert!(
@@ -639,6 +646,102 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_resent_invite_form_issues_nothing_and_leads_to_the_wait() {
+    let fixture = serving().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    let name = fixture.hermes().await;
+    let actions = browser
+        .get(&format!("/hermes/actions?name={name}"), Some(&cookie))
+        .await
+        .text();
+    assert!(
+        actions.contains("name=\"replaces\" value=\"none\""),
+        "{actions}"
+    );
+
+    let body = format!("name={name}&replaces=none");
+    let before = count(&fixture, "invite").await;
+    let first = browser.post("/hermes/invite", Some(&cookie), &body).await;
+    assert_eq!(first.status, 200);
+    let first_invite = invite_of(&block_of(&first.text()));
+    assert_eq!(count(&fixture, "invite").await, before + 1);
+
+    // The same form again (Back, reload): nothing is issued, and the way leads to the wait.
+    let wait = format!("/hermes/wait?name={name}");
+    let again = browser.post("/hermes/invite", Some(&cookie), &body).await;
+    assert_eq!(again.status, 303);
+    assert_eq!(again.header("location"), Some(wait.as_str()));
+    assert_eq!(count(&fixture, "invite").await, before + 1);
+    // The invite already given keeps working.
+    let page = page_path_of(&sentence_of(&first.text()));
+    let served = http::get(fixture.addr(), &page, &[], PATIENCE)
+        .await
+        .unwrap();
+    assert_eq!(served.status, 200);
+    // A form with no `replaces` at all issues nothing either.
+    let bare = browser
+        .post("/hermes/invite", Some(&cookie), &format!("name={name}"))
+        .await;
+    assert_eq!(bare.status, 303);
+    assert_eq!(bare.header("location"), Some(wait.as_str()));
+    assert_eq!(count(&fixture, "invite").await, before + 1);
+
+    // The wait says the message cannot come back, and its form carries the invite shown.
+    let page = wait_page(&browser, &cookie, &name).await;
+    assert!(page.contains("cannot be shown again"), "{page}");
+    assert!(page.contains("action=\"/hermes/invite\""));
+    assert!(page.contains("name=\"replaces\" value=\"invite-"));
+    assert!(!page.contains(&first_invite));
+    let replaces = hidden(&page, "replaces");
+    let second = browser
+        .post(
+            "/hermes/invite",
+            Some(&cookie),
+            &format!("name={name}&replaces={replaces}"),
+        )
+        .await;
+    assert_eq!(second.status, 200);
+    assert!(
+        second
+            .text()
+            .contains("The invite issued before was cancelled.")
+    );
+    assert_eq!(count(&fixture, "invite").await, before + 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_wait_gives_the_timed_help_after_ninety_seconds() {
+    let fixture = serving().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    browser
+        .post("/hermes/connect", Some(&cookie), "name=vendas")
+        .await;
+    let fresh = wait_page(&browser, &cookie, "vendas").await;
+    assert!(!fresh.contains("Nothing has arrived yet"), "{fresh}");
+
+    // The panel tests run on the system clock: the invite is moved instead.
+    sqlx::query("UPDATE invite SET expires_at = expires_at - 91000 WHERE state = 'issued'")
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+    let late = wait_page(&browser, &cookie, "vendas").await;
+    assert!(
+        late.contains("<div class=\"warnings\"><p><b>Nothing has arrived yet</b></p><ul>"),
+        "{late}"
+    );
+    assert!(late.contains("may be waiting for your approval"));
+    assert!(late.contains("may not reach this hub"));
+    assert!(late.contains("The message may have gone to another chat"));
+    let until: i64 = sqlx::query_scalar("SELECT expires_at FROM invite WHERE state = 'issued'")
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap();
+    assert_eq!(hidden(&late, "replaces"), format!("invite-{until}"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_hub_that_serves_no_connector_issues_nothing_from_the_panel() {
     // The hub of the other tests of the panel: no file to download.
     let fixture = hub().await;
@@ -649,7 +752,7 @@ async fn a_hub_that_serves_no_connector_issues_nothing_from_the_panel() {
 
     for (path, body) in [
         ("/hermes/connect", "name=novo".to_owned()),
-        ("/hermes/invite", format!("name={existing}")),
+        ("/hermes/invite", format!("name={existing}&replaces=none")),
     ] {
         let answer = browser.post(path, Some(&cookie), &body).await;
         assert_eq!(answer.status, 200, "{path}");
@@ -688,8 +791,16 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
             && actions.contains("<span class=\"lbl\">Reconnect</span>"),
         "{actions}"
     );
+    assert!(
+        actions.contains("name=\"replaces\" value=\"none\""),
+        "{actions}"
+    );
     let issued = browser
-        .post("/hermes/invite", Some(&cookie), &format!("name={name}"))
+        .post(
+            "/hermes/invite",
+            Some(&cookie),
+            &format!("name={name}&replaces=none"),
+        )
         .await;
     assert_eq!(issued.status, 200);
     let page = issued.text();
@@ -808,7 +919,10 @@ async fn five_wrong_codes_deny_the_request_and_so_does_the_button() {
         .post("/hermes/deny", Some(&cookie), &format!("name={other}"))
         .await;
     assert_eq!(denied.status, 303);
-    assert_eq!(denied.header("location"), Some("/"));
+    assert_eq!(
+        denied.header("location"),
+        Some(format!("/?hermes={other}").as_str())
+    );
     assert_eq!(fixture.state_of(&asking).await.0, "denied");
     assert_eq!(fixture.state_of(&device).await.0, "denied");
 }

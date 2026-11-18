@@ -1035,6 +1035,13 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Decide", "Entscheiden"),
     ("Number {alias}: {state}.", "Nummer {alias}: {state}."),
     (
+        "Number {alias} was removed.",
+        "Nummer {alias} wurde entfernt.",
+    ),
+    ("Telephone given", "Angegebenes Telefon"),
+    ("Telephone that paired", "Telefon, das gekoppelt hat"),
+    ("Undo…", "Rückgängig…"),
+    (
         "The hub changed the number {alias}, but WAHA did not answer: its session there may still be as it was. Check WAHA with {command} on the hub's server.",
         "Der Hub hat die Nummer {alias} geändert, aber WAHA hat nicht geantwortet: Die Sitzung der Nummer dort ist möglicherweise noch wie vorher. Prüfen Sie WAHA mit {command} auf dem Server des Hubs.",
     ),
@@ -1123,6 +1130,11 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "einen Code auf dem Telefon eingeben, falls es diesen Bildschirm nicht scannen kann",
     ),
     ("Start pairing", "Kopplung starten"),
+    (
+        "{alias} is in the list now. Pair it now, or later from its line.",
+        "{alias} steht jetzt in der Liste. Koppeln Sie die Nummer jetzt oder später in ihrer Zeile.",
+    ),
+    ("Pair later", "Später koppeln"),
     (
         "WAHA has not created the session of this number yet. Starting the pairing tries again.",
         "WAHA hat die Sitzung dieser Nummer noch nicht angelegt. Beim Starten der Kopplung wird es erneut versucht.",
@@ -1580,4 +1592,34 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ),
     ("Dismiss", "Ausblenden"),
     ("Dismiss: {title}", "Ausblenden: {title}"),
+    (
+        "The message of this invite cannot be shown again. If it did not reach the Hermes, issue another invite: this one then stops working.",
+        "Die Nachricht dieser Einladung kann nicht erneut angezeigt werden. Wenn sie den Hermes nicht erreicht hat, stellen Sie eine weitere Einladung aus: Diese funktioniert dann nicht mehr.",
+    ),
+    ("Nothing has arrived yet", "Noch nichts angekommen"),
+    (
+        "The Hermes may be waiting for your approval to run the command, in the command channel.",
+        "Der Hermes wartet vielleicht auf Ihre Genehmigung, den Befehl auszuführen, im Befehlskanal.",
+    ),
+    (
+        "The Hermes may not reach this hub: check that its machine reaches the address of the hub.",
+        "Der Hermes erreicht diesen Hub vielleicht nicht: Prüfen Sie, ob sein Rechner die Adresse des Hubs erreicht.",
+    ),
+    (
+        "The message may have gone to another chat: it only works in the command channel of this Hermes.",
+        "Die Nachricht ist vielleicht in einem anderen Chat gelandet: Sie funktioniert nur im Befehlskanal dieses Hermes.",
+    ),
+    (
+        "Type the name {name} to confirm.",
+        "Geben Sie zur Bestätigung den Namen {name} ein.",
+    ),
+    (
+        "The name typed does not match. Nothing was done.",
+        "Der eingegebene Name stimmt nicht überein. Es wurde nichts getan.",
+    ),
+    ("Hermes {name}: {state}.", "Hermes {name}: {state}."),
+    (
+        "Saved. Who gives {hermes} orders on WhatsApp: {orders}.",
+        "Gespeichert. Wer {hermes} auf WhatsApp Befehle gibt: {orders}.",
+    ),
 ];

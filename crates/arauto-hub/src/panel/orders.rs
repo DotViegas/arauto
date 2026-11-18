@@ -1184,14 +1184,16 @@ fn source_fieldset(html: &mut Html, window: &Window<'_>, marks: &Marks) {
         .raw("</span></label><div class=\"orders-sub orders-list\">");
     for pick in window.picks {
         let offender = marks.boxes.contains(&pick.alias);
+        let checked = typed.gives.contains(&pick.alias);
+        // Its own WhatsApp cannot give it orders (the save refuses it), so its box comes
+        // disabled. A box that came back checked, after that refusal, stays enabled so it can
+        // be unchecked: a disabled box is not sent, and the choice would vanish unseen.
+        let own = bridge == Some(pick.alias.as_str());
         html.raw("<label class=\"option\"><input type=\"checkbox\" name=\"gives\" value=\"")
             .text(&pick.alias)
             .raw("\"")
-            .raw(if typed.gives.contains(&pick.alias) {
-                " checked"
-            } else {
-                ""
-            })
+            .raw(if checked { " checked" } else { "" })
+            .raw(if own && !checked { " disabled" } else { "" })
             .raw(if offender {
                 " aria-invalid=\"true\" aria-describedby=\"orders-error\""
             } else {
@@ -1202,7 +1204,7 @@ fn source_fieldset(html: &mut Html, window: &Window<'_>, marks: &Marks) {
             .raw("</span><span class=\"mono\">")
             .text(&pick.shown)
             .raw("</span>");
-        if bridge == Some(pick.alias.as_str()) {
+        if own {
             html.raw("<span class=\"muted\">")
                 .t(ITS_WHATSAPP_TAG)
                 .raw("</span>");
@@ -1217,9 +1219,13 @@ fn source_fieldset(html: &mut Html, window: &Window<'_>, marks: &Marks) {
     if marks.from {
         ids.push("orders-error");
     }
+    // Tall enough to show every telephone recorded, plus a free line, up to 12 lines.
+    let rows = (typed.from.lines().count() + 1).clamp(3, 12);
     html.raw("<div class=\"field\"><label for=\"orders-from\">")
         .t(OTHER_TELEPHONES)
-        .raw("</label><textarea id=\"orders-from\" name=\"from\" rows=\"3\" spellcheck=\"false\" placeholder=\"+55 11 9XXXX-XXXX\"");
+        .raw("</label><textarea id=\"orders-from\" name=\"from\" rows=\"")
+        .text(&rows.to_string())
+        .raw("\" spellcheck=\"false\" placeholder=\"+55 11 9XXXX-XXXX\"");
     describedby(html, &ids);
     html.raw(if marks.from_invalid {
         " aria-invalid=\"true\""
@@ -1914,7 +1920,12 @@ async fn save(cx: &Cx<'_>, form: &http::Form) -> Result<Response<Body>, RepoErro
         .hermes_orders_set(cx.hub.vault(), hermes, &edit, cx.hub.now_ms())
         .await
     {
-        Ok(_) | Err(AdminError::NoSuchHermes) => Ok(http::see_other(target(typed.to_numbers))),
+        // The address names the Hermes, never a telephone: the list says what the save left.
+        Ok(_) => Ok(http::see_other_to(&format!(
+            "{}?orders={hermes}",
+            target(typed.to_numbers)
+        ))),
+        Err(AdminError::NoSuchHermes) => Ok(http::see_other(target(typed.to_numbers))),
         Err(error) => {
             let problem = Problem::of(&error, &after, &analysis);
             cx.refuse(hermes, &typed, &picks, &analysis, &problem).await
@@ -2198,6 +2209,48 @@ mod tests {
             (None, None),
             None,
         ));
+    }
+
+    #[test]
+    fn its_own_whatsapp_comes_disabled_and_the_telephones_fit_the_box() {
+        let frame = Frame::default();
+        let under = Under::Hermes(HermesPage::default());
+        let picks = [pick("ponte", 1), pick("vendas", 2)];
+        let from: Vec<String> = (10..17).map(|n| format!("+{}", phone(n))).collect();
+        let mut typed = Typed {
+            takes: Takes::Number("ponte".to_owned()),
+            takes_other: String::new(),
+            own: false,
+            gives: Vec::new(),
+            from: from.join("\n"),
+            to_numbers: false,
+        };
+        let render = |typed: &Typed| {
+            window_page(
+                &frame,
+                &under,
+                &Window {
+                    hermes: "ana",
+                    typed,
+                    picks: &picks,
+                    problem: None,
+                    notice: None,
+                    readback: None,
+                    ack: None,
+                },
+            )
+        };
+        let shown = render(&typed);
+        assert!(shown.contains("name=\"gives\" value=\"ponte\" disabled>"));
+        assert!(shown.contains("name=\"gives\" value=\"vendas\">"));
+        // Seven telephones and a free line.
+        assert!(shown.contains("name=\"from\" rows=\"8\""));
+        // Checked after a refusal: it stays enabled, so it can be unchecked.
+        typed.gives = vec!["ponte".to_owned()];
+        typed.from = String::new();
+        let shown = render(&typed);
+        assert!(shown.contains("name=\"gives\" value=\"ponte\" checked>"));
+        assert!(shown.contains("name=\"from\" rows=\"3\""));
     }
 
     #[test]
