@@ -53,6 +53,20 @@ pub fn write_durable(path: &Path, contents: &[u8]) -> Result<(), FsError> {
     stage(path, Access::Private, |file| file.write_all(contents))?.install(path)
 }
 
+/// Like [`write_durable`], but the new file is readable by everybody (`0644` on Unix).
+///
+/// It is for a file that another user of the machine must read, such as a digest that a
+/// container running as another user checks. **Never** use it for a secret. The mode is set
+/// on the open file after it is created, so the process umask does not narrow it. Everything
+/// else, including the errors and the temporary file, is as in [`write_durable`].
+///
+/// # Errors
+///
+/// The same as [`write_durable`].
+pub fn write_durable_readable(path: &Path, contents: &[u8]) -> Result<(), FsError> {
+    stage(path, Access::Readable, |file| file.write_all(contents))?.install(path)
+}
+
 /// Removes from `dir` the temporary files that interrupted writes left behind, and returns
 /// how many were removed.
 ///
@@ -138,6 +152,8 @@ fn is_temporary_name(name: &OsStr) -> bool {
 pub(crate) enum Access {
     /// Owner reads and writes (`0600`).
     Private,
+    /// Everybody reads, the owner writes (`0644`).
+    Readable,
     /// Owner reads, writes and runs (`0700`).
     PrivateExecutable,
 }
@@ -344,7 +360,15 @@ fn create_temporary_drawing(
         options.write(true).create_new(true);
         restrict(&mut options, access);
         match options.open(&path) {
-            Ok(file) => return Ok((path, file)),
+            Ok(file) => {
+                // The mode of `open` is narrowed by the umask: set it on the open file.
+                if let Err(cause) = fix_mode(&file, access) {
+                    drop(file);
+                    let _ = fs::remove_file(&path);
+                    return Err(FsError::io("set the mode of", &path, cause));
+                }
+                return Ok((path, file));
+            }
             Err(cause) if cause.kind() == io::ErrorKind::AlreadyExists => {}
             Err(cause) => return Err(FsError::io("create", &path, cause)),
         }
@@ -355,13 +379,32 @@ fn create_temporary_drawing(
 }
 
 #[cfg(unix)]
+fn mode_of(access: Access) -> u32 {
+    match access {
+        Access::Private => 0o600,
+        Access::Readable => 0o644,
+        Access::PrivateExecutable => 0o700,
+    }
+}
+
+#[cfg(unix)]
 fn restrict(options: &mut OpenOptions, access: Access) {
     use std::os::unix::fs::OpenOptionsExt;
 
-    options.mode(match access {
-        Access::Private => 0o600,
-        Access::PrivateExecutable => 0o700,
-    });
+    options.mode(mode_of(access));
+}
+
+/// Sets the mode exactly, whatever the umask of the process is.
+#[cfg(unix)]
+fn fix_mode(file: &File, access: Access) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    file.set_permissions(fs::Permissions::from_mode(mode_of(access)))
+}
+
+#[cfg(windows)]
+fn fix_mode(_file: &File, _access: Access) -> io::Result<()> {
+    Ok(())
 }
 
 /// On Windows a new file takes the permissions of its folder.
@@ -892,6 +935,57 @@ mod tests {
             write_durable(&path, b"secret").unwrap();
 
             assert_eq!(mode_of(&path), 0o600);
+        }
+
+        /// The umask is process-wide and cannot be set without `unsafe`, so the write runs in
+        /// a copy of this test binary that `sh` starts under `umask 077`. Without the explicit
+        /// mode, that copy writes `0600` and its assertion fails.
+        #[test]
+        fn readable_write_makes_a_file_that_everybody_reads_whatever_the_umask() {
+            const CHILD: &str = "ARAUTO_TEST_READABLE_UMASK_DIR";
+            const THIS: &str = "durable::tests::unix::readable_write_makes_a_file_that_everybody_reads_whatever_the_umask";
+            if let Ok(dir) = std::env::var(CHILD) {
+                let path = Path::new(&dir).join("api-key.sha512");
+                write_durable_readable(&path, b"digest").unwrap();
+                assert_eq!(mode_of(&path), 0o644);
+                assert_eq!(fs::read(&path).unwrap(), b"digest");
+                return;
+            }
+            let dir = tempfile::tempdir().unwrap();
+            let status = std::process::Command::new("sh")
+                .arg("-c")
+                .arg("umask 077; exec \"$0\" --exact \"$1\" --test-threads=1")
+                .arg(std::env::current_exe().unwrap())
+                .arg(THIS)
+                .env(CHILD, dir.path())
+                .output()
+                .unwrap();
+            assert!(
+                status.status.success(),
+                "the child under umask 077 failed: {}",
+                String::from_utf8_lossy(&status.stdout)
+            );
+            assert!(String::from_utf8_lossy(&status.stdout).contains("1 passed"));
+            assert_eq!(mode_of(&dir.path().join("api-key.sha512")), 0o644);
+        }
+
+        #[test]
+        fn replacing_a_private_file_with_a_readable_one_opens_it_and_back_closes_it() {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("api-key.sha512");
+            write_durable(&path, b"old").unwrap();
+            write_durable_readable(&path, b"digest").unwrap();
+            assert_eq!(mode_of(&path), 0o644);
+            write_durable(&path, b"secret").unwrap();
+            assert_eq!(mode_of(&path), 0o600);
+        }
+
+        #[test]
+        fn the_temporary_of_a_readable_write_is_still_matched_by_the_cleanup() {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("api-key.sha512");
+            std::mem::forget(stage(&path, Access::Readable, |file| file.write_all(b"x")).unwrap());
+            assert_eq!(remove_stale_temporaries(dir.path()).unwrap(), 1);
         }
 
         #[test]

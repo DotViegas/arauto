@@ -74,6 +74,9 @@ alert_kinds! {
     EngineSessionCorrected => "engine_session_corrected",
     /// The telephone that paired a number is not the one that was added.
     NumberSwapped => "number_swapped",
+    /// The engine refused the key of the hub. Its details say which engine and whether the
+    /// installation brought it, which decides what the admin does about it.
+    EngineKeyRefused => "engine_key_refused",
 }
 
 impl std::fmt::Display for AlertKind {

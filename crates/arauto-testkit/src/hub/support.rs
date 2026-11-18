@@ -111,6 +111,7 @@ pub fn config(installation: &Installation, client_ip: ClientIpSource) -> ServeCo
             listen: local,
             url: PublicUrl::parse(PANEL_ORIGIN).unwrap(),
         }),
+        installation_engine: None,
     }
 }
 

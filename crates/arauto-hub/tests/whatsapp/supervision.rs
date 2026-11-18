@@ -8,7 +8,7 @@ use arauto_protocol::clock::{Clock, SystemClock};
 use arauto_testkit::engine::Fault;
 use serde_json::json;
 
-use crate::world::{World, message, phone};
+use crate::world::{KEY, World, message, phone};
 
 const CHAT: &str = "5511900000001@c.us";
 
@@ -203,4 +203,86 @@ async fn an_engine_that_does_not_answer_changes_nothing() {
     world.fake.fail("", Fault::Malformed);
     engine::supervise(world.hub()).await;
     assert_eq!(world.state("vendas").await, NumberState::Connected);
+}
+
+/// The details of every alert of the kind, oldest first.
+async fn details_of(world: &World, kind: &str) -> Vec<serde_json::Value> {
+    sqlx::query_scalar(
+        "SELECT details FROM alert WHERE organization_id = $1 AND kind = $2 ORDER BY at, id",
+    )
+    .bind(world.organization().id())
+    .bind(kind)
+    .fetch_all(world.hub().pool())
+    .await
+    .unwrap()
+}
+
+const OTHER_KEY: &str = "another-key-entirely-0001";
+
+#[tokio::test]
+async fn a_refused_key_raises_one_alert_per_episode() {
+    let world = World::new().await;
+    engine::supervise(world.hub()).await;
+    assert!(world.alerts().await.is_empty());
+    let id = world.fixture.admin.engine_show().await.unwrap().unwrap().id;
+    // The engine now takes another key: three rounds, one alert.
+    world.fake.set_api_key(OTHER_KEY);
+    for _ in 0..3 {
+        engine::supervise(world.hub()).await;
+    }
+    assert_eq!(world.alerts().await, ["engine_key_refused"]);
+    // Its details are exactly the engine and where it came from: no key, digest or address.
+    assert_eq!(
+        details_of(&world, "engine_key_refused").await,
+        [json!({"engine": id.to_string(), "origin": "admin"})]
+    );
+    let everything = sqlx::query_scalar::<_, String>("SELECT details::text FROM alert")
+        .fetch_all(world.hub().pool())
+        .await
+        .unwrap()
+        .join("\n");
+    assert!(!everything.contains(KEY) && !everything.contains(OTHER_KEY));
+    // The first answer that works ends the episode, and a new refusal opens another.
+    world.fake.set_api_key(KEY);
+    engine::supervise(world.hub()).await;
+    let row = world.fixture.admin.engine_show().await.unwrap().unwrap();
+    assert_eq!(row.key_refused_since, None);
+    assert_eq!(world.alerts().await, ["engine_key_refused"]);
+    world.fake.set_api_key(OTHER_KEY);
+    engine::supervise(world.hub()).await;
+    engine::supervise(world.hub()).await;
+    assert_eq!(
+        world.alerts().await,
+        ["engine_key_refused", "engine_key_refused"]
+    );
+}
+
+#[tokio::test]
+async fn the_alert_of_a_refused_key_says_where_the_engine_came_from() {
+    let world = World::new().await;
+    // The row is marked as the installation's: the key is drawn, never typed.
+    sqlx::query("UPDATE engine SET origin = 'installation' WHERE organization_id = $1")
+        .bind(world.organization().id())
+        .execute(world.hub().pool())
+        .await
+        .unwrap();
+    world.fake.set_api_key(OTHER_KEY);
+    engine::supervise(world.hub()).await;
+    let details = details_of(&world, "engine_key_refused").await;
+    assert_eq!(details.len(), 1);
+    assert_eq!(details[0]["origin"], "installation");
+    assert_eq!(details[0].as_object().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn an_engine_that_fails_in_another_way_raises_no_alert_about_the_key() {
+    let world = World::new().await;
+    world.fake.fail("", Fault::ServerError);
+    engine::supervise(world.hub()).await;
+    world.fake.heal();
+    world.fake.fail("", Fault::Malformed);
+    engine::supervise(world.hub()).await;
+    assert!(world.alerts().await.is_empty());
+    let row = world.fixture.admin.engine_show().await.unwrap().unwrap();
+    assert_eq!(row.key_refused_since, None);
 }

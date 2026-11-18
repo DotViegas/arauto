@@ -178,6 +178,26 @@ fn notice(lang: Lang, alert: &Alert) -> Notice {
             k("Engine"),
             text::tr(lang, k("an engine session had another configuration, and the hub applied its own.")).to_owned(),
         ),
+        AlertKind::EngineKeyRefused => {
+            // An origin that is not the installation reads as an engine an admin set up: the
+            // one for which setting the key again is the right advice.
+            let brought = alert.details.get("origin").and_then(serde_json::Value::as_str)
+                == Some("installation");
+            let said = if brought {
+                text::tr(
+                    lang,
+                    k("the engine refused the key of the hub. Restart the engine: it reads its key only when it starts."),
+                )
+                .to_owned()
+            } else {
+                text::fill(
+                    lang,
+                    k("the engine refused the key of the hub. Set its key again with {command}."),
+                    &[("command", super::numbers::KEY_SET)],
+                )
+            };
+            (true, k("Engine"), said)
+        }
         AlertKind::NumberSwapped => (
             true,
             k("Number swapped"),

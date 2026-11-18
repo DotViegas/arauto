@@ -10,8 +10,8 @@ use super::{Report, escape, maybe_time, time};
 use crate::admin::orders::OrdersOfNumbers;
 use crate::admin::qr::QrCode;
 use crate::admin::whatsapp::{Added, Changed, PairOutcome, Shown};
-use crate::engine::{EngineError, EngineVersion, Ensured, Phone};
-use crate::repo::engine::{EngineRow, SetOutcome};
+use crate::engine::{Cause, EngineError, EngineVersion, Ensured, Phone};
+use crate::repo::engine::{EngineOrigin, EngineRow, SetOutcome};
 use crate::repo::number::Number;
 
 /// `admin engine set`.
@@ -25,6 +25,11 @@ pub fn engine_set(outcome: SetOutcome) -> Report {
                                    to every number at its next check.\n"
             .to_owned(),
         SetOutcome::Unchanged(_) => "The engine already had these addresses.\n".to_owned(),
+        SetOutcome::LeftInstallation(_) => "The engine is now the one at this address. Set its \
+                                            key with `arauto-hub admin engine set-key`. The \
+                                            engine brought by the installation will not start \
+                                            again.\n"
+            .to_owned(),
     })
 }
 
@@ -60,6 +65,15 @@ pub fn engine_show(row: Option<&EngineRow>) -> Report {
         }
     );
     let _ = writeln!(text, "  events secret  set");
+    let _ = writeln!(
+        text,
+        "  brought by the installation  {}",
+        if row.origin() == EngineOrigin::Installation {
+            "yes"
+        } else {
+            "no"
+        }
+    );
     let version = row
         .version_seen
         .as_deref()
@@ -76,10 +90,28 @@ pub fn engine_show(row: Option<&EngineRow>) -> Report {
 
 /// `admin engine health`.
 #[must_use]
-pub fn engine_health(result: Result<(), EngineError>) -> Report {
+pub fn engine_health(result: Result<(), EngineError>, origin: Option<EngineOrigin>) -> Report {
     match result {
         Ok(()) => Report::done("The engine is healthy.\n".to_owned()),
+        Err(EngineError::Unavailable(Cause::KeyRefused)) => Report::not_done(format!(
+            "The engine is not healthy: {}.\n",
+            key_refused_said(origin)
+        )),
         Err(error) => Report::not_done(format!("The engine is not healthy: {error}.\n")),
+    }
+}
+
+/// What to do when the engine refuses the key of the hub. The engine brought by the
+/// installation holds a key the hub drew: it is never typed, and the engine reads it only when
+/// it starts. Any other row is an engine an admin set up, and its key is typed again.
+fn key_refused_said(origin: Option<EngineOrigin>) -> &'static str {
+    match origin {
+        Some(EngineOrigin::Installation) => {
+            "the engine refused the key of the hub. Restart the engine: it reads its key only when it starts"
+        }
+        _ => {
+            "the engine refused the key of the hub. Set its key again with `arauto-hub admin engine set-key`"
+        }
     }
 }
 

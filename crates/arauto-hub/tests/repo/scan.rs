@@ -161,6 +161,19 @@ fn repo_files() -> Vec<PathBuf> {
 /// The functions of `src`, outside the repositories, that are handed a handle of the database
 /// and no resolved organization: the file, the name, and why each one may.
 const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
+    // The start of `serve` with an engine the installation brings: a task of the whole
+    // installation that finds its one organization itself (`SystemTask::InstallationEngine`) and
+    // hands it on as a `ResolvedOrg`.
+    (
+        "engine/installation.rs",
+        "ensure",
+        "task of the installation: finds the one organization and then works only in it",
+    ),
+    (
+        "engine/installation.rs",
+        "ensure_with",
+        "task of the installation: `ensure` with the patience and a pause for the tests",
+    ),
     // The entry functions: the only ways an organization is found from the outside.
     (
         "db.rs",

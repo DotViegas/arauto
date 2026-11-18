@@ -163,6 +163,13 @@ pub enum AdminError {
     #[error("there is no engine yet: run `arauto-hub admin engine set --url ... --events-url ...`")]
     NoEngine,
 
+    /// `set-key` on the engine brought by the installation.
+    #[error(
+        "the engine brought by the installation has a key the hub drew; it is never typed. \
+         If the engine refuses it, restart the engine"
+    )]
+    InstallationEngineKey,
+
     /// An address of the engine or of its events is not in the format.
     #[error("not a usable address: {0}")]
     InvalidAddress(crate::engine::AddressError),

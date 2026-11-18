@@ -552,6 +552,14 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "an engine session had another configuration, and the hub applied its own.",
         "एक इंजन सेशन का कॉन्फ़िगरेशन अलग था, और हब ने अपना कॉन्फ़िगरेशन लागू किया।",
     ),
+    (
+        "the engine refused the key of the hub. Restart the engine: it reads its key only when it starts.",
+        "इंजन ने हब की कुंजी अस्वीकार कर दी। इंजन को रीस्टार्ट करें: वह अपनी कुंजी केवल शुरू होते समय पढ़ता है।",
+    ),
+    (
+        "the engine refused the key of the hub. Set its key again with {command}.",
+        "इंजन ने हब की कुंजी अस्वीकार कर दी। उसकी कुंजी {command} से फिर सेट करें।",
+    ),
     ("Number swapped", "नंबर बदला हुआ"),
     (
         "the phone that paired belongs to a different number from the one given. The accesses stay stopped until you decide.",
@@ -1120,8 +1128,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "हब WAHA तक नहीं पहुँच सका। जाँचें कि वह चल रहा है और हब के नेटवर्क पर है।",
     ),
     (
-        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
-        "WAHA ने हब की कुंजी अस्वीकार कर दी। हब के सर्वर पर {command} से सही कुंजी सेट करें।",
+        "WAHA refused the key the hub has. If the installation brought the engine, restart the engine: it reads its key only when it starts. If you set the engine up yourself, set the right key on the hub's server with {command}.",
+        "WAHA ने हब की कुंजी अस्वीकार कर दी। अगर इंजन इंस्टॉलेशन के साथ आया है, तो इंजन को रीस्टार्ट करें: वह अपनी कुंजी केवल शुरू होते समय पढ़ता है। अगर आपने इंजन खुद सेट किया है, तो हब के सर्वर पर {command} से सही कुंजी सेट करें।",
     ),
     (
         "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",

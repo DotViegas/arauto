@@ -24,6 +24,7 @@ mod ceiling;
 mod chats;
 mod hostile;
 mod inbox;
+mod installation;
 mod isolation;
 mod numbers;
 mod orders;

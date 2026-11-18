@@ -100,7 +100,7 @@ mod shutdown;
 #[cfg(test)]
 mod test_support;
 
-pub use durable::{remove_stale_temporaries, write_durable};
+pub use durable::{remove_stale_temporaries, write_durable, write_durable_readable};
 pub use error::FsError;
 pub use executable::replace_executable;
 pub use home::{HomeError, default_home};

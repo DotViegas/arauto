@@ -525,6 +525,14 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "an engine session had another configuration, and the hub applied its own.",
         "某个引擎会话使用了其他配置，hub 已应用自己的配置。",
     ),
+    (
+        "the engine refused the key of the hub. Restart the engine: it reads its key only when it starts.",
+        "引擎拒绝了 hub 的密钥。请重启引擎：它只在启动时读取密钥。",
+    ),
+    (
+        "the engine refused the key of the hub. Set its key again with {command}.",
+        "引擎拒绝了 hub 的密钥。请用 {command} 重新设置它的密钥。",
+    ),
     ("Number swapped", "号码不符"),
     (
         "the phone that paired belongs to a different number from the one given. The accesses stay stopped until you decide.",
@@ -1081,8 +1089,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "hub 无法连接到 WAHA。请检查它是否正在运行，并且位于 hub 的网络中。",
     ),
     (
-        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
-        "WAHA 拒绝了 hub 持有的密钥。请在 hub 服务器上用 {command} 设置正确的密钥。",
+        "WAHA refused the key the hub has. If the installation brought the engine, restart the engine: it reads its key only when it starts. If you set the engine up yourself, set the right key on the hub's server with {command}.",
+        "WAHA 拒绝了 hub 持有的密钥。如果引擎由安装包带来，请重启引擎：它只在启动时读取密钥。如果引擎是你自己设置的，请在 hub 服务器上用 {command} 设置正确的密钥。",
     ),
     (
         "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",

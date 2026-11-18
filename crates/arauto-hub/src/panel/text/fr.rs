@@ -582,6 +582,14 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "an engine session had another configuration, and the hub applied its own.",
         "une session du moteur avait une autre configuration, et le hub a appliqué la sienne.",
     ),
+    (
+        "the engine refused the key of the hub. Restart the engine: it reads its key only when it starts.",
+        "le moteur a refusé la clé du hub. Redémarrez le moteur : il ne lit sa clé qu'au démarrage.",
+    ),
+    (
+        "the engine refused the key of the hub. Set its key again with {command}.",
+        "le moteur a refusé la clé du hub. Redéfinissez sa clé avec {command}.",
+    ),
     ("Number swapped", "Numéro échangé"),
     (
         "the phone that paired belongs to a different number from the one given. The accesses stay stopped until you decide.",
@@ -1183,8 +1191,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Le hub n'a pas pu joindre WAHA. Vérifiez qu'il tourne et qu'il est sur le réseau du hub.",
     ),
     (
-        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
-        "WAHA a refusé la clé que possède le hub. Définissez la bonne clé sur le serveur du hub avec {command}.",
+        "WAHA refused the key the hub has. If the installation brought the engine, restart the engine: it reads its key only when it starts. If you set the engine up yourself, set the right key on the hub's server with {command}.",
+        "WAHA a refusé la clé que possède le hub. Si l'installation a apporté le moteur, redémarrez le moteur : il ne lit sa clé qu'au démarrage. Si vous avez configuré le moteur vous-même, définissez la bonne clé sur le serveur du hub avec {command}.",
     ),
     (
         "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",

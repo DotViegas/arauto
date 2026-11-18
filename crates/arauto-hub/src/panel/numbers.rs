@@ -54,7 +54,7 @@ use crate::repo::{self, RepoError};
 use std::sync::Arc;
 
 const ENGINE_SET: &str = "arauto-hub admin engine set --url URL --events-url URL";
-const KEY_SET: &str = "arauto-hub admin engine set-key";
+pub(super) const KEY_SET: &str = "arauto-hub admin engine set-key";
 const ENGINE_HEALTH: &str = "arauto-hub admin engine health";
 
 const N27: &str = k(
@@ -83,8 +83,9 @@ const N47: &str =
     k("This cannot be done while the number is in the state \"{state}\". Nothing was done.");
 const N67: &str =
     k("The hub could not reach WAHA. Check that it is running and on the hub's network.");
-const N68: &str =
-    k("WAHA refused the key the hub has. Set the right key on the hub's server with {command}.");
+const N68: &str = k(
+    "WAHA refused the key the hub has. If the installation brought the engine, restart the engine: it reads its key only when it starts. If you set the engine up yourself, set the right key on the hub's server with {command}.",
+);
 const N69: &str = k(
     "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
 );
@@ -1569,6 +1570,13 @@ mod tests {
         assert_eq!(status_of(&refused(N72)), StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(status_of(&refused(RESTORED)), StatusCode::CONFLICT);
         assert_eq!(status_of(&refused(N84)), StatusCode::OK);
+        // The refused key is answered for both origins: a restart, or the key typed again.
+        let key = plain(Lang::En, &refused(N68));
+        assert!(
+            key.contains("restart the engine: it reads its key only when it starts"),
+            "{key}"
+        );
+        assert!(key.contains("arauto-hub admin engine set-key"), "{key}");
         // The text of the line above the list fills the state in the language of the page.
         let said = plain(Lang::En, &not_now);
         assert!(said.contains("\"Connected\""), "{said}");

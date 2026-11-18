@@ -26,7 +26,7 @@ use crate::engine::{
 };
 use crate::repo;
 use crate::repo::alert::{AlertDetails, AlertKind, NewAlert, raise};
-use crate::repo::engine::{EngineRow, SetOutcome};
+use crate::repo::engine::{EngineRow, SetKeyOutcome, SetOutcome};
 use crate::repo::number::{AddOutcome, ChangeOutcome, Number, Observed};
 use crate::vault::Vault;
 
@@ -168,7 +168,8 @@ impl Session {
     /// `admin engine set-key`: `typed` is the line read from the terminal.
     ///
     /// # Errors
-    /// [`AdminError::InvalidKey`]; [`AdminError::NoEngine`]; [`AdminError::Restored`].
+    /// [`AdminError::InvalidKey`]; [`AdminError::NoEngine`];
+    /// [`AdminError::InstallationEngineKey`]; [`AdminError::Restored`].
     pub async fn engine_set_key(
         &self,
         vault: &Vault,
@@ -186,10 +187,10 @@ impl Session {
             now,
         )
         .await?;
-        if set {
-            Ok(())
-        } else {
-            Err(AdminError::NoEngine)
+        match set {
+            SetKeyOutcome::Set => Ok(()),
+            SetKeyOutcome::NoEngine => Err(AdminError::NoEngine),
+            SetKeyOutcome::InstallationEngine => Err(AdminError::InstallationEngineKey),
         }
     }
 

@@ -12,6 +12,9 @@
 //! | `ARAUTO_ALLOW_UNSAFE_DB` | `1` lets the hub start on a database with `fsync` off. For tests only. |
 //! | `ARAUTO_LISTEN_PANEL` | Optional: the address of the port of the panel. Without it there is no panel. |
 //! | `ARAUTO_PANEL_URL` | With the panel: the address the admin opens it at, in the browser. |
+//! | `ARAUTO_ENGINE_URL` | Optional, with the next two: where the hub reaches the engine that the installation brings. |
+//! | `ARAUTO_ENGINE_EVENTS_URL` | With the engine of the installation: where that engine reaches the internal port. |
+//! | `ARAUTO_ENGINE_DIGEST_DIR` | With the engine of the installation: the folder where the hub writes the digest of the engine key. Never the data folder. |
 //! | `ARAUTO_DATABASE_PASSWORD` | Optional: `rotate-at-first-access` makes the hub replace the password of its database role with one it draws, right after the first passkey of the panel. Never set, never by itself. |
 //!
 //! Each command asks only for what it uses: [`StorageConfig`] for the commands that open the
@@ -22,9 +25,10 @@
 
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 use crate::db_password::{self, DatabasePasswordError, DatabaseTarget};
+use crate::engine::config::{EngineAddress, EventsUrl};
 
 /// The name of each variable.
 pub mod names {
@@ -50,7 +54,16 @@ pub mod names {
     pub const PANEL_URL: &str = "ARAUTO_PANEL_URL";
     /// Whether the hub replaces the password of its database role by itself.
     pub const DATABASE_PASSWORD: &str = "ARAUTO_DATABASE_PASSWORD";
+    /// Where the hub reaches the engine that the installation brings.
+    pub const ENGINE_URL: &str = "ARAUTO_ENGINE_URL";
+    /// Where the engine that the installation brings reaches the internal port of the hub.
+    pub const ENGINE_EVENTS_URL: &str = "ARAUTO_ENGINE_EVENTS_URL";
+    /// The folder where the hub writes the digest of the key of that engine.
+    pub const ENGINE_DIGEST_DIR: &str = "ARAUTO_ENGINE_DIGEST_DIR";
 }
+
+/// The longest folder of the digest of the engine key accepted, in bytes.
+const ENGINE_DIGEST_DIR_MAX_LEN: usize = 255;
 
 /// The longest public address accepted.
 const PUBLIC_URL_MAX_LEN: usize = 255;
@@ -367,6 +380,22 @@ pub struct ServeConfig {
     /// The panel of the admin. `None`, the default: the hub listens on no port for it
     /// (`docs/decisoes/0028-painel-fechado-por-padrao.md`).
     pub panel: Option<PanelConfig>,
+    /// The engine that the installation brings (a third service of the composition). `None`,
+    /// the default: every engine is the admin's, set in the panel.
+    pub installation_engine: Option<InstallationEngineConfig>,
+}
+
+/// The engine that the installation brings: all three variables are set, by whoever controls
+/// the composition, or none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstallationEngineConfig {
+    /// Where the hub reaches the engine.
+    pub address: EngineAddress,
+    /// Where the engine reaches the internal port of the hub.
+    pub events_url: EventsUrl,
+    /// The folder where the hub writes the digest of the engine key. Absolute, and never the
+    /// data folder, inside it or around it.
+    pub digest_dir: PathBuf,
 }
 
 /// Where the panel of the admin listens and at which address the browser reaches it.
@@ -414,6 +443,11 @@ impl ServeConfig {
         let public_url = read_public_url(env, &mut problems);
         let client_ip = read_client_ip(env, &mut problems);
         let panel = read_panel(env, listen, listen_internal, &mut problems);
+        let installation_engine = read_installation_engine(
+            env,
+            storage.as_ref().map(|storage| storage.data_dir.as_path()),
+            &mut problems,
+        );
         let config = match (
             storage,
             listen,
@@ -421,6 +455,7 @@ impl ServeConfig {
             public_url,
             client_ip,
             panel,
+            installation_engine,
         ) {
             (
                 Some(storage),
@@ -429,6 +464,7 @@ impl ServeConfig {
                 Some(public_url),
                 Some(client_ip),
                 Some(panel),
+                Some(installation_engine),
             ) => Some(Self {
                 storage,
                 listen,
@@ -436,11 +472,127 @@ impl ServeConfig {
                 public_url,
                 client_ip,
                 panel,
+                installation_engine,
             }),
             _ => None,
         };
         finish(config, problems)
     }
+}
+
+/// The engine of the installation: off when none of its three variables is set
+/// (`Some(None)`), on when all three are and are right (`Some(Some(..))`), and a problem
+/// otherwise (`None`). A problem names the variable and the rule, never the value.
+fn read_installation_engine(
+    env: &impl Lookup,
+    data_dir: Option<&Path>,
+    problems: &mut Vec<Problem>,
+) -> Option<Option<InstallationEngineConfig>> {
+    let url = value(env, names::ENGINE_URL);
+    let events = value(env, names::ENGINE_EVENTS_URL);
+    let dir = value(env, names::ENGINE_DIGEST_DIR);
+    if url.is_none() && events.is_none() && dir.is_none() {
+        return Some(None);
+    }
+    let mut complete = true;
+    for (set, variable) in [
+        (url.is_some(), names::ENGINE_URL),
+        (events.is_some(), names::ENGINE_EVENTS_URL),
+        (dir.is_some(), names::ENGINE_DIGEST_DIR),
+    ] {
+        if !set {
+            complete = false;
+            problems.push(Problem {
+                variable,
+                what: format!(
+                    "is not set; {}, {} and {} are set together, by the recipe that brings \
+                     the engine",
+                    names::ENGINE_URL,
+                    names::ENGINE_EVENTS_URL,
+                    names::ENGINE_DIGEST_DIR
+                ),
+            });
+        }
+    }
+    if !complete {
+        return None;
+    }
+    let address = match EngineAddress::parse(&url?) {
+        Ok(address) => Some(address),
+        Err(rule) => {
+            problems.push(Problem {
+                variable: names::ENGINE_URL,
+                what: format!("is not usable: {rule}"),
+            });
+            None
+        }
+    };
+    let events_url = match EventsUrl::parse(&events?) {
+        Ok(address) => Some(address),
+        Err(rule) => {
+            problems.push(Problem {
+                variable: names::ENGINE_EVENTS_URL,
+                what: format!("is not usable: {rule}"),
+            });
+            None
+        }
+    };
+    let digest_dir = match check_digest_dir(&dir?, data_dir) {
+        Ok(path) => Some(path),
+        Err(what) => {
+            problems.push(Problem {
+                variable: names::ENGINE_DIGEST_DIR,
+                what: what.to_owned(),
+            });
+            None
+        }
+    };
+    Some(Some(InstallationEngineConfig {
+        address: address?,
+        events_url: events_url?,
+        digest_dir: digest_dir?,
+    }))
+}
+
+/// The folder of the digest: absolute, short, with no `..`, and apart from the data folder,
+/// which holds the master key (compared by path components, with a relative data folder made
+/// absolute first; a link is not followed). The text of a problem is fixed.
+fn check_digest_dir(text: &str, data_dir: Option<&Path>) -> Result<PathBuf, &'static str> {
+    if text.trim() != text {
+        return Err("must not start or end with a space");
+    }
+    let path = PathBuf::from(text);
+    if !is_absolute_text(&path, text) {
+        return Err("must be an absolute folder");
+    }
+    if text.len() > ENGINE_DIGEST_DIR_MAX_LEN {
+        return Err("is too long: at most 255 bytes");
+    }
+    if path.components().any(|part| part == Component::ParentDir) {
+        return Err("must not have a `..` part");
+    }
+    if let Some(data_dir) = data_dir {
+        let data_dir = if is_absolute_text(data_dir, &data_dir.to_string_lossy()) {
+            data_dir.to_path_buf()
+        } else {
+            std::path::absolute(data_dir).map_err(
+                |_| "cannot be checked against ARAUTO_DATA_DIR, which is a relative folder",
+            )?
+        };
+        if path.starts_with(&data_dir) || data_dir.starts_with(&path) {
+            return Err(
+                "must be a folder apart from ARAUTO_DATA_DIR: the engine reads it, and the \
+                 data folder holds the master key",
+            );
+        }
+    }
+    Ok(path)
+}
+
+/// Whether a folder is absolute. In the tests a leading slash counts everywhere, because the
+/// hub runs on Linux and the tests also run on Windows; the build for production never does.
+fn is_absolute_text(path: &Path, text: &str) -> bool {
+    path.is_absolute() || (cfg!(test) && text.starts_with('/'))
 }
 
 fn finish<T>(value: Option<T>, problems: Vec<Problem>) -> Result<T, ConfigError> {
@@ -1244,6 +1396,202 @@ mod tests {
         ] {
             assert!(Network::parse(wrong).is_none(), "{wrong:?}");
         }
+    }
+
+    const ENGINE_URL_OK: &str = "http://engine:3000";
+    const ENGINE_EVENTS_OK: &str = "http://hub:9000";
+    const ENGINE_DIR_OK: &str = "/run/arauto-engine";
+
+    fn engine_env(extra: &[(&'static str, &'static str)]) -> Vec<(&'static str, &'static str)> {
+        let mut pairs: Vec<_> = FULL.to_vec();
+        pairs.extend_from_slice(extra);
+        pairs
+    }
+
+    fn all_three() -> [(&'static str, &'static str); 3] {
+        [
+            (names::ENGINE_URL, ENGINE_URL_OK),
+            (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+            (names::ENGINE_DIGEST_DIR, ENGINE_DIR_OK),
+        ]
+    }
+
+    #[test]
+    fn none_of_the_engine_variables_is_no_engine_of_the_installation() {
+        let config = ServeConfig::read(&env(&FULL)).unwrap();
+        assert_eq!(config.installation_engine, None);
+    }
+
+    #[test]
+    fn all_three_engine_variables_make_the_engine_of_the_installation() {
+        let config = ServeConfig::read(&env(&engine_env(&all_three()))).unwrap();
+        let engine = config.installation_engine.unwrap();
+        assert_eq!(engine.address.http().to_text(), "http://engine:3000");
+        assert_eq!(engine.events_url.to_text(), "http://hub:9000");
+        assert_eq!(engine.digest_dir, PathBuf::from(ENGINE_DIR_OK));
+    }
+
+    #[test]
+    fn one_or_two_of_the_engine_variables_name_each_one_that_is_missing() {
+        let three = all_three();
+        for set in [[0], [1], [2]] {
+            let pairs: Vec<_> = set.iter().map(|&i| three[i]).collect();
+            let error = ServeConfig::read(&env(&engine_env(&pairs))).unwrap_err();
+            let expected: Vec<_> = (0..3)
+                .filter(|i| !set.contains(i))
+                .map(|i| three[i].0)
+                .collect();
+            assert_eq!(variables(&error), expected);
+        }
+        for missing in 0..3 {
+            let pairs: Vec<_> = (0..3).filter(|i| *i != missing).map(|i| three[i]).collect();
+            let error = ServeConfig::read(&env(&engine_env(&pairs))).unwrap_err();
+            assert_eq!(variables(&error), vec![three[missing].0]);
+        }
+    }
+
+    #[test]
+    fn an_empty_engine_variable_counts_as_not_set() {
+        let pairs = engine_env(&[
+            (names::ENGINE_URL, ""),
+            (names::ENGINE_EVENTS_URL, "  "),
+            (names::ENGINE_DIGEST_DIR, ""),
+        ]);
+        assert_eq!(
+            ServeConfig::read(&env(&pairs)).unwrap().installation_engine,
+            None
+        );
+        let pairs = engine_env(&[
+            (names::ENGINE_URL, ENGINE_URL_OK),
+            (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+            (names::ENGINE_DIGEST_DIR, ""),
+        ]);
+        let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+        assert_eq!(variables(&error), vec![names::ENGINE_DIGEST_DIR]);
+    }
+
+    #[test]
+    fn the_digest_folder_is_never_the_data_folder_nor_inside_it_nor_around_it() {
+        for wrong in [
+            "relative/dir",
+            "run/arauto-engine",
+            "/var/lib/arauto",
+            "/var/lib/arauto/",
+            "/var/lib/arauto/engine",
+            "/var/lib",
+            "/",
+            "/run/../var/lib/arauto-engine",
+            "/run/arauto-engine/..",
+            "/run/arauto-engine ",
+            " /run/arauto-engine",
+        ] {
+            let pairs = engine_env(&[
+                (names::ENGINE_URL, ENGINE_URL_OK),
+                (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+                (names::ENGINE_DIGEST_DIR, wrong),
+            ]);
+            let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+            assert_eq!(
+                variables(&error),
+                vec![names::ENGINE_DIGEST_DIR],
+                "{wrong:?}"
+            );
+        }
+        // A sibling that only shares a prefix is another folder.
+        let pairs = engine_env(&[
+            (names::ENGINE_URL, ENGINE_URL_OK),
+            (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+            (names::ENGINE_DIGEST_DIR, "/var/lib/arauto-engine"),
+        ]);
+        assert!(ServeConfig::read(&env(&pairs)).is_ok());
+    }
+
+    #[test]
+    fn a_relative_data_folder_is_compared_by_its_absolute_path() {
+        let here = std::env::current_dir().unwrap();
+        let leak = |path: PathBuf| -> &'static str {
+            Box::leak(path.to_string_lossy().into_owned().into_boxed_str())
+        };
+        for wrong in [
+            here.join("data"),
+            here.join("data").join("engine"),
+            here.clone(),
+        ] {
+            let wrong = leak(wrong);
+            let pairs = engine_env(&[
+                (names::DATA_DIR, "data"),
+                (names::ENGINE_URL, ENGINE_URL_OK),
+                (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+                (names::ENGINE_DIGEST_DIR, wrong),
+            ]);
+            let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+            assert_eq!(
+                variables(&error),
+                vec![names::ENGINE_DIGEST_DIR],
+                "{wrong:?}"
+            );
+        }
+        // Another folder passes, and a sibling that only shares a prefix too.
+        for right in [ENGINE_DIR_OK, leak(here.join("data-engine"))] {
+            let pairs = engine_env(&[
+                (names::DATA_DIR, "data"),
+                (names::ENGINE_URL, ENGINE_URL_OK),
+                (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+                (names::ENGINE_DIGEST_DIR, right),
+            ]);
+            assert!(ServeConfig::read(&env(&pairs)).is_ok(), "{right:?}");
+        }
+    }
+
+    #[test]
+    fn a_digest_folder_longer_than_255_bytes_is_refused() {
+        let long: &'static str = Box::leak(format!("/{}", "a".repeat(255)).into_boxed_str());
+        let pairs = engine_env(&[
+            (names::ENGINE_URL, ENGINE_URL_OK),
+            (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+            (names::ENGINE_DIGEST_DIR, long),
+        ]);
+        let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+        assert_eq!(variables(&error), vec![names::ENGINE_DIGEST_DIR]);
+    }
+
+    #[test]
+    fn a_wrong_engine_address_is_a_problem_of_its_own_variable() {
+        let pairs = engine_env(&[
+            (names::ENGINE_URL, "http://engine_one:3000"),
+            (names::ENGINE_EVENTS_URL, "ftp://hub:9000"),
+            (names::ENGINE_DIGEST_DIR, ENGINE_DIR_OK),
+        ]);
+        let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+        assert_eq!(
+            variables(&error),
+            vec![names::ENGINE_URL, names::ENGINE_EVENTS_URL]
+        );
+    }
+
+    #[test]
+    fn a_problem_of_the_engine_variables_never_holds_the_value() {
+        const MARK: &str = "zz-canary-value";
+        let pairs = engine_env(&[
+            (names::ENGINE_URL, "http://engine_zz-canary-value:3000/path"),
+            (names::ENGINE_EVENTS_URL, "http://zz-canary-value@hub:9000"),
+            (
+                names::ENGINE_DIGEST_DIR,
+                "zz-canary-value/../var/lib/arauto",
+            ),
+        ]);
+        let error = ServeConfig::read(&env(&pairs)).unwrap_err();
+        assert_eq!(error.problems.len(), 3);
+        assert!(!error.to_string().contains(MARK), "{error}");
+        let data = engine_env(&[
+            (names::ENGINE_URL, ENGINE_URL_OK),
+            (names::ENGINE_EVENTS_URL, ENGINE_EVENTS_OK),
+            (names::ENGINE_DIGEST_DIR, "/var/lib/arauto/zz-canary-value"),
+        ]);
+        let error = ServeConfig::read(&env(&data)).unwrap_err();
+        assert_eq!(error.problems.len(), 1);
+        assert!(!error.to_string().contains(MARK), "{error}");
+        assert!(!error.to_string().contains("/var/lib/arauto/"), "{error}");
     }
 
     #[test]

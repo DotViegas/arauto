@@ -22,6 +22,7 @@ use serde_json::json;
 
 use super::registry::LoadedEngine;
 use super::types::{Author, EngineStatus, Ensured, Message, MessageQuery, Page};
+use super::{Cause, EngineError};
 use crate::audit::{self, Action, Actor, Details, Event, TargetKind};
 use crate::channel::Hub;
 use crate::core::number::NumberState;
@@ -77,6 +78,9 @@ async fn supervise_organization(hub: &Hub, organization: ResolvedOrg) -> Result<
         Ok(version) => version,
         Err(error) => {
             tracing::warn!(%error, "the engine did not answer its version");
+            if matches!(error, EngineError::Unavailable(Cause::KeyRefused)) {
+                repo::engine::key_refused(hub.pool(), organization, engine.id, now).await?;
+            }
             return Ok(());
         }
     };

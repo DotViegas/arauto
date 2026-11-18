@@ -1059,3 +1059,35 @@ async fn every_window_of_the_numbers_stands_over_the_list_and_stops_its_refresh(
     assert!(!list.contains("<dialog"));
     assert!(list.contains("id=\"live-main\" data-live"));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_panel_says_what_to_do_about_a_refused_key_by_where_the_engine_came_from() {
+    let rig = rig().await;
+    let pool = &rig.world.fixture.pool;
+    rig.world.fake.set_api_key("another-key-entirely-0001");
+    arauto_hub::engine::supervise(rig.world.hub()).await;
+    // An engine an admin set up: its key is typed again.
+    let page = rig.get("/whatsapps").await.text();
+    assert!(page.contains("Set its key again with"), "{page}");
+    assert!(page.contains("arauto-hub admin engine set-key"), "{page}");
+    assert!(
+        !page.contains("it reads its key only when it starts"),
+        "{page}"
+    );
+    // The engine of the installation: its key is drawn, and a restart is what helps.
+    sqlx::query("DELETE FROM alert")
+        .execute(pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE engine SET origin = 'installation', key_refused_since = NULL")
+        .execute(pool)
+        .await
+        .unwrap();
+    arauto_hub::engine::supervise(rig.world.hub()).await;
+    let page = rig.get("/whatsapps").await.text();
+    assert!(
+        page.contains("Restart the engine: it reads its key only when it starts."),
+        "{page}"
+    );
+    assert!(!page.contains("Set its key again with"), "{page}");
+}

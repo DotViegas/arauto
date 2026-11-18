@@ -718,6 +718,9 @@ pub enum SystemTask {
     /// The supervision of the engine, at the start and every 5 minutes: its version, the
     /// configuration of each session, the pairings that expired and the catch-up.
     Engine,
+    /// The start of `serve` with an engine the installation brings: the hub finds the one
+    /// organization it seeds the engine in and settles the digest file for.
+    InstallationEngine,
 }
 
 /// Every organization, for a named task of the hub itself, oldest first. The supervision of

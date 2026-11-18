@@ -719,8 +719,11 @@ async fn run_engine(
             whatsapp::engine_secret("A new secret of the events was drawn")
         }
         EngineCommand::Health => match session.engine_health(&vault).await {
-            Ok(()) => whatsapp::engine_health(Ok(())),
-            Err(admin::AdminError::Engine(error)) => whatsapp::engine_health(Err(error)),
+            Ok(()) => whatsapp::engine_health(Ok(()), None),
+            Err(admin::AdminError::Engine(error)) => {
+                let origin = session.engine_show().await?.map(|row| row.origin());
+                whatsapp::engine_health(Err(error), origin)
+            }
             Err(other) => return Err(other.into()),
         },
         EngineCommand::Version => {

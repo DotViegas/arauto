@@ -14,6 +14,7 @@ mod database;
 mod enrollment;
 mod follow;
 mod hermes;
+mod installation_engine_rounds;
 mod org;
 mod org_rounds;
 mod peer_rounds;

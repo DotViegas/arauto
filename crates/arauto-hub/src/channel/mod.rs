@@ -150,6 +150,9 @@ pub enum ServeError {
     /// A fixed field of the connection page is outside its format.
     #[error(transparent)]
     JoinPage(#[from] BadPageField),
+    /// The engine the installation brings could not be settled: its row or its digest file.
+    #[error(transparent)]
+    InstallationEngine(#[from] engine::installation::InstallationEngineError),
 }
 
 /// The tasks of the hub that are still running, for the stop to wait for them.
@@ -687,6 +690,14 @@ pub async fn start<P: Purposes>(
     let keypair = admin::hub_keypair(&pool, &vault).await?;
     recover(&pool, &mark, clock.now_ms()).await?;
     close_left_open(&pool, clock.now_ms()).await?;
+    // The engine the installation brings reads its key from a file the hub writes here: before
+    // the first port opens, so the hub answers its health, and the engine starts, only with the
+    // file in place. After `recover`, so the database is not behind the mark and the write is
+    // accepted.
+    if let Some(installation_engine) = &config.installation_engine {
+        engine::installation::ensure(&pool, &mark, &vault, installation_engine, clock.now_ms())
+            .await?;
+    }
     let connectors = listen(config.listen).await?;
     let internal = listen(config.listen_internal).await?;
     let local = |listener: &TcpListener, address| {

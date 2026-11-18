@@ -7,6 +7,7 @@
 //! | [`error`] | The typed errors, each with its code of the catalog. |
 //! | [`config`] | The address of the engine, the address of the events, the key and the secret of the events. |
 //! | `client` | The HTTP/1.1 client: deadlines, ceilings, type of content. |
+//! | [`installation`] | The engine the installation brings: the key the hub draws, its row and the digest file the engine reads its key from. |
 //! | [`waha`] | The adapter of the WAHA. |
 //! | [`registry`] | The engine of each organization, loaded from the database and rebuilt when it changes. |
 //! | `inbox` | The inbox of events, on the internal port. |
@@ -19,6 +20,7 @@
 
 pub mod config;
 pub mod error;
+pub mod installation;
 pub mod registry;
 pub mod types;
 pub mod waha;

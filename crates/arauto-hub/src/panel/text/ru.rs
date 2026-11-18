@@ -582,6 +582,14 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "an engine session had another configuration, and the hub applied its own.",
         "у сеанса движка была другая конфигурация, и хаб применил свою.",
     ),
+    (
+        "the engine refused the key of the hub. Restart the engine: it reads its key only when it starts.",
+        "движок отклонил ключ хаба. Перезапустите движок: он читает свой ключ только при запуске.",
+    ),
+    (
+        "the engine refused the key of the hub. Set its key again with {command}.",
+        "движок отклонил ключ хаба. Задайте его ключ заново командой {command}.",
+    ),
     ("Number swapped", "Номер подменён"),
     (
         "the phone that paired belongs to a different number from the one given. The accesses stay stopped until you decide.",
@@ -1177,8 +1185,8 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Хаб не смог связаться с WAHA. Проверьте, запущен ли он и находится ли в сети хаба.",
     ),
     (
-        "WAHA refused the key the hub has. Set the right key on the hub's server with {command}.",
-        "WAHA отклонил ключ, который есть у хаба. Задайте правильный ключ на сервере хаба командой {command}.",
+        "WAHA refused the key the hub has. If the installation brought the engine, restart the engine: it reads its key only when it starts. If you set the engine up yourself, set the right key on the hub's server with {command}.",
+        "WAHA отклонил ключ, который есть у хаба. Если движок поставлялся вместе с установкой, перезапустите движок: он читает свой ключ только при запуске. Если вы настроили движок сами, задайте правильный ключ на сервере хаба командой {command}.",
     ),
     (
         "WAHA answered with an error, or not in time. Try again in a moment; {command} on the hub's server says more.",
