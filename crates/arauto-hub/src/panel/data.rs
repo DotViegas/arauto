@@ -16,7 +16,7 @@ use super::text::{self, Lang, k};
 use super::guide::{Ended, Facts, LastUse, Screen};
 use super::view::{
     AccessPage, AccessRow, Cell, EngineLine, Frame, HermesPage, HermesRow, LineAction, Notice,
-    NumberRow, NumbersPage, RowAction, Tone,
+    NumberRow, NumbersPage, OrderTag, RowAction, Tone,
 };
 use crate::admin::render;
 use crate::channel::Hub;
@@ -251,6 +251,7 @@ pub(super) async fn hermes(
     let accesses = repo::access::list(hub.pool(), organization, None).await?;
     let sessions = hub.sessions_by_device();
     let now = hub.now_ms();
+    let key = hub.organization_key(organization).await?;
     let mut page = HermesPage::default();
     for line in &lines {
         let in_session = line
@@ -282,6 +283,20 @@ pub(super) async fn hermes(
             }
         });
         let device = line.in_use.as_ref().or(line.request.as_ref());
+        let record = repo::orders::get(hub.pool(), organization, &key, line.hermes.id).await?;
+        let orders = if record.self_chat {
+            text::tr(lang, k("its own chat")).to_owned()
+        } else if record.orders_from.len() == 1 {
+            text::tr(lang, k("1 telephone")).to_owned()
+        } else if record.orders_from.is_empty() {
+            text::tr(lang, k("not recorded")).to_owned()
+        } else {
+            text::fill(
+                lang,
+                k("{n} telephones"),
+                &[("n", &record.orders_from.len().to_string())],
+            )
+        };
         page.rows.push(HermesRow {
             name: name.to_owned(),
             tone,
@@ -304,6 +319,7 @@ pub(super) async fn hermes(
                 )
             },
             explain,
+            orders,
             action: if line.request.is_some() || line.invite_expires_at.is_some() {
                 RowAction::Continue
             } else if line.in_use.is_some() {
@@ -483,6 +499,7 @@ fn line_actions(
         NumberState::Failed => vec![LineAction::Restart],
         NumberState::Removed => return Vec::new(),
     };
+    actions.push(LineAction::Orders);
     actions.push(LineAction::Remove);
     actions
 }
@@ -497,6 +514,7 @@ pub(super) async fn numbers(
     let numbers = repo::number::list(hub.pool(), organization, false).await?;
     let accesses = repo::access::list(hub.pool(), organization, None).await?;
     let mut phones = phones(hub, organization, &numbers).await;
+    let tags = repo::orders::tags(hub.pool(), organization).await?;
     let now = hub.now_ms();
     let engine = repo::engine::get(hub.pool(), organization)
         .await?
@@ -548,6 +566,14 @@ pub(super) async fn numbers(
                     .collect(),
                 last_message: ago(lang, now, number.last_message_at),
                 actions: line_actions(hub, organization, session, number),
+                tags: tags
+                    .iter()
+                    .filter(|tag| tag.number == number.id)
+                    .map(|tag| OrderTag {
+                        hermes: tag.hermes.as_str().to_owned(),
+                        takes_orders_here: tag.takes_orders_here,
+                    })
+                    .collect(),
             }
         })
         .collect();

@@ -1312,4 +1312,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "Отметка следования идёт только с более высокого уровня на более низкий и только на связи с пробуждением.",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "Кто отдаёт ему приказы"),
+    ("not recorded", "не записано"),
+    ("its own chat", "свой собственный чат"),
+    ("{n} telephones", "телефонов: {n}"),
+    ("1 telephone", "1 телефон"),
+    ("Orders", "Приказы"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "Кто отдаёт приказы {hermes} в WhatsApp",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "Телефон, на котором работает WhatsApp {hermes}",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} принимает здесь приказы. Пусто, если у него нет WhatsApp.",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "Это номер {alias} в Arauto.",
+    ),
+    ("Orders come from", "Приказы приходят от"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "Его собственный WhatsApp, в чате с самим собой (режим self-chat)",
+    ),
+    (
+        "These telephones, one per line",
+        "Эти телефоны, по одному в строке",
+    ),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "Arauto не позволяет ни одному Hermes, включая {hermes}, писать в чат, где {hermes} принимает эти приказы. Кто может читать, определяют доступы.",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "Если здесь ничего не записано, Arauto ничего не блокирует: Hermes, который может писать в чат, где {hermes} принимает приказы, мог бы выдать себя за вас или за того, кто их отдаёт.",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "Сначала введите телефон, на котором работает WhatsApp {hermes}.",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} уже принимает приказы на этом телефоне.",
+    ),
+    ("At most 16 telephones.", "Не более 16 телефонов."),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "В хабе произошёл сбой. Посмотрите журнал хаба и проверьте запись Hermes.",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "Какой-то Hermes мог бы отдавать приказы {hermes}",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "Ничего не заблокировано: любой Hermes, который может писать в чат, где {hermes} принимает приказы, может выдать себя за того, кто их отдаёт.",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "Arauto снова позволит любому Hermes писать в чат между каждым удалённым телефоном и WhatsApp {hermes} и выдавать там себя за того, кто отдаёт приказы {hermes}.",
+    ),
+    ("Save anyway", "Всё равно сохранить"),
+    ("Go back", "Вернуться"),
+    ("gives orders to {hermes}", "отдаёт приказы {hermes}"),
+    (
+        "{hermes} takes orders here",
+        "{hermes} принимает здесь приказы",
+    ),
+    (
+        "Orders on WhatsApp for {alias}",
+        "Приказы в WhatsApp для {alias}",
+    ),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "Выберите Hermes. Ничего не сохраняется, пока вы не сохраните в его окне.",
+    ),
 ];

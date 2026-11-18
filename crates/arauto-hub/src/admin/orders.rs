@@ -85,6 +85,47 @@ fn parsed(edit: &OrdersEdit) -> Result<Parsed, AdminError> {
     Ok((takes, from))
 }
 
+/// What an edit makes of the record a Hermes has. The one place that says it: the write and
+/// the preview of the panel both go through it.
+fn applied(
+    before: &OrdersRecord,
+    takes: Option<&Option<Phone>>,
+    from: Option<&[Phone]>,
+    self_chat: bool,
+) -> OrdersRecord {
+    let mut after = before.clone();
+    if let Some(takes) = takes {
+        after.takes_orders_on.clone_from(takes);
+    }
+    if let Some(from) = from {
+        after.self_chat = false;
+        after.orders_from = from.to_vec();
+    }
+    if self_chat {
+        after.self_chat = true;
+        after.orders_from.clear();
+    }
+    after
+}
+
+/// The record `edit` would make of `before`, without writing anything: what the panel needs to
+/// know whether a save protects fewer chats. Rules of the record are not checked here.
+///
+/// # Errors
+/// [`AdminError::InvalidPhone`]; [`AdminError::OrdersRule`] for `self-chat` with a list.
+pub fn preview(before: &OrdersRecord, edit: &OrdersEdit) -> Result<OrdersRecord, AdminError> {
+    let (takes, from) = parsed(edit)?;
+    if edit.self_chat && from.as_ref().is_some_and(|list| !list.is_empty()) {
+        return Err(AdminError::OrdersRule(Invalid::SelfChatWithAList));
+    }
+    Ok(applied(
+        before,
+        takes.as_ref(),
+        from.as_deref(),
+        edit.self_chat,
+    ))
+}
+
 impl Session {
     /// `admin hermes whatsapp NAME`: the record of a Hermes.
     ///
@@ -139,21 +180,7 @@ impl Session {
             &self.admin,
             &key,
             &name,
-            |before| {
-                let mut after = before.clone();
-                if let Some(takes) = takes {
-                    after.takes_orders_on = takes;
-                }
-                if let Some(from) = from {
-                    after.self_chat = false;
-                    after.orders_from = from;
-                }
-                if self_chat {
-                    after.self_chat = true;
-                    after.orders_from.clear();
-                }
-                after
-            },
+            |before| applied(before, takes.as_ref(), from.as_deref(), self_chat),
             now,
         )
         .await?;

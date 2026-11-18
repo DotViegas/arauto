@@ -1321,4 +1321,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "Eine Folgen-Markierung geht nur von einer höheren Ebene zu einer niedrigeren, an einer Verknüpfung, die weckt.",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "Wer ihm Befehle gibt"),
+    ("not recorded", "nicht erfasst"),
+    ("its own chat", "der eigene Chat"),
+    ("{n} telephones", "{n} Telefone"),
+    ("1 telephone", "1 Telefon"),
+    ("Orders", "Befehle"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "Wer {hermes} auf WhatsApp Befehle gibt",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "Das Telefon, auf dem das WhatsApp von {hermes} läuft",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} nimmt hier Befehle entgegen. Leer, wenn es kein WhatsApp hat.",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "Das ist die Nummer {alias} in Arauto.",
+    ),
+    ("Orders come from", "Befehle kommen von"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "Sein eigenes WhatsApp, im Chat mit sich selbst (Modus self-chat)",
+    ),
+    (
+        "These telephones, one per line",
+        "Diese Telefone, eines pro Zeile",
+    ),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "Arauto verweigert jedem Hermes, auch {hermes}, das Schreiben im Chat, in dem {hermes} diese Befehle erhält. Wer ihn liest, richtet sich nach den Zugriffen.",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "Ist hier nichts erfasst, blockiert Arauto nichts: Ein Hermes, der in den Chat schreiben kann, in dem {hermes} Befehle erhält, könnte sich als Sie ausgeben oder als jemand, der sie erteilt.",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "Geben Sie zuerst das Telefon ein, auf dem das WhatsApp von {hermes} läuft.",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} nimmt auf diesem Telefon bereits Befehle entgegen.",
+    ),
+    ("At most 16 telephones.", "Höchstens 16 Telefone."),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "Im Hub ist etwas fehlgeschlagen. Sehen Sie im Protokoll des Hubs nach und prüfen Sie den Eintrag des Hermes.",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "Ein Hermes könnte {hermes} Befehle erteilen",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "Nichts ist blockiert: Jeder Hermes, der in den Chat schreiben kann, in dem {hermes} Befehle erhält, kann sich als die Person ausgeben, die sie erteilt.",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "Arauto lässt wieder jeden Hermes in den Chat zwischen jedem entfernten Telefon und dem WhatsApp von {hermes} schreiben und sich dort als die Person ausgeben, die {hermes} Befehle erteilt.",
+    ),
+    ("Save anyway", "Trotzdem speichern"),
+    ("Go back", "Zurück"),
+    ("gives orders to {hermes}", "gibt {hermes} Befehle"),
+    (
+        "{hermes} takes orders here",
+        "{hermes} nimmt hier Befehle entgegen",
+    ),
+    (
+        "Orders on WhatsApp for {alias}",
+        "Befehle über WhatsApp für {alias}",
+    ),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "Wählen Sie den Hermes. Nichts wird gespeichert, bis Sie in seinem Fenster speichern.",
+    ),
 ];

@@ -895,7 +895,19 @@ async fn run_installed(
             }
             HermesCommand::List { all } => render::hermes_list(&session.hermes_list(all).await?),
             HermesCommand::Remove { name } => {
-                render::hermes_removed(&session.hermes_remove(&name, now).await?)
+                // The record of who gives it orders goes with the Hermes: say what that ends.
+                let had_a_record = match vault(storage).await {
+                    Ok(vault) => session
+                        .hermes_orders_show(&vault, &name)
+                        .await
+                        .is_ok_and(|shown| !shown.after.is_empty()),
+                    Err(_) => false,
+                };
+                let mut report = render::hermes_removed(&session.hermes_remove(&name, now).await?);
+                if had_a_record {
+                    report.text.push_str(&orders::removal_line(&name));
+                }
+                report
             }
             HermesCommand::Whatsapp {
                 name,

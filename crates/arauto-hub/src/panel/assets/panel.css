@@ -134,6 +134,16 @@ td { color: var(--strong); }
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mono { font-family: var(--f-mono); white-space: nowrap; }
 .tag { margin-left: 8px; font-size: var(--t-label); color: var(--text); white-space: nowrap; }
+.tag { text-decoration: underline; text-underline-offset: 3px; }
+.button .muted { font-weight: 400; color: var(--text); }
+.orders-form { display: grid; gap: 16px; }
+.orders-form fieldset { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; }
+.field textarea {
+  width: 100%; padding: 8px 12px; font-family: var(--f-mono); font-size: var(--t-body);
+  border: 1px solid var(--border); border-radius: 10px; background: var(--ground); color: var(--strong); resize: vertical;
+}
+.orders-choices { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.orders-choices li { display: flex; flex-wrap: wrap; gap: 8px; }
 .empty td { color: var(--text); padding: 24px 0; }
 tr.explain td { background: var(--frame-raised); padding: 14px 16px; border-radius: 10px; }
 

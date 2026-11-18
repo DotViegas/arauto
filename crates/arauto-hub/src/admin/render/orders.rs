@@ -26,6 +26,15 @@ pub fn fewer_chats_line(hermes: &str) -> String {
     )
 }
 
+/// The line `admin hermes remove` prints when the Hermes had a record: its protection ends with it.
+#[must_use]
+pub fn removal_line(hermes: &str) -> String {
+    format!(
+        "Arauto stops refusing writes in the chat where {hermes} takes orders.
+"
+    )
+}
+
 fn summary(hermes: &str, record: &OrdersRecord) -> String {
     let takes = if record.takes_orders_on.is_some() {
         "a recorded telephone"

@@ -1216,4 +1216,75 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "遵循标记只能从较高层级指向较低层级，且只能设在会唤醒的链接上。",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "谁向它下达指令"),
+    ("not recorded", "未记录"),
+    ("its own chat", "它自己的聊天"),
+    ("{n} telephones", "{n} 个电话"),
+    ("1 telephone", "1 个电话"),
+    ("Orders", "指令"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "谁在 WhatsApp 上向 {hermes} 下达指令",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "{hermes} 的 WhatsApp 所运行的电话",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} 在这里接收指令。若它没有 WhatsApp，请留空。",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "这是 Arauto 中的号码 {alias}。",
+    ),
+    ("Orders come from", "指令来自"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "它自己的 WhatsApp，在与自己的聊天中（self-chat 模式）",
+    ),
+    ("These telephones, one per line", "这些电话，每行一个"),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "Arauto 拒绝任何 Hermes（包括 {hermes}）在 {hermes} 接收这些指令的聊天中写入。读取则遵循访问权限。",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "如果这里没有记录任何内容，Arauto 不会拦截任何东西：能在 {hermes} 接收指令的聊天中写入的 Hermes，可能冒充你，或冒充下达指令的人。",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "请先输入 {hermes} 的 WhatsApp 所运行的电话。",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} 已在这部电话上接收指令。",
+    ),
+    ("At most 16 telephones.", "最多 16 个电话。"),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "hub 中出现故障。请查看 hub 的日志，并核对该 Hermes 的记录。",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "某个 Hermes 可能向 {hermes} 下达指令",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "没有任何拦截：任何能在 {hermes} 接收指令的聊天中写入的 Hermes，都可以冒充下达指令的人。",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "Arauto 将再次允许任何 Hermes 在每个被移除的电话与 {hermes} 的 WhatsApp 之间的聊天中写入，并在那里冒充向 {hermes} 下达指令的人。",
+    ),
+    ("Save anyway", "仍然保存"),
+    ("Go back", "返回"),
+    ("gives orders to {hermes}", "向 {hermes} 下达指令"),
+    ("{hermes} takes orders here", "{hermes} 在这里接收指令"),
+    ("Orders on WhatsApp for {alias}", "{alias} 的 WhatsApp 指令"),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "选择 Hermes。在其窗口中保存之前，不会保存任何内容。",
+    ),
 ];

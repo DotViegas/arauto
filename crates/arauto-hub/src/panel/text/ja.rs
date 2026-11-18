@@ -1303,4 +1303,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "従う設定は、上位のレベルから下位のレベルへ向かい、起動通知のあるリンクにだけ付けられます。",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "誰が命令を出すか"),
+    ("not recorded", "未登録"),
+    ("its own chat", "自分自身とのチャット"),
+    ("{n} telephones", "電話 {n} 件"),
+    ("1 telephone", "電話 1 件"),
+    ("Orders", "命令"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "WhatsApp で {hermes} に命令を出すのは誰か",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "{hermes} の WhatsApp が動いている電話",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} はここで命令を受けます。WhatsApp がなければ空にしてください。",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "これは Arauto の番号 {alias} です。",
+    ),
+    ("Orders come from", "命令の出どころ"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "自分自身の WhatsApp、自分とのチャット内（self-chat モード）",
+    ),
+    (
+        "These telephones, one per line",
+        "これらの電話（1 行に 1 件）",
+    ),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "Arauto は、{hermes} を含むすべての Hermes が、{hermes} がこれらの命令を受ける会話に書き込むことを拒否します。読み取りはアクセスの設定に従います。",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "ここに何も登録されていなければ、Arauto は何もブロックしません。{hermes} が命令を受ける会話に書き込める Hermes が、あなた、または命令を出す人になりすます可能性があります。",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "先に {hermes} の WhatsApp が動いている電話を入力してください。",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} はすでにこの電話で命令を受けています。",
+    ),
+    ("At most 16 telephones.", "電話は最大 16 件です。"),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "ハブでエラーが発生しました。ハブのログを確認し、その Hermes の登録内容を確かめてください。",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "ある Hermes が {hermes} に命令を出せるようになります",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "何もブロックされていません。{hermes} が命令を受ける会話に書き込める Hermes は、命令を出す人になりすませます。",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "Arauto は、削除された各電話と {hermes} の WhatsApp の間の会話に、あらゆる Hermes が再び書き込み、{hermes} に命令を出す人になりすますことを許可します。",
+    ),
+    ("Save anyway", "それでも保存"),
+    ("Go back", "戻る"),
+    ("gives orders to {hermes}", "{hermes} に命令を出す"),
+    (
+        "{hermes} takes orders here",
+        "{hermes} はここで命令を受ける",
+    ),
+    (
+        "Orders on WhatsApp for {alias}",
+        "{alias} の WhatsApp での命令",
+    ),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "Hermes を選んでください。そのウィンドウで保存するまで、何も保存されません。",
+    ),
 ];

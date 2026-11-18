@@ -16,6 +16,7 @@
 //! | `POST /language` | the language the person chose, kept in a cookie ([`text`]) |
 //! | `/hermes/...` | the guide that connects a Hermes ([`connect`]) |
 //! | `/accesses/edit`, `/accesses/save`, `/hermes/revoke` | the editor of an access and the revocation of a Hermes ([`editor`]) |
+//! | `/hermes/whatsapp`, `/whatsapps/orders` | who gives a Hermes orders on WhatsApp ([`orders`]) |
 //!
 //! What holds for every request:
 //!
@@ -45,6 +46,7 @@ mod html;
 mod http;
 pub mod installation;
 mod numbers;
+pub mod orders;
 pub mod org;
 mod pairing;
 pub mod passkey;
@@ -443,6 +445,9 @@ pub(crate) async fn route(
         }
         (true, "/" | "/whatsapps" | "/accesses") => {
             page(&hub, panel, &parts.headers, path, parts.uri.query()).await
+        }
+        (_, "/hermes/whatsapp" | "/whatsapps/orders") => {
+            orders::answer(&hub, panel, &parts, body).await
         }
         (_, path) if path.starts_with("/whatsapps/") => {
             numbers::answer(&hub, panel, &parts, body).await

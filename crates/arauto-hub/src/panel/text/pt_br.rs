@@ -1303,4 +1303,81 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "Uma marca de seguir vai só de um nível mais alto para um mais baixo, em uma ligação que acorda.",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "Quem dá ordens a ele"),
+    ("not recorded", "não registrado"),
+    ("its own chat", "a própria conversa"),
+    ("{n} telephones", "{n} telefones"),
+    ("1 telephone", "1 telefone"),
+    ("Orders", "Ordens"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "Quem dá ordens a {hermes} no WhatsApp",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "O telefone em que o WhatsApp de {hermes} funciona",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} recebe ordens aqui. Vazio se não tiver WhatsApp.",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "Este é o número {alias} no Arauto.",
+    ),
+    ("Orders come from", "As ordens vêm de"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "O próprio WhatsApp dele, na conversa consigo mesmo (modo self-chat)",
+    ),
+    (
+        "These telephones, one per line",
+        "Estes telefones, um por linha",
+    ),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "O Arauto recusa que qualquer Hermes, inclusive {hermes}, escreva na conversa em que {hermes} recebe essas ordens. Quem lê segue os acessos.",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "Se nada for registrado aqui, o Arauto não bloqueia nada: um Hermes que consiga escrever na conversa em que {hermes} recebe ordens poderia se passar por você, ou por quem as dá.",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "Digite primeiro o telefone em que o WhatsApp de {hermes} funciona.",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} já recebe ordens neste telefone.",
+    ),
+    ("At most 16 telephones.", "No máximo 16 telefones."),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "Algo falhou no hub. Veja o registro do hub e confira o que está gravado para o Hermes.",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "Um Hermes poderia dar ordens a {hermes}",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "Nada está bloqueado: qualquer Hermes que consiga escrever na conversa em que {hermes} recebe ordens pode se passar por quem as dá.",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "O Arauto voltará a deixar todo Hermes escrever na conversa entre cada telefone removido e o WhatsApp de {hermes}, e se passar ali por quem dá ordens a {hermes}.",
+    ),
+    ("Save anyway", "Salvar mesmo assim"),
+    ("Go back", "Voltar"),
+    ("gives orders to {hermes}", "dá ordens a {hermes}"),
+    ("{hermes} takes orders here", "{hermes} recebe ordens aqui"),
+    (
+        "Orders on WhatsApp for {alias}",
+        "Ordens no WhatsApp para {alias}",
+    ),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "Escolha o Hermes. Nada é salvo até você salvar na janela dele.",
+    ),
 ];

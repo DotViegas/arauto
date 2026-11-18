@@ -1252,4 +1252,78 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "पालन का निशान केवल ऊँचे स्तर से नीचे के स्तर तक जाता है, और केवल ऐसे लिंक पर जो जगाता है।",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "उसे आदेश कौन देता है"),
+    ("not recorded", "दर्ज नहीं"),
+    ("its own chat", "अपनी ही चैट"),
+    ("{n} telephones", "{n} फ़ोन"),
+    ("1 telephone", "1 फ़ोन"),
+    ("Orders", "आदेश"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "WhatsApp पर {hermes} को आदेश कौन देता है",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "वह फ़ोन जिस पर {hermes} का WhatsApp चलता है",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} यहीं आदेश लेता है। WhatsApp न हो तो खाली छोड़ें।",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "यह Arauto में नंबर {alias} है।",
+    ),
+    ("Orders come from", "आदेश कहाँ से आते हैं"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "उसका अपना WhatsApp, खुद से की गई चैट में (self-chat मोड)",
+    ),
+    ("These telephones, one per line", "ये फ़ोन, हर पंक्ति में एक"),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "Arauto हर Hermes को, {hermes} को भी, उस चैट में लिखने से रोकता है जहाँ {hermes} ये आदेश लेता है। पढ़ना एक्सेस के अनुसार चलता है।",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "यहाँ कुछ दर्ज न हो तो Arauto कुछ नहीं रोकता: जो Hermes उस चैट में लिख सकता है जहाँ {hermes} आदेश लेता है, वह आपके या आदेश देने वाले के रूप में पेश आ सकता है।",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "पहले वह फ़ोन लिखें जिस पर {hermes} का WhatsApp चलता है।",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} पहले से इसी फ़ोन पर आदेश लेता है।",
+    ),
+    ("At most 16 telephones.", "अधिकतम 16 फ़ोन।"),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "हब में कुछ विफल हुआ। हब का लॉग देखें और Hermes की प्रविष्टि जाँचें।",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "कोई Hermes {hermes} को आदेश दे सकता है",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "कुछ भी अवरुद्ध नहीं है: जो भी Hermes उस चैट में लिख सकता है जहाँ {hermes} आदेश लेता है, वह आदेश देने वाले व्यक्ति के रूप में पेश आ सकता है।",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "Arauto हर Hermes को फिर से हटाए गए हर फ़ोन और {hermes} के WhatsApp के बीच की चैट में लिखने देगा, और वहाँ {hermes} को आदेश देने वाले व्यक्ति के रूप में पेश आने देगा।",
+    ),
+    ("Save anyway", "फिर भी सहेजें"),
+    ("Go back", "वापस जाएँ"),
+    ("gives orders to {hermes}", "{hermes} को आदेश देता है"),
+    ("{hermes} takes orders here", "{hermes} यहाँ आदेश लेता है"),
+    (
+        "Orders on WhatsApp for {alias}",
+        "{alias} के लिए WhatsApp पर आदेश",
+    ),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "Hermes चुनें। जब तक आप उसकी विंडो में सहेजें नहीं, कुछ भी सहेजा नहीं जाता।",
+    ),
 ];

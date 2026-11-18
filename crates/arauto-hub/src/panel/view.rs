@@ -168,6 +168,9 @@ pub struct HermesRow {
     pub explain: Option<String>,
     /// What the button of its line does.
     pub action: RowAction,
+    /// Who gives it orders on WhatsApp, as a muted state of its action: a sentence of the
+    /// screens, already in the language of the page (decision 0051).
+    pub orders: String,
 }
 
 /// What the admin can do from the line of a Hermes.
@@ -219,6 +222,18 @@ pub struct NumberRow {
     pub last_message: String,
     /// What the admin can do from its line, by its state.
     pub actions: Vec<LineAction>,
+    /// How it takes part in the records of who gives a Hermes orders (decision 0051).
+    pub tags: Vec<OrderTag>,
+}
+
+/// How a number takes part in the record of a Hermes: it gives orders to it, or it is where the
+/// Hermes takes them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderTag {
+    /// The Hermes.
+    pub hermes: String,
+    /// Whether the Hermes takes orders on this number (else this number gives orders to it).
+    pub takes_orders_here: bool,
 }
 
 /// What the line of a number offers.
@@ -238,6 +253,8 @@ pub enum LineAction {
     Restart,
     /// Another phone paired: keep it or undo.
     Decide,
+    /// Choose a Hermes it gives orders to, or takes them for (decision 0051).
+    Orders,
     /// Remove it.
     Remove,
 }
@@ -766,6 +783,13 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
                     .raw("</button></form>");
             }
         }
+        html.raw("<a class=\"button\" href=\"/hermes/whatsapp?name=")
+            .text(&row.name)
+            .raw("\">")
+            .t(k("Who gives it orders"))
+            .raw("<span class=\"muted\">: ")
+            .text(&row.orders)
+            .raw("</span></a>");
         if row.action.has_something() {
             html.raw("<a class=\"button danger\" href=\"/hermes/revoke?name=")
                 .text(&row.name)
@@ -825,6 +849,7 @@ fn line_action(html: &mut Html, alias: &str, action: &LineAction) {
         }
         LineAction::Disconnect => link(html, "button", "/whatsapps/disconnect", k("Disconnect")),
         LineAction::Decide => link(html, "button", "/whatsapps/decide", k("Decide")),
+        LineAction::Orders => link(html, "button", "/whatsapps/orders", k("Orders")),
         LineAction::Remove => link(html, "button danger", "/whatsapps/remove", k("Remove")),
         LineAction::Restart => {
             html.raw("<form method=\"post\" action=\"/whatsapps/restart\"><input type=\"hidden\" name=\"alias\" value=\"")
@@ -890,6 +915,20 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
         html.raw("<tr><td><span class=\"name\">")
             .text(&row.alias)
             .raw("</span>");
+        for tag in &row.tags {
+            html.raw("<a class=\"tag\" href=\"/hermes/whatsapp?name=")
+                .text(&tag.hermes)
+                .raw("\">")
+                .fill(
+                    if tag.takes_orders_here {
+                        k("{hermes} takes orders here")
+                    } else {
+                        k("gives orders to {hermes}")
+                    },
+                    &[("hermes", Arg::Text(&tag.hermes))],
+                )
+                .raw("</a>");
+        }
         html.raw("</td><td class=\"wide-only mono\">");
         match &row.phone {
             Some(phone) => html.text(phone),
@@ -1071,6 +1110,7 @@ mod tests {
                 seen: HOSTILE.to_owned(),
                 explain: Some(HOSTILE.to_owned()),
                 action: RowAction::Reconnect,
+                orders: HOSTILE.to_owned(),
             }],
             connected: 0,
             waiting: 0,
@@ -1080,7 +1120,7 @@ mod tests {
         clean(&page);
         // The values of the row (its name three times: in the list, in the form of its button
         // and in the address of its revocation), and the ones of the frame: all escaped.
-        assert_eq!(page.matches("&lt;script&gt;").count(), 10);
+        assert_eq!(page.matches("&lt;script&gt;").count(), 12);
 
         let numbers_page = NumbersPage {
             rows: vec![NumberRow {
@@ -1093,7 +1133,18 @@ mod tests {
                 actions: vec![
                     LineAction::Continue(HOSTILE.to_owned()),
                     LineAction::Restart,
+                    LineAction::Orders,
                     LineAction::Remove,
+                ],
+                tags: vec![
+                    OrderTag {
+                        hermes: HOSTILE.to_owned(),
+                        takes_orders_here: true,
+                    },
+                    OrderTag {
+                        hermes: HOSTILE.to_owned(),
+                        takes_orders_here: false,
+                    },
                 ],
             }],
             engine: Some(EngineLine {

@@ -833,6 +833,7 @@ mod tests {
                 seen: String::new(),
                 explain: None,
                 action: crate::panel::view::RowAction::Continue,
+                orders: String::new(),
             }],
             ..HermesPage::default()
         };

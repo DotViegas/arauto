@@ -163,7 +163,7 @@ own WhatsApp runs on and who gives it orders there, with `arauto-hub admin herme
 the hub then refuses every Hermes writing in that chat (section 3, rule 7). Reading it follows the
 accesses. **Not guaranteed:** a command channel nobody recorded is open to writing; the hub cannot
 know it. While nothing is recorded for a Hermes, the command prints a warning, and `number list`
-ends with a line while no Hermes protects any chat. The panel does not yet show any of it.
+ends with a line while no Hermes protects any chat. The panel shows and sets it since part B (built and tested against a fake engine, **not tried in a browser**): the line action "Who gives it orders" of the Hermes tab opens a window with the same record, the fixed risk sentence is always in it, and a save that leaves nothing protected or unprotects a chat asks first and saves nothing before the answer (screens T1 and T4, [07](07-telas.md)). The number tags and the "Orders" action of the numbers tab lead to the same window. What the panel writes is what the command writes, with the same audit. The risk window for a telephone a connector reported (part E) does not exist.
 
 ## 7. Send ceiling
 

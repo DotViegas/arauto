@@ -1318,4 +1318,84 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "A follow mark goes only from a higher level to a lower one, on a link that wakes.",
         "Une marque de suivi va seulement d'un niveau plus haut vers un niveau plus bas, sur un lien qui réveille.",
     ),
+    // orders.rs, and the actions and tags of the lists (decision 0051)
+    ("Who gives it orders", "Qui lui donne des ordres"),
+    ("not recorded", "non enregistré"),
+    ("its own chat", "son propre chat"),
+    ("{n} telephones", "{n} téléphones"),
+    ("1 telephone", "1 téléphone"),
+    ("Orders", "Ordres"),
+    (
+        "Who gives {hermes} orders on WhatsApp",
+        "Qui donne des ordres à {hermes} sur WhatsApp",
+    ),
+    (
+        "The telephone {hermes}'s WhatsApp runs on",
+        "Le téléphone sur lequel tourne le WhatsApp de {hermes}",
+    ),
+    (
+        "{hermes} takes orders here. Empty if it has no WhatsApp.",
+        "{hermes} reçoit ses ordres ici. Vide s'il n'a pas de WhatsApp.",
+    ),
+    (
+        "This is the number {alias} in Arauto.",
+        "C'est le numéro {alias} dans Arauto.",
+    ),
+    ("Orders come from", "Les ordres viennent de"),
+    (
+        "Its own WhatsApp, in the chat with itself (self-chat mode)",
+        "Son propre WhatsApp, dans la conversation avec lui-même (mode self-chat)",
+    ),
+    (
+        "These telephones, one per line",
+        "Ces téléphones, un par ligne",
+    ),
+    (
+        "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
+        "Arauto refuse que tout Hermes, {hermes} compris, écrive dans la conversation où {hermes} reçoit ces ordres. Qui la lit suit les accès.",
+    ),
+    (
+        "If nothing is recorded here, Arauto blocks nothing: a Hermes that can write in the chat where {hermes} takes orders could pass for you, or for whoever gives them.",
+        "Si rien n'est enregistré ici, Arauto ne bloque rien : un Hermes qui peut écrire dans la conversation où {hermes} reçoit ses ordres pourrait se faire passer pour vous, ou pour celui qui les donne.",
+    ),
+    (
+        "Type the telephone {hermes}'s WhatsApp runs on first.",
+        "Saisissez d'abord le téléphone sur lequel tourne le WhatsApp de {hermes}.",
+    ),
+    (
+        "{other} already takes orders on this telephone.",
+        "{other} reçoit déjà des ordres sur ce téléphone.",
+    ),
+    ("At most 16 telephones.", "16 téléphones au plus."),
+    (
+        "Something failed in the hub. See the hub's log and check the record of the Hermes.",
+        "Une erreur s'est produite dans le hub. Consultez le journal du hub et vérifiez ce qui est enregistré pour le Hermes.",
+    ),
+    (
+        "A Hermes could give {hermes} orders",
+        "Un Hermes pourrait donner des ordres à {hermes}",
+    ),
+    (
+        "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
+        "Rien n'est bloqué : tout Hermes qui peut écrire dans la conversation où {hermes} reçoit ses ordres peut se faire passer pour la personne qui les donne.",
+    ),
+    (
+        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
+        "Arauto laissera de nouveau tout Hermes écrire dans la conversation entre chaque téléphone retiré et le WhatsApp de {hermes}, et s'y faire passer pour la personne qui donne des ordres à {hermes}.",
+    ),
+    ("Save anyway", "Enregistrer quand même"),
+    ("Go back", "Revenir en arrière"),
+    ("gives orders to {hermes}", "donne des ordres à {hermes}"),
+    (
+        "{hermes} takes orders here",
+        "{hermes} reçoit ses ordres ici",
+    ),
+    (
+        "Orders on WhatsApp for {alias}",
+        "Ordres sur WhatsApp pour {alias}",
+    ),
+    (
+        "Choose the Hermes. Nothing is saved until you save in its window.",
+        "Choisissez le Hermes. Rien n'est enregistré avant que vous n'enregistriez dans sa fenêtre.",
+    ),
 ];
