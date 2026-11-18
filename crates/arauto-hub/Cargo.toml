@@ -51,6 +51,7 @@ arauto-protocol = { workspace = true, features = ["testing"] }
 arauto-testkit.workspace = true
 proptest.workspace = true
 tempfile.workspace = true
+yaml-rust2 = { version = "0.13", default-features = false }
 
 [lints]
 workspace = true

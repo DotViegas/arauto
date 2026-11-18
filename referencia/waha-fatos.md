@@ -200,3 +200,62 @@ person is listed under `@c.us`, but the field `from` of its last message ended i
 `{"lid", "pn"}` with `pn` ending in `@c.us`: the engine translates a hidden identifier into a
 telephone. One session listed the chat of the account with itself, under its own `@c.us` identifier.
 Not tried: a hidden identifier the engine does not know; the identifier in the event of a webhook.
+
+## The engine as a service of the installation (18/11/2026)
+
+**[observed]** on 18/11/2026, on the image
+`devlikeapro/waha:gows-2026.10.1@sha256:1f7faeb0227ad5edb5711f7058bfce807ea65e5f92234af0778e4db140f6eb46`
+(amd64), first alone in a throwaway container and then as the `engine` service of
+`deploy/easypanel/compose.engine.yaml`, started with plain Docker Compose on a test server, with the
+hub built from the code of [decision 0052](../docs/decisoes/0052-a-instalacao-traz-o-motor.md).
+**Not tried on Easypanel.** The installation was removed after the run.
+
+The image:
+
+- Its entry point is `/usr/bin/tini --` and its command is `/entrypoint.sh`. It runs as user 0.
+  `/bin/sh` is `dash`. Node is 24.
+- `/entrypoint.sh` takes `WHATSAPP_API_KEY` before `WAHA_API_KEY`, unsets both, passes a value that
+  starts with `sha512:` on unchanged and hashes any other.
+- About 3.2 GB on disk. Idle with no number, about 410 MiB of memory; with one number paired, about
+  315 MiB a few minutes later. It answered about 12 seconds after its start.
+
+The key:
+
+- With `WAHA_API_KEY=sha512:` followed by the SHA-512, in lowercase hexadecimal, of the text of the
+  key, a call with the key in `x-api-key` answers 200; with no key, with another key and with the
+  digest itself in place of the key it answers 401. This holds for `GET /api/server/version`,
+  `GET /api/sessions?all=true` and `GET /api/keys`.
+- `GET /ping` answers 200 with no key.
+
+With the thirteen variables the recipe pins (the two screens off and their two "no password"
+switches on, the apps, the metrics and the debug mode off, QR printing off, the general log level
+`info` and the level of the access lines `debug`):
+
+- `/dashboard`, `/api-json` and `/metrics` answer 404; `/api` and `/health` answer 401 with no key.
+- The log held no line with a password, a generated value, the key or its digest, no QR and no
+  access line for the calls made.
+- After a pairing the log held the telephone of the account once, in the line that says the
+  pairing worked, and no text of a message.
+
+As a service beside the hub:
+
+- A new named volume mounted on a folder the image of the hub owns took that owner and mode
+  (10001, 755); the hub wrote the 135 bytes of the digest with mode 644; the engine, with the volume
+  read-only, read it and could not write there.
+- The hub recorded the engine by itself, the engine came up after the hub was healthy, the hub read
+  the version as tested, and a number was paired in the panel with nothing typed about the engine.
+- Restarting only the hub left the container of the engine as it was, not restarted, and the number
+  connected.
+- With the digest file removed and the engine restarted, the engine waited: one line in its log, no
+  answer on its port. When the hub started again it wrote the file, the engine came up and the
+  number connected again without a new pairing.
+- With the digest of another key in the file and the engine restarted, the hub was refused and said
+  the engine needs a restart. The alert of the refused key did not appear in the 95 seconds watched;
+  it was there after the hub started again. How long the hub takes to raise it while running was
+  not measured.
+- Right after the pairing the engine logged once that it dropped an event for a slow listener.
+  Whether the hub recovers what that event carried was not checked.
+
+Not tried: Easypanel (one volume shared by two services, a replaced entry point, Restart and Stop,
+a Deploy that needs a migration); the arm64 image; sending and receiving a message; raising the
+pinned version; a stop of the engine while it waits.
