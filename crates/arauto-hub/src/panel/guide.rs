@@ -834,6 +834,7 @@ mod tests {
                 explain: None,
                 action: crate::panel::view::RowAction::Continue,
                 orders: String::new(),
+                orders_recorded: false,
             }],
             ..HermesPage::default()
         };

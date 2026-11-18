@@ -1507,4 +1507,59 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
         "{alias} は {hermes} の WhatsApp です。同時に命令を出すことはできません。",
     ),
+    ("Actions: {name}", "操作: {name}"),
+    (
+        "Issues the first invite for {name}.",
+        "{name} に最初の招待を発行します。",
+    ),
+    (
+        "Goes back to the connection of {name} that is in progress.",
+        "進行中の {name} の接続に戻ります。",
+    ),
+    (
+        "Issues an invite. When it is used, {name} moves to the new device.",
+        "招待を発行します。使われると、{name} は新しい端末に移ります。",
+    ),
+    (
+        "Which chat or telephones may give it orders on WhatsApp.",
+        "WhatsApp でどのチャットまたはどの電話番号が指示を出せるか。",
+    ),
+    (
+        "Closes {name} in the hub. Asks first.",
+        "ハブで {name} を閉じます。先に確認します。",
+    ),
+    (
+        "Opens the window to pair {alias} with a QR code or a pairing code.",
+        "QR コードまたはペアリングコードで {alias} をペアリングするウィンドウを開きます。",
+    ),
+    (
+        "Goes back to the pairing of {alias} that is running.",
+        "進行中の {alias} のペアリングに戻ります。",
+    ),
+    (
+        "Shows the pairing of {alias} that another panel session started.",
+        "パネルの別のセッションが始めた {alias} のペアリングを表示します。",
+    ),
+    (
+        "Stops {alias} for every Hermes. Asks for the alias.",
+        "すべての Hermes に対して {alias} を停止します。エイリアスの入力を求めます。",
+    ),
+    (
+        "Starts the failed session of {alias} again.",
+        "失敗した {alias} のセッションをもう一度開始します。",
+    ),
+    (
+        "Another phone paired as {alias}: keep it or undo.",
+        "別の電話が {alias} としてペアリングされました: 残すか取り消すか。",
+    ),
+    (
+        "Which Hermes takes orders in the chats of this number.",
+        "この番号のチャットで指示を受ける Hermes。",
+    ),
+    (
+        "Takes {alias} out of the hub. Asks for the alias.",
+        "{alias} をハブから外します。エイリアスの入力を求めます。",
+    ),
+    ("Dismiss", "非表示にする"),
+    ("Dismiss: {title}", "非表示にする: {title}"),
 ];

@@ -1402,4 +1402,59 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
         "{alias} 是 {hermes} 的 WhatsApp：不能同时向它下达指令。",
     ),
+    ("Actions: {name}", "操作：{name}"),
+    (
+        "Issues the first invite for {name}.",
+        "为 {name} 签发第一个邀请。",
+    ),
+    (
+        "Goes back to the connection of {name} that is in progress.",
+        "回到 {name} 正在进行的连接。",
+    ),
+    (
+        "Issues an invite. When it is used, {name} moves to the new device.",
+        "签发一个邀请。邀请被使用后，{name} 会转到新设备。",
+    ),
+    (
+        "Which chat or telephones may give it orders on WhatsApp.",
+        "哪个聊天或哪些电话可以在 WhatsApp 上给它下达指令。",
+    ),
+    (
+        "Closes {name} in the hub. Asks first.",
+        "在中心里关闭 {name}。会先询问。",
+    ),
+    (
+        "Opens the window to pair {alias} with a QR code or a pairing code.",
+        "打开窗口，用二维码或配对码配对 {alias}。",
+    ),
+    (
+        "Goes back to the pairing of {alias} that is running.",
+        "回到 {alias} 正在进行的配对。",
+    ),
+    (
+        "Shows the pairing of {alias} that another panel session started.",
+        "显示由面板另一个会话发起的 {alias} 的配对。",
+    ),
+    (
+        "Stops {alias} for every Hermes. Asks for the alias.",
+        "为所有 Hermes 停止 {alias}。会要求输入别名。",
+    ),
+    (
+        "Starts the failed session of {alias} again.",
+        "重新启动 {alias} 失败的会话。",
+    ),
+    (
+        "Another phone paired as {alias}: keep it or undo.",
+        "另一部手机以 {alias} 配对：保留或撤销。",
+    ),
+    (
+        "Which Hermes takes orders in the chats of this number.",
+        "哪个 Hermes 在这个号码的聊天中接收指令。",
+    ),
+    (
+        "Takes {alias} out of the hub. Asks for the alias.",
+        "把 {alias} 从中心移除。会要求输入别名。",
+    ),
+    ("Dismiss", "忽略"),
+    ("Dismiss: {title}", "忽略：{title}"),
 ];

@@ -1507,4 +1507,59 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
         "{alias} es el WhatsApp de {hermes}: no puede darle órdenes también.",
     ),
+    ("Actions: {name}", "Acciones: {name}"),
+    (
+        "Issues the first invite for {name}.",
+        "Emite la primera invitación para {name}.",
+    ),
+    (
+        "Goes back to the connection of {name} that is in progress.",
+        "Vuelve a la conexión de {name} que está en curso.",
+    ),
+    (
+        "Issues an invite. When it is used, {name} moves to the new device.",
+        "Emite una invitación. Cuando se use, {name} pasa al nuevo dispositivo.",
+    ),
+    (
+        "Which chat or telephones may give it orders on WhatsApp.",
+        "Qué chat o qué teléfonos pueden darle órdenes en WhatsApp.",
+    ),
+    (
+        "Closes {name} in the hub. Asks first.",
+        "Cierra {name} en el hub. Pregunta antes.",
+    ),
+    (
+        "Opens the window to pair {alias} with a QR code or a pairing code.",
+        "Abre la ventana para vincular {alias} con un código QR o un código de vinculación.",
+    ),
+    (
+        "Goes back to the pairing of {alias} that is running.",
+        "Vuelve a la vinculación de {alias} que está en curso.",
+    ),
+    (
+        "Shows the pairing of {alias} that another panel session started.",
+        "Muestra la vinculación de {alias} que inició otra sesión del panel.",
+    ),
+    (
+        "Stops {alias} for every Hermes. Asks for the alias.",
+        "Detiene {alias} para todos los Hermes. Pide el alias.",
+    ),
+    (
+        "Starts the failed session of {alias} again.",
+        "Inicia de nuevo la sesión de {alias} que falló.",
+    ),
+    (
+        "Another phone paired as {alias}: keep it or undo.",
+        "Otro teléfono se vinculó como {alias}: conservarlo o deshacer.",
+    ),
+    (
+        "Which Hermes takes orders in the chats of this number.",
+        "Qué Hermes recibe órdenes en los chats de este número.",
+    ),
+    (
+        "Takes {alias} out of the hub. Asks for the alias.",
+        "Quita {alias} del hub. Pide el alias.",
+    ),
+    ("Dismiss", "Descartar"),
+    ("Dismiss: {title}", "Descartar: {title}"),
 ];

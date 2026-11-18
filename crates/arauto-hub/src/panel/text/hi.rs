@@ -1444,4 +1444,59 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
         "{alias} {hermes} का WhatsApp है: यह उसे आदेश भी नहीं दे सकता।",
     ),
+    ("Actions: {name}", "कार्रवाइयाँ: {name}"),
+    (
+        "Issues the first invite for {name}.",
+        "{name} के लिए पहला आमंत्रण जारी करता है।",
+    ),
+    (
+        "Goes back to the connection of {name} that is in progress.",
+        "{name} के चल रहे कनेक्शन पर वापस ले जाता है।",
+    ),
+    (
+        "Issues an invite. When it is used, {name} moves to the new device.",
+        "एक आमंत्रण जारी करता है। उसका उपयोग होने पर {name} नए डिवाइस पर चला जाता है।",
+    ),
+    (
+        "Which chat or telephones may give it orders on WhatsApp.",
+        "WhatsApp पर कौन-सी चैट या कौन-से फ़ोन उसे आदेश दे सकते हैं।",
+    ),
+    (
+        "Closes {name} in the hub. Asks first.",
+        "हब में {name} को बंद करता है। पहले पूछता है।",
+    ),
+    (
+        "Opens the window to pair {alias} with a QR code or a pairing code.",
+        "{alias} को QR कोड या पेयरिंग कोड से जोड़ने की विंडो खोलता है।",
+    ),
+    (
+        "Goes back to the pairing of {alias} that is running.",
+        "{alias} की चल रही पेयरिंग पर वापस ले जाता है।",
+    ),
+    (
+        "Shows the pairing of {alias} that another panel session started.",
+        "{alias} की वह पेयरिंग दिखाता है जिसे पैनल के दूसरे सत्र ने शुरू किया।",
+    ),
+    (
+        "Stops {alias} for every Hermes. Asks for the alias.",
+        "{alias} को सभी Hermes के लिए रोकता है। उपनाम पूछता है।",
+    ),
+    (
+        "Starts the failed session of {alias} again.",
+        "{alias} का विफल हुआ सत्र फिर से शुरू करता है।",
+    ),
+    (
+        "Another phone paired as {alias}: keep it or undo.",
+        "दूसरा फ़ोन {alias} के रूप में जुड़ा: रखें या पूर्ववत करें।",
+    ),
+    (
+        "Which Hermes takes orders in the chats of this number.",
+        "इस नंबर की चैट में कौन-सा Hermes आदेश लेता है।",
+    ),
+    (
+        "Takes {alias} out of the hub. Asks for the alias.",
+        "{alias} को हब से हटाता है। उपनाम पूछता है।",
+    ),
+    ("Dismiss", "हटाएँ"),
+    ("Dismiss: {title}", "हटाएँ: {title}"),
 ];

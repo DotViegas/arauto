@@ -16,6 +16,8 @@
 //! | `POST /language` | the language the person chose, kept in a cookie ([`text`]) |
 //! | `/hermes/...` | the guide that connects a Hermes ([`connect`]) |
 //! | `/accesses/edit`, `/accesses/save`, `/hermes/revoke` | the editor of an access and the revocation of a Hermes ([`editor`]) |
+//! | `POST /alerts/dismiss` | marks an alert of the band as seen, as `admin alerts --ack` does ([`actions`]) |
+//! | `/hermes/actions`, `/whatsapps/actions` | the window of every action of one line of a list ([`actions`]) |
 //! | `/hermes/whatsapp`, `/whatsapps/orders` | who gives a Hermes orders on WhatsApp ([`orders`]) |
 //!
 //! What holds for every request:
@@ -36,6 +38,7 @@
 //! What the pages show is what `arauto-hub admin` shows, through the same repository
 //! functions; what they change, they change by the functions that command calls.
 
+pub mod actions;
 mod attempts;
 pub mod block;
 mod connect;
@@ -461,6 +464,10 @@ pub(crate) async fn route(
         }
         (true, "/" | "/whatsapps" | "/accesses") => {
             page(&hub, panel, &parts.headers, path, parts.uri.query()).await
+        }
+        (false, "/alerts/dismiss") => actions::dismiss(&hub, panel, &parts, body).await,
+        (true, "/hermes/actions" | "/whatsapps/actions") => {
+            actions::answer(&hub, panel, &parts).await
         }
         (_, "/hermes/whatsapp" | "/whatsapps/orders") => {
             orders::answer(&hub, panel, &parts, body).await

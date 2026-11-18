@@ -219,6 +219,7 @@ fn notice(lang: Lang, alert: &Alert) -> Notice {
         ));
     }
     Notice {
+        id: alert.id,
         grave,
         lead,
         text: said,
@@ -341,6 +342,7 @@ pub(super) async fn hermes(
             },
             explain,
             orders,
+            orders_recorded: record.self_chat || !record.orders_from.is_empty(),
             action: if line.request.is_some() || line.invite_expires_at.is_some() {
                 RowAction::Continue
             } else if line.in_use.is_some() {

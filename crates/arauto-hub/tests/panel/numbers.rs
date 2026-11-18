@@ -694,8 +694,22 @@ async fn the_lines_offer_what_the_state_allows() {
     let _ = down;
     let run = rig.start("busy", "qr").await;
     let list = rig.get("/whatsapps").await.text();
+    // Each line has one button, and the window behind it lists what the state allows.
+    let mut windows = std::collections::HashMap::new();
+    for alias in ["unpaired", "online", "broken", "away", "busy"] {
+        assert!(line(&list, alias).contains(&format!(
+            "href=\"/whatsapps/actions?alias={alias}\" aria-label=\"Actions: {alias}\""
+        )));
+        assert!(!line(&list, alias).contains("/whatsapps/remove?"));
+        windows.insert(
+            alias,
+            rig.get(&format!("/whatsapps/actions?alias={alias}"))
+                .await
+                .text(),
+        );
+    }
     let has = |alias: &str, wanted: &[&str], unwanted: &[&str]| {
-        let line = line(&list, alias);
+        let line = &windows[alias];
         for want in wanted {
             assert!(line.contains(want), "{alias} lacks {want}: {line}");
         }
@@ -745,6 +759,17 @@ async fn the_lines_offer_what_the_state_allows() {
         ],
         &["/whatsapps/pair?"],
     );
+    // What ends something comes last, in a group of its own.
+    let online = &windows["online"];
+    assert!(
+        online.find("<ul class=\"acts end\">").unwrap()
+            < online.find("/whatsapps/disconnect?alias=online").unwrap()
+    );
+    assert!(
+        online.find("/whatsapps/orders?alias=online").unwrap()
+            < online.find("<ul class=\"acts end\">").unwrap()
+    );
+    assert_eq!(rig.get("/whatsapps/actions?alias=nobody").await.status, 303);
     // A number that is not in a state to pair is told so, with nothing started.
     let answer = rig
         .post("/whatsapps/pair/start", "alias=online&method=qr")

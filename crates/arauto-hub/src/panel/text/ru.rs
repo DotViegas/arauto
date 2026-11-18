@@ -1516,4 +1516,59 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
         "{alias} — WhatsApp {hermes}: он не может одновременно отдавать ему приказы.",
     ),
+    ("Actions: {name}", "Действия: {name}"),
+    (
+        "Issues the first invite for {name}.",
+        "Выдаёт первое приглашение для {name}.",
+    ),
+    (
+        "Goes back to the connection of {name} that is in progress.",
+        "Возвращает к текущему подключению {name}.",
+    ),
+    (
+        "Issues an invite. When it is used, {name} moves to the new device.",
+        "Выдаёт приглашение. Когда его используют, {name} переходит на новое устройство.",
+    ),
+    (
+        "Which chat or telephones may give it orders on WhatsApp.",
+        "Какой чат или какие телефоны могут отдавать ему приказы в WhatsApp.",
+    ),
+    (
+        "Closes {name} in the hub. Asks first.",
+        "Закрывает {name} в хабе. Сначала спрашивает.",
+    ),
+    (
+        "Opens the window to pair {alias} with a QR code or a pairing code.",
+        "Открывает окно, чтобы связать {alias} через QR-код или код сопряжения.",
+    ),
+    (
+        "Goes back to the pairing of {alias} that is running.",
+        "Возвращает к текущему сопряжению {alias}.",
+    ),
+    (
+        "Shows the pairing of {alias} that another panel session started.",
+        "Показывает сопряжение {alias}, которое начала другая сессия панели.",
+    ),
+    (
+        "Stops {alias} for every Hermes. Asks for the alias.",
+        "Останавливает {alias} для всех Hermes. Просит ввести псевдоним.",
+    ),
+    (
+        "Starts the failed session of {alias} again.",
+        "Заново запускает сессию {alias}, которая завершилась сбоем.",
+    ),
+    (
+        "Another phone paired as {alias}: keep it or undo.",
+        "Другой телефон сопряжён как {alias}: оставить или отменить.",
+    ),
+    (
+        "Which Hermes takes orders in the chats of this number.",
+        "Какой Hermes принимает приказы в чатах этого номера.",
+    ),
+    (
+        "Takes {alias} out of the hub. Asks for the alias.",
+        "Убирает {alias} из хаба. Просит ввести псевдоним.",
+    ),
+    ("Dismiss", "Скрыть"),
+    ("Dismiss: {title}", "Скрыть: {title}"),
 ];

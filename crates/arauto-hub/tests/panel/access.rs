@@ -341,10 +341,12 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
 
     // The line of a Hermes with a device has the button; one with nothing to close has not.
     let list = page(&browser, &cookie, "/").await;
-    assert!(list.contains(&format!(
-        "<a class=\"button danger\" href=\"/hermes/revoke?name={name}\">Revoke</a>"
-    )));
-    assert!(!list.contains(&format!("/hermes/revoke?name={alone}")));
+    assert!(list.contains(&format!("href=\"/hermes/actions?name={name}\"")));
+    assert!(!list.contains("/hermes/revoke?name="));
+    let actions = page(&browser, &cookie, &format!("/hermes/actions?name={name}")).await;
+    assert!(actions.contains(&format!("<a href=\"/hermes/revoke?name={name}\">")));
+    let actions = page(&browser, &cookie, &format!("/hermes/actions?name={alone}")).await;
+    assert!(!actions.contains("/hermes/revoke?name="));
 
     // Asking revokes nothing, however many times.
     for _ in 0..3 {
@@ -401,7 +403,8 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
     );
     let list = page(&browser, &cookie, "/").await;
     assert!(list.contains("<span class=\"state idle\">No device</span>"));
-    assert!(!list.contains(&format!("/hermes/revoke?name={name}")));
+    let actions = page(&browser, &cookie, &format!("/hermes/actions?name={name}")).await;
+    assert!(!actions.contains("/hermes/revoke?name="));
     let audit = rows(&fixture, "audit").await.join("\n");
     assert!(audit.contains("\"actor_note\":\"panel\""));
     // Revoking again, or someone who does not exist, changes nothing.
@@ -581,4 +584,111 @@ async fn saving_be_woken_off_turns_off_the_chat_lines_of_that_access_only() {
     assert_eq!(saved.status, 303, "{}", saved.text());
     assert!(line_wakes(&world, here).await);
     assert!(line_wakes(&world, there).await);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn each_hermes_line_has_one_actions_button_and_its_window_lists_the_actions_of_its_state() {
+    let fixture = hub().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    let (name, _session) = fixture.connected().await;
+    let alone = fixture.hermes().await;
+
+    let list = page(&browser, &cookie, "/").await;
+    for each in [&name, &alone] {
+        assert_eq!(
+            list.matches(&format!("aria-label=\"Actions: {each}\""))
+                .count(),
+            1
+        );
+    }
+    // The window is a modal over the list, with the actions of the state and the ending last.
+    let with_device = page(&browser, &cookie, &format!("/hermes/actions?name={name}")).await;
+    assert!(with_device.contains("<dialog open class=\"modal\" id=\"guide\""));
+    assert!(with_device.contains("<div class=\"page\" inert>"));
+    assert!(with_device.contains("<span class=\"lbl\">Reconnect</span>"));
+    assert!(with_device.contains("<span class=\"lbl\">Who gives it orders</span>"));
+    let revoke = with_device.find("/hermes/revoke?name=").unwrap();
+    assert!(with_device.find("<ul class=\"acts end\">").unwrap() < revoke);
+    assert!(with_device.find("/hermes/whatsapp?name=").unwrap() < revoke);
+    let without = page(&browser, &cookie, &format!("/hermes/actions?name={alone}")).await;
+    assert!(without.contains("<span class=\"lbl\">Connect</span>"));
+    assert!(!without.contains("/hermes/revoke?name=") && !without.contains("acts end"));
+    // An unknown name goes back to the list, and a read writes nothing.
+    for path in ["/hermes/actions?name=ninguem", "/hermes/actions"] {
+        let answer = browser.get(path, Some(&cookie)).await;
+        assert_eq!((answer.status, answer.header("location")), (303, Some("/")));
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dismissing_an_alert_marks_it_as_seen_as_the_command_does_and_an_unknown_id_changes_nothing()
+ {
+    let fixture = hub().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    arauto_hub::repo::alert::mark_not_advanced(
+        &fixture.pool,
+        fixture.installation.organization,
+        None,
+        7,
+        fixture.now(),
+    )
+    .await
+    .unwrap();
+    let list = page(&browser, &cookie, "/whatsapps").await;
+    assert!(list.contains("action=\"/alerts/dismiss\""), "{list}");
+    assert!(list.contains("aria-label=\"Dismiss: Audit mark\""));
+    let id: String = sqlx::query_scalar("SELECT id::text FROM alert WHERE seen_at IS NULL")
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap();
+    let audit_before = rows(&fixture, "audit").await;
+
+    // An id that is not there, or not an id, changes nothing.
+    let unknown = browser
+        .post(
+            "/alerts/dismiss",
+            Some(&cookie),
+            "id=00000000-0000-4000-8000-000000000000",
+        )
+        .await;
+    assert_eq!(unknown.status, 303);
+    assert_eq!(
+        browser
+            .post("/alerts/dismiss", Some(&cookie), "id=not-an-id")
+            .await
+            .status,
+        400
+    );
+    assert!(page(&browser, &cookie, "/").await.contains("Audit mark"));
+
+    // The form marks it as seen and goes back to the page it came from; only a list is a way back.
+    let done = browser
+        .post(
+            "/alerts/dismiss",
+            Some(&cookie),
+            &format!("id={id}&return=/whatsapps"),
+        )
+        .await;
+    assert_eq!(
+        (done.status, done.header("location")),
+        (303, Some("/whatsapps"))
+    );
+    assert!(!page(&browser, &cookie, "/").await.contains("Audit mark"));
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM alert WHERE seen_at IS NOT NULL")
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap();
+    assert_eq!(seen, 1);
+    // The command writes no audit event for it, and neither does the button.
+    assert_eq!(rows(&fixture, "audit").await, audit_before);
+    let again = browser
+        .post(
+            "/alerts/dismiss",
+            Some(&cookie),
+            &format!("id={id}&return=https://example.com"),
+        )
+        .await;
+    assert_eq!((again.status, again.header("location")), (303, Some("/")));
 }

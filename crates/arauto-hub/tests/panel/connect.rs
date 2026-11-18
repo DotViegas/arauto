@@ -592,8 +592,16 @@ async fn the_block_appears_once_and_a_new_invite_cancels_the_one_before() {
     // The line already exists: another invite comes from its button, and cancels the first.
     let list = browser.get("/", Some(&cookie)).await.text();
     assert!(
-        list.contains("<a class=\"button\" href=\"/hermes/wait?name=vendas\">Continue</a>"),
+        list.contains("href=\"/hermes/actions?name=vendas\""),
         "{list}"
+    );
+    let actions = browser
+        .get("/hermes/actions?name=vendas", Some(&cookie))
+        .await
+        .text();
+    assert!(
+        actions.contains("<a href=\"/hermes/wait?name=vendas\">"),
+        "{actions}"
     );
     let second = browser
         .post("/hermes/invite", Some(&cookie), "name=vendas")
@@ -670,9 +678,15 @@ async fn a_reconnect_asks_about_the_last_use_that_is_on_the_screen() {
     drop(session);
 
     let list = browser.get("/", Some(&cookie)).await.text();
+    let actions = browser
+        .get(&format!("/hermes/actions?name={name}"), Some(&cookie))
+        .await
+        .text();
+    assert!(list.contains(&format!("href=\"/hermes/actions?name={name}\"")));
     assert!(
-        list.contains("<button class=\"button\" type=\"submit\">Reconnect</button>"),
-        "{list}"
+        actions.contains("<form method=\"post\" action=\"/hermes/invite\">")
+            && actions.contains("<span class=\"lbl\">Reconnect</span>"),
+        "{actions}"
     );
     let issued = browser
         .post("/hermes/invite", Some(&cookie), &format!("name={name}"))

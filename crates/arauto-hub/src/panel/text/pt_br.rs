@@ -1504,4 +1504,59 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
         "{alias} é o WhatsApp de {hermes}: não pode também dar ordens a ele.",
     ),
+    ("Actions: {name}", "Ações: {name}"),
+    (
+        "Issues the first invite for {name}.",
+        "Emite o primeiro convite para {name}.",
+    ),
+    (
+        "Goes back to the connection of {name} that is in progress.",
+        "Volta à conexão de {name} que está em andamento.",
+    ),
+    (
+        "Issues an invite. When it is used, {name} moves to the new device.",
+        "Emite um convite. Quando ele for usado, {name} passa para o novo dispositivo.",
+    ),
+    (
+        "Which chat or telephones may give it orders on WhatsApp.",
+        "Qual conversa ou quais telefones podem dar ordens a ele no WhatsApp.",
+    ),
+    (
+        "Closes {name} in the hub. Asks first.",
+        "Encerra {name} no hub. Pergunta antes.",
+    ),
+    (
+        "Opens the window to pair {alias} with a QR code or a pairing code.",
+        "Abre a janela para parear {alias} com um QR code ou um código de pareamento.",
+    ),
+    (
+        "Goes back to the pairing of {alias} that is running.",
+        "Volta ao pareamento de {alias} que está em andamento.",
+    ),
+    (
+        "Shows the pairing of {alias} that another panel session started.",
+        "Mostra o pareamento de {alias} que outra sessão do painel iniciou.",
+    ),
+    (
+        "Stops {alias} for every Hermes. Asks for the alias.",
+        "Para {alias} para todos os Hermes. Pede o alias.",
+    ),
+    (
+        "Starts the failed session of {alias} again.",
+        "Inicia de novo a sessão de {alias} que falhou.",
+    ),
+    (
+        "Another phone paired as {alias}: keep it or undo.",
+        "Outro telefone pareou como {alias}: manter ou desfazer.",
+    ),
+    (
+        "Which Hermes takes orders in the chats of this number.",
+        "Qual Hermes recebe ordens nas conversas deste número.",
+    ),
+    (
+        "Takes {alias} out of the hub. Asks for the alias.",
+        "Tira {alias} do hub. Pede o alias.",
+    ),
+    ("Dismiss", "Dispensar"),
+    ("Dismiss: {title}", "Dispensar: {title}"),
 ];

@@ -112,6 +112,8 @@ impl Tone {
 /// One alert of the band at the top.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
+    /// The alert, for the button that dismisses it. Never put in an address.
+    pub id: uuid::Uuid,
     /// Whether it is of the kind that stops a Hermes or a number.
     pub grave: bool,
     /// What it is about, in a few fixed words: a sentence of the screens.
@@ -171,6 +173,8 @@ pub struct HermesRow {
     /// Who gives it orders on WhatsApp, as a muted state of its action: a sentence of the
     /// screens, already in the language of the page (decision 0051).
     pub orders: String,
+    /// Whether anything is recorded in `orders`: false draws the value muted.
+    pub orders_recorded: bool,
 }
 
 /// What the admin can do from the line of a Hermes.
@@ -187,7 +191,7 @@ pub enum RowAction {
 impl RowAction {
     /// Whether the Hermes has something a revocation would close: a device, a request or an
     /// invite.
-    const fn has_something(self) -> bool {
+    pub(super) const fn has_something(self) -> bool {
         !matches!(self, RowAction::Connect)
     }
 }
@@ -600,16 +604,35 @@ pub(super) fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
                 .text(restored)
                 .raw("</li>");
         }
+        let back = match tab {
+            Tab::Hermes => Some("/"),
+            Tab::Numbers => Some("/whatsapps"),
+            Tab::Accesses => Some("/accesses"),
+            Tab::Org => None,
+        };
         for notice in &frame.notices {
             html.raw(if notice.grave {
-                "<li class=\"alert bad\"><span class=\"state bad\">"
+                "<li class=\"alert bad dismissable\"><span class=\"alert-text\"><span class=\"state bad\">"
             } else {
-                "<li class=\"alert\"><span class=\"state wait\">"
+                "<li class=\"alert dismissable\"><span class=\"alert-text\"><span class=\"state wait\">"
             })
             .t(notice.lead)
             .raw(":</span> ")
             .text(&notice.text)
-            .raw("</li>");
+            .raw("</span><form method=\"post\" action=\"/alerts/dismiss\"><input type=\"hidden\" name=\"id\" value=\"")
+            .text(&notice.id.to_string())
+            .raw("\">");
+            if let Some(back) = back {
+                html.raw("<input type=\"hidden\" name=\"return\" value=\"")
+                    .raw(back)
+                    .raw("\">");
+            }
+            let title = tr(html.lang(), notice.lead);
+            html.raw("<button class=\"button\" type=\"submit\" aria-label=\"")
+                .fill(k("Dismiss: {title}"), &[("title", Arg::Text(title))])
+                .raw("\">")
+                .t(k("Dismiss"))
+                .raw("</button></form></li>");
         }
         if frame.unknown_devices > 0 {
             html.raw("<li class=\"alert bad\"><span class=\"state bad\">")
@@ -691,7 +714,7 @@ pub(super) fn state(html: &mut Html, tone: Tone, label: &'static str) {
         .raw("</span>");
 }
 
-fn names(html: &mut Html, list: &[String]) {
+pub(super) fn names(html: &mut Html, list: &[String]) {
     if list.is_empty() {
         html.t(k("none"));
         return;
@@ -735,6 +758,8 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         .raw("</th><th scope=\"col\">")
         .t(k("Numbers"))
         .raw("</th><th scope=\"col\">")
+        .t(k("Who gives it orders"))
+        .raw("</th><th scope=\"col\">")
         .t(k("Connector"))
         .raw("</th><th scope=\"col\">")
         .t(k("Seen"))
@@ -742,7 +767,7 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         .t(k("Actions"))
         .raw("</span></th></tr></thead><tbody>");
     if page.rows.is_empty() {
-        html.raw("<tr class=\"empty\"><td colspan=\"6\">")
+        html.raw("<tr class=\"empty\"><td colspan=\"7\">")
             .t(k(
                 "No Hermes yet. Connect the first one with the \"Connect Hermes\" button.",
             ))
@@ -755,51 +780,30 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         state(html, row.tone, row.state);
         html.raw("</td><td class=\"second-line\">");
         names(html, &row.numbers);
-        html.raw("</td><td class=\"wide-only mono\">");
+        html.raw("</td><td class=\"second-line\"><span class=\"cell-label\">")
+            .t(k("Who gives it orders"))
+            .raw(": </span><a class=\"")
+            .raw(if row.orders_recorded {
+                "value"
+            } else {
+                "value empty-value"
+            })
+            .raw("\" href=\"/hermes/whatsapp?name=")
+            .text(&row.name)
+            .raw("\">")
+            .text(&row.orders)
+            .raw("</a></td><td class=\"wide-only mono\">");
         match &row.connector {
             Some(version) => html.text(version),
             None => html.raw("—"),
         };
         html.raw("</td><td class=\"wide-only num\">")
             .text(&row.seen)
-            .raw("</td><td class=\"actions-cell\"><div class=\"actions\">");
-        match row.action {
-            RowAction::Continue => {
-                html.raw("<a class=\"button\" href=\"/hermes/wait?name=")
-                    .text(&row.name)
-                    .raw("\">")
-                    .t(k("Continue"))
-                    .raw("</a>");
-            }
-            RowAction::Connect | RowAction::Reconnect => {
-                html.raw("<form method=\"post\" action=\"/hermes/invite\"><input type=\"hidden\" name=\"name\" value=\"")
-                    .text(&row.name)
-                    .raw("\"><button class=\"button\" type=\"submit\">")
-                    .t(if row.action == RowAction::Connect {
-                        k("Connect")
-                    } else {
-                        k("Reconnect")
-                    })
-                    .raw("</button></form>");
-            }
-        }
-        html.raw("<a class=\"button\" href=\"/hermes/whatsapp?name=")
-            .text(&row.name)
-            .raw("\">")
-            .t(k("Who gives it orders"))
-            .raw("<span class=\"muted\">: ")
-            .text(&row.orders)
-            .raw("</span></a>");
-        if row.action.has_something() {
-            html.raw("<a class=\"button danger\" href=\"/hermes/revoke?name=")
-                .text(&row.name)
-                .raw("\">")
-                .t(k("Revoke"))
-                .raw("</a>");
-        }
+            .raw("</td><td class=\"actions-cell act\"><div class=\"actions\">");
+        more_button(html, "/hermes/actions?name=", &row.name);
         html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
-            html.raw("<tr class=\"explain\"><td colspan=\"6\">")
+            html.raw("<tr class=\"explain\"><td colspan=\"7\">")
                 .text(explain)
                 .raw("</td></tr>");
         }
@@ -819,46 +823,17 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     html.finish()
 }
 
-/// One button of the line of a number: a link, or a form that posts the alias.
-fn line_action(html: &mut Html, alias: &str, action: &LineAction) {
-    let link = |html: &mut Html, class: &'static str, path: &'static str, label: &'static str| {
-        html.raw("<a class=\"")
-            .raw(class)
-            .raw("\" href=\"")
-            .raw(path)
-            .raw("?alias=")
-            .text(alias)
-            .raw("\">")
-            .t(label)
-            .raw("</a>");
-    };
-    match action {
-        LineAction::Pair => link(html, "button", "/whatsapps/pair", k("Pair")),
-        LineAction::PairAgain => link(html, "button", "/whatsapps/pair", k("Pair again")),
-        LineAction::Continue(run) => {
-            html.raw("<a class=\"button\" href=\"/whatsapps/pair/wait?alias=")
-                .text(alias)
-                .raw("&amp;run=")
-                .text(run)
-                .raw("\">")
-                .t(k("Continue pairing"))
-                .raw("</a>");
-        }
-        LineAction::SeePairing => {
-            link(html, "button", "/whatsapps/pair/wait", k("See the pairing"))
-        }
-        LineAction::Disconnect => link(html, "button", "/whatsapps/disconnect", k("Disconnect")),
-        LineAction::Decide => link(html, "button", "/whatsapps/decide", k("Decide")),
-        LineAction::Orders => link(html, "button", "/whatsapps/orders", k("Orders")),
-        LineAction::Remove => link(html, "button danger", "/whatsapps/remove", k("Remove")),
-        LineAction::Restart => {
-            html.raw("<form method=\"post\" action=\"/whatsapps/restart\"><input type=\"hidden\" name=\"alias\" value=\"")
-                .text(alias)
-                .raw("\"><button class=\"button\" type=\"submit\">")
-                .t(k("Restart"))
-                .raw("</button></form>");
-        }
-    }
+/// The one button of every line: a link to the window of the actions of that line. `path`
+/// ends where the name of the line goes.
+fn more_button(html: &mut Html, path: &'static str, name: &str) {
+    html.raw("<a class=\"button more\" href=\"")
+        .raw(path)
+        .text(name)
+        .raw("\" aria-label=\"")
+        .fill(k("Actions: {name}"), &[("name", Arg::Text(name))])
+        .raw("\"><svg class=\"dots\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle cx=\"3\" cy=\"8\" r=\"1.6\"/><circle cx=\"8\" cy=\"8\" r=\"1.6\"/><circle cx=\"13\" cy=\"8\" r=\"1.6\"/></svg>")
+        .t(k("Actions"))
+        .raw("</a>");
 }
 
 /// Writes the page of the numbers up to where a window over it would go.
@@ -915,6 +890,9 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
         html.raw("<tr><td><span class=\"name\">")
             .text(&row.alias)
             .raw("</span>");
+        if !row.tags.is_empty() {
+            html.raw("<span class=\"tags\">");
+        }
         for tag in &row.tags {
             html.raw("<a class=\"tag\" href=\"/hermes/whatsapp?name=")
                 .text(&tag.hermes)
@@ -929,6 +907,9 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
                 )
                 .raw("</a>");
         }
+        if !row.tags.is_empty() {
+            html.raw("</span>");
+        }
         html.raw("</td><td class=\"wide-only mono\">");
         match &row.phone {
             Some(phone) => html.text(phone),
@@ -940,10 +921,8 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
         names(html, &row.hermes);
         html.raw("</td><td class=\"wide-only num\">")
             .text(&row.last_message)
-            .raw("</td><td class=\"actions-cell\"><div class=\"actions\">");
-        for action in &row.actions {
-            line_action(html, &row.alias, action);
-        }
+            .raw("</td><td class=\"actions-cell act\"><div class=\"actions\">");
+        more_button(html, "/whatsapps/actions?alias=", &row.alias);
         html.raw("</div></td></tr>");
     }
     html.raw("</tbody></table></div><p class=\"note\">")
@@ -1088,6 +1067,7 @@ mod tests {
             lang: Lang::En,
             restored: Some(HOSTILE.to_owned()),
             notices: vec![Notice {
+                id: uuid::Uuid::nil(),
                 grave: true,
                 lead: k("Connection taken"),
                 text: HOSTILE.to_owned(),
@@ -1111,6 +1091,7 @@ mod tests {
                 explain: Some(HOSTILE.to_owned()),
                 action: RowAction::Reconnect,
                 orders: HOSTILE.to_owned(),
+                orders_recorded: true,
             }],
             connected: 0,
             waiting: 0,

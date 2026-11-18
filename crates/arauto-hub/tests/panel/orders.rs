@@ -183,9 +183,7 @@ async fn the_window_says_the_risk_in_every_state_and_the_list_says_the_state() {
     let rig = ready().await;
     let ana = rig.world.fixture.hermes().await;
     let line = |page: &str, state: &str| {
-        let wanted = format!(
-            "href=\"/hermes/whatsapp?name={ana}\">Who gives it orders<span class=\"muted\">: {state}</span></a>"
-        );
+        let wanted = format!("href=\"/hermes/whatsapp?name={ana}\">{state}</a>");
         assert!(page.contains(&wanted), "{state}: {page}");
     };
 
@@ -758,8 +756,18 @@ async fn the_numbers_carry_the_tags_and_lead_to_the_window_of_the_hermes() {
     );
     assert!(!operador.contains("takes orders here") && !ponte.contains("gives orders to"));
     // Any time after a number is in the list: every line has the way in.
+    for alias in ["operador", "ponte"] {
+        let actions = rig
+            .get(&format!("/whatsapps/actions?alias={alias}"))
+            .await
+            .text();
+        assert!(
+            actions.contains(&format!("href=\"/whatsapps/orders?alias={alias}\"")),
+            "{actions}"
+        );
+    }
     for row in [&operador, &ponte] {
-        assert!(row.contains("href=\"/whatsapps/orders?alias="), "{row}");
+        assert!(row.contains("href=\"/whatsapps/actions?alias="), "{row}");
     }
 
     // The way in is a short form that names the Hermes and what the number is for it now, and
