@@ -14,5 +14,5 @@ Hub and engine remain two processes. The hub is the only one that talks to the e
 
 - A new version of the hub does not bring WhatsApp down.
 - The configuration of an engine session exists in one place only.
-- Changing the version of the engine remains an act of whoever installs. The hub does not control containers.
+- Changing the version of the engine remains an act of whoever installs. The hub does not control containers. (17/11/2026, at the maintainer's request: in the proposal of [0052](0052-a-instalacao-traz-o-motor.md), not built, the recipe of the project pins the version and whoever installs applies it.)
 - The hub needs a contract test against the engine at each new version.

@@ -2,6 +2,11 @@
 
 **Status:** proposal, to be validated in the prototype · **Date:** 09/11/2026
 
+**17/11/2026:** at the maintainer's request, the installation is to bring the engine
+([0052](0052-a-instalacao-traz-o-motor.md), proposal, not built). When that is built, this decision
+describes only the advanced path: an engine of whoever installs, given by address and key. Until
+then it describes what exists.
+
 ## Context
 
 The engine used today is third-party, is an unofficial WhatsApp client, and the image that was checked declares an undefined license.

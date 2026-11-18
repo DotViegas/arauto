@@ -55,3 +55,4 @@ prototype, or is **pending**.
 | 0049 | [Waking by WhatsApp is decided by the verb "be woken" alone](0049-acordar-pelo-whatsapp-so-pelo-verbo.md) | decided |
 | 0050 | [Org chart stage B: the follow mark of a link](0050-etapa-b-marca-de-seguir.md) | proposal (the follow sentence, item 21 of docs/04 and the changes of 0005 and 0018 were approved on 16/11/2026; the connector side is built) |
 | 0051 | [The chat where a Hermes takes orders on WhatsApp is refused for writing](0051-quem-da-ordens-a-um-hermes-no-whatsapp.md) | proposal (built and tested against a fake engine on 17/11/2026; the texts were not approved word for word; not tried on a real Hermes or WhatsApp) |
+| 0052 | [The installation brings the engine](0052-a-instalacao-traz-o-motor.md) | proposal (the direction, the form and the rule in CLAUDE.md were approved on 17/11/2026; nothing built) |

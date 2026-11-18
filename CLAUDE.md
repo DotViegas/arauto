@@ -118,7 +118,9 @@ They hold for all code and every document.
 
 - Log message content or a secret.
 - Expose the WhatsApp engine outside the internal network.
-- Embed the engine in the delivery of the project.
+- Build the engine into the image of the hub, or publish a copy of the image of a third-party
+  engine. The composition names the original image, pinned, as a service of its own
+  (`docs/decisoes/0052-a-instalacao-traz-o-motor.md`).
 - Create an alternative connection path "to make it easier" that skips the invite or the
   verification code.
 - Open a network port on Hermes's machine.
