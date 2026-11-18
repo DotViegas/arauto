@@ -104,10 +104,17 @@ They hold for all code and every document.
   documents (`docs/decisoes/0016-idioma.md`).
 - `Cargo.lock` versioned; compile with `--locked`.
 - Run, before saying that something is ready: `cargo fmt --all -- --check`,
-  `cargo clippy --workspace --all-targets --locked -- -D warnings` and
-  `cargo test --workspace --locked`, with `ARAUTO_TEST_DATABASE_URL` pointing to a test PostgreSQL.
-  Report: what ran, what passed, what failed and what was left without coverage. What was only read
-  does not count as tested.
+  `cargo clippy --workspace --all-targets --locked -- -D warnings` and the tests of what the change
+  touches (the test binary or the module: a change in the panel runs the panel tests, not the
+  whole suite), with `ARAUTO_TEST_DATABASE_URL` pointing to a test PostgreSQL.
+- The whole suite, `cargo test --workspace --locked`, takes about half an hour and runs once for a
+  batch of work, not for each change: before a push that changes what the hub or the connector
+  does, or at the end of a block of work. It always runs before a push that touches the swap of
+  the credential, the channel or the queues. Do not run it again on a tree where it already
+  passed, and not once for each helper in a parallel job.
+- Report: what ran, what passed, what failed and what was left without coverage. "Only the tests
+  of the area ran" is a valid report; calling that the whole suite is not. What was only read does
+  not count as tested.
 - A new security rule comes with a test that fails when the rule is removed.
 - Queues and the swap of the credential have a test with randomized rounds: drops, delays and
   repetitions.
