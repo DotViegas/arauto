@@ -847,6 +847,72 @@ async fn a_number_swapped_onto_the_bridge_telephone_refuses_the_chat_with_the_op
     assert_eq!(send(&mut g, "troca", &by_name["Bia"]).await, None);
 }
 
+/// SECURITY RULE (18/11/2026): the telephone a Hermes's WhatsApp runs on cannot also give it
+/// orders: that chat is the self-chat mode. The command refuses it, in either form of the
+/// telephone, also when only the bridge is changed against a recorded list. It fails when the
+/// rule is removed from `OrdersRecord::check`.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_telephone_of_the_bridge_cannot_also_give_it_orders() {
+    let r = ready(true).await;
+    let admin = &r.world.fixture.admin;
+    let counts = |world: &World| {
+        let pool = world.hub().pool().clone();
+        async move {
+            let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM hermes_whatsapp_phone")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            let audited: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM audit WHERE action = 'hermes.whatsapp_orders_changed'",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            (rows, audited)
+        }
+    };
+    let among = |from: String| OrdersEdit {
+        takes_orders_on: Some(Some(plus(BRIDGE))),
+        orders_from: Some(vec![from]),
+        ..OrdersEdit::default()
+    };
+    for from in [plus(BRIDGE), without_ninth(BRIDGE)] {
+        let refused = admin
+            .hermes_orders_set(&r.world.vault, &r.h.name, &among(from), r.world.now())
+            .await;
+        assert!(
+            matches!(
+                refused,
+                Err(AdminError::OrdersRule(Invalid::BridgeAmongGivers))
+            ),
+            "{refused:?}"
+        );
+    }
+    assert_eq!(counts(&r.world).await, (0, 0), "a refusal wrote");
+
+    // The usual record, then the bridge changed alone to a telephone that already gives orders:
+    // the record after the edit is the one that is checked.
+    record_the_usual(&r.world, &r.h.name).await;
+    let before = counts(&r.world).await;
+    let alone = OrdersEdit {
+        takes_orders_on: Some(Some(plus(OPERATOR))),
+        ..OrdersEdit::default()
+    };
+    let refused = admin
+        .hermes_orders_set(&r.world.vault, &r.h.name, &alone, r.world.now())
+        .await;
+    assert!(
+        matches!(
+            refused,
+            Err(AdminError::OrdersRule(Invalid::BridgeAmongGivers))
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(counts(&r.world).await, before, "a refusal wrote");
+    let text = AdminError::OrdersRule(Invalid::BridgeAmongGivers).to_string();
+    assert!(text.contains("--self-chat") && text.contains("--orders-from"));
+}
+
 /// Test 13: the record in the repository.
 #[tokio::test(flavor = "multi_thread")]
 async fn the_record_is_audited_with_counts_and_its_rules_hold() {

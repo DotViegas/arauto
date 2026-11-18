@@ -24,6 +24,7 @@ use crate::core::access::{Scope, Verbs};
 use crate::core::model::{Device, DeviceState};
 use crate::core::number::NumberState;
 use crate::db::ResolvedOrg;
+use crate::engine::Phone;
 use crate::repo::access::Listed;
 use crate::repo::alert::{Alert, AlertFilter, AlertKind};
 use crate::repo::hermes::HermesLine;
@@ -489,6 +490,52 @@ pub(super) async fn phone_of(
     let key = hub.organization_key(organization).await.ok()?;
     let phone = number.phone(&key).ok()?;
     Some(format!("+{}", phone.digits()))
+}
+
+/// A number of the hub the orders window offers as a choice.
+pub(super) struct Pick {
+    /// The alias of the number.
+    pub alias: String,
+    /// Its telephone, opened with the key of the organization.
+    pub phone: Phone,
+    /// `+digits`, as the WhatsApps tab shows it.
+    pub shown: String,
+    /// The Hermes whose own WhatsApp runs on it.
+    pub takes_for: Option<String>,
+    /// The Hermes it gives orders to.
+    pub gives_to: Vec<String>,
+}
+
+/// The numbers of the hub, not removed, by alias, whose telephone the key opens.
+pub(super) async fn picks(hub: &Hub, organization: ResolvedOrg) -> Result<Vec<Pick>, RepoError> {
+    let numbers = repo::number::list(hub.pool(), organization, false).await?;
+    let Ok(key) = hub.organization_key(organization).await else {
+        return Ok(Vec::new());
+    };
+    let tags = repo::orders::tags(hub.pool(), organization).await?;
+    Ok(numbers
+        .iter()
+        .filter(|number| number.state != NumberState::Removed)
+        .filter_map(|number| {
+            let phone = number.phone(&key).ok()?;
+            let mut takes_for = None;
+            let mut gives_to = Vec::new();
+            for tag in tags.iter().filter(|tag| tag.number == number.id) {
+                if tag.takes_orders_here {
+                    takes_for = Some(tag.hermes.as_str().to_owned());
+                } else {
+                    gives_to.push(tag.hermes.as_str().to_owned());
+                }
+            }
+            Some(Pick {
+                alias: number.alias.as_str().to_owned(),
+                shown: format!("+{}", phone.digits()),
+                phone,
+                takes_for,
+                gives_to,
+            })
+        })
+        .collect())
 }
 
 /// What the line of a number offers: by its state, and for a pairing, by who runs it.

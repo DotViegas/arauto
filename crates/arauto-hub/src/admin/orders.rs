@@ -108,8 +108,9 @@ fn applied(
     after
 }
 
-/// The record `edit` would make of `before`, without writing anything: what the panel needs to
-/// know whether a save protects fewer chats. Rules of the record are not checked here.
+/// The record `edit` would make of `before`, without writing anything, normalized as the write
+/// checks it: what the panel needs to count, check and know whether a save protects fewer
+/// chats. Rules of the record are checked by the caller (`OrdersRecord::check`).
 ///
 /// # Errors
 /// [`AdminError::InvalidPhone`]; [`AdminError::OrdersRule`] for `self-chat` with a list.
@@ -118,12 +119,7 @@ pub fn preview(before: &OrdersRecord, edit: &OrdersEdit) -> Result<OrdersRecord,
     if edit.self_chat && from.as_ref().is_some_and(|list| !list.is_empty()) {
         return Err(AdminError::OrdersRule(Invalid::SelfChatWithAList));
     }
-    Ok(applied(
-        before,
-        takes.as_ref(),
-        from.as_deref(),
-        edit.self_chat,
-    ))
+    Ok(applied(before, takes.as_ref(), from.as_deref(), edit.self_chat).normalized())
 }
 
 impl Session {
@@ -242,6 +238,37 @@ pub const fn rule_text(rule: Invalid) -> &'static str {
         Invalid::SelfChatWithAList => {
             "self-chat and a list of telephones are two answers to the same question: give one"
         }
+        Invalid::BridgeAmongGivers => {
+            "The telephone the Hermes's WhatsApp runs on cannot also give it orders: that chat is the self-chat mode (use --self-chat), or leave it out of --orders-from"
+        }
         Invalid::TooMany => "At most 16 telephones can give a Hermes orders",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_rule_of_the_bridge_is_said_to_the_command() {
+        let text = AdminError::OrdersRule(Invalid::BridgeAmongGivers).to_string();
+        assert!(text.contains("--self-chat"), "{text}");
+        assert!(text.contains("--orders-from"), "{text}");
+    }
+
+    #[test]
+    fn a_preview_is_normalized_as_the_write_checks_it() {
+        let before = OrdersRecord::default();
+        let mut lines: Vec<String> = (0..16).map(|n| format!("+55119000001{n:02}")).collect();
+        lines.push("+5511987654321".to_owned());
+        lines.push("+551187654321".to_owned());
+        let edit = OrdersEdit {
+            takes_orders_on: Some(Some("+5511900000001".to_owned())),
+            self_chat: false,
+            orders_from: Some(lines[1..].to_vec()),
+        };
+        let after = preview(&before, &edit).unwrap();
+        assert_eq!(after.orders_from.len(), 16, "one in both forms counts once");
+        assert_eq!(after.check(), Ok(()));
     }
 }

@@ -449,7 +449,7 @@ enum HermesCommand {
         /// Its own WhatsApp gives it orders, in the chat with itself.
         #[arg(long = "self-chat", conflicts_with = "orders_from")]
         self_chat: bool,
-        /// A telephone that gives the Hermes orders. Repeat it; none clears the list.
+        /// A telephone that gives the Hermes orders, not the one its WhatsApp runs on. Repeat it; none clears the list.
         #[arg(long = "orders-from", value_name = "PHONE|none")]
         orders_from: Vec<String>,
     },

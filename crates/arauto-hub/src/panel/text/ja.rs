@@ -1323,14 +1323,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "WhatsApp で {hermes} に命令を出すのは誰か",
     ),
     (
-        "The telephone {hermes}'s WhatsApp runs on",
-        "{hermes} の WhatsApp が動いている電話",
-    ),
-    (
-        "{hermes} takes orders here. Empty if it has no WhatsApp.",
-        "{hermes} はここで命令を受けます。WhatsApp がなければ空にしてください。",
-    ),
-    (
         "This is the number {alias} in Arauto.",
         "これは Arauto の番号 {alias} です。",
     ),
@@ -1338,10 +1330,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Its own WhatsApp, in the chat with itself (self-chat mode)",
         "自分自身の WhatsApp、自分とのチャット内（self-chat モード）",
-    ),
-    (
-        "These telephones, one per line",
-        "これらの電話（1 行に 1 件）",
     ),
     (
         "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
@@ -1352,14 +1340,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "ここに何も登録されていなければ、Arauto は何もブロックしません。{hermes} が命令を受ける会話に書き込める Hermes が、あなた、または命令を出す人になりすます可能性があります。",
     ),
     (
-        "Type the telephone {hermes}'s WhatsApp runs on first.",
-        "先に {hermes} の WhatsApp が動いている電話を入力してください。",
-    ),
-    (
         "{other} already takes orders on this telephone.",
         "{other} はすでにこの電話で命令を受けています。",
     ),
-    ("At most 16 telephones.", "電話は最大 16 件です。"),
     (
         "Something failed in the hub. See the hub's log and check the record of the Hermes.",
         "ハブでエラーが発生しました。ハブのログを確認し、その Hermes の登録内容を確かめてください。",
@@ -1372,11 +1355,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
         "何もブロックされていません。{hermes} が命令を受ける会話に書き込める Hermes は、命令を出す人になりすませます。",
     ),
-    (
-        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
-        "Arauto は、削除された各電話と {hermes} の WhatsApp の間の会話に、あらゆる Hermes が再び書き込み、{hermes} に命令を出す人になりすますことを許可します。",
-    ),
-    ("Save anyway", "それでも保存"),
     ("Go back", "戻る"),
     ("gives orders to {hermes}", "{hermes} に命令を出す"),
     (
@@ -1387,8 +1365,146 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Orders on WhatsApp for {alias}",
         "{alias} の WhatsApp での命令",
     ),
+    ("Its WhatsApp", "その WhatsApp"),
     (
-        "Choose the Hermes. Nothing is saved until you save in its window.",
-        "Hermes を選んでください。そのウィンドウで保存するまで、何も保存されません。",
+        "The telephone {hermes}'s own WhatsApp runs on: {hermes} takes orders there.",
+        "{hermes} 自身の WhatsApp が動いている電話：{hermes} はそこで命令を受けます。",
+    ),
+    ("It has no WhatsApp", "WhatsApp はありません"),
+    ("A number of Arauto", "Arauto の番号"),
+    ("Choose a number", "番号を選んでください"),
+    ("Another telephone", "別の電話"),
+    (
+        "Read only when Another telephone is chosen. Start with + and the country code, like +55 11 9XXXX-XXXX.",
+        "「別の電話」を選んだときだけ読み取ります。+ と国番号から始めてください（例：+55 11 9XXXX-XXXX）。",
+    ),
+    ("These telephones", "これらの電話"),
+    ("its WhatsApp", "その WhatsApp"),
+    ("Other telephones", "その他の電話"),
+    (
+        "Telephones that are not numbers of Arauto, one per line. At most 16 telephones in all.",
+        "Arauto の番号ではない電話を、1 行に 1 件ずつ。合計で最大 16 件です。",
+    ),
+    (
+        "{alias} is chosen. Nothing is saved until you save.",
+        "{alias} を選びました。保存するまで何も保存されません。",
+    ),
+    (
+        "{alias} is chosen as its WhatsApp, in place of {before}. Nothing is saved until you save.",
+        "{before} の代わりに {alias} をその WhatsApp として選びました。保存するまで何も保存されません。",
+    ),
+    (
+        "Choose an option for its WhatsApp. Nothing was saved.",
+        "その WhatsApp の選択肢を選んでください。何も保存されていません。",
+    ),
+    (
+        "{alias} is not a number of Arauto now. Nothing was saved.",
+        "{alias} は現在 Arauto の番号ではありません。何も保存されていません。",
+    ),
+    (
+        "Type the other telephone its WhatsApp runs on, or choose another option. Nothing was saved.",
+        "その WhatsApp が動いている別の電話を入力するか、別の選択肢を選んでください。何も保存されていません。",
+    ),
+    (
+        "The other telephone of its WhatsApp is not a telephone: 8 to 15 digits, with + and the country code first. Nothing was saved.",
+        "その WhatsApp の別の電話が電話として読み取れません。8〜15 桁で、+ と国番号から始めてください。何も保存されていません。",
+    ),
+    (
+        "Line {n} of Other telephones is not a telephone. Nothing was saved.",
+        "「その他の電話」の {n} 行目は電話ではありません。何も保存されていません。",
+    ),
+    (
+        "Its own chat and a list of telephones are two answers: clear the list, or choose These telephones. Nothing was saved.",
+        "自分自身とのチャットと電話の一覧は別々の答えです。一覧を空にするか、「これらの電話」を選んでください。何も保存されていません。",
+    ),
+    (
+        "Choose {hermes}'s WhatsApp first: a chat has two ends. Nothing was saved.",
+        "先に {hermes} の WhatsApp を選んでください。チャットには 2 つの端があります。何も保存されていません。",
+    ),
+    (
+        "Its WhatsApp cannot also give it orders: that chat is the self-chat mode. Nothing was saved.",
+        "その WhatsApp が同時に命令を出すことはできません。そのチャットは self-chat モードです。何も保存されていません。",
+    ),
+    (
+        "At most 16 telephones can give it orders; these are {n}. Nothing was saved.",
+        "命令を出せる電話は最大 16 件です。現在 {n} 件です。何も保存されていません。",
+    ),
+    (
+        "1 typed telephone needs a look. Nothing was saved.",
+        "入力された電話 1 件の確認が必要です。何も保存されていません。",
+    ),
+    (
+        "{n} typed telephones need a look. Nothing was saved.",
+        "入力された電話 {n} 件の確認が必要です。何も保存されていません。",
+    ),
+    ("Line {n}", "{n} 行目"),
+    (
+        "Not a telephone: 8 to 15 digits, with + and the country code first.",
+        "電話ではありません。8〜15 桁で、+ と国番号から始めてください。",
+    ),
+    ("Not a number of Arauto.", "Arauto の番号ではありません。"),
+    (
+        "The same telephone as line {n}: it counts once.",
+        "{n} 行目と同じ電話です。1 件として数えます。",
+    ),
+    (
+        "The same telephone as {alias}, chosen above: it counts once.",
+        "上で選んだ {alias} と同じ電話です。1 件として数えます。",
+    ),
+    (
+        "This is its WhatsApp: it cannot also give it orders.",
+        "これはその WhatsApp です。同時に命令を出すことはできません。",
+    ),
+    (
+        "Typed without +, so the first digits were read as the country code. If that is not its country, type + and the country code first. Saving again keeps it as read.",
+        "+ なしで入力されたため、先頭の数字を国番号として読み取りました。その国でない場合は、+ と国番号から入力してください。もう一度保存すると、読み取ったとおりに保持されます。",
+    ),
+    (
+        "{n} of 16 telephones, with the numbers chosen above.",
+        "16 件中 {n} 件（上で選んだ番号を含む）。",
+    ),
+    (
+        "These chats stop being protected",
+        "これらのチャットは保護されなくなります",
+    ),
+    (
+        "Between {bridge}, its WhatsApp until now, and:",
+        "これまでその WhatsApp だった {bridge} と、次との間：",
+    ),
+    ("itself (self-chat mode)", "自分自身（self-chat モード）"),
+    (
+        "Arauto will let every Hermes write again in these chats, and pass there for the person who gives {hermes} orders.",
+        "Arauto は、これらのチャットにあらゆる Hermes が再び書き込み、{hermes} に命令を出す人になりすますことを許可します。",
+    ),
+    ("Remove the protection", "保護を解除"),
+    ("Save without protection", "保護なしで保存"),
+    (
+        "What {alias} is for it",
+        "{alias} がその Hermes にとって何か",
+    ),
+    ("A telephone that gives it orders", "命令を出す電話"),
+    (
+        "Its WhatsApp, where it takes orders",
+        "その WhatsApp（命令を受ける場所）",
+    ),
+    (
+        "takes orders on {alias} now",
+        "現在 {alias} で命令を受けています",
+    ),
+    (
+        "{alias} gives it orders now",
+        "{alias} は現在命令を出しています",
+    ),
+    (
+        "Nothing is saved here. The window of the Hermes opens with {alias} chosen.",
+        "ここでは何も保存されません。{alias} を選んだ状態で Hermes のウィンドウが開きます。",
+    ),
+    (
+        "Choose a Hermes and what {alias} is for it.",
+        "Hermes と、{alias} がその Hermes にとって何かを選んでください。",
+    ),
+    (
+        "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
+        "{alias} は {hermes} の WhatsApp です。同時に命令を出すことはできません。",
     ),
 ];

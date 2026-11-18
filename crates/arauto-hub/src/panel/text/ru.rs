@@ -1332,14 +1332,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Кто отдаёт приказы {hermes} в WhatsApp",
     ),
     (
-        "The telephone {hermes}'s WhatsApp runs on",
-        "Телефон, на котором работает WhatsApp {hermes}",
-    ),
-    (
-        "{hermes} takes orders here. Empty if it has no WhatsApp.",
-        "{hermes} принимает здесь приказы. Пусто, если у него нет WhatsApp.",
-    ),
-    (
         "This is the number {alias} in Arauto.",
         "Это номер {alias} в Arauto.",
     ),
@@ -1347,10 +1339,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Its own WhatsApp, in the chat with itself (self-chat mode)",
         "Его собственный WhatsApp, в чате с самим собой (режим self-chat)",
-    ),
-    (
-        "These telephones, one per line",
-        "Эти телефоны, по одному в строке",
     ),
     (
         "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
@@ -1361,14 +1349,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Если здесь ничего не записано, Arauto ничего не блокирует: Hermes, который может писать в чат, где {hermes} принимает приказы, мог бы выдать себя за вас или за того, кто их отдаёт.",
     ),
     (
-        "Type the telephone {hermes}'s WhatsApp runs on first.",
-        "Сначала введите телефон, на котором работает WhatsApp {hermes}.",
-    ),
-    (
         "{other} already takes orders on this telephone.",
         "{other} уже принимает приказы на этом телефоне.",
     ),
-    ("At most 16 telephones.", "Не более 16 телефонов."),
     (
         "Something failed in the hub. See the hub's log and check the record of the Hermes.",
         "В хабе произошёл сбой. Посмотрите журнал хаба и проверьте запись Hermes.",
@@ -1381,11 +1364,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
         "Ничего не заблокировано: любой Hermes, который может писать в чат, где {hermes} принимает приказы, может выдать себя за того, кто их отдаёт.",
     ),
-    (
-        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
-        "Arauto снова позволит любому Hermes писать в чат между каждым удалённым телефоном и WhatsApp {hermes} и выдавать там себя за того, кто отдаёт приказы {hermes}.",
-    ),
-    ("Save anyway", "Всё равно сохранить"),
     ("Go back", "Вернуться"),
     ("gives orders to {hermes}", "отдаёт приказы {hermes}"),
     (
@@ -1396,8 +1374,146 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Orders on WhatsApp for {alias}",
         "Приказы в WhatsApp для {alias}",
     ),
+    ("Its WhatsApp", "Его WhatsApp"),
     (
-        "Choose the Hermes. Nothing is saved until you save in its window.",
-        "Выберите Hermes. Ничего не сохраняется, пока вы не сохраните в его окне.",
+        "The telephone {hermes}'s own WhatsApp runs on: {hermes} takes orders there.",
+        "Телефон, на котором работает собственный WhatsApp {hermes}: {hermes} принимает там приказы.",
+    ),
+    ("It has no WhatsApp", "У него нет WhatsApp"),
+    ("A number of Arauto", "Номер Arauto"),
+    ("Choose a number", "Выберите номер"),
+    ("Another telephone", "Другой телефон"),
+    (
+        "Read only when Another telephone is chosen. Start with + and the country code, like +55 11 9XXXX-XXXX.",
+        "Учитывается, только если выбран вариант Другой телефон. Начните с + и кода страны, например +55 11 9XXXX-XXXX.",
+    ),
+    ("These telephones", "Эти телефоны"),
+    ("its WhatsApp", "его WhatsApp"),
+    ("Other telephones", "Другие телефоны"),
+    (
+        "Telephones that are not numbers of Arauto, one per line. At most 16 telephones in all.",
+        "Телефоны, которые не являются номерами Arauto, по одному в строке. Всего не более 16 телефонов.",
+    ),
+    (
+        "{alias} is chosen. Nothing is saved until you save.",
+        "{alias} выбран. Ничего не сохраняется, пока вы не сохраните.",
+    ),
+    (
+        "{alias} is chosen as its WhatsApp, in place of {before}. Nothing is saved until you save.",
+        "{alias} выбран как его WhatsApp вместо {before}. Ничего не сохраняется, пока вы не сохраните.",
+    ),
+    (
+        "Choose an option for its WhatsApp. Nothing was saved.",
+        "Выберите вариант для его WhatsApp. Ничего не было сохранено.",
+    ),
+    (
+        "{alias} is not a number of Arauto now. Nothing was saved.",
+        "{alias} сейчас не является номером Arauto. Ничего не было сохранено.",
+    ),
+    (
+        "Type the other telephone its WhatsApp runs on, or choose another option. Nothing was saved.",
+        "Введите другой телефон, на котором работает его WhatsApp, или выберите другой вариант. Ничего не было сохранено.",
+    ),
+    (
+        "The other telephone of its WhatsApp is not a telephone: 8 to 15 digits, with + and the country code first. Nothing was saved.",
+        "Другой телефон для его WhatsApp не является телефоном: от 8 до 15 цифр, сначала + и код страны. Ничего не было сохранено.",
+    ),
+    (
+        "Line {n} of Other telephones is not a telephone. Nothing was saved.",
+        "Строка {n} в Других телефонах не является телефоном. Ничего не было сохранено.",
+    ),
+    (
+        "Its own chat and a list of telephones are two answers: clear the list, or choose These telephones. Nothing was saved.",
+        "Его собственный чат и список телефонов — это два разных ответа: очистите список или выберите Эти телефоны. Ничего не было сохранено.",
+    ),
+    (
+        "Choose {hermes}'s WhatsApp first: a chat has two ends. Nothing was saved.",
+        "Сначала выберите WhatsApp для {hermes}: у чата два конца. Ничего не было сохранено.",
+    ),
+    (
+        "Its WhatsApp cannot also give it orders: that chat is the self-chat mode. Nothing was saved.",
+        "Его WhatsApp не может одновременно отдавать ему приказы: этот чат — режим self-chat. Ничего не было сохранено.",
+    ),
+    (
+        "At most 16 telephones can give it orders; these are {n}. Nothing was saved.",
+        "Приказы ему могут отдавать не более 16 телефонов; здесь их {n}. Ничего не было сохранено.",
+    ),
+    (
+        "1 typed telephone needs a look. Nothing was saved.",
+        "1 введённый телефон требует проверки. Ничего не было сохранено.",
+    ),
+    (
+        "{n} typed telephones need a look. Nothing was saved.",
+        "Введённых телефонов, требующих проверки: {n}. Ничего не было сохранено.",
+    ),
+    ("Line {n}", "Строка {n}"),
+    (
+        "Not a telephone: 8 to 15 digits, with + and the country code first.",
+        "Это не телефон: от 8 до 15 цифр, сначала + и код страны.",
+    ),
+    ("Not a number of Arauto.", "Это не номер Arauto."),
+    (
+        "The same telephone as line {n}: it counts once.",
+        "Тот же телефон, что в строке {n}: он считается один раз.",
+    ),
+    (
+        "The same telephone as {alias}, chosen above: it counts once.",
+        "Тот же телефон, что {alias}, выбранный выше: он считается один раз.",
+    ),
+    (
+        "This is its WhatsApp: it cannot also give it orders.",
+        "Это его WhatsApp: он не может одновременно отдавать ему приказы.",
+    ),
+    (
+        "Typed without +, so the first digits were read as the country code. If that is not its country, type + and the country code first. Saving again keeps it as read.",
+        "Введён без +, поэтому первые цифры прочитаны как код страны. Если это не его страна, сначала введите + и код страны. Повторное сохранение оставит его в том виде, как он прочитан.",
+    ),
+    (
+        "{n} of 16 telephones, with the numbers chosen above.",
+        "{n} из 16 телефонов, считая выбранные выше номера.",
+    ),
+    (
+        "These chats stop being protected",
+        "Эти чаты перестанут быть защищёнными",
+    ),
+    (
+        "Between {bridge}, its WhatsApp until now, and:",
+        "Между {bridge}, его прежним WhatsApp, и:",
+    ),
+    ("itself (self-chat mode)", "им самим (режим self-chat)"),
+    (
+        "Arauto will let every Hermes write again in these chats, and pass there for the person who gives {hermes} orders.",
+        "Arauto снова позволит любому Hermes писать в этих чатах и выдавать себя там за того, кто отдаёт приказы {hermes}.",
+    ),
+    ("Remove the protection", "Снять защиту"),
+    ("Save without protection", "Сохранить без защиты"),
+    ("What {alias} is for it", "Чем {alias} является для него"),
+    (
+        "A telephone that gives it orders",
+        "Телефон, который отдаёт ему приказы",
+    ),
+    (
+        "Its WhatsApp, where it takes orders",
+        "Его WhatsApp, где он принимает приказы",
+    ),
+    (
+        "takes orders on {alias} now",
+        "сейчас принимает приказы на {alias}",
+    ),
+    (
+        "{alias} gives it orders now",
+        "{alias} сейчас отдаёт ему приказы",
+    ),
+    (
+        "Nothing is saved here. The window of the Hermes opens with {alias} chosen.",
+        "Здесь ничего не сохраняется. Окно Hermes откроется с выбранным {alias}.",
+    ),
+    (
+        "Choose a Hermes and what {alias} is for it.",
+        "Выберите Hermes и чем {alias} является для него.",
+    ),
+    (
+        "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
+        "{alias} — WhatsApp {hermes}: он не может одновременно отдавать ему приказы.",
     ),
 ];

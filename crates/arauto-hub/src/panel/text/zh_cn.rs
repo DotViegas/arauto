@@ -1236,14 +1236,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "谁在 WhatsApp 上向 {hermes} 下达指令",
     ),
     (
-        "The telephone {hermes}'s WhatsApp runs on",
-        "{hermes} 的 WhatsApp 所运行的电话",
-    ),
-    (
-        "{hermes} takes orders here. Empty if it has no WhatsApp.",
-        "{hermes} 在这里接收指令。若它没有 WhatsApp，请留空。",
-    ),
-    (
         "This is the number {alias} in Arauto.",
         "这是 Arauto 中的号码 {alias}。",
     ),
@@ -1252,7 +1244,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Its own WhatsApp, in the chat with itself (self-chat mode)",
         "它自己的 WhatsApp，在与自己的聊天中（self-chat 模式）",
     ),
-    ("These telephones, one per line", "这些电话，每行一个"),
     (
         "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
         "Arauto 拒绝任何 Hermes（包括 {hermes}）在 {hermes} 接收这些指令的聊天中写入。读取则遵循访问权限。",
@@ -1262,14 +1253,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "如果这里没有记录任何内容，Arauto 不会拦截任何东西：能在 {hermes} 接收指令的聊天中写入的 Hermes，可能冒充你，或冒充下达指令的人。",
     ),
     (
-        "Type the telephone {hermes}'s WhatsApp runs on first.",
-        "请先输入 {hermes} 的 WhatsApp 所运行的电话。",
-    ),
-    (
         "{other} already takes orders on this telephone.",
         "{other} 已在这部电话上接收指令。",
     ),
-    ("At most 16 telephones.", "最多 16 个电话。"),
     (
         "Something failed in the hub. See the hub's log and check the record of the Hermes.",
         "hub 中出现故障。请查看 hub 的日志，并核对该 Hermes 的记录。",
@@ -1282,17 +1268,138 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
         "没有任何拦截：任何能在 {hermes} 接收指令的聊天中写入的 Hermes，都可以冒充下达指令的人。",
     ),
-    (
-        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
-        "Arauto 将再次允许任何 Hermes 在每个被移除的电话与 {hermes} 的 WhatsApp 之间的聊天中写入，并在那里冒充向 {hermes} 下达指令的人。",
-    ),
-    ("Save anyway", "仍然保存"),
     ("Go back", "返回"),
     ("gives orders to {hermes}", "向 {hermes} 下达指令"),
     ("{hermes} takes orders here", "{hermes} 在这里接收指令"),
     ("Orders on WhatsApp for {alias}", "{alias} 的 WhatsApp 指令"),
+    ("Its WhatsApp", "它的 WhatsApp"),
     (
-        "Choose the Hermes. Nothing is saved until you save in its window.",
-        "选择 Hermes。在其窗口中保存之前，不会保存任何内容。",
+        "The telephone {hermes}'s own WhatsApp runs on: {hermes} takes orders there.",
+        "{hermes} 自己的 WhatsApp 所运行的电话：{hermes} 在那里接收指令。",
+    ),
+    ("It has no WhatsApp", "它没有 WhatsApp"),
+    ("A number of Arauto", "Arauto 的一个号码"),
+    ("Choose a number", "选择一个号码"),
+    ("Another telephone", "另一部电话"),
+    (
+        "Read only when Another telephone is chosen. Start with + and the country code, like +55 11 9XXXX-XXXX.",
+        "仅在选择“另一部电话”时读取。以 + 和国家代码开头，例如 +55 11 9XXXX-XXXX。",
+    ),
+    ("These telephones", "这些电话"),
+    ("its WhatsApp", "它的 WhatsApp"),
+    ("Other telephones", "其他电话"),
+    (
+        "Telephones that are not numbers of Arauto, one per line. At most 16 telephones in all.",
+        "不是 Arauto 号码的电话，每行一个。总共最多 16 个电话。",
+    ),
+    (
+        "{alias} is chosen. Nothing is saved until you save.",
+        "已选择 {alias}。保存之前不会保存任何内容。",
+    ),
+    (
+        "{alias} is chosen as its WhatsApp, in place of {before}. Nothing is saved until you save.",
+        "已选择 {alias} 作为它的 WhatsApp，取代 {before}。保存之前不会保存任何内容。",
+    ),
+    (
+        "Choose an option for its WhatsApp. Nothing was saved.",
+        "请为它的 WhatsApp 选择一个选项。没有保存任何内容。",
+    ),
+    (
+        "{alias} is not a number of Arauto now. Nothing was saved.",
+        "{alias} 现在不是 Arauto 的号码。没有保存任何内容。",
+    ),
+    (
+        "Type the other telephone its WhatsApp runs on, or choose another option. Nothing was saved.",
+        "请输入它的 WhatsApp 所运行的另一部电话，或选择其他选项。没有保存任何内容。",
+    ),
+    (
+        "The other telephone of its WhatsApp is not a telephone: 8 to 15 digits, with + and the country code first. Nothing was saved.",
+        "它的 WhatsApp 的另一部电话不是有效电话：8 至 15 位数字，以 + 和国家代码开头。没有保存任何内容。",
+    ),
+    (
+        "Line {n} of Other telephones is not a telephone. Nothing was saved.",
+        "“其他电话”的第 {n} 行不是电话。没有保存任何内容。",
+    ),
+    (
+        "Its own chat and a list of telephones are two answers: clear the list, or choose These telephones. Nothing was saved.",
+        "它自己的聊天和电话列表是两种答案：请清空列表，或选择“这些电话”。没有保存任何内容。",
+    ),
+    (
+        "Choose {hermes}'s WhatsApp first: a chat has two ends. Nothing was saved.",
+        "请先选择 {hermes} 的 WhatsApp：一个聊天有两端。没有保存任何内容。",
+    ),
+    (
+        "Its WhatsApp cannot also give it orders: that chat is the self-chat mode. Nothing was saved.",
+        "它的 WhatsApp 不能同时向它下达指令：该聊天就是 self-chat 模式。没有保存任何内容。",
+    ),
+    (
+        "At most 16 telephones can give it orders; these are {n}. Nothing was saved.",
+        "最多 16 个电话可以向它下达指令；现在有 {n} 个。没有保存任何内容。",
+    ),
+    (
+        "1 typed telephone needs a look. Nothing was saved.",
+        "有 1 个输入的电话需要检查。没有保存任何内容。",
+    ),
+    (
+        "{n} typed telephones need a look. Nothing was saved.",
+        "有 {n} 个输入的电话需要检查。没有保存任何内容。",
+    ),
+    ("Line {n}", "第 {n} 行"),
+    (
+        "Not a telephone: 8 to 15 digits, with + and the country code first.",
+        "不是电话：8 至 15 位数字，以 + 和国家代码开头。",
+    ),
+    ("Not a number of Arauto.", "不是 Arauto 的号码。"),
+    (
+        "The same telephone as line {n}: it counts once.",
+        "与第 {n} 行是同一个电话：只计一次。",
+    ),
+    (
+        "The same telephone as {alias}, chosen above: it counts once.",
+        "与上面选择的 {alias} 是同一个电话：只计一次。",
+    ),
+    (
+        "This is its WhatsApp: it cannot also give it orders.",
+        "这是它的 WhatsApp：不能同时向它下达指令。",
+    ),
+    (
+        "Typed without +, so the first digits were read as the country code. If that is not its country, type + and the country code first. Saving again keeps it as read.",
+        "输入时没有 +，因此前几位数字被读作国家代码。如果这不是它所在的国家，请先输入 + 和国家代码。再次保存会保持读取的结果。",
+    ),
+    (
+        "{n} of 16 telephones, with the numbers chosen above.",
+        "{n} / 16 个电话，包含上面选择的号码。",
+    ),
+    ("These chats stop being protected", "这些聊天将不再受保护"),
+    (
+        "Between {bridge}, its WhatsApp until now, and:",
+        "在 {bridge}（它此前的 WhatsApp）与以下对象之间：",
+    ),
+    ("itself (self-chat mode)", "它自己（self-chat 模式）"),
+    (
+        "Arauto will let every Hermes write again in these chats, and pass there for the person who gives {hermes} orders.",
+        "Arauto 将再次允许任何 Hermes 在这些聊天中写入，并在那里冒充向 {hermes} 下达指令的人。",
+    ),
+    ("Remove the protection", "移除保护"),
+    ("Save without protection", "不受保护地保存"),
+    ("What {alias} is for it", "{alias} 对它而言是什么"),
+    ("A telephone that gives it orders", "向它下达指令的电话"),
+    (
+        "Its WhatsApp, where it takes orders",
+        "它的 WhatsApp，在这里接收指令",
+    ),
+    ("takes orders on {alias} now", "现在在 {alias} 上接收指令"),
+    ("{alias} gives it orders now", "{alias} 现在向它下达指令"),
+    (
+        "Nothing is saved here. The window of the Hermes opens with {alias} chosen.",
+        "此处不会保存任何内容。Hermes 的窗口将在选中 {alias} 的状态下打开。",
+    ),
+    (
+        "Choose a Hermes and what {alias} is for it.",
+        "请选择一个 Hermes，以及 {alias} 对它而言是什么。",
+    ),
+    (
+        "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
+        "{alias} 是 {hermes} 的 WhatsApp：不能同时向它下达指令。",
     ),
 ];

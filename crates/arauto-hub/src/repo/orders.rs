@@ -46,6 +46,8 @@ pub enum Invalid {
     NoTelephoneOfTheHermes,
     /// `self-chat` and a list are two answers to the same question.
     SelfChatWithAList,
+    /// The telephone the bridge runs on is also in the list: that chat is the self-chat mode.
+    BridgeAmongGivers,
     /// More than [`MAX_ORDERS_FROM`] telephones.
     TooMany,
 }
@@ -89,13 +91,21 @@ impl OrdersRecord {
         self.pairs().is_empty()
     }
 
+    /// The chats of this record that `after` leaves unprotected, in the order of
+    /// [`Self::pairs`].
+    #[must_use]
+    pub fn lost_in(&self, after: &Self) -> Vec<(Phone, Phone)> {
+        let kept = after.pairs();
+        self.pairs()
+            .into_iter()
+            .filter(|(a, b)| !kept.iter().any(|(c, d)| same(a, c) && same(b, d)))
+            .collect()
+    }
+
     /// Whether `after` leaves unprotected a chat that this record protects.
     #[must_use]
     pub fn loses_a_pair_in(&self, after: &Self) -> bool {
-        let kept = after.pairs();
-        self.pairs()
-            .iter()
-            .any(|(a, b)| !kept.iter().any(|(c, d)| same(a, c) && same(b, d)))
+        !self.lost_in(after).is_empty()
     }
 
     /// The rules of the record.
@@ -109,6 +119,11 @@ impl OrdersRecord {
         if (self.self_chat || !self.orders_from.is_empty()) && self.takes_orders_on.is_none() {
             return Err(Invalid::NoTelephoneOfTheHermes);
         }
+        if let Some(takes) = &self.takes_orders_on
+            && self.orders_from.iter().any(|from| same(takes, from))
+        {
+            return Err(Invalid::BridgeAmongGivers);
+        }
         if self.orders_from.len() > MAX_ORDERS_FROM {
             return Err(Invalid::TooMany);
         }
@@ -116,7 +131,7 @@ impl OrdersRecord {
     }
 
     /// The same record with each telephone once, sorted.
-    fn normalized(mut self) -> Self {
+    pub(crate) fn normalized(mut self) -> Self {
         let mut seen: Vec<Phone> = Vec::new();
         for phone in std::mem::take(&mut self.orders_from) {
             if !seen.iter().any(|known| same(known, &phone)) {
@@ -216,6 +231,49 @@ pub async fn get(
     read_in(&mut connection, organization, key, hermes).await
 }
 
+/// The Hermes, other than `hermes`, that already takes orders on `takes` (either form).
+async fn taken_in(
+    connection: &mut PgConnection,
+    organization: ResolvedOrg,
+    key: &OrganizationKey,
+    hermes: Uuid,
+    takes: &Phone,
+) -> Result<Option<HermesName>, RepoError> {
+    let digests: Vec<Vec<u8>> = digests_of(key, organization, takes)
+        .into_iter()
+        .map(|digest| digest.to_vec())
+        .collect();
+    let other: Option<String> = sqlx::query_scalar(
+        "SELECT h.name FROM hermes_whatsapp_phone_digest d          JOIN hermes_whatsapp_phone p            ON p.organization_id = d.organization_id AND p.id = d.phone_id          JOIN hermes h ON h.organization_id = p.organization_id AND h.id = p.hermes_id          WHERE d.organization_id = $1 AND d.role = 'takes_orders' AND d.digest = ANY($2)            AND p.hermes_id <> $3 AND h.deleted_at IS NULL          LIMIT 1",
+    )
+    .bind(organization.id())
+    .bind(&digests)
+    .bind(hermes)
+    .fetch_optional(connection)
+    .await?;
+    other
+        .map(|other| {
+            HermesName::parse(&other).map_err(|_| RepoError::Inconsistent("the name of a Hermes"))
+        })
+        .transpose()
+}
+
+/// Read-only: the Hermes, other than `hermes`, that already takes orders on `takes`. The panel
+/// says it before the window that asks; [`set`] checks again inside its write.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn bridge_taken_by(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    key: &OrganizationKey,
+    hermes: Uuid,
+    takes: &Phone,
+) -> Result<Option<HermesName>, RepoError> {
+    let mut connection = pool.acquire().await?;
+    taken_in(&mut connection, organization, key, hermes, takes).await
+}
+
 /// What [`set`] did.
 #[derive(Debug, Clone)]
 pub enum SetOutcome {
@@ -268,31 +326,11 @@ pub async fn set(
         write.rollback().await?;
         return Ok(SetOutcome::Unchanged(before));
     }
-    if let Some(takes) = &after.takes_orders_on {
-        let digests: Vec<Vec<u8>> = digests_of(key, organization, takes)
-            .into_iter()
-            .map(|digest| digest.to_vec())
-            .collect();
-        let other: Option<String> = sqlx::query_scalar(
-            "SELECT h.name FROM hermes_whatsapp_phone_digest d \
-             JOIN hermes_whatsapp_phone p \
-               ON p.organization_id = d.organization_id AND p.id = d.phone_id \
-             JOIN hermes h ON h.organization_id = p.organization_id AND h.id = p.hermes_id \
-             WHERE d.organization_id = $1 AND d.role = 'takes_orders' AND d.digest = ANY($2) \
-               AND p.hermes_id <> $3 AND h.deleted_at IS NULL \
-             LIMIT 1",
-        )
-        .bind(organization.id())
-        .bind(&digests)
-        .bind(hermes)
-        .fetch_optional(write.connection())
-        .await?;
-        if let Some(other) = other {
-            write.rollback().await?;
-            let other = HermesName::parse(&other)
-                .map_err(|_| RepoError::Inconsistent("the name of a Hermes"))?;
-            return Ok(SetOutcome::TelephoneTaken(other));
-        }
+    if let Some(takes) = &after.takes_orders_on
+        && let Some(other) = taken_in(write.connection(), organization, key, hermes, takes).await?
+    {
+        write.rollback().await?;
+        return Ok(SetOutcome::TelephoneTaken(other));
     }
     sqlx::query("DELETE FROM hermes_whatsapp_phone WHERE organization_id = $1 AND hermes_id = $2")
         .bind(organization.id())
@@ -626,6 +664,22 @@ mod tests {
         };
         assert_eq!(many.check(), Err(Invalid::TooMany));
         assert!(OrdersRecord::default().protects_nothing());
+        let among = OrdersRecord {
+            takes_orders_on: Some(phone("+5511987654321")),
+            self_chat: false,
+            orders_from: vec![phone("+5511987654321")],
+        };
+        assert_eq!(among.check(), Err(Invalid::BridgeAmongGivers));
+        let other_form = OrdersRecord {
+            orders_from: vec![phone("+551187654321")],
+            ..among.clone()
+        };
+        assert_eq!(other_form.check(), Err(Invalid::BridgeAmongGivers));
+        let both = OrdersRecord {
+            self_chat: true,
+            ..among
+        };
+        assert_eq!(both.check(), Err(Invalid::SelfChatWithAList));
     }
 
     #[test]
@@ -648,5 +702,24 @@ mod tests {
         };
         assert!(before.loses_a_pair_in(&cleared));
         assert!(!cleared.loses_a_pair_in(&before));
+    }
+
+    #[test]
+    fn the_pairs_that_go_are_named() {
+        let bridge = phone("+5511900000001");
+        let before = OrdersRecord {
+            takes_orders_on: Some(bridge.clone()),
+            self_chat: false,
+            orders_from: vec![phone("+5511900000002"), phone("+5511900000003")],
+        };
+        let after = OrdersRecord {
+            orders_from: vec![phone("+5511900000002")],
+            ..before.clone()
+        };
+        let lost = before.lost_in(&after);
+        assert_eq!(lost.len(), 1);
+        assert_eq!(lost[0].0.digits(), bridge.digits());
+        assert_eq!(lost[0].1.digits(), "5511900000003");
+        assert!(after.lost_in(&before).is_empty());
     }
 }

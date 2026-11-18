@@ -1272,14 +1272,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "WhatsApp पर {hermes} को आदेश कौन देता है",
     ),
     (
-        "The telephone {hermes}'s WhatsApp runs on",
-        "वह फ़ोन जिस पर {hermes} का WhatsApp चलता है",
-    ),
-    (
-        "{hermes} takes orders here. Empty if it has no WhatsApp.",
-        "{hermes} यहीं आदेश लेता है। WhatsApp न हो तो खाली छोड़ें।",
-    ),
-    (
         "This is the number {alias} in Arauto.",
         "यह Arauto में नंबर {alias} है।",
     ),
@@ -1288,7 +1280,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Its own WhatsApp, in the chat with itself (self-chat mode)",
         "उसका अपना WhatsApp, खुद से की गई चैट में (self-chat मोड)",
     ),
-    ("These telephones, one per line", "ये फ़ोन, हर पंक्ति में एक"),
     (
         "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
         "Arauto हर Hermes को, {hermes} को भी, उस चैट में लिखने से रोकता है जहाँ {hermes} ये आदेश लेता है। पढ़ना एक्सेस के अनुसार चलता है।",
@@ -1298,14 +1289,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "यहाँ कुछ दर्ज न हो तो Arauto कुछ नहीं रोकता: जो Hermes उस चैट में लिख सकता है जहाँ {hermes} आदेश लेता है, वह आपके या आदेश देने वाले के रूप में पेश आ सकता है।",
     ),
     (
-        "Type the telephone {hermes}'s WhatsApp runs on first.",
-        "पहले वह फ़ोन लिखें जिस पर {hermes} का WhatsApp चलता है।",
-    ),
-    (
         "{other} already takes orders on this telephone.",
         "{other} पहले से इसी फ़ोन पर आदेश लेता है।",
     ),
-    ("At most 16 telephones.", "अधिकतम 16 फ़ोन।"),
     (
         "Something failed in the hub. See the hub's log and check the record of the Hermes.",
         "हब में कुछ विफल हुआ। हब का लॉग देखें और Hermes की प्रविष्टि जाँचें।",
@@ -1318,11 +1304,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
         "कुछ भी अवरुद्ध नहीं है: जो भी Hermes उस चैट में लिख सकता है जहाँ {hermes} आदेश लेता है, वह आदेश देने वाले व्यक्ति के रूप में पेश आ सकता है।",
     ),
-    (
-        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
-        "Arauto हर Hermes को फिर से हटाए गए हर फ़ोन और {hermes} के WhatsApp के बीच की चैट में लिखने देगा, और वहाँ {hermes} को आदेश देने वाले व्यक्ति के रूप में पेश आने देगा।",
-    ),
-    ("Save anyway", "फिर भी सहेजें"),
     ("Go back", "वापस जाएँ"),
     ("gives orders to {hermes}", "{hermes} को आदेश देता है"),
     ("{hermes} takes orders here", "{hermes} यहाँ आदेश लेता है"),
@@ -1330,8 +1311,137 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Orders on WhatsApp for {alias}",
         "{alias} के लिए WhatsApp पर आदेश",
     ),
+    ("Its WhatsApp", "उसका WhatsApp"),
     (
-        "Choose the Hermes. Nothing is saved until you save in its window.",
-        "Hermes चुनें। जब तक आप उसकी विंडो में सहेजें नहीं, कुछ भी सहेजा नहीं जाता।",
+        "The telephone {hermes}'s own WhatsApp runs on: {hermes} takes orders there.",
+        "वह फ़ोन जिस पर {hermes} का अपना WhatsApp चलता है: {hermes} वहीं आदेश लेता है।",
+    ),
+    ("It has no WhatsApp", "उसके पास WhatsApp नहीं है"),
+    ("A number of Arauto", "Arauto का एक नंबर"),
+    ("Choose a number", "एक नंबर चुनें"),
+    ("Another telephone", "कोई और फ़ोन"),
+    (
+        "Read only when Another telephone is chosen. Start with + and the country code, like +55 11 9XXXX-XXXX.",
+        "केवल तब पढ़ा जाता है जब कोई और फ़ोन चुना हो। + और देश कोड से शुरू करें, जैसे +55 11 9XXXX-XXXX।",
+    ),
+    ("These telephones", "ये फ़ोन"),
+    ("its WhatsApp", "उसका WhatsApp"),
+    ("Other telephones", "अन्य फ़ोन"),
+    (
+        "Telephones that are not numbers of Arauto, one per line. At most 16 telephones in all.",
+        "वे फ़ोन जो Arauto के नंबर नहीं हैं, हर पंक्ति में एक। कुल मिलाकर अधिकतम 16 फ़ोन।",
+    ),
+    (
+        "{alias} is chosen. Nothing is saved until you save.",
+        "{alias} चुना गया है। जब तक आप सहेजें नहीं, कुछ भी सहेजा नहीं जाता।",
+    ),
+    (
+        "{alias} is chosen as its WhatsApp, in place of {before}. Nothing is saved until you save.",
+        "{before} की जगह {alias} को उसके WhatsApp के रूप में चुना गया है। जब तक आप सहेजें नहीं, कुछ भी सहेजा नहीं जाता।",
+    ),
+    (
+        "Choose an option for its WhatsApp. Nothing was saved.",
+        "उसके WhatsApp के लिए कोई विकल्प चुनें। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "{alias} is not a number of Arauto now. Nothing was saved.",
+        "{alias} अब Arauto का नंबर नहीं है। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "Type the other telephone its WhatsApp runs on, or choose another option. Nothing was saved.",
+        "वह दूसरा फ़ोन लिखें जिस पर उसका WhatsApp चलता है, या कोई और विकल्प चुनें। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "The other telephone of its WhatsApp is not a telephone: 8 to 15 digits, with + and the country code first. Nothing was saved.",
+        "उसके WhatsApp का दूसरा फ़ोन मान्य फ़ोन नहीं है: 8 से 15 अंक, पहले + और देश कोड के साथ। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "Line {n} of Other telephones is not a telephone. Nothing was saved.",
+        "अन्य फ़ोन की पंक्ति {n} फ़ोन नहीं है। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "Its own chat and a list of telephones are two answers: clear the list, or choose These telephones. Nothing was saved.",
+        "उसकी अपनी चैट और फ़ोनों की सूची दो अलग उत्तर हैं: सूची खाली करें, या ये फ़ोन चुनें। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "Choose {hermes}'s WhatsApp first: a chat has two ends. Nothing was saved.",
+        "पहले {hermes} का WhatsApp चुनें: चैट के दो सिरे होते हैं। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "Its WhatsApp cannot also give it orders: that chat is the self-chat mode. Nothing was saved.",
+        "उसका WhatsApp उसे आदेश भी नहीं दे सकता: वह चैट self-chat मोड है। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "At most 16 telephones can give it orders; these are {n}. Nothing was saved.",
+        "अधिकतम 16 फ़ोन उसे आदेश दे सकते हैं; ये {n} हैं। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "1 typed telephone needs a look. Nothing was saved.",
+        "लिखे गए 1 फ़ोन को देखना ज़रूरी है। कुछ भी सहेजा नहीं गया।",
+    ),
+    (
+        "{n} typed telephones need a look. Nothing was saved.",
+        "लिखे गए {n} फ़ोनों को देखना ज़रूरी है। कुछ भी सहेजा नहीं गया।",
+    ),
+    ("Line {n}", "पंक्ति {n}"),
+    (
+        "Not a telephone: 8 to 15 digits, with + and the country code first.",
+        "फ़ोन नहीं है: 8 से 15 अंक, पहले + और देश कोड के साथ।",
+    ),
+    ("Not a number of Arauto.", "Arauto का नंबर नहीं है।"),
+    (
+        "The same telephone as line {n}: it counts once.",
+        "यह पंक्ति {n} वाला ही फ़ोन है: यह एक बार गिना जाता है।",
+    ),
+    (
+        "The same telephone as {alias}, chosen above: it counts once.",
+        "यह ऊपर चुने गए {alias} वाला ही फ़ोन है: यह एक बार गिना जाता है।",
+    ),
+    (
+        "This is its WhatsApp: it cannot also give it orders.",
+        "यह उसका WhatsApp है: यह उसे आदेश भी नहीं दे सकता।",
+    ),
+    (
+        "Typed without +, so the first digits were read as the country code. If that is not its country, type + and the country code first. Saving again keeps it as read.",
+        "+ के बिना लिखा गया, इसलिए पहले अंक देश कोड के रूप में पढ़े गए। अगर यह उसका देश नहीं है, तो पहले + और देश कोड लिखें। दोबारा सहेजने पर यह वैसा ही रहेगा जैसा पढ़ा गया।",
+    ),
+    (
+        "{n} of 16 telephones, with the numbers chosen above.",
+        "16 में से {n} फ़ोन, ऊपर चुने गए नंबरों सहित।",
+    ),
+    (
+        "These chats stop being protected",
+        "ये चैट अब सुरक्षित नहीं रहेंगी",
+    ),
+    (
+        "Between {bridge}, its WhatsApp until now, and:",
+        "{bridge} (अब तक उसका WhatsApp) और इनके बीच:",
+    ),
+    ("itself (self-chat mode)", "वह खुद (self-chat मोड)"),
+    (
+        "Arauto will let every Hermes write again in these chats, and pass there for the person who gives {hermes} orders.",
+        "Arauto हर Hermes को फिर से इन चैट में लिखने देगा, और वहाँ {hermes} को आदेश देने वाले व्यक्ति के रूप में पेश होने देगा।",
+    ),
+    ("Remove the protection", "सुरक्षा हटाएँ"),
+    ("Save without protection", "बिना सुरक्षा के सहेजें"),
+    ("What {alias} is for it", "{alias} उसके लिए क्या है"),
+    ("A telephone that gives it orders", "वह फ़ोन जो उसे आदेश देता है"),
+    (
+        "Its WhatsApp, where it takes orders",
+        "उसका WhatsApp, जहाँ वह आदेश लेता है",
+    ),
+    ("takes orders on {alias} now", "अभी {alias} पर आदेश लेता है"),
+    ("{alias} gives it orders now", "{alias} अभी उसे आदेश देता है"),
+    (
+        "Nothing is saved here. The window of the Hermes opens with {alias} chosen.",
+        "यहाँ कुछ भी सहेजा नहीं जाता। {alias} चुने हुए के साथ Hermes की विंडो खुलती है।",
+    ),
+    (
+        "Choose a Hermes and what {alias} is for it.",
+        "कोई Hermes चुनें और यह भी कि {alias} उसके लिए क्या है।",
+    ),
+    (
+        "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
+        "{alias} {hermes} का WhatsApp है: यह उसे आदेश भी नहीं दे सकता।",
     ),
 ];

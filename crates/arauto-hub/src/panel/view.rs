@@ -918,7 +918,7 @@ pub(super) fn numbers_into(html: &mut Html, frame: &Frame, page: &NumbersPage, o
         for tag in &row.tags {
             html.raw("<a class=\"tag\" href=\"/hermes/whatsapp?name=")
                 .text(&tag.hermes)
-                .raw("\">")
+                .raw("&amp;return=whatsapps\">")
                 .fill(
                     if tag.takes_orders_here {
                         k("{hermes} takes orders here")

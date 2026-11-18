@@ -159,6 +159,10 @@ pub struct PanelState {
     relying: Option<RelyingParty>,
     /// The pairings of WhatsApp numbers this panel runs, in memory only ([`pairing`]).
     pub(crate) pairings: pairing::Pairings,
+    /// The key of the acknowledgement of typed telephones that need a look ([`orders`]),
+    /// drawn from the system's generator and kept in memory only. `None` when the draw failed:
+    /// no acknowledgement is then written or accepted.
+    orders_ack: Option<arauto_protocol::secret::Secret<32>>,
 }
 
 impl PanelState {
@@ -188,7 +192,19 @@ impl PanelState {
                 .collect(),
             relying: RelyingParty::new(&url.origin()).ok(),
             pairings: pairing::Pairings::default(),
+            orders_ack: arauto_protocol::secret::Secret::random()
+                .inspect_err(|_| {
+                    tracing::error!(
+                        "the panel could not draw the key of the orders acknowledgement"
+                    );
+                })
+                .ok(),
         }
+    }
+
+    /// The key of the acknowledgement of typed telephones, when it could be drawn.
+    pub(crate) const fn orders_ack(&self) -> Option<&arauto_protocol::secret::Secret<32>> {
+        self.orders_ack.as_ref()
     }
 
     /// The organization this panel serves, found when the hub started: the one the first access

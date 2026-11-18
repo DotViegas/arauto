@@ -1338,14 +1338,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Qui donne des ordres à {hermes} sur WhatsApp",
     ),
     (
-        "The telephone {hermes}'s WhatsApp runs on",
-        "Le téléphone sur lequel tourne le WhatsApp de {hermes}",
-    ),
-    (
-        "{hermes} takes orders here. Empty if it has no WhatsApp.",
-        "{hermes} reçoit ses ordres ici. Vide s'il n'a pas de WhatsApp.",
-    ),
-    (
         "This is the number {alias} in Arauto.",
         "C'est le numéro {alias} dans Arauto.",
     ),
@@ -1353,10 +1345,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Its own WhatsApp, in the chat with itself (self-chat mode)",
         "Son propre WhatsApp, dans la conversation avec lui-même (mode self-chat)",
-    ),
-    (
-        "These telephones, one per line",
-        "Ces téléphones, un par ligne",
     ),
     (
         "Arauto refuses every Hermes, {hermes} included, writing in the chat where {hermes} takes these orders. Who reads it follows the accesses.",
@@ -1367,14 +1355,9 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Si rien n'est enregistré ici, Arauto ne bloque rien : un Hermes qui peut écrire dans la conversation où {hermes} reçoit ses ordres pourrait se faire passer pour vous, ou pour celui qui les donne.",
     ),
     (
-        "Type the telephone {hermes}'s WhatsApp runs on first.",
-        "Saisissez d'abord le téléphone sur lequel tourne le WhatsApp de {hermes}.",
-    ),
-    (
         "{other} already takes orders on this telephone.",
         "{other} reçoit déjà des ordres sur ce téléphone.",
     ),
-    ("At most 16 telephones.", "16 téléphones au plus."),
     (
         "Something failed in the hub. See the hub's log and check the record of the Hermes.",
         "Une erreur s'est produite dans le hub. Consultez le journal du hub et vérifiez ce qui est enregistré pour le Hermes.",
@@ -1387,11 +1370,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Nothing is blocked: any Hermes that can write in the chat where {hermes} takes orders can pass for the person who gives them.",
         "Rien n'est bloqué : tout Hermes qui peut écrire dans la conversation où {hermes} reçoit ses ordres peut se faire passer pour la personne qui les donne.",
     ),
-    (
-        "Arauto will let every Hermes write again in the chat between each removed telephone and {hermes}'s WhatsApp, and pass there for the person who gives {hermes} orders.",
-        "Arauto laissera de nouveau tout Hermes écrire dans la conversation entre chaque téléphone retiré et le WhatsApp de {hermes}, et s'y faire passer pour la personne qui donne des ordres à {hermes}.",
-    ),
-    ("Save anyway", "Enregistrer quand même"),
     ("Go back", "Revenir en arrière"),
     ("gives orders to {hermes}", "donne des ordres à {hermes}"),
     (
@@ -1402,8 +1380,149 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Orders on WhatsApp for {alias}",
         "Ordres sur WhatsApp pour {alias}",
     ),
+    ("Its WhatsApp", "Son WhatsApp"),
     (
-        "Choose the Hermes. Nothing is saved until you save in its window.",
-        "Choisissez le Hermes. Rien n'est enregistré avant que vous n'enregistriez dans sa fenêtre.",
+        "The telephone {hermes}'s own WhatsApp runs on: {hermes} takes orders there.",
+        "Le téléphone sur lequel tourne le propre WhatsApp de {hermes} : {hermes} y reçoit ses ordres.",
+    ),
+    ("It has no WhatsApp", "Il n'a pas de WhatsApp"),
+    ("A number of Arauto", "Un numéro d'Arauto"),
+    ("Choose a number", "Choisissez un numéro"),
+    ("Another telephone", "Un autre téléphone"),
+    (
+        "Read only when Another telephone is chosen. Start with + and the country code, like +55 11 9XXXX-XXXX.",
+        "Lu seulement si Un autre téléphone est choisi. Commencez par + et l'indicatif du pays, comme +55 11 9XXXX-XXXX.",
+    ),
+    ("These telephones", "Ces téléphones"),
+    ("its WhatsApp", "son WhatsApp"),
+    ("Other telephones", "Autres téléphones"),
+    (
+        "Telephones that are not numbers of Arauto, one per line. At most 16 telephones in all.",
+        "Téléphones qui ne sont pas des numéros d'Arauto, un par ligne. 16 téléphones au plus en tout.",
+    ),
+    (
+        "{alias} is chosen. Nothing is saved until you save.",
+        "{alias} est choisi. Rien n'est enregistré avant que vous enregistriez.",
+    ),
+    (
+        "{alias} is chosen as its WhatsApp, in place of {before}. Nothing is saved until you save.",
+        "{alias} est choisi comme son WhatsApp, à la place de {before}. Rien n'est enregistré avant que vous enregistriez.",
+    ),
+    (
+        "Choose an option for its WhatsApp. Nothing was saved.",
+        "Choisissez une option pour son WhatsApp. Rien n'a été enregistré.",
+    ),
+    (
+        "{alias} is not a number of Arauto now. Nothing was saved.",
+        "{alias} n'est plus un numéro d'Arauto. Rien n'a été enregistré.",
+    ),
+    (
+        "Type the other telephone its WhatsApp runs on, or choose another option. Nothing was saved.",
+        "Saisissez l'autre téléphone sur lequel tourne son WhatsApp, ou choisissez une autre option. Rien n'a été enregistré.",
+    ),
+    (
+        "The other telephone of its WhatsApp is not a telephone: 8 to 15 digits, with + and the country code first. Nothing was saved.",
+        "L'autre téléphone de son WhatsApp n'est pas un téléphone : de 8 à 15 chiffres, en commençant par + et l'indicatif du pays. Rien n'a été enregistré.",
+    ),
+    (
+        "Line {n} of Other telephones is not a telephone. Nothing was saved.",
+        "La ligne {n} de Autres téléphones n'est pas un téléphone. Rien n'a été enregistré.",
+    ),
+    (
+        "Its own chat and a list of telephones are two answers: clear the list, or choose These telephones. Nothing was saved.",
+        "Sa propre conversation et une liste de téléphones sont deux réponses : videz la liste, ou choisissez Ces téléphones. Rien n'a été enregistré.",
+    ),
+    (
+        "Choose {hermes}'s WhatsApp first: a chat has two ends. Nothing was saved.",
+        "Choisissez d'abord le WhatsApp de {hermes} : une conversation a deux bouts. Rien n'a été enregistré.",
+    ),
+    (
+        "Its WhatsApp cannot also give it orders: that chat is the self-chat mode. Nothing was saved.",
+        "Son WhatsApp ne peut pas aussi lui donner des ordres : cette conversation est le mode self-chat. Rien n'a été enregistré.",
+    ),
+    (
+        "At most 16 telephones can give it orders; these are {n}. Nothing was saved.",
+        "16 téléphones au plus peuvent lui donner des ordres ; en voici {n}. Rien n'a été enregistré.",
+    ),
+    (
+        "1 typed telephone needs a look. Nothing was saved.",
+        "1 téléphone saisi demande un contrôle. Rien n'a été enregistré.",
+    ),
+    (
+        "{n} typed telephones need a look. Nothing was saved.",
+        "{n} téléphones saisis demandent un contrôle. Rien n'a été enregistré.",
+    ),
+    ("Line {n}", "Ligne {n}"),
+    (
+        "Not a telephone: 8 to 15 digits, with + and the country code first.",
+        "Ce n'est pas un téléphone : de 8 à 15 chiffres, en commençant par + et l'indicatif du pays.",
+    ),
+    (
+        "Not a number of Arauto.",
+        "Ce n'est pas un numéro d'Arauto.",
+    ),
+    (
+        "The same telephone as line {n}: it counts once.",
+        "Le même téléphone que la ligne {n} : il ne compte qu'une fois.",
+    ),
+    (
+        "The same telephone as {alias}, chosen above: it counts once.",
+        "Le même téléphone que {alias}, choisi plus haut : il ne compte qu'une fois.",
+    ),
+    (
+        "This is its WhatsApp: it cannot also give it orders.",
+        "C'est son WhatsApp : il ne peut pas aussi lui donner des ordres.",
+    ),
+    (
+        "Typed without +, so the first digits were read as the country code. If that is not its country, type + and the country code first. Saving again keeps it as read.",
+        "Saisi sans +, donc les premiers chiffres ont été lus comme l'indicatif du pays. Si ce n'est pas son pays, saisissez d'abord + et l'indicatif du pays. Enregistrer de nouveau le garde tel qu'il a été lu.",
+    ),
+    (
+        "{n} of 16 telephones, with the numbers chosen above.",
+        "{n} téléphones sur 16, avec les numéros choisis plus haut.",
+    ),
+    (
+        "These chats stop being protected",
+        "Ces conversations ne seront plus protégées",
+    ),
+    (
+        "Between {bridge}, its WhatsApp until now, and:",
+        "Entre {bridge}, son WhatsApp jusqu'ici, et :",
+    ),
+    ("itself (self-chat mode)", "lui-même (mode self-chat)"),
+    (
+        "Arauto will let every Hermes write again in these chats, and pass there for the person who gives {hermes} orders.",
+        "Arauto laissera de nouveau tout Hermes écrire dans ces conversations, et s'y faire passer pour la personne qui donne des ordres à {hermes}.",
+    ),
+    ("Remove the protection", "Retirer la protection"),
+    ("Save without protection", "Enregistrer sans protection"),
+    ("What {alias} is for it", "Ce que {alias} est pour lui"),
+    (
+        "A telephone that gives it orders",
+        "Un téléphone qui lui donne des ordres",
+    ),
+    (
+        "Its WhatsApp, where it takes orders",
+        "Son WhatsApp, où il reçoit ses ordres",
+    ),
+    (
+        "takes orders on {alias} now",
+        "reçoit ses ordres sur {alias} actuellement",
+    ),
+    (
+        "{alias} gives it orders now",
+        "{alias} lui donne des ordres actuellement",
+    ),
+    (
+        "Nothing is saved here. The window of the Hermes opens with {alias} chosen.",
+        "Rien n'est enregistré ici. La fenêtre du Hermes s'ouvre avec {alias} choisi.",
+    ),
+    (
+        "Choose a Hermes and what {alias} is for it.",
+        "Choisissez un Hermes et ce que {alias} est pour lui.",
+    ),
+    (
+        "{alias} is the WhatsApp of {hermes}: it cannot also give it orders.",
+        "{alias} est le WhatsApp de {hermes} : il ne peut pas aussi lui donner des ordres.",
     ),
 ];

@@ -176,9 +176,21 @@ impl FormError {
 pub(super) struct Form(Zeroizing<Vec<u8>>);
 
 impl Form {
+    /// A form of a test, from its body.
+    #[cfg(test)]
+    pub(super) fn of(body: &[u8]) -> Self {
+        Self(Zeroizing::new(body.to_vec()))
+    }
+
     /// The value of a field, decoded. A field that did not come, or is not text, is none.
     pub(super) fn field(&self, name: &str) -> Option<Zeroizing<String>> {
         field_of(&self.0, name)
+    }
+
+    /// Every value of a field, decoded, in the order of the form. A value that is not text is
+    /// left out.
+    pub(super) fn fields(&self, name: &str) -> Vec<Zeroizing<String>> {
+        fields_of(&self.0, name)
     }
 }
 
@@ -249,6 +261,21 @@ fn field_of(body: &[u8], field: &str) -> Option<Zeroizing<String>> {
     })
 }
 
+/// Every value of `field` in a form body, decoded, in order. A bare name is an empty value.
+fn fields_of(body: &[u8], field: &str) -> Vec<Zeroizing<String>> {
+    body.split(|byte| *byte == b'&')
+        .filter_map(|pair| {
+            let mut halves = pair.splitn(2, |byte| *byte == b'=');
+            let name = halves.next()?;
+            let value = halves.next().unwrap_or_default();
+            if decode(name)?.as_str() != field {
+                return None;
+            }
+            decode(value)
+        })
+        .collect()
+}
+
 /// Decodes the encoding of a form: `+` is a space and `%XX` is a byte.
 fn decode(encoded: &[u8]) -> Option<Zeroizing<String>> {
     let mut bytes = Zeroizing::new(Vec::with_capacity(encoded.len()));
@@ -279,6 +306,19 @@ mod tests {
             map.append(*name, HeaderValue::from_static(value));
         }
         map
+    }
+
+    #[test]
+    fn every_value_of_a_repeated_field_comes_in_order() {
+        let form = Form(Zeroizing::new(b"a=1&b=2&a=%2B3&a".to_vec()));
+        let a: Vec<String> = form
+            .fields("a")
+            .iter()
+            .map(|v| v.as_str().to_owned())
+            .collect();
+        assert_eq!(a, ["1", "+3", ""]);
+        assert_eq!(form.fields("b").len(), 1);
+        assert!(form.fields("c").is_empty());
     }
 
     #[test]
