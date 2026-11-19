@@ -16,7 +16,8 @@
 //!   output, a one-line `[a, b]` included (it may be a text value), is "unreadable", and then
 //!   nothing is written.
 //! - Nothing is rolled back, and Hermes is never restarted.
-//! - Not tried: whether a woken run then calls the Arauto tools, whether a running gateway needs a
+//! - Seen once (P4, 19/11/2026): with `arauto` in the list and the gateway restarted, a woken run
+//!   read the notes and answered through Arauto. Not tried: whether a running gateway needs a
 //!   restart to use the new list, and what `[]` means for a woken run (an empty list is left alone
 //!   because its meaning is unknown).
 
