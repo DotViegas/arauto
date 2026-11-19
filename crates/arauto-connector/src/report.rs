@@ -1,6 +1,8 @@
 //! `status`: the hub, the version, the situation of the device and whether the Hermes can be
 //! woken (`docs/11-conector.md`, section 1). It reads the files and asks the leader through the
-//! local socket; it never opens a connection to the hub, and shows no secret.
+//! local socket; it never opens a connection to the hub, and shows no secret. It changes nothing.
+//! When the entry carries the reference to the key it runs one command of Hermes, a read of the
+//! list of tools of the runs a notice wakes (`crate::toolsets`).
 //!
 //! **The key of the local API of Hermes** is what the leader holds, not what this process has:
 //! the line comes from the answer of the leader and never from the environment of the process
@@ -14,10 +16,12 @@ use arauto_protocol::tools::ToolName;
 
 use crate::ask;
 use crate::catalog::Told;
+use crate::hermes::Hermes;
 use crate::home::Home;
 use crate::settings::Settings;
 use crate::status::{ChannelStatus, Status};
 use crate::store::{self, Current, Situation};
+use crate::toolsets::RunTools;
 use crate::wake::LastWake;
 
 /// What the files say about one folder.
@@ -58,17 +62,29 @@ pub struct Report {
     pub entry: Option<EntryReport>,
     /// What the leader in execution says, when one answers.
     pub leader: Option<Status>,
+    /// The list of tools of the runs a notice wakes, read now; only when the entry carries the
+    /// reference to the key.
+    pub run_tools: Option<RunTools>,
+    /// What `join` recorded about that list.
+    pub recorded: Option<RunTools>,
 }
 
 /// Reads the files and asks the leader.
-pub async fn report(home: &Home, settings: &Settings) -> Report {
+pub async fn report(home: &Home, hermes: &Hermes, settings: &Settings) -> Report {
     let files = {
         let home = home.clone();
-        tokio::task::spawn_blocking(move || (store::scan(&home), store::read_state(&home))).await
+        tokio::task::spawn_blocking(move || {
+            (
+                store::scan(&home),
+                store::read_state(&home),
+                store::read_run_tools(&home),
+            )
+        })
+        .await
     };
-    let (layout, state) = match files {
-        Ok((layout, state)) => (layout.ok(), state.ok()),
-        Err(_) => (None, None),
+    let (layout, state, recorded) = match files {
+        Ok((layout, state, recorded)) => (layout.ok(), state.ok(), Some(recorded)),
+        Err(_) => (None, None, None),
     };
     let leader = match ask::ask(home, ask::operation("status"), settings.local_answer_ms).await {
         Ok(answer) => answer.get("status").and_then(Status::from_json),
@@ -87,6 +103,8 @@ pub async fn report(home: &Home, settings: &Settings) -> Report {
         tools: state.map(|state| state.tools).unwrap_or_default(),
         entry: None,
         leader,
+        run_tools: None,
+        recorded,
     };
     if let Some(layout) = layout {
         report.damaged |= layout.current == Current::Damaged
@@ -111,7 +129,45 @@ pub async fn report(home: &Home, settings: &Settings) -> Report {
         report.device = device.map(folder);
         report.request = request.map(folder);
     }
+    if report
+        .entry
+        .is_some_and(|entry| entry.registered && entry.key_reference == Some(true))
+    {
+        report.run_tools = crate::toolsets::read_now(hermes, settings).await;
+    }
     report
+}
+
+/// The line about the tools of the runs a notice wakes, and the sentences that go with it.
+fn run_tools_lines(text: &mut String, now: RunTools, recorded: Option<RunTools>) {
+    let (line, told): (&str, Option<Told>) = match now {
+        RunTools::Included => (
+            "the list of the api_server platform includes arauto",
+            (recorded == Some(RunTools::Added)).then_some(Told::RunToolsAddedByJoin),
+        ),
+        RunTools::Default => (
+            "no list for the api_server platform (Hermes gives its default tools)",
+            None,
+        ),
+        RunTools::Missing => (
+            "the list of the api_server platform does not include arauto",
+            Some(Told::RunToolsMissing),
+        ),
+        RunTools::Empty => (
+            "the list of the api_server platform is empty (cannot tell)",
+            Some(Told::RunToolsEmpty),
+        ),
+        RunTools::Unreadable => (
+            "unknown (the list of the api_server platform could not be read)",
+            Some(Told::RunToolsUnreadable),
+        ),
+        // The live read never yields these two.
+        RunTools::Added | RunTools::NotChecked => return,
+    };
+    let _ = writeln!(text, "Tools of woken runs: {line}");
+    if let Some(told) = told {
+        let _ = writeln!(text, "{}", told.phrase());
+    }
 }
 
 fn situation(situation: Option<Situation>) -> String {
@@ -218,6 +274,9 @@ pub fn render(report: &Report) -> String {
     if let Some(entry) = &report.entry {
         let _ = writeln!(text, "Entry in Hermes: {}", entry_line(entry));
     }
+    if let Some(now) = report.run_tools {
+        run_tools_lines(&mut text, now, report.recorded);
+    }
     match &report.leader {
         Some(leader) => {
             let process = leader
@@ -310,6 +369,8 @@ mod tests {
             tools: Vec::new(),
             entry,
             leader,
+            run_tools: None,
+            recorded: None,
         }
     }
 
@@ -446,5 +507,68 @@ mod tests {
                 "{text}"
             );
         }
+    }
+
+    /// T2: each live state has its line and its sentence; the reminder of `join` only when the
+    /// list includes `arauto` and `join` was the one that added it.
+    #[test]
+    fn the_tools_of_woken_runs_are_said_for_each_state() {
+        let table: [(RunTools, &str, &[Told]); 5] = [
+            (
+                RunTools::Included,
+                "Tools of woken runs: the list of the api_server platform includes arauto\n",
+                &[],
+            ),
+            (
+                RunTools::Default,
+                "Tools of woken runs: no list for the api_server platform (Hermes gives its default tools)\n",
+                &[],
+            ),
+            (
+                RunTools::Missing,
+                "Tools of woken runs: the list of the api_server platform does not include arauto\n",
+                &[Told::RunToolsMissing],
+            ),
+            (
+                RunTools::Empty,
+                "Tools of woken runs: the list of the api_server platform is empty (cannot tell)\n",
+                &[Told::RunToolsEmpty],
+            ),
+            (
+                RunTools::Unreadable,
+                "Tools of woken runs: unknown (the list of the api_server platform could not be read)\n",
+                &[Told::RunToolsUnreadable],
+            ),
+        ];
+        let run_tools_told = [
+            Told::RunToolsIncluded,
+            Told::RunToolsDefault,
+            Told::RunToolsAddedByJoin,
+            Told::RunToolsMissing,
+            Told::RunToolsEmpty,
+            Told::RunToolsUnreadable,
+        ];
+        for (state, line, told) in table {
+            let mut shown = report(entry(true, Some(true)), None);
+            shown.run_tools = Some(state);
+            let text = render(&shown);
+            let entry_at = text.find("Entry in Hermes").unwrap();
+            let line_at = text.find(line).unwrap_or_else(|| panic!("{text}"));
+            assert!(line_at > entry_at, "{text}");
+            for phrase in run_tools_told {
+                assert_eq!(
+                    text.contains(phrase.phrase()),
+                    told.contains(&phrase),
+                    "{phrase:?} {text}"
+                );
+            }
+        }
+        let mut shown = report(entry(true, Some(true)), None);
+        shown.run_tools = Some(RunTools::Included);
+        shown.recorded = Some(RunTools::Added);
+        assert!(render(&shown).contains(Told::RunToolsAddedByJoin.phrase()));
+        shown.recorded = Some(RunTools::Included);
+        assert!(!render(&shown).contains(Told::RunToolsAddedByJoin.phrase()));
+        assert!(!render(&report(entry(true, Some(true)), None)).contains("Tools of woken runs"));
     }
 }

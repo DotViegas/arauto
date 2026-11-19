@@ -25,11 +25,11 @@ that has not received a credential yet.
 
 | Command | What it does |
 |---|---|
-| `join HUB KEY INVITE` | Creates the folder of the request with a new identity and does the enrollment with the hub of that key. If the hub accepts, it copies itself to the fixed path `~/.arauto/arauto-connector` (through a temporary file and a rename, because the old program may be running), registers the tool server in Hermes and shows the verification code. Then, only when this Hermes has no key for its local API, it makes one (section 6). It ends in seconds, or up to a minute later when it looks for a key. With `--no-register`, for development, it skips the registration. |
+| `join HUB KEY INVITE` | Creates the folder of the request with a new identity and does the enrollment with the hub of that key. If the hub accepts, it copies itself to the fixed path `~/.arauto/arauto-connector` (through a temporary file and a rename, because the old program may be running), registers the tool server in Hermes and shows the verification code. Then, only when this Hermes has no key for its local API, it makes one (section 6). Then, only when the entry carries the reference, it reads the list of tools Hermes gives the runs of its local API (`platform_toolsets.api_server`) and, when it is an explicit list without `arauto`, appends `arauto` to it (section 6; proposal, 18/11/2026). It ends in seconds, or up to a minute and a half later in the worst case. With `--no-register`, for development, it skips the registration. |
 | `mcp` | What Hermes starts. It speaks MCP over stdio with Hermes and keeps the channel with the hub. |
-| `status` | Hub, version, situation of the device, whether the admin allowed waking by WhatsApp. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. |
+| `status` | Hub, version, situation of the device, whether the admin allowed waking by WhatsApp. It reads the local files and asks the leader through the local socket. It does not open a connection of its own with the hub. When the entry carries the reference it also reads that list once, with Hermes's own command, and says whether that list includes `arauto`. It writes nothing. |
 | `register` | Proposal, 15/11/2026 ([decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). For a Hermes that is already connected: runs the same registration as `join` (section 4) and records in the folder of the device whether the entry has the reference to the key. It does not contact the hub, does not ask the leader anything, does not touch the identity, the credential or `current`, does not restart Hermes and makes no key for its local API. With no device in the folder it runs no Hermes command and says so. A running Hermes keeps the entry it loaded: the new one takes effect after Hermes restarts its gateway. After `register`, the operator restarts Hermes's gateway; until then the running connector keeps the old entry, and `status` says whether the key was received. |
-| `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. It then prints a fixed line saying that the Arauto notes the Hermes may have saved in its memory stay there until the Hermes removes them (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). |
+| `leave` | Asks the hub for the closing of its own device. With the answer, it deletes the files and removes the registration in Hermes. It also deletes `woken-runs.json`, and leaves `arauto` in the list of tools of Hermes, as it leaves the key. It then prints a fixed line saying that the Arauto notes the Hermes may have saved in its memory stay there until the Hermes removes them (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). |
 | `await-reply THREAD [--minutes N]` | Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)); built, not tried on a real Hermes. Waits for an answer in a thread and prints one fixed line. THREAD must be a UUID; otherwise it prints the usage line, exits with 2 and never shows the argument. N is from 1 to 120 minutes, default 20. It talks only to the local socket of the leader, like `status`: no connection of its own to the hub, no port, no new variable. Exit codes: 0 an answer arrived; 11 no answer in time; 12 cannot wait; 9 the leader is still gone at the deadline; 2 usage. A refusal that may pass (AR-203, AR-207, AR-710: for example a fresh leader without its channel session yet) is tried again every 5 seconds until the deadline, and then exits 12 with that code. The output is fixed text that carries only a validated thread, a validated name of a Hermes, the minutes, or a code of the catalog with its catalog sentence. It never reads the thread: no note text appears in it. |
 | `leave --local` | Deletes the files and the registration without talking to the hub. It exists for when the hub no longer exists or changed its key. It is for a person to run: the device stays valid in the hub until it is revoked in the panel. |
 
@@ -90,6 +90,7 @@ the server of tools it starts another (checked on 14/11/2026, `referencia/hermes
                               local API (`key_reference`: true, false, or absent when an older
                               connector saved it)
   state.json                  last notices handled and the tool list of the last session
+  woken-runs.json             what join found in platform_toolsets.api_server of Hermes (proposal, 18/11/2026)
   lock                        lock file of the leader
   channel.sock                local socket between the copies of the connector
 ```
@@ -221,7 +222,7 @@ seconds (the first run in a data folder Hermes never used took 47 s on 14/11/202
   argument that contains `${...}` unchanged. Nothing in the connector depends on a shell, but only a
   trial on each system shows the saved entry.
 
-- The entry contains no secret (the reference `${API_SERVER_KEY}` names a variable and is not its value), and it is the only change that stays in the configuration of Hermes, apart from a key of the local API that the connector made for a Hermes that had none (section 6).
+- The entry contains no secret (the reference `${API_SERVER_KEY}` names a variable and is not its value), and it is the only change that stays in the configuration of Hermes, apart from a key of the local API that the connector made for a Hermes that had none (section 6) and `arauto` appended to an explicit `platform_toolsets.api_server` that lacked it (section 6; proposal, 18/11/2026).
 - Hermes checks every tool server entry when saving and when starting, and refuses the ones that
   look like an attack. The connector follows the format Hermes accepts: one program with one
   argument, with no command interpreter. The project does not try to get around that check.
@@ -296,7 +297,47 @@ answer. `arauto_status` (the tool) carries one more field, `local_waking`, added
 connector of this Hermes received the key of the local API; when `false`, nothing wakes this Hermes
 whatever `can_be_woken` says ([09](09-contrato-mcp.md), [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md): `can_be_woken` now means notes or the verb "be woken"; the switch it once followed is gone.)
 
-`arauto_status` carries one more field, `keep_in_memory`, also added by the connector (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)): a reminder sentence followed by the three Arauto lines that a Hermes keeps in its own main memory. It is fixed text, added only to a successful answer, and it overwrites any value of the hub. The connector never reads or writes the memory or the files of Hermes (principle 7), apart from the key of the local API that Hermes's own command saves in `join` (section 6): the Hermes saves the lines with its own tool, and the connector cannot know whether it did.
+`arauto_status` carries one more field, `keep_in_memory`, also added by the connector (proposal, 15/11/2026, [decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)): a reminder sentence followed by the three Arauto lines that a Hermes keeps in its own main memory. It is fixed text, added only to a successful answer, and it overwrites any value of the hub. The connector never reads or writes the memory or the files of Hermes (principle 7), apart from two settings, both through Hermes's own command (section 6): the key of the local API that it saves in `join`, and the list of tools of the runs of that API (`platform_toolsets.api_server`), which `join` and `status` read and `join` appends `arauto` to. The Hermes saves the memory lines with its own tool, and the connector cannot know whether it did.
+
+### The tools of a woken run (proposal, 18/11/2026; [decision 0046](decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md))
+
+**Observed context** (`referencia/hermes-fatos.md`, P1 to P5): one Hermes v0.23.0, on 18/11/2026, whose woken runs never read the notes while `local_waking` was true. Its configuration limited the platform `api_server` to an explicit list of tools that did not include `arauto`, and every run a notice woke made one model call and answered with text. Not tried: whether a woken run calls the Arauto tools once `arauto` is in that list; whether a running gateway needs a restart to apply a changed list; what an empty list (`[]`) means for a woken run.
+
+**What the connector does at `join`** (built; the printed form of the list and the effect of `config set` were observed on 18/11/2026, N25 of `referencia/hermes-fatos.md`; a woken run with the new list was not tried), only when the entry carries the reference, after the key step, with its own budget of 30 seconds:
+
+1. `hermes config get platform_toolsets.api_server`, keeping the output (up to 64 KiB; an output that reached that ceiling may have been cut and is unreadable). Exit 1 (no row): stop, record `default`, print nothing. Another failure or time out: record `unreadable`, print **RunToolsUnreadable**.
+2. Parse the output with a strict parser, after dropping the blank lines at its end. The form Hermes prints (N25) is the block form: the maximal run of lines at the end of the output, each exactly two spaces, `-`, one space and a name (`  - web`); lines printed before that run are ignored only when every one of them is a plain line: blank, or not indented, not starting with `-`, `[` or `#` and not ending with `:`; otherwise the run may be the end of a longer value (a list whose first item is a mapping, a mapping that holds a list) and the output is unreadable. (On the production Hermes of 18/11/2026 the command helper's line goes to the error output, which the connector drops: N25.) A last line `[]` is the empty list. There is no other list form: a one-line flow form such as `[a, b]` is not accepted, because a value stored as text prints the same way, so it is unreadable and gets no write. Each name has 1 to 64 characters of `[A-Za-z0-9_.:-]` that does not start with `.`, `:` or `-`, at most 64 items. Anything else is unreadable and nothing is written. The output is dropped after the parse: it is never printed, logged or put in an error.
+3. An empty list: record `empty`, print **RunToolsEmpty**, write nothing. A list that includes `arauto`: record `included`, print nothing.
+4. Otherwise `hermes config set platform_toolsets.api_server VALUE`, VALUE the compact JSON array of the old names in their order and `"arauto"` at the end, one argument, no shell. Exit non-zero: record `missing`, print **RunToolsNotAdded** and **RunToolsMissing**. Ended by a signal, timed out or not started: the `set` may have written, so the connector cannot tell: record `unreadable`, print **RunToolsNotConfirmed**.
+5. Read back with `config get`. Success only when the output is in the block form and its list is exactly the old one plus `arauto` (a Hermes that stored the text would print it as one plain line, not as `  - ` items). Success: record `added`, print **RunToolsAdded** and **RunToolsRestart**. Anything else: record `unreadable`, print **RunToolsNotConfirmed**.
+
+Nothing is rolled back and Hermes is never restarted. The exit code of `join` does not change. The connector writes `woken-runs.json` (`{"v":1,"api_server":"<state>"}`) with the record; the leader reads that file and runs no command of Hermes.
+
+**`status`** reads the list once, live (limit 15 seconds), only when the entry is registered with the reference, and prints right after `Entry in Hermes`:
+
+| Live state | Line | Sentence after it |
+|---|---|---|
+| includes `arauto` | `Tools of woken runs: the list of the api_server platform includes arauto` | **RunToolsAddedByJoin**, only when the record says `added` |
+| no row | `Tools of woken runs: no list for the api_server platform (Hermes gives its default tools)` | none |
+| explicit, without `arauto` | `Tools of woken runs: the list of the api_server platform does not include arauto` | **RunToolsMissing** |
+| empty | `Tools of woken runs: the list of the api_server platform is empty (cannot tell)` | **RunToolsEmpty** |
+| not readable | `Tools of woken runs: unknown (the list of the api_server platform could not be read)` | **RunToolsUnreadable** |
+
+**`arauto_status`** carries two more fields, added by the connector from the record of `join` ([09](09-contrato-mcp.md)): `woken_run_tools` (`included`, `default`, `added`, `missing`, `empty`, `unreadable` or `not_checked`) and `woken_run_tools_text` (the fixed sentence of that state). `local_waking` keeps its meaning: the key arrived.
+
+**Not guaranteed:**
+
+- How `config get` prints a list and how `config set` stores one were observed on Hermes Agent v0.23.0 and v0.22.5 (N25), on throwaway containers; another version, or a Hermes that prints a list in another form (a one-line `[a, b]` included), is "unreadable" and gets no write.
+- Exit 1 of `config get` is read as "no row", although a crash of Hermes's command also exits 1: a Hermes that crashes on that read is recorded as `default`, and nothing is written.
+- A plain line printed before the list is ignored; the connector cannot tell what it was. A line that could belong to the value (indented, an item, a comment, a key) makes the output unreadable instead, so a longer value is never cut on the write.
+- The tools step does not depend on the address guard of the local API: if that API is reachable by others, they also get the Arauto tools in its runs, and the connector does not check it.
+- Whether a woken run calls the Arauto tools once `arauto` is in the list was not tried.
+- The meaning of an empty list for a woken run was not tried, so it is left alone and said.
+- A toolset name other than the key of the server under `mcp_servers` (`mcp-arauto`, say) is not recognized.
+- `arauto_status` shows what `join` found, not the current list; `status` reads it now.
+- Whether a running gateway needs a restart to apply the new list was not tried. The connector cannot tell whether it happened.
+- `leave` does not take `arauto` out of the list.
+- The leader runs no command of Hermes.
 
 **A failed wake.** The connector answers the hub `failed`, and the hub puts the notice back to pending
 with waits of 5 s, 10 s, 20 s, up to 5 minutes, until it expires. The note itself is kept and
@@ -409,6 +450,7 @@ carries a command to run. The text `keep_in_memory` of `arauto_status` is not a 
 | AR-602 | Hermes's local API does not answer or refuses the key. |
 | `await-reply` lines | Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)). Fixed lines of the command, with only a validated thread, a validated name and the minutes. They are not catalog messages: the line of exit 0 is longer than the 240 bytes of the catalog rule, and the field `to_get_the_reply` names a command, like `keep_in_memory`. The refusal line of exit 12 carries the code and the sentence of the catalog. |
 | Told lines | Fixed sentences that `join`, `register` and `status` print about waking (proposal, 15/11/2026; decision 0046). Wake needs the local API: "This Hermes can be woken only while its local API is on, which Hermes does when its own setting API_SERVER_KEY holds a key. The status command says whether the connector received it." Key not received: "No notice wakes this Hermes until its local API is on. Hermes turns it on when its own setting API_SERVER_KEY, kept in the configuration of Hermes, holds a key." Key made: "This Hermes had no key for its local API, so the connector drew one and saved it in API_SERVER_KEY with the config command of Hermes. The connector shows it to nobody and writes it in no file of its own." Restart after the key: "The local API of this Hermes turns on only after its gateway restarts. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard." Key not made: "The connector did not confirm a new key for the local API of this Hermes. If the status command says the key is not received, the operator sets API_SERVER_KEY in the configuration of Hermes and restarts its gateway." After a restart: "If that setting already holds a key, Hermes hands it to the connector after it restarts its gateway." Reference refused: "This version of Hermes refused the reference to the key of its local API, so the entry was saved without it and no notice wakes this Hermes. Notes and tools still work." Running keeps the old entry: "A running Hermes keeps the entry it loaded: the new entry takes effect after Hermes restarts its gateway. The connector does not restart Hermes." Older entry: "The entry of the connector in Hermes was saved by an older connector and may have no reference to the key. The register command of the connector saves it again." Unchanged connection: "The connection did not change: the same device and the same credential." |
+| Tools of a woken run lines | Proposal, 18/11/2026. Eleven fixed sentences printed by `join` and `status` and sent in `woken_run_tools_text`, listed below the table. |
 | No device (`register`) | "There is no device in this folder. Nothing was registered in Hermes." Exit code 9, like the other local failures. |
 | Notes in memory (`leave`) | Proposal, 15/11/2026 ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)). Printed by `leave` after a leave that deleted the files: "If this Hermes saved the three Arauto notes in its memory, they are still there: remove them with the memory tool of Hermes. The connector never reads or changes the memory of Hermes." |
 | AR-701 | The verb needed for this call is missing. |
@@ -427,6 +469,20 @@ carries a command to run. The text `keep_in_memory` of `arauto_status` is not a 
 | AR-714 | (18/11/2026, decision 0051, proposal) The chat is the command channel of this Hermes, as the admin recorded it: Arauto does not write in it, and the Hermes replies through its own WhatsApp. Sent only on a connection of protocol version 2; every other Hermes gets AR-705 or AR-712. |
 
 The sentence of each code, in English, is compiled into the connector.
+
+The tools of a woken run (proposal, 18/11/2026), word for word:
+
+- **RunToolsIncluded**: "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, includes arauto."
+- **RunToolsDefault**: "The configuration of Hermes has no list platform_toolsets.api_server, so the runs a notice wakes get the default tools of Hermes."
+- **RunToolsAdded**: "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, did not include arauto, so the connector added arauto at its end with the config command of Hermes. The other tools stay."
+- **RunToolsRestart**: "Hermes may apply the new list only after its gateway restarts. After the approval, the operator restarts the gateway of this Hermes once; the same restart also serves a key the connector made."
+- **RunToolsNotAdded**: "The config command of Hermes did not add arauto to the list platform_toolsets.api_server, so the connector could not do it."
+- **RunToolsMissing**: "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, does not include arauto. The operator adds arauto to that list, keeping the other tools, and restarts the gateway."
+- **RunToolsEmpty**: "The list platform_toolsets.api_server in the configuration of Hermes is empty, and the connector cannot tell whether the runs a notice wakes have the Arauto tools. The connector changed nothing; the operator checks it."
+- **RunToolsUnreadable**: "The connector could not read the list platform_toolsets.api_server in the configuration of Hermes, so it cannot tell whether the runs a notice wakes have the Arauto tools. That list must be absent or include arauto."
+- **RunToolsNotConfirmed**: "The connector asked Hermes to add arauto to the list platform_toolsets.api_server and could not confirm the result. The operator checks that list in the configuration of Hermes: it keeps the other tools and includes arauto."
+- **RunToolsNotChecked**: "This connector has not checked the list platform_toolsets.api_server, which sets the tools of the runs a notice wakes. The status command of the connector reads it; that list must be absent or include arauto."
+- **RunToolsAddedByJoin**: "The join of this connector added arauto to the list platform_toolsets.api_server. Hermes may apply it only after its gateway restarts: if the gateway has not restarted since, the operator restarts it once."
 
 ## 9. Shielded mode (planned)
 

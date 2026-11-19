@@ -148,7 +148,8 @@ async fn quarantine_and_revocation_keep_the_connector_alive_with_the_error() {
     })
     .await;
     // The local socket still answers.
-    let report = arauto_connector::report(&folder.home, &s).await;
+    let report =
+        arauto_connector::report(&folder.home, &arauto_connector::Hermes::new(None), &s).await;
     assert!(report.leader.is_some(), "{report:?}");
     assert_eq!(folder.devices(), vec![device.clone()]);
     assert!(folder.credential(&device).is_some());

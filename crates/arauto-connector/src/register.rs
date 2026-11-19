@@ -9,7 +9,8 @@
 //!   process died (`referencia/hermes-fatos.md`), so ending the leader would leave Hermes
 //!   without Arauto until the gateway restarts;
 //! - it does not touch `identity.key`, `credential.seal`, `current`, `state.json` or
-//!   `wakes.json`, and does not read or write any file of Hermes;
+//!   `wakes.json` or `woken-runs.json`, and does not read or write any file of Hermes; it touches
+//!   no list of tools of Hermes (`platform_toolsets.api_server` is only `join`'s and `status`'s);
 //! - it does not hold the lock of the device folders while the command of Hermes runs, which can
 //!   take 90 seconds: the leader waits at most 30 seconds for that lock before a write.
 //!

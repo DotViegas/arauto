@@ -627,6 +627,7 @@ pub(crate) fn remove_everything(home: &Home) -> Result<(), StoreError> {
     }
     remove_file(&home.state_file())?;
     remove_file(&home.wakes_file())?;
+    remove_file(&home.woken_runs_file())?;
     clean_leftovers(home)
 }
 
@@ -735,6 +736,46 @@ pub(crate) fn write_handled(home: &Home, handled: &[uuid::Uuid]) -> Result<(), S
         file: crate::home::WAKES_FILE,
     })?;
     Ok(write_durable(&home.wakes_file(), &bytes)?)
+}
+
+// ---------------------------------------------------------------------------- woken runs
+
+/// What `join` found in the list of tools of the runs of the local API of Hermes, as
+/// `woken-runs.json` keeps it. A file that is missing, too long, damaged, of another format or
+/// with a word it does not know gives `NotChecked`.
+pub(crate) fn read_run_tools(home: &Home) -> crate::toolsets::RunTools {
+    use crate::toolsets::RunTools;
+
+    let Ok(Some(bytes)) = read_capped(&home.woken_runs_file(), STATE_FILE_MAX) else {
+        return RunTools::NotChecked;
+    };
+    let Ok(Value::Object(object)) = read_strict(&bytes) else {
+        return RunTools::NotChecked;
+    };
+    if object.get("v").and_then(Value::as_u64) != Some(FORMAT_VERSION) {
+        return RunTools::NotChecked;
+    }
+    object
+        .get("api_server")
+        .and_then(Value::as_str)
+        .and_then(RunTools::parse)
+        .unwrap_or(RunTools::NotChecked)
+}
+
+/// Writes `woken-runs.json`, durably. `NotChecked` is never written.
+pub(crate) fn write_run_tools(
+    home: &Home,
+    state: crate::toolsets::RunTools,
+) -> Result<(), StoreError> {
+    if state == crate::toolsets::RunTools::NotChecked {
+        return Ok(());
+    }
+    let bytes = serde_json::to_vec(&json!({"v": FORMAT_VERSION, "api_server": state.as_str()}))
+        .map_err(|_| StoreError::Damaged {
+            device: String::new(),
+            file: crate::home::WOKEN_RUNS_FILE,
+        })?;
+    Ok(write_durable(&home.woken_runs_file(), &bytes)?)
 }
 
 // ---------------------------------------------------------------------------------- lock
@@ -1031,5 +1072,43 @@ mod tests {
         assert_eq!(layout.current, Current::Absent);
         assert!(!home.state_file().exists());
         assert!(home.lock_file().exists());
+    }
+
+    #[test]
+    fn the_record_of_the_tools_of_woken_runs_round_trips_and_is_lenient() {
+        use crate::toolsets::RunTools;
+
+        let (_dir, home) = home();
+        assert_eq!(read_run_tools(&home), RunTools::NotChecked);
+        for state in [
+            RunTools::Included,
+            RunTools::Default,
+            RunTools::Added,
+            RunTools::Missing,
+            RunTools::Empty,
+            RunTools::Unreadable,
+        ] {
+            write_run_tools(&home, state).unwrap();
+            assert_eq!(read_run_tools(&home), state);
+        }
+        // `not_checked` is never written: the file keeps the last state.
+        write_run_tools(&home, RunTools::NotChecked).unwrap();
+        assert_eq!(read_run_tools(&home), RunTools::Unreadable);
+        for bad in [
+            &b"not json"[..],
+            br#"{"v":2,"api_server":"added"}"#,
+            br#"{"v":1,"api_server":"always"}"#,
+            br#"{"v":1,"api_server":"not_checked"}"#,
+            br#"{"v":1}"#,
+            b"[]",
+        ] {
+            std::fs::write(home.woken_runs_file(), bad).unwrap();
+            assert_eq!(read_run_tools(&home), RunTools::NotChecked);
+        }
+        std::fs::write(home.woken_runs_file(), vec![b' '; STATE_FILE_MAX + 1]).unwrap();
+        assert_eq!(read_run_tools(&home), RunTools::NotChecked);
+        write_run_tools(&home, RunTools::Added).unwrap();
+        remove_everything(&home).unwrap();
+        assert!(!home.woken_runs_file().exists());
     }
 }

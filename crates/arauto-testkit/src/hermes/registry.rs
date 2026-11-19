@@ -48,6 +48,20 @@
 //! [`HANG_FILE`] (the call named in the file, `get` or `set`, does not end until it is killed,
 //! the file is removed or two minutes pass).
 //!
+//! **`config get platform_toolsets.P`** and **`config set platform_toolsets.P VALUE`** model the
+//! contract of the list of tools of a platform as observed on Hermes Agent v0.23.0 and v0.22.5
+//! (`referencia/hermes-fatos.md`, N25), kept in [`TOOLSETS_FILE`] (platform to a list of strings,
+//! or to a string when it was stored as text). No row exits 1 and prints the sentence `Config key
+//! not set: NAME` (which stream the real one uses was not checked). A row exits 0 and prints a
+//! line before the value and then the value, in the form of [`TOOLSETS_FORM_FILE`]: `block`, the default
+//! and the observed form, one `  - a` line per item (two spaces, a dash, a space), and `[]` for an
+//! empty list. The other forms are switches for the tests of the parser: `python` (`['a', 'b']`),
+//! `json` (`["a", "b"]`) and `bare` (`- a`, no indent: a form never observed, which the parser
+//! must refuse). [`TOOLSETS_PREAMBLE_FILE`] adds one more line before the value. A string is printed as it is. `set` parses VALUE as a JSON array of strings and
+//! stores it, unless [`TOOLSETS_AS_TEXT_FILE`] exists (it stores the text) or [`TOOLSETS_REPLACES_FILE`]
+//! exists (it stores `["arauto"]` only, a write that loses entries). The switches of `get` and
+//! `set` above (`config-get-fails`, `config-set-fails`, `hang`) apply to them too.
+//!
 //! Exit codes: 0 done, 1 refused, 2 not a command it knows, 3 its folder could not be used.
 
 use std::io::{Read, Write};
@@ -100,6 +114,23 @@ pub const SET_FAILS_FILE: &str = "config-set-fails";
 
 /// While this file names a `config` call (`get` or `set`), that call does not end.
 pub const HANG_FILE: &str = "hang";
+
+/// The lists of tools per platform: a JSON object, platform to a list of strings (or a string).
+pub const TOOLSETS_FILE: &str = "platform-toolsets.json";
+
+/// How `config get platform_toolsets.P` prints a list: `block` (default), `python`, `json` or
+/// `bare`.
+pub const TOOLSETS_FORM_FILE: &str = "toolsets-form";
+
+/// The text of this file, when it exists, is one more line printed before the value of `config get
+/// platform_toolsets.P` (a long one makes an output that reaches the capture ceiling).
+pub const TOOLSETS_PREAMBLE_FILE: &str = "toolsets-preamble";
+
+/// While this file exists, `config set platform_toolsets.P VALUE` stores VALUE as a string.
+pub const TOOLSETS_AS_TEXT_FILE: &str = "toolsets-set-as-text";
+
+/// While this file exists, that `set` stores `["arauto"]` only.
+pub const TOOLSETS_REPLACES_FILE: &str = "toolsets-set-replaces";
 
 /// Done.
 pub const DONE: u8 = 0;
@@ -157,6 +188,12 @@ pub fn run(
                 return USAGE;
             }
             add(folder, name, command, &env, &args, input)
+        }
+        ["config", "get", name] if platform_of(name).is_some() => {
+            toolsets_get(folder, platform_of(name).unwrap_or_default(), output)
+        }
+        ["config", "set", name, value] if platform_of(name).is_some() => {
+            toolsets_set(folder, platform_of(name).unwrap_or_default(), value)
         }
         ["config", "get", name] => config_get(folder, name),
         ["config", "set", name, value] => config_set(folder, name, value),
@@ -264,6 +301,90 @@ fn hang_when_asked(folder: &Path, call: &str) {
     while named(folder) && std::time::Instant::now() < until {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+}
+
+/// The platform of `platform_toolsets.P`.
+fn platform_of(name: &str) -> Option<&str> {
+    name.strip_prefix("platform_toolsets.")
+        .filter(|platform| !platform.is_empty())
+}
+
+/// `config get platform_toolsets.P`: 1 and the not-set sentence when there is no row; otherwise a
+/// line printed before it and the value, in the form the folder says.
+fn toolsets_get(folder: &Path, platform: &str, output: &mut dyn Write) -> u8 {
+    hang_when_asked(folder, "get");
+    if folder.join(GET_FAILS_FILE).exists() {
+        return USAGE;
+    }
+    let Some(value) = read_object(&folder.join(TOOLSETS_FILE)).remove(platform) else {
+        let sentence = format!("Config key not set: platform_toolsets.{platform}\n");
+        let _ = output.write_all(sentence.as_bytes());
+        return REFUSED;
+    };
+    let form = std::fs::read_to_string(folder.join(TOOLSETS_FORM_FILE)).unwrap_or_default();
+    let printed = match &value {
+        Value::Array(items) => {
+            let names: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
+            let joined = |quote: &str| {
+                names
+                    .iter()
+                    .map(|name| format!("{quote}{name}{quote}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let lines = |indent: &str| {
+                names
+                    .iter()
+                    .map(|name| format!("{indent}- {name}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            match form.trim() {
+                _ if names.is_empty() => "[]".to_owned(),
+                "json" => format!("[{}]", joined("\"")),
+                "python" => format!("[{}]", joined("'")),
+                "bare" => lines(""),
+                _ => lines("  "),
+            }
+        }
+        Value::String(text) => text.clone(),
+        other => other.to_string(),
+    };
+    let extra = std::fs::read_to_string(folder.join(TOOLSETS_PREAMBLE_FILE))
+        .map(|preamble| format!("{preamble}\n"))
+        .unwrap_or_default();
+    let text = format!("{extra}(fake hermes) reading the configuration\n{printed}\n");
+    if output.write_all(text.as_bytes()).is_err() {
+        return BROKEN;
+    }
+    DONE
+}
+
+/// `config set platform_toolsets.P VALUE`.
+fn toolsets_set(folder: &Path, platform: &str, value: &str) -> u8 {
+    hang_when_asked(folder, "set");
+    if folder.join(SET_FAILS_FILE).exists() {
+        return REFUSED;
+    }
+    let stored = if folder.join(TOOLSETS_AS_TEXT_FILE).exists() {
+        Value::from(value)
+    } else if folder.join(TOOLSETS_REPLACES_FILE).exists() {
+        json!(["arauto"])
+    } else {
+        match serde_json::from_str::<Vec<String>>(value) {
+            Ok(list) => json!(list),
+            Err(_) => Value::from(value),
+        }
+    };
+    let mut rows = read_object(&folder.join(TOOLSETS_FILE));
+    rows.insert(platform.to_owned(), stored);
+    let Ok(bytes) = serde_json::to_vec(&Value::Object(rows)) else {
+        return BROKEN;
+    };
+    if std::fs::write(folder.join(TOOLSETS_FILE), bytes).is_err() {
+        return BROKEN;
+    }
+    DONE
 }
 
 /// `config get NAME`: 0 when it is set, 1 when it is not.
@@ -538,6 +659,83 @@ mod tests {
         // Every call is recorded, the value of a `set` included: that file is the fake's.
         let calls = std::fs::read_to_string(folder.join(CALLS_FILE)).unwrap();
         assert_eq!(calls.lines().count(), 10);
+    }
+
+    /// The observed contract of the list of tools of a platform, and its variants; the
+    /// generic `config get` and `config set` stay as they were.
+    #[test]
+    fn the_list_of_tools_behaves_as_scripted() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path();
+        let get = |platform: &str| {
+            call(
+                folder,
+                &format!("config get platform_toolsets.{platform}"),
+                "",
+            )
+        };
+        assert_eq!(
+            get("api_server"),
+            (
+                REFUSED,
+                "Config key not set: platform_toolsets.api_server\n".to_owned()
+            )
+        );
+        std::fs::write(
+            folder.join(TOOLSETS_FILE),
+            br#"{"api_server":["web","other_server"],"empty":[],"text":"x y"}"#,
+        )
+        .unwrap();
+        let header = "(fake hermes) reading the configuration\n";
+        assert_eq!(
+            get("api_server"),
+            (DONE, format!("{header}  - web\n  - other_server\n"))
+        );
+        std::fs::write(folder.join(TOOLSETS_FORM_FILE), b"python").unwrap();
+        assert_eq!(
+            get("api_server").1,
+            format!("{header}['web', 'other_server']\n")
+        );
+        std::fs::remove_file(folder.join(TOOLSETS_FORM_FILE)).unwrap();
+        assert_eq!(get("empty"), (DONE, format!("{header}[]\n")));
+        assert_eq!(get("text"), (DONE, format!("{header}x y\n")));
+        std::fs::write(folder.join(TOOLSETS_FORM_FILE), b"json").unwrap();
+        assert_eq!(
+            get("api_server").1,
+            format!("{header}[\"web\", \"other_server\"]\n")
+        );
+        assert_eq!(get("empty").1, format!("{header}[]\n"));
+        std::fs::write(folder.join(TOOLSETS_FORM_FILE), b"bare").unwrap();
+        assert_eq!(
+            get("api_server").1,
+            format!("{header}- web\n- other_server\n")
+        );
+        assert_eq!(get("empty").1, format!("{header}[]\n"));
+        // `set`: a JSON array is stored as a list, the variants flatten or lose it.
+        let set = |value: &str| {
+            call(
+                folder,
+                &format!("config set platform_toolsets.api_server {value}"),
+                "",
+            )
+            .0
+        };
+        let stored = |folder: &Path| read_object(&folder.join(TOOLSETS_FILE))["api_server"].clone();
+        assert_eq!(set(r#"["a","arauto"]"#), DONE);
+        assert_eq!(stored(folder), json!(["a", "arauto"]));
+        std::fs::write(folder.join(TOOLSETS_AS_TEXT_FILE), b"").unwrap();
+        assert_eq!(set(r#"["a"]"#), DONE);
+        assert_eq!(stored(folder), json!(r#"["a"]"#));
+        std::fs::remove_file(folder.join(TOOLSETS_AS_TEXT_FILE)).unwrap();
+        std::fs::write(folder.join(TOOLSETS_REPLACES_FILE), b"").unwrap();
+        assert_eq!(set(r#"["a","b"]"#), DONE);
+        assert_eq!(stored(folder), json!(["arauto"]));
+        std::fs::write(folder.join(SET_FAILS_FILE), b"").unwrap();
+        assert_eq!(set(r#"["z"]"#), REFUSED);
+        std::fs::write(folder.join(GET_FAILS_FILE), b"").unwrap();
+        assert_eq!(get("api_server").0, USAGE);
+        // The settings of the key are not touched by any of this.
+        assert!(read_object(&folder.join(SECRETS_FILE)).is_empty());
     }
 
     /// F1 to F4 of `referencia/hermes-fatos.md`: it saves only when it reads `y`.

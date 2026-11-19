@@ -9,6 +9,7 @@
 //!     credential.seal     SECRET: the latest credential received from the hub
 //!     hub.json            address and key of the hub, digest of the invite, local situation
 //!   state.json            the tools of the last session
+//!   woken-runs.json       what join found in platform_toolsets.api_server of Hermes (proposal, 18/11/2026)
 //!   lock                  the lock of the leader
 //!   devices.lock          the lock of the device folders: join, leave and the writes of the leader
 //!   channel.sock          the local socket between the copies (Unix)
@@ -35,6 +36,9 @@ pub(crate) const STATE_FILE: &str = "state.json";
 
 /// The identifiers of the notices this connector already woke its Hermes for.
 pub(crate) const WAKES_FILE: &str = "wakes.json";
+
+/// What `join` found in the list of tools of the runs of the local API of Hermes.
+pub(crate) const WOKEN_RUNS_FILE: &str = "woken-runs.json";
 
 /// The lock of the device folders. It is not the lock of the leader: `join` takes it while a
 /// leader runs.
@@ -126,6 +130,10 @@ impl Home {
         self.root.join(WAKES_FILE)
     }
 
+    pub(crate) fn woken_runs_file(&self) -> PathBuf {
+        self.root.join(WOKEN_RUNS_FILE)
+    }
+
     pub(crate) fn lock_file(&self) -> PathBuf {
         self.root.join(LOCK_FILE_NAME)
     }
@@ -170,6 +178,7 @@ mod tests {
         assert_eq!(home.devices(), dir.path().join("devices"));
         assert_eq!(home.current_file(), dir.path().join("current"));
         assert_eq!(home.state_file(), dir.path().join("state.json"));
+        assert_eq!(home.woken_runs_file(), dir.path().join("woken-runs.json"));
         assert!(
             home.program()
                 .file_name()

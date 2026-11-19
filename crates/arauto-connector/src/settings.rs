@@ -37,6 +37,10 @@ pub struct Settings {
     /// The whole key step of `join` (`docs/11-conector.md`, section 6): every call of Hermes in
     /// it and the probe of the listener, together.
     pub(crate) key_step_ms: i64,
+    /// The whole tools step of `join` (`docs/11-conector.md`, section 6): its reads and its one write.
+    pub(crate) tools_step_ms: i64,
+    /// The one read of the list of tools that `status` makes.
+    pub(crate) tools_read_ms: i64,
     /// Where the listener guard of the key step connects: the default address of the local API
     /// of Hermes.
     pub(crate) key_probe: std::net::SocketAddr,
@@ -76,6 +80,8 @@ impl Default for Settings {
             // Windows machine (14/11/2026); in a folder in use it takes 2 to 4 s.
             hermes_ms: 90 * SECOND_MS,
             key_step_ms: 60 * SECOND_MS,
+            tools_step_ms: 30 * SECOND_MS,
+            tools_read_ms: 15 * SECOND_MS,
             key_probe: std::net::SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 8642)),
             shutdown_ms: 1_500,
             waker: std::sync::Arc::default(),
@@ -129,6 +135,10 @@ mod tests {
         assert!(settings.shutdown_ms < 2_000);
         // The key step: 60 seconds in all, and the default address of the local API of Hermes.
         assert_eq!(settings.key_step_ms, 60_000);
+        assert_eq!(
+            (settings.tools_step_ms, settings.tools_read_ms),
+            (30_000, 15_000)
+        );
         assert_eq!(settings.key_probe.to_string(), "127.0.0.1:8642");
         // The leader gives up a write before the hub gives up the "saved".
         assert!(settings.devices_lock_ms < settings.deadlines.saved_ms);

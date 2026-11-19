@@ -209,6 +209,15 @@ async fn arauto_status_says_whether_this_connector_can_wake() {
     let without = status(&without_key).await;
     assert_eq!(with["local_waking"], json!(true));
     assert_eq!(without["local_waking"], json!(false));
+    // Nothing recorded the list of tools of the runs a notice wakes: not checked, and the fixed
+    // sentence says so.
+    for fields in [&with, &without] {
+        assert_eq!(fields["woken_run_tools"], json!("not_checked"));
+        assert_eq!(
+            fields["woken_run_tools_text"],
+            json!(arauto_connector::catalog::Told::RunToolsNotChecked.phrase())
+        );
+    }
     let reminder = json!(arauto_connector::memory::keep_in_memory());
     assert_eq!(with["keep_in_memory"], reminder);
     assert_eq!(without["keep_in_memory"], reminder);

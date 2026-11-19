@@ -20,6 +20,7 @@
 //! injected.json    what the "secret source" of Hermes adds to every server it starts (R6)
 //! no-env           while it exists, `mcp add` does not know `--env`
 //! no-key, config-set.json, config-get-fails, config-set-fails, hang   what `config get` and `config set` do ([`registry`])
+//! platform-toolsets.json, toolsets-form, toolsets-set-as-text, toolsets-set-replaces   the assumed list of tools of a platform ([`registry`])
 //! terminal-env.json extra variables of the terminal of the operator
 //! ```
 //!
@@ -273,6 +274,66 @@ impl FakeHermes {
                 let _ = std::fs::remove_file(path);
             }
         }
+    }
+
+    /// Sets (or, with `None`, removes) the row `platform_toolsets.PLATFORM`, as a list.
+    pub fn set_tool_list(&self, platform: &str, list: Option<&[&str]>) {
+        let mut rows = self.read_map(registry::TOOLSETS_FILE);
+        match list {
+            Some(names) => {
+                rows.insert(platform.to_owned(), Value::from(names.to_vec()));
+            }
+            None => {
+                rows.remove(platform);
+            }
+        }
+        std::fs::write(
+            self.folder().join(registry::TOOLSETS_FILE),
+            serde_json::to_vec(&Value::Object(rows)).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// Sets the row `platform_toolsets.PLATFORM` to a string (a value stored as text).
+    pub fn set_tool_text(&self, platform: &str, text: &str) {
+        let mut rows = self.read_map(registry::TOOLSETS_FILE);
+        rows.insert(platform.to_owned(), Value::from(text));
+        std::fs::write(
+            self.folder().join(registry::TOOLSETS_FILE),
+            serde_json::to_vec(&Value::Object(rows)).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// The row of `platform` as the fake stores it, none when there is no row.
+    #[must_use]
+    pub fn tool_list(&self, platform: &str) -> Option<Value> {
+        self.read_map(registry::TOOLSETS_FILE).remove(platform)
+    }
+
+    /// How `config get` prints a list: `block` (the default, the observed form), or `python`,
+    /// `json` and `bare`, which were never observed and which the parser must refuse.
+    pub fn tool_list_form(&self, form: &str) {
+        std::fs::write(self.folder().join(registry::TOOLSETS_FORM_FILE), form).unwrap();
+    }
+
+    /// One more line, `preamble`, printed before the value `config get` prints for a list.
+    pub fn tool_list_preamble(&self, preamble: &str) {
+        std::fs::write(
+            self.folder().join(registry::TOOLSETS_PREAMBLE_FILE),
+            preamble,
+        )
+        .unwrap();
+    }
+
+    /// While `on`, `config set` of a list stores the text of VALUE.
+    pub fn tool_list_set_as_text(&self, on: bool) {
+        self.toggle(registry::TOOLSETS_AS_TEXT_FILE, on);
+    }
+
+    /// While `on`, `config set` of a list stores `["arauto"]` only.
+    pub fn tool_list_set_replaces(&self, on: bool) {
+        self.toggle(registry::TOOLSETS_REPLACES_FILE, on);
     }
 
     /// The value `config set` kept for `name`.

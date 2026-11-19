@@ -37,6 +37,7 @@ use std::time::Duration;
 
 use arauto_connector::SERVER_NAME;
 use arauto_connector::catalog::{Local, Told};
+use arauto_connector::toolsets::RunTools;
 use arauto_hub::repo::approval::ApproveOutcome;
 use arauto_protocol::clock::{Clock, ManualClock, SystemClock};
 use arauto_protocol::errors::ErrorCode;
@@ -193,6 +194,31 @@ fn status_of(name: &str, local_waking: bool) -> Value {
     })
 }
 
+/// The two fields of the tools of a woken run in an `arauto_status` result: the word and the text.
+fn tools_fields(result: &Value) -> (String, String) {
+    let content = &result["structuredContent"];
+    (
+        content["woken_run_tools"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
+        content["woken_run_tools_text"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
+    )
+}
+
+/// The `structuredContent` of `result` without the two fields of the tools of a woken run.
+fn without_tools_fields(result: &Value) -> Value {
+    let mut content = result["structuredContent"].clone();
+    if let Some(map) = content.as_object_mut() {
+        map.remove("woken_run_tools");
+        map.remove("woken_run_tools_text");
+    }
+    content
+}
+
 /// [`served_with`], for a Hermes that has no key of the local API.
 async fn served(copy: &mut McpCopy, name: &str) -> Value {
     served_with(copy, name, false).await
@@ -206,8 +232,12 @@ async fn served_with(copy: &mut McpCopy, name: &str, local_waking: bool) -> Valu
     loop {
         let result = copy.call("arauto_status", json!({})).await;
         if result["isError"] == false
-            && result["structuredContent"] == status_of(name, local_waking)
+            && without_tools_fields(&result) == status_of(name, local_waking)
         {
+            let (word, text) = tools_fields(&result);
+            let state = RunTools::parse(&word).unwrap_or(RunTools::NotChecked);
+            assert_eq!(word, state.as_str());
+            assert_eq!(text, state.text());
             return result;
         }
         assert!(
@@ -1346,15 +1376,17 @@ async fn the_command_of_hermes_never_gets_the_key_variables() {
 
 // ---- The key step of `join` (`docs/11-conector.md`, section 6) ----
 
-/// Every call of the command was about the servers of tools, or was the one read of the setting
-/// the key step makes first: this Hermes had a key, so nothing was written.
+/// Every call of the command was about the servers of tools, or was a read: the one of the
+/// setting the key step makes first, or the one of the list of tools of the runs a notice wakes.
+/// This Hermes had a key, so nothing was written.
 fn assert_only_mcp_and_the_key_read(hermes: &FakeHermes) {
     let read = ["config", "get", "API_SERVER_KEY"].map(str::to_owned);
+    let tools = ["config", "get", "platform_toolsets.api_server"].map(str::to_owned);
     assert!(
         hermes
             .calls()
             .iter()
-            .all(|call| call[0] == "mcp" || call.as_slice() == read),
+            .all(|call| call[0] == "mcp" || call.as_slice() == read || call.as_slice() == tools),
         "{:?}",
         hermes.calls()
     );
@@ -1591,7 +1623,10 @@ async fn a_hermes_with_a_key_is_left_alone_by_join() {
         vec![
             ["config", "get", "API_SERVER_KEY"]
                 .map(str::to_owned)
-                .to_vec()
+                .to_vec(),
+            ["config", "get", "platform_toolsets.api_server"]
+                .map(str::to_owned)
+                .to_vec(),
         ]
     );
     assert_eq!(hermes.secret("API_SERVER_KEY"), None);
@@ -1666,7 +1701,15 @@ async fn only_join_makes_a_key_and_leave_keeps_it() {
     close_all(copies).await;
     let ran = command(&hermes, &home, &["leave"]).await;
     assert_eq!(ran.code, Some(0), "{ran:?}");
-    assert_eq!(hermes.config_calls(), Vec::<Vec<String>>::new());
+    // Only `status` read a setting, once: the list of tools of the runs a notice wakes.
+    assert_eq!(
+        hermes.config_calls(),
+        vec![
+            ["config", "get", "platform_toolsets.api_server"]
+                .map(str::to_owned)
+                .to_vec()
+        ]
+    );
     assert_eq!(hermes.secret("API_SERVER_KEY"), None);
 
     // `leave` after a `join` that made a key: no `config` call, and the key is still there.
@@ -1681,7 +1724,8 @@ async fn only_join_makes_a_key_and_leave_keeps_it() {
     approve(&fixture, &name, &code_in(&ran.stdout)).await;
     let key = hermes.secret("API_SERVER_KEY").expect("a key was saved");
     let before = hermes.config_calls();
-    assert_eq!(before.len(), 6, "{before:?}");
+    // The 5 reads and the `set` of the key step, and the read of the list of tools.
+    assert_eq!(before.len(), 7, "{before:?}");
     let ran = command(&hermes, &home, &["leave"]).await;
     assert_eq!(ran.code, Some(0), "{ran:?}");
     assert_eq!(hermes.config_calls(), before);
@@ -1825,7 +1869,209 @@ async fn a_hanging_key_step_ends_at_its_deadline_and_join_still_exits_0() {
     assert!(took < Duration::from_secs(30), "{took:?}");
     // The step reached the `set`, and nothing was saved.
     let calls = hermes.config_calls();
-    assert_eq!(calls.len(), 6, "{calls:?}");
+    assert_eq!(calls.len(), 7, "{calls:?}");
     assert_eq!(calls[5][1], "set");
+    // The tools step ran after it, and made a read.
+    assert_eq!(
+        calls[6],
+        ["config", "get", "platform_toolsets.api_server"].map(str::to_owned)
+    );
     assert_eq!(hermes.secret("API_SERVER_KEY"), None);
+}
+
+// ---- The tools of a woken run (`docs/11-conector.md`, section 6; decision 0046) ----
+
+const TOOLS_GET: [&str; 3] = ["config", "get", "platform_toolsets.api_server"];
+
+fn tools_sets(hermes: &FakeHermes) -> usize {
+    hermes
+        .config_calls()
+        .iter()
+        .filter(|call| call[1] == "set" && call[2] == "platform_toolsets.api_server")
+        .count()
+}
+
+/// P1 (T1 and T2): a list without `arauto` gets it at `join`, in its order and with the others
+/// kept; `join` says so after the code; the copies say `added` through `arauto_status`; `status`
+/// reads the list now; the same `join` again writes nothing and the record becomes `included`.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_list_without_arauto_gets_it_at_join_and_status_says_so() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.set_tool_list("api_server", Some(&["web", "other_server"]));
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    let code_at = line_of(
+        &ran.stdout,
+        &format!("VERIFICATION CODE: {}", code_in(&ran.stdout)),
+    )
+    .expect("the code");
+    let added = line_of(&ran.stdout, Told::RunToolsAdded.phrase()).expect("RunToolsAdded");
+    let restart = line_of(&ran.stdout, Told::RunToolsRestart.phrase()).expect("RunToolsRestart");
+    assert!(code_at < added && added + 1 == restart, "{ran:?}");
+    assert_eq!(
+        hermes.tool_list("api_server"),
+        Some(json!(["web", "other_server", "arauto"]))
+    );
+    assert_eq!(tools_sets(&hermes), 1);
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &only_device(&home))).await;
+    let result = served_with(&mut copies[0], &name, false).await;
+    let (word, text) = tools_fields(&result);
+    assert_eq!(word, "added");
+    assert_eq!(text, Told::RunToolsAddedByJoin.phrase());
+
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        has_line(
+            &ran.stdout,
+            "Tools of woken runs: the list of the api_server platform includes arauto"
+        ),
+        "{ran:?}"
+    );
+    assert!(
+        has_line(&ran.stdout, Told::RunToolsAddedByJoin.phrase()),
+        "{ran:?}"
+    );
+    assert_eq!(tools_sets(&hermes), 1);
+    close_all(copies).await;
+
+    // The same join again: nothing is written, nothing is said, the record becomes `included`.
+    let before = tools_sets(&hermes);
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert_eq!(tools_sets(&hermes), before);
+    for told in Told::ALL {
+        let phrase = told.phrase();
+        if phrase.contains("platform_toolsets.api_server") {
+            assert!(!ran.stdout.contains(phrase), "{ran:?}");
+        }
+    }
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &only_device(&home))).await;
+    let result = served_with(&mut copies[0], &name, false).await;
+    assert_eq!(tools_fields(&result).0, "included");
+    close_all(copies).await;
+}
+
+/// P2 (T2): a list that `status` finds without `arauto` is told, with one read and no write;
+/// `arauto_status` keeps what `join` found (the documented limit).
+#[tokio::test(flavor = "multi_thread")]
+async fn a_list_that_status_finds_without_arauto_is_told() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+    assert_eq!(tools_sets(&hermes), 0);
+
+    hermes.set_tool_list("api_server", Some(&["web"]));
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &only_device(&home))).await;
+    let result = served_with(&mut copies[0], &name, false).await;
+    assert_eq!(tools_fields(&result).0, "default");
+    let before = hermes.config_calls().len();
+    let ran = command(&hermes, &home, &["status"]).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        has_line(
+            &ran.stdout,
+            "Tools of woken runs: the list of the api_server platform does not include arauto"
+        ),
+        "{ran:?}"
+    );
+    assert!(
+        has_line(&ran.stdout, Told::RunToolsMissing.phrase()),
+        "{ran:?}"
+    );
+    let calls = hermes.config_calls();
+    assert_eq!(calls.len(), before + 1, "{calls:?}");
+    assert_eq!(calls[before], TOOLS_GET.map(str::to_owned));
+    assert_eq!(tools_sets(&hermes), 0);
+    close_all(copies).await;
+}
+
+/// P3 (D5): an empty list is left alone, and said.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_empty_list_is_left_alone_and_said() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.set_tool_list("api_server", Some(&[]));
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert!(
+        has_line(&ran.stdout, Told::RunToolsEmpty.phrase()),
+        "{ran:?}"
+    );
+    assert_eq!(tools_sets(&hermes), 0);
+    assert_eq!(hermes.tool_list("api_server"), Some(json!([])));
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+    let mut copies = started(&hermes, 1).await;
+    in_session(&fixture, &public(&home, &only_device(&home))).await;
+    let result = served_with(&mut copies[0], &name, false).await;
+    assert_eq!(tools_fields(&result).0, "empty");
+    close_all(copies).await;
+}
+
+/// P4 (principle 2 and 6): what `config get` printed is parsed and dropped. A canary name in the
+/// list, and the line the fake prints before the value, are in no output of `join` or `status`,
+/// whether the list is written to or only read.
+#[tokio::test(flavor = "multi_thread")]
+async fn what_config_get_printed_is_in_no_output_of_join_or_status() {
+    const CANARY: &str = "canary_toolset_zq81";
+    const PREAMBLE: &str = "(fake hermes) reading the configuration";
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    assert_the_local_api_port_is_free();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    hermes.set_tool_list("api_server", Some(&["web", CANARY]));
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    // The list was written to, and read back.
+    assert_eq!(
+        hermes.tool_list("api_server"),
+        Some(json!(["web", CANARY, "arauto"]))
+    );
+    approve(&fixture, &name, &code_in(&ran.stdout)).await;
+    let status = command(&hermes, &home, &["status"]).await;
+    assert_eq!(status.code, Some(0), "{status:?}");
+    // The list now includes `arauto`: `status` read it, and told its state only.
+    assert!(
+        has_line(
+            &status.stdout,
+            "Tools of woken runs: the list of the api_server platform includes arauto"
+        ),
+        "{status:?}"
+    );
+    for printed in [&ran, &status] {
+        for text in [&printed.stdout, &printed.stderr] {
+            assert!(!text.contains(CANARY), "{printed:?}");
+            assert!(!text.contains(PREAMBLE), "{printed:?}");
+        }
+    }
 }

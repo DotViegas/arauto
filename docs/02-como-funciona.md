@@ -184,8 +184,11 @@ that stays registered in Hermes.
 The block, the sentence and the page never have: a system header, a stamp, "authorized by",
 urgency, "without asking for approval", `curl | sh`, `sudo`, an address shortener or an encoded
 piece. It does not edit Hermes's configuration by hand: the connector registers itself through the
-official command, and that is the only change the connector makes that stays, except one: a Hermes
-with no key for its local API gets one, drawn by the connector and saved with Hermes's own command.
+official command, and that is the only change the connector makes that stays, except two: a Hermes
+with no key for its local API gets one, drawn by the connector and saved with Hermes's own command;
+and when Hermes's configuration limits the tools of the runs of its local API to an explicit list
+without `arauto`, the connector appends `arauto` to that list with the same command, keeping every
+other entry ([04](04-seguranca-conexao.md), C6, 18/11/2026).
 The page also asks the Hermes to save three fixed lines
 in its own memory; the Hermes writes them itself, and Arauto never reads or writes that memory.
 

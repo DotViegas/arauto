@@ -1,6 +1,6 @@
 # 0046 — The key through the entry, and a Hermes without a key
 
-**Status:** proposal · **Date:** 15/11/2026. The reference in the entry was rehearsed and is built. For a Hermes without a key, this file describes the first step (Option A, built); on 15/11/2026 the maintainer asked for Option B, designed and built on 16/11/2026 (below) and **rehearsed once on 16/11/2026, on Hermes Agent v0.23.2 from the official Docker image** (facts N15 to N18 in `referencia/hermes-fatos.md`). It builds on [0023](0023-chave-da-api-local.md) (decided), which it does not reopen.
+**Status:** proposal · **Date:** 15/11/2026. The reference in the entry was rehearsed and is built. For a Hermes without a key, this file describes the first step (Option A, built); on 15/11/2026 the maintainer asked for Option B, designed and built on 16/11/2026 (below) and **rehearsed once on 16/11/2026, on Hermes Agent v0.23.2 from the official Docker image** (facts N15 to N18 in `referencia/hermes-fatos.md`). On 18/11/2026 the tools of a woken run (section below, proposal, built, not tried on a real Hermes). It builds on [0023](0023-chave-da-api-local.md) (decided), which it does not reopen.
 
 ## Context
 
@@ -14,6 +14,16 @@ The maintainer asked that Arauto configure the key of Hermes's local API by itse
 - **`arauto-connector register`** saves the entry again for a Hermes connected before this change. It asks the hub and the leader nothing and touches neither the identity nor the credential.
 - **`local_waking`.** `arauto_status` gains a field added by the connector: whether the connector of this Hermes received the key. Its description does not change. The hub does not change.
 - **The connector reads its own variables only,** and the key only in the `mcp` process. The `hermes` command it runs does not receive `API_SERVER_KEY` or `ARAUTO_HERMES_API_KEY` in its environment; the one `config set` of Option B receives the key it saves as an argument.
+
+## The tools of a woken run (proposal, 18/11/2026)
+
+**Context.** One Hermes v0.23.0 had an explicit list `platform_toolsets.api_server` without `arauto`: every woken run was answered with text and never read the notes, while `arauto_status` said `local_waking: true` (`referencia/hermes-fatos.md`, P1 to P5).
+
+**Decision, approved by the maintainer on 18/11/2026.** T1: at `join`, the connector reads that list through Hermes's own command (`config get`) and, when it is an explicit non-empty list without `arauto`, appends `arauto` with `config set`, keeping every other entry, reads it back, and says so in the output. A missing row, a list that already includes it and an empty list change nothing. T2: `status` and `arauto_status` say whether the list of tools of woken runs includes `arauto`, and what to do when it does not, with fixed text in the connector. Built as in [11](../11-conector.md), section 6: only in `join`, only when the entry carries the reference, after the key step; no rollback; no restart; a record file `woken-runs.json`; two new fields of `arauto_status` (`woken_run_tools`, `woken_run_tools_text`); `local_waking` unchanged; the leader runs no command of Hermes; `status` reads the list live and writes nothing.
+
+**Not guaranteed.** How `config get` prints a list (one `  - NAME` line per item, `[]` when empty; a one-line `[a, b]` is not read as a list, because a text value prints the same way) and how `config set` stores one (a real list) were observed on Hermes Agent v0.23.0 and v0.22.5 on 18/11/2026 (N25), so another form, and a run of items after a line that could belong to the value (indented, an item, a comment, a key), is "unreadable" and gets no write; whether a woken run calls the Arauto tools once `arauto` is in the list was not tried; the meaning of an empty list for a woken run is unknown; whether a running gateway needs a restart was not tried; a toolset name other than the key of the server is not recognized; `arauto_status` shows what `join` found, not the current list; the change may need a gateway restart; `leave` does not take `arauto` out of the list.
+
+**Open points.** The part of P6 that N25 did not settle: whether a gateway restart is needed for the new list, and what an empty list means for a woken run. [04](../04-seguranca-conexao.md), C6, now names the appended `arauto` as the second lasting change, beside the key (wording approved by the maintainer on 18/11/2026).
 
 ## Not guaranteed
 

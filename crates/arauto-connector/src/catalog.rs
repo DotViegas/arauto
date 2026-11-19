@@ -125,7 +125,7 @@ impl Local {
 
 /// What a command tells the operator when it succeeded but a thing is not as they may expect,
 /// about the key of the local API of Hermes and about the lines kept in its memory. Fixed phrases, under the same rules as [`Local`].
-/// The connector never restarts Hermes. It saves a key only in `join`, only when Hermes has none (KeyMade); these phrases say whose setting it is.
+/// The connector never restarts Hermes. It saves a key only in `join`, only when Hermes has none (KeyMade); these phrases say whose setting it is. It also appends `arauto` to `platform_toolsets.api_server` only in `join`, only when that list is explicit and lacks it (the `RunTools` phrases).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Told {
     /// The connector is registered, but waking needs the local API of Hermes to be on.
@@ -150,6 +150,28 @@ pub enum Told {
     ConnectionUnchanged,
     /// After `leave`: the Arauto notes the Hermes kept in its memory are still there.
     NotesStayInMemory,
+    /// The list of tools of woken runs includes arauto.
+    RunToolsIncluded,
+    /// No list: woken runs get the default tools.
+    RunToolsDefault,
+    /// `join` appended arauto to the list of tools of woken runs.
+    RunToolsAdded,
+    /// The new list may need a restart of the gateway.
+    RunToolsRestart,
+    /// The config command of Hermes refused the append.
+    RunToolsNotAdded,
+    /// The list of tools of woken runs lacks arauto.
+    RunToolsMissing,
+    /// The list of tools of woken runs is empty: cannot tell.
+    RunToolsEmpty,
+    /// The list of tools of woken runs could not be read.
+    RunToolsUnreadable,
+    /// The append was asked and not confirmed.
+    RunToolsNotConfirmed,
+    /// No record: the list was not checked.
+    RunToolsNotChecked,
+    /// Reminder after `join` appended arauto.
+    RunToolsAddedByJoin,
 }
 
 impl Told {
@@ -166,6 +188,17 @@ impl Told {
         Told::EntryOlder,
         Told::ConnectionUnchanged,
         Told::NotesStayInMemory,
+        Told::RunToolsIncluded,
+        Told::RunToolsDefault,
+        Told::RunToolsAdded,
+        Told::RunToolsRestart,
+        Told::RunToolsNotAdded,
+        Told::RunToolsMissing,
+        Told::RunToolsEmpty,
+        Told::RunToolsUnreadable,
+        Told::RunToolsNotConfirmed,
+        Told::RunToolsNotChecked,
+        Told::RunToolsAddedByJoin,
     ];
 
     /// The fixed phrase.
@@ -223,6 +256,39 @@ impl Told {
                 "If this Hermes saved the three Arauto notes in its memory, they are still there: \
                  remove them with the memory tool of Hermes. The connector never reads or changes \
                  the memory of Hermes."
+            }
+            Told::RunToolsIncluded => {
+                "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, includes arauto."
+            }
+            Told::RunToolsDefault => {
+                "The configuration of Hermes has no list platform_toolsets.api_server, so the runs a notice wakes get the default tools of Hermes."
+            }
+            Told::RunToolsAdded => {
+                "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, did not include arauto, so the connector added arauto at its end with the config command of Hermes. The other tools stay."
+            }
+            Told::RunToolsRestart => {
+                "Hermes may apply the new list only after its gateway restarts. After the approval, the operator restarts the gateway of this Hermes once; the same restart also serves a key the connector made."
+            }
+            Told::RunToolsNotAdded => {
+                "The config command of Hermes did not add arauto to the list platform_toolsets.api_server, so the connector could not do it."
+            }
+            Told::RunToolsMissing => {
+                "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, does not include arauto. The operator adds arauto to that list, keeping the other tools, and restarts the gateway."
+            }
+            Told::RunToolsEmpty => {
+                "The list platform_toolsets.api_server in the configuration of Hermes is empty, and the connector cannot tell whether the runs a notice wakes have the Arauto tools. The connector changed nothing; the operator checks it."
+            }
+            Told::RunToolsUnreadable => {
+                "The connector could not read the list platform_toolsets.api_server in the configuration of Hermes, so it cannot tell whether the runs a notice wakes have the Arauto tools. That list must be absent or include arauto."
+            }
+            Told::RunToolsNotConfirmed => {
+                "The connector asked Hermes to add arauto to the list platform_toolsets.api_server and could not confirm the result. The operator checks that list in the configuration of Hermes: it keeps the other tools and includes arauto."
+            }
+            Told::RunToolsNotChecked => {
+                "This connector has not checked the list platform_toolsets.api_server, which sets the tools of the runs a notice wakes. The status command of the connector reads it; that list must be absent or include arauto."
+            }
+            Told::RunToolsAddedByJoin => {
+                "The join of this connector added arauto to the list platform_toolsets.api_server. Hermes may apply it only after its gateway restarts: if the gateway has not restarted since, the operator restarts it once."
             }
         }
     }
@@ -359,6 +425,65 @@ mod tests {
         for ((told, text), size) in approved.into_iter().zip(sizes) {
             assert_eq!(told.phrase(), text);
             assert_eq!(text.len(), size, "{text}");
+        }
+    }
+
+    /// The phrases of the tools of a woken run are the approved texts, character by character.
+    #[test]
+    fn the_phrases_of_the_woken_run_tools_are_the_approved_texts() {
+        let approved: [(Told, &str); 11] = [
+            (
+                Told::RunToolsIncluded,
+                "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, includes arauto.",
+            ),
+            (
+                Told::RunToolsDefault,
+                "The configuration of Hermes has no list platform_toolsets.api_server, so the runs a notice wakes get the default tools of Hermes.",
+            ),
+            (
+                Told::RunToolsAdded,
+                "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, did not include arauto, so the connector added arauto at its end with the config command of Hermes. The other tools stay.",
+            ),
+            (
+                Told::RunToolsRestart,
+                "Hermes may apply the new list only after its gateway restarts. After the approval, the operator restarts the gateway of this Hermes once; the same restart also serves a key the connector made.",
+            ),
+            (
+                Told::RunToolsNotAdded,
+                "The config command of Hermes did not add arauto to the list platform_toolsets.api_server, so the connector could not do it.",
+            ),
+            (
+                Told::RunToolsMissing,
+                "The list platform_toolsets.api_server in the configuration of Hermes, the tools of the runs a notice wakes, does not include arauto. The operator adds arauto to that list, keeping the other tools, and restarts the gateway.",
+            ),
+            (
+                Told::RunToolsEmpty,
+                "The list platform_toolsets.api_server in the configuration of Hermes is empty, and the connector cannot tell whether the runs a notice wakes have the Arauto tools. The connector changed nothing; the operator checks it.",
+            ),
+            (
+                Told::RunToolsUnreadable,
+                "The connector could not read the list platform_toolsets.api_server in the configuration of Hermes, so it cannot tell whether the runs a notice wakes have the Arauto tools. That list must be absent or include arauto.",
+            ),
+            (
+                Told::RunToolsNotConfirmed,
+                "The connector asked Hermes to add arauto to the list platform_toolsets.api_server and could not confirm the result. The operator checks that list in the configuration of Hermes: it keeps the other tools and includes arauto.",
+            ),
+            (
+                Told::RunToolsNotChecked,
+                "This connector has not checked the list platform_toolsets.api_server, which sets the tools of the runs a notice wakes. The status command of the connector reads it; that list must be absent or include arauto.",
+            ),
+            (
+                Told::RunToolsAddedByJoin,
+                "The join of this connector added arauto to the list platform_toolsets.api_server. Hermes may apply it only after its gateway restarts: if the gateway has not restarted since, the operator restarts it once.",
+            ),
+        ];
+        let sizes = [124, 129, 229, 192, 123, 222, 218, 215, 223, 208, 205];
+        for ((told, text), size) in approved.into_iter().zip(sizes) {
+            assert_eq!(told.phrase(), text);
+            assert_eq!(text.len(), size, "{text}");
+            if told != Told::RunToolsRestart {
+                assert!(text.contains("platform_toolsets.api_server"), "{text}");
+            }
         }
     }
 

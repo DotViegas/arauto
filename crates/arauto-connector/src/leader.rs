@@ -280,8 +280,15 @@ fn initial_tools(home: &Home) -> Vec<ToolName> {
 /// sent under this name is overwritten. The name avoids the word "key": Hermes masks output
 /// by variable name. The connector also adds the fixed reminder of the three Arauto notes
 /// (`crate::memory`); the hub never sends it (principle 6), and any hub value under its name
-/// is overwritten.
-fn with_connector_fields(outcome: CallOutcome, can_wake: bool) -> CallOutcome {
+/// is overwritten. It also adds `woken_run_tools` and `woken_run_tools_text` (proposal,
+/// 18/11/2026): what `join` recorded about the list of tools of the runs a notice wakes, read
+/// from the file of the connector by the caller. The leader runs no command of Hermes. The hub's
+/// values under these names are overwritten too.
+fn with_connector_fields(
+    outcome: CallOutcome,
+    can_wake: bool,
+    run_tools: crate::toolsets::RunTools,
+) -> CallOutcome {
     match outcome {
         CallOutcome::Ok(payload) => {
             let mut map = payload.into_map();
@@ -289,6 +296,14 @@ fn with_connector_fields(outcome: CallOutcome, can_wake: bool) -> CallOutcome {
             map.insert(
                 crate::memory::FIELD.to_owned(),
                 Value::from(crate::memory::keep_in_memory()),
+            );
+            map.insert(
+                "woken_run_tools".to_owned(),
+                Value::from(run_tools.as_str()),
+            );
+            map.insert(
+                "woken_run_tools_text".to_owned(),
+                Value::from(run_tools.text()),
             );
             CallOutcome::Ok(Payload::new(map))
         }
@@ -337,7 +352,15 @@ impl Shared {
             None => refused(*self.unavailable.borrow()),
         };
         match name.as_str() {
-            ARAUTO_STATUS => with_connector_fields(outcome, self.settings.waker.can_wake()),
+            ARAUTO_STATUS => {
+                let run_tools = {
+                    let home = self.home.clone();
+                    tokio::task::spawn_blocking(move || store::read_run_tools(&home))
+                        .await
+                        .unwrap_or(crate::toolsets::RunTools::NotChecked)
+                };
+                with_connector_fields(outcome, self.settings.waker.can_wake(), run_tools)
+            }
             HERMES_SEND_MESSAGE => with_reply_field(outcome),
             _ => outcome,
         }
@@ -1240,21 +1263,39 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::toolsets::RunTools;
 
     #[test]
     fn with_connector_fields_overwrites_the_hub_values() {
         let hub = Payload::new(
-            json!({"can_be_woken": true, "local_waking": "from the hub", "keep_in_memory": "from the hub"})
+            json!({"can_be_woken": true, "local_waking": "from the hub", "keep_in_memory": "from the hub", "woken_run_tools": "from the hub", "woken_run_tools_text": "from the hub"})
                 .as_object()
                 .cloned()
                 .unwrap(),
         );
-        for can_wake in [true, false] {
+        let states = [
+            RunTools::Included,
+            RunTools::Default,
+            RunTools::Added,
+            RunTools::Missing,
+            RunTools::Empty,
+            RunTools::Unreadable,
+            RunTools::NotChecked,
+        ];
+        for (can_wake, state) in [true, false]
+            .into_iter()
+            .flat_map(|w| states.map(|s| (w, s)))
+        {
             let CallOutcome::Ok(payload) =
-                with_connector_fields(CallOutcome::Ok(hub.clone()), can_wake)
+                with_connector_fields(CallOutcome::Ok(hub.clone()), can_wake, state)
             else {
                 panic!("a success stays a success");
             };
+            assert_eq!(payload.as_map()["woken_run_tools"], json!(state.as_str()));
+            assert_eq!(
+                payload.as_map()["woken_run_tools_text"],
+                json!(state.text())
+            );
             assert_eq!(payload.as_map()["local_waking"], json!(can_wake));
             assert_eq!(payload.as_map()["can_be_woken"], json!(true));
             assert_eq!(
@@ -1266,7 +1307,10 @@ mod tests {
             code: ErrorCode::Ar203,
             retry_after: None,
         };
-        assert_eq!(with_connector_fields(refused.clone(), true), refused);
+        assert_eq!(
+            with_connector_fields(refused.clone(), true, RunTools::Added),
+            refused
+        );
     }
 
     #[test]

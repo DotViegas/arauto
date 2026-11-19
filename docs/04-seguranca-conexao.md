@@ -162,10 +162,16 @@ the first one through the same swap as all the others (C7).
 
 At the end of the enrollment the connector registers itself in Hermes as a tool server, through the
 official command (`hermes mcp add`). The entry contains no secret: only the path of the program and
-the argument `mcp`. It is the only change that stays in Hermes's configuration, with one exception:
-when this Hermes has no key for its local API, the connector draws one from the system's generator
-and saves it with Hermes's own command (`hermes config set API_SERVER_KEY`); that key stays, also
-after `leave`, a denial or an expiry ([11](11-conector.md), section 6).
+the argument `mcp`. It is the only change that stays in Hermes's configuration, with two exceptions:
+
+- when this Hermes has no key for its local API, the connector draws one from the system's
+  generator and saves it with Hermes's own command (`hermes config set API_SERVER_KEY`);
+- when Hermes's configuration limits the tools of the runs of its local API to an explicit list
+  without `arauto` (`platform_toolsets.api_server`), the connector appends `arauto` to that list
+  with the same command, keeping every other entry.
+
+Both stay, also after `leave`, a denial or an expiry ([11](11-conector.md), section 6). (The second
+exception approved by the maintainer on 18/11/2026.)
 
 Hermes starts the connector in less than a minute. While the device is pending, the connector opens
 the channel **waiting**: it proves the identity, has no WhatsApp tool at all and waits.

@@ -13,6 +13,7 @@
 //! | [`Settings::with_seed`] | The waits before a new attempt come from a seed, not from the system. |
 //! | [`Settings::with_hermes`] | The command of Hermes is answered by the test instead of run. |
 //! | [`Settings::with_key_step_ms`], [`Settings::with_key_probe`] | The time and the probe address of the key step of `join`. |
+//! | [`Settings::with_tools_step_ms`], [`Settings::with_tools_read_ms`] | The time of the tools step of `join` and of the read of `status`. |
 //! | [`attempt`] | One attempt of the channel of a device, with the code of the leader, and nothing around it. |
 
 use std::ffi::OsString;
@@ -230,6 +231,20 @@ impl Settings {
     #[must_use]
     pub fn with_key_step_ms(mut self, ms: i64) -> Self {
         self.key_step_ms = ms;
+        self
+    }
+
+    /// The time the whole tools step of `join` has, in milliseconds.
+    #[must_use]
+    pub fn with_tools_step_ms(mut self, ms: i64) -> Self {
+        self.tools_step_ms = ms;
+        self
+    }
+
+    /// The time the one read of the list of tools in `status` has, in milliseconds.
+    #[must_use]
+    pub fn with_tools_read_ms(mut self, ms: i64) -> Self {
+        self.tools_read_ms = ms;
         self
     }
 

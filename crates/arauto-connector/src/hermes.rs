@@ -53,6 +53,11 @@
 //!   connector, minus `API_SERVER_KEY` and `ARAUTO_HERMES_API_KEY`: no layer between the
 //!   connector and Hermes (a shim that re-parses its arguments through a shell, say) can turn
 //!   the reference into the key. The rest stays, because Hermes needs to find its own folder.
+//! - **The tools of a woken run** (proposal, 18/11/2026). From `join` and `status` the connector
+//!   reads the one setting [`TOOLS_SETTING`] with its output (`config get`, up to 64 KiB, parsed
+//!   in `toolsets` and dropped: never printed, logged or put in an error), and only `join`
+//!   writes it, by appending `arauto` to an explicit list that lacks it (`config set`). Both
+//!   take fixed arguments and go through the same `run`.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -70,6 +75,9 @@ pub const SERVER_NAME: &str = "arauto";
 /// The setting of Hermes that holds the key of its local API (observed on v0.22.5).
 pub const HERMES_KEY_VARIABLE: &str = "API_SERVER_KEY";
 
+/// The setting of Hermes that lists the tools of the runs of its local API.
+pub(crate) const TOOLS_SETTING: &str = "platform_toolsets.api_server";
+
 /// The reference the entry carries so that Hermes hands its key to the connector. Fixed text,
 /// not a secret: `${` and `}` are literal characters of the constant.
 pub(crate) const KEY_REFERENCE: &str = "ARAUTO_HERMES_API_KEY=${API_SERVER_KEY}";
@@ -85,7 +93,7 @@ pub const DEFAULT_PROGRAM: &str = "hermes";
 const ANSWERS: &[u8] = b"y\ny\n";
 
 /// How much of the list `add` keeps to look for its row.
-const LIST_CEILING: usize = 64 * 1024;
+pub(crate) const LIST_CEILING: usize = 64 * 1024;
 
 /// Why the registration failed: AR-601.
 #[derive(Debug, thiserror::Error)]
@@ -352,6 +360,49 @@ impl Hermes {
             Some(0) => Ok(true),
             Some(1) => Ok(false),
             _ => Err(HermesError::Refused),
+        }
+    }
+
+    /// `hermes config get platform_toolsets.api_server`, with its output: `Ok(None)` for exit 1
+    /// (no row), `Ok(Some(bytes))` for exit 0 with the start of the standard output (64 KiB),
+    /// `Err` for anything else, an output that filled the ceiling (it may be cut) included. The bytes
+    /// are only parsed by the caller: never logged or shown.
+    pub(crate) async fn read_tool_list(
+        &self,
+        limit: std::time::Duration,
+    ) -> Result<Option<Vec<u8>>, HermesError> {
+        let arguments: Vec<OsString> = ["config", "get", TOOLS_SETTING]
+            .into_iter()
+            .map(OsString::from)
+            .collect();
+        let ran = self.run(&arguments, limit, None, true).await?;
+        match ran.code {
+            // An output that filled the ceiling may have been cut: it is not read.
+            Some(0) if ran.captured.len() >= LIST_CEILING => Err(HermesError::Refused),
+            Some(0) => Ok(Some(ran.captured)),
+            Some(1) => Ok(None),
+            _ => Err(HermesError::Refused),
+        }
+    }
+
+    /// `hermes config set platform_toolsets.api_server VALUE`: `Ok(true)` exit 0, `Ok(false)` an
+    /// exit code that is not 0, `Err` not started, timed out or ended by a signal (it may have
+    /// written: the caller cannot tell).
+    pub(crate) async fn write_tool_list(
+        &self,
+        value: &str,
+        limit: std::time::Duration,
+    ) -> Result<bool, HermesError> {
+        let arguments: Vec<OsString> = vec![
+            OsString::from("config"),
+            OsString::from("set"),
+            OsString::from(TOOLS_SETTING),
+            OsString::from(value),
+        ];
+        match self.run(&arguments, limit, None, false).await?.code {
+            Some(0) => Ok(true),
+            Some(_) => Ok(false),
+            None => Err(HermesError::Refused),
         }
     }
 

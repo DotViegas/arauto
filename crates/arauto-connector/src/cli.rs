@@ -300,7 +300,7 @@ async fn run_inner(
             mcp(home, settings.waking(target)).await
         }
         Command::Status => {
-            let report = crate::report::report(&home, &settings).await;
+            let report = crate::report::report(&home, &hermes, &settings).await;
             print!("{}", crate::report::render(&report));
             Exit::Done
         }
@@ -423,6 +423,7 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
                 println!("This code replaces the one shown before, which is no longer valid.");
             }
             key_step(entry, hermes, settings).await;
+            tools_step(entry, hermes, settings, home).await;
             Exit::Done
         }
         Ok(Joined::AlreadyApproved { entry }) => {
@@ -431,6 +432,7 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
                 print_entry(entry, true);
             }
             key_step(entry, hermes, settings).await;
+            tools_step(entry, hermes, settings, home).await;
             Exit::Done
         }
         Err(said) => {
@@ -459,6 +461,29 @@ async fn key_step(entry: Entry, hermes: &Hermes, settings: &Settings) {
         }
         KeyOutcome::NotMade => println!("{}", Told::KeyNotMade.phrase()),
     }
+    let _ = std::io::stdout().flush();
+}
+
+/// After the key step, for the same entries: the tools of the runs a notice wakes
+/// (`docs/11-conector.md`, section 6). It appends `arauto` to an explicit list of the local API
+/// platform that lacks it, prints what happened, records what it found for the leader, and
+/// never changes the exit code of `join`.
+async fn tools_step(entry: Entry, hermes: &Hermes, settings: &Settings, home: &Home) {
+    use std::io::Write;
+
+    if !entry.carries_key_reference() {
+        return;
+    }
+    let _ = std::io::stdout().flush();
+    let Some(outcome) = crate::toolsets::add_step(hermes, settings).await else {
+        return;
+    };
+    for told in outcome.told() {
+        println!("{}", told.phrase());
+    }
+    let state = outcome.record();
+    let home = home.clone();
+    let _ = tokio::task::spawn_blocking(move || crate::store::write_run_tools(&home, state)).await;
     let _ = std::io::stdout().flush();
 }
 

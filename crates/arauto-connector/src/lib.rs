@@ -49,6 +49,7 @@ mod status;
 mod store;
 #[cfg(feature = "testing")]
 pub mod testing;
+pub mod toolsets;
 mod waiters;
 pub mod wake;
 mod writes;
