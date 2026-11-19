@@ -29,6 +29,7 @@
 
 pub mod admin;
 pub mod audit;
+pub mod bundle;
 pub mod channel;
 pub mod check;
 pub mod config;

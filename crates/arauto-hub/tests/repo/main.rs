@@ -19,6 +19,7 @@ mod org;
 mod org_rounds;
 mod peer_rounds;
 mod purge;
+mod reconnect;
 mod role;
 mod rounds;
 mod scan;

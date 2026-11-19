@@ -212,6 +212,8 @@ pub struct Hub {
     keypair: StaticKeypair,
     client_ip: ClientIpSource,
     downloads: Downloads,
+    /// What the files of `downloads` are, hashed once: the standing of the connectors.
+    served: crate::core::reconnect::Served,
     /// The fixed fields of the instruction page of an invite. `None` when the hub serves no
     /// connector to point at.
     join_page: Option<JoinPage>,
@@ -303,6 +305,10 @@ impl Hub {
 
     pub(crate) fn downloads(&self) -> &Downloads {
         &self.downloads
+    }
+
+    pub(crate) fn served(&self) -> &crate::core::reconnect::Served {
+        &self.served
     }
 
     pub(crate) fn join_page(&self) -> Option<&JoinPage> {
@@ -739,6 +745,10 @@ pub async fn start<P: Purposes>(
         clock,
         keypair,
         client_ip: config.client_ip.clone(),
+        served: crate::core::reconnect::Served::of(
+            &options.downloads.listed(),
+            crate::bundle::known_for(&options.downloads.listed()),
+        ),
         downloads: options.downloads,
         join_page,
         join_lookups: Semaphore::new(settings.join_lookups_max),

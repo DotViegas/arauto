@@ -7,6 +7,10 @@
 # x86_64 and macOS (arm64 and x86_64). The WhatsApp engine is never in the image: whoever installs
 # brings their own.
 #
+# The connectors are built first. Their build number and the SHA-256 of each file are then
+# compiled into the hub, which at start compares the files it serves with those digests: the hub
+# knows the build of the connectors it serves (decision 0053, proposal).
+#
 # Fact stated by the maintainer's assistant on 14/11/2026: the Windows and macOS builds below
 # compile and link in this build image. None of those files was ever run.
 
@@ -17,10 +21,8 @@ COPY Cargo.toml Cargo.lock clippy.toml ./
 COPY crates ./crates
 # `--locked`: the versions are the ones of Cargo.lock, or the build fails.
 # The connector is built with TLS (`wss://`): outside the machine of the hub there is no other way.
-RUN cargo build --release --locked -p arauto-hub \
- && cargo build --release --locked -p arauto-connector --features tls \
+RUN cargo build --release --locked -p arauto-connector --features tls \
  && mkdir -p /out/download \
- && cp target/release/arauto-hub /out/arauto-hub \
  && cp target/release/arauto-connector /out/download/arauto-connector-linux-x86_64
 # The connector for Windows x86_64: the GNU target, linked by mingw-w64.
 RUN apt-get update \
@@ -40,6 +42,12 @@ RUN apt-get update \
  && cargo zigbuild --release --locked -p arauto-connector --features tls --target x86_64-apple-darwin \
  && cp target/aarch64-apple-darwin/release/arauto-connector /out/download/arauto-connector-macos-aarch64 \
  && cp target/x86_64-apple-darwin/release/arauto-connector /out/download/arauto-connector-macos-x86_64
+# The hub, last: it is built with the number and the digests of the four connectors above.
+RUN export ARAUTO_BUNDLE_CONNECTOR_VERSION="$(sed -n 's/^version = "\([0-9]*\.[0-9]*\.[0-9]*\)"$/\1/p' crates/arauto-connector/Cargo.toml | head -n 1)" \
+ && export ARAUTO_BUNDLE_CONNECTOR_SHA256="$(cd /out/download && for f in arauto-connector-*; do printf '%s=%s,' "$f" "$(sha256sum "$f" | cut -d ' ' -f 1)"; done | sed 's/,$//')" \
+ && test -n "$ARAUTO_BUNDLE_CONNECTOR_VERSION" && test -n "$ARAUTO_BUNDLE_CONNECTOR_SHA256" \
+ && cargo build --release --locked -p arauto-hub \
+ && cp target/release/arauto-hub /out/arauto-hub
 
 # ---------------------------------------------------------------------------- run
 FROM debian:bookworm-slim

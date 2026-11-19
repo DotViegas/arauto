@@ -74,6 +74,8 @@ pub struct Enrollment<'a> {
     pub declared: &'a Declared,
     /// The version of the connector, from `hello`. Not verified.
     pub connector_version: &'a DeclaredText,
+    /// The protocol version agreed on this connection.
+    pub proto: u32,
     /// The address the connection came from.
     pub origin: Option<IpAddr>,
     /// The nonce the hub drew for this enrollment ([`draw_nonce`]), which goes in `enrolled`.
@@ -242,8 +244,9 @@ pub async fn enroll(
             "INSERT INTO device (id, organization_id, hermes_id, public_key, state, \
                                  state_since, slot, verification_code, confirm_until, \
                                  enrollments, declared, enrolled_from, connector_version, \
-                                 created_at) \
-             VALUES ($1, $2, $3, $4, 'pending', $5, 'request', $6, $7, 1, $8, $9, $10, $5) \
+                                 enrolled_connector, enrolled_proto, created_at) \
+             VALUES ($1, $2, $3, $4, 'pending', $5, 'request', $6, $7, 1, $8, $9, $10, $10, \
+                     $11, $5) \
              ON CONFLICT (public_key) DO NOTHING",
         )
         .bind(device)
@@ -256,6 +259,7 @@ pub async fn enroll(
         .bind(Json(declared))
         .bind(request.origin.map(|origin| origin.to_string()))
         .bind(request.connector_version.as_str())
+        .bind(i32::try_from(request.proto).unwrap_or(i32::MAX))
         .execute(write.connection())
         .await?
         .rows_affected();

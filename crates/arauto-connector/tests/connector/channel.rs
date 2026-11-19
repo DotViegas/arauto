@@ -359,10 +359,18 @@ async fn a_call_through_a_copy_without_a_session_is_ar203() {
     leader.shutdown().await;
 }
 
-/// A `join` that changed the program asks the leader to end, for Hermes to start the new
-/// version.
+/// The leader did not finish and still answers a call: what a `restart` would have ended.
+async fn assert_still_serving(connector: &Connector) {
+    let ended = tokio::time::timeout(std::time::Duration::from_secs(2), connector.finished()).await;
+    assert!(ended.is_err(), "the leader was asked to end");
+    assert_eq!(connector.role(), Role::Leader);
+    assert!(status_works(connector).await);
+}
+
+/// A `join` that changed the program, with the same folder format, does not ask the leader to
+/// end (decision 0053): it keeps serving until the gateway of Hermes restarts.
 #[tokio::test(flavor = "multi_thread")]
-async fn a_join_with_a_new_program_asks_the_leader_to_end() {
+async fn a_join_with_a_new_program_does_not_ask_the_leader_to_end() {
     let fixture = Fixture::new(settings()).await;
     let (s, mut watch, _registrations) = support::settings();
     let (name, folder, connector) = connected(&fixture, s.clone(), &mut watch).await;
@@ -389,16 +397,14 @@ async fn a_join_with_a_new_program_asks_the_leader_to_end() {
         std::fs::read(folder.home.program()).unwrap(),
         b"a newer program for the tests"
     );
-    tokio::time::timeout(PATIENCE, connector.finished())
-        .await
-        .expect("the leader was asked to end");
+    assert_still_serving(&connector).await;
     connector.shutdown().await;
 }
 
 /// The same when the registration is made late, on AR-104: the program it names is copied
-/// then, and a new one asks the leader to end.
+/// then, and the leader is not asked to end either.
 #[tokio::test(flavor = "multi_thread")]
-async fn a_late_registration_with_a_new_program_asks_the_leader_to_end() {
+async fn a_late_registration_with_a_new_program_does_not_ask_the_leader_to_end() {
     let fixture = Fixture::new(settings()).await;
     let (s, mut watch, registrations) = support::settings();
     let name = fixture.hermes().await;
@@ -454,9 +460,7 @@ async fn a_late_registration_with_a_new_program_asks_the_leader_to_end() {
         std::fs::read(folder.home.program()).unwrap(),
         b"a newer program for the tests"
     );
-    tokio::time::timeout(PATIENCE, connector.finished())
-        .await
-        .expect("the leader was asked to end");
+    assert_still_serving(&connector).await;
     connector.shutdown().await;
 }
 

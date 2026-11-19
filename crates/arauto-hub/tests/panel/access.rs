@@ -413,11 +413,11 @@ async fn revoking_asks_first_and_only_the_form_revokes() {
         "the session of the Hermes ended"
     );
     let list = page(&browser, &cookie, "/").await;
-    assert!(list.contains("<span class=\"state idle\">No device</span>"));
+    assert!(list.contains("<span class=\"state idle\">Revoked</span>"));
     let after = page(&browser, &cookie, &said).await;
     assert!(
         after.contains(&format!(
-            "<p class=\"status idle\" role=\"status\">Hermes {name}: No device.</p>"
+            "<p class=\"status idle\" role=\"status\">Hermes {name}: Revoked.</p>"
         )),
         "{after}"
     );

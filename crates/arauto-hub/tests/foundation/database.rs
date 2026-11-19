@@ -1162,3 +1162,135 @@ async fn the_answer_of_orders_from_outside_whatsapp_comes_empty_and_keeps_one_ro
         "only for a Hermes that exists"
     );
 }
+
+/// The reason of an invite and the program that enrolled a device (migration 0024): the
+/// columns come empty to a database that has data, and keep their format.
+#[tokio::test]
+async fn the_reason_of_an_invite_comes_empty_and_keeps_its_format() {
+    let db = TestDb::empty().await;
+    let before = Migrator::with_migrations(
+        MIGRATOR
+            .iter()
+            .filter(|migration| migration.version < 24)
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    db::migrate_new_database(&db.pool, &before).await.unwrap();
+    assert!(!column_exists(&db.pool, "invite", "reason").await);
+    assert!(!column_exists(&db.pool, "device", "enrolled_connector").await);
+    let home = TestHome::new();
+    let organization = common::organization(&db.pool, &home).await;
+    let hermes = common::hermes(&db.pool, organization).await;
+    let (device, _) =
+        common::device(&db.pool, organization, hermes, "active", Confirmed::Yes).await;
+    let (invite, _) = common::invite(&db.pool, organization, hermes, "used", Some(device)).await;
+    db::migrate_existing_database(&db.pool, &MIGRATOR, BackupConfirmed::i_have_a_backup())
+        .await
+        .unwrap();
+    for column in ["reason", "version_clause", "version_from", "version_to"] {
+        assert!(column_exists(&db.pool, "invite", column).await, "{column}");
+        let filled: i64 = sqlx::query_scalar(AssertSqlSafe(format!(
+            "SELECT count(*) FROM invite WHERE {column} IS NOT NULL"
+        )))
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(filled, 0, "{column} starts empty");
+    }
+    let (connector, proto): (Option<String>, Option<i32>) =
+        sqlx::query_as("SELECT enrolled_connector, enrolled_proto FROM device WHERE id = $1")
+            .bind(device)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!((connector, proto), (None, None));
+
+    // The format is kept by the database.
+    let set = |sql: &'static str, text: Option<&'static str>| {
+        let pool = db.pool.clone();
+        async move {
+            sqlx::query(sql)
+                .bind(invite)
+                .bind(text)
+                .execute(&pool)
+                .await
+        }
+    };
+    assert!(
+        set(
+            "UPDATE invite SET reason = $2 WHERE id = $1",
+            Some("request_approved")
+        )
+        .await
+        .is_ok()
+    );
+    assert!(
+        set("UPDATE invite SET reason = $2 WHERE id = $1", Some("pick"))
+            .await
+            .is_err(),
+        "an unknown reason"
+    );
+    assert!(
+        set(
+            "UPDATE invite SET version_clause = $2 WHERE id = $1",
+            Some("newer")
+        )
+        .await
+        .is_err(),
+        "an unknown clause"
+    );
+    assert!(
+        set(
+            "UPDATE invite SET version_from = $2, version_to = $2, version_clause = 'numbers' \
+             WHERE id = $1",
+            Some("1.2")
+        )
+        .await
+        .is_err(),
+        "a version is three numbers"
+    );
+    assert!(
+        set(
+            "UPDATE invite SET version_from = $2, version_to = $2 WHERE id = $1",
+            Some("1.2.3")
+        )
+        .await
+        .is_err(),
+        "versions only come with the clause numbers"
+    );
+    assert!(
+        set(
+            "UPDATE invite SET version_clause = 'numbers' WHERE id = $1",
+            None
+        )
+        .await
+        .is_err(),
+        "the clause numbers comes with both versions"
+    );
+    assert!(
+        set(
+            "UPDATE invite SET version_from = $2, version_to = '1.2.4', \
+             version_clause = 'numbers' WHERE id = $1",
+            Some("1.2.3")
+        )
+        .await
+        .is_ok()
+    );
+    let long = "x".repeat(129);
+    assert!(
+        sqlx::query("UPDATE device SET enrolled_connector = $2 WHERE id = $1")
+            .bind(device)
+            .bind(&long)
+            .execute(&db.pool)
+            .await
+            .is_err(),
+        "the declared text is at most 128 characters"
+    );
+    assert!(
+        sqlx::query("UPDATE device SET enrolled_proto = 0 WHERE id = $1")
+            .bind(device)
+            .execute(&db.pool)
+            .await
+            .is_err()
+    );
+}

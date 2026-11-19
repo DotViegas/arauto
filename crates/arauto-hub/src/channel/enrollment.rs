@@ -23,7 +23,7 @@
 use std::sync::Arc;
 
 use arauto_protocol::errors::ErrorCode;
-use arauto_protocol::message::{Hello, Message};
+use arauto_protocol::message::{Hello, Message, Negotiation};
 
 use super::Hub;
 use super::link::{Link, RecvError};
@@ -63,10 +63,15 @@ pub(crate) async fn run(hub: Arc<Hub>, mut link: Link, hello: Hello) {
         tracing::error!("the generator of the system failed");
         return link.close(ErrorCode::Ar205);
     };
+    // `hello` routes only an agreed protocol here; anything else closes.
+    let Negotiation::Agreed(proto) = hub.settings().versions.negotiate(hello.proto) else {
+        return link.close(ErrorCode::Ar402);
+    };
     let request = Enrollment {
         identity: &info.identity,
         declared: &declared,
         connector_version: &hello.connector,
+        proto,
         origin: Some(info.address),
         nonce: &nonce,
         handshake_hash: &info.handshake_hash,

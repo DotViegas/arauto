@@ -27,6 +27,7 @@ use uuid::Uuid;
 use crate::audit::{self, Action, AuditError, Event, TargetKind};
 use crate::config::PublicUrl;
 use crate::core::model::Hermes;
+use crate::core::reconnect::Served;
 use crate::db::{self, BackupConfirmed, DbError, ResolvedOrg, SchemaState, SystemTask};
 use crate::mark::{Mark, MarkError, MarkValue};
 use crate::repo::alert::{Alert, AlertFilter};
@@ -794,6 +795,23 @@ impl Session {
         public_url: &PublicUrl,
         now: i64,
     ) -> Result<Block, AdminError> {
+        self.invite_serving(name, public_url, &Served::nothing(), now)
+            .await
+    }
+
+    /// [`Session::invite`] for a hub that serves `served`: the reason of the invite compares
+    /// the connector of the device in use with it. The panel and the command pass what the hub
+    /// serves; [`Session::invite`] is for tests.
+    ///
+    /// # Errors
+    /// As [`Session::invite`].
+    pub async fn invite_serving(
+        &self,
+        name: &str,
+        public_url: &PublicUrl,
+        served: &Served,
+        now: i64,
+    ) -> Result<Block, AdminError> {
         let name = known_name(name)?;
         let hub_key = hub_public_key(&self.pool)
             .await?
@@ -804,6 +822,7 @@ impl Session {
             self.organization,
             &self.admin,
             &name,
+            served,
             now,
         )
         .await?;

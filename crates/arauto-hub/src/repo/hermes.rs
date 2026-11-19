@@ -147,6 +147,10 @@ pub struct HermesLine {
     pub request: Option<Device>,
     /// Until when the issued invite of this Hermes is accepted, if there is one.
     pub invite_expires_at: Option<i64>,
+    /// The newest closed device that tells something (not a replaced one, and not one closed
+    /// by a newer invite), when it is newer than the device in use: what a line with no device
+    /// in use says (decision 0053).
+    pub newest_final: Option<Device>,
 }
 
 /// Every Hermes line of `organization`, by name. With `include_removed`, the removed ones
@@ -173,6 +177,15 @@ pub async fn list(
             .bind(organization.id())
             .fetch_all(pool)
             .await?;
+    let mut finals: Vec<Device> = sqlx::query_as(
+        "SELECT DISTINCT ON (hermes_id) * FROM device \
+         WHERE organization_id = $1 AND slot IS NULL AND state <> 'replaced' \
+           AND state_reason IS DISTINCT FROM 'new_invite' \
+         ORDER BY hermes_id, created_at DESC, id DESC",
+    )
+    .bind(organization.id())
+    .fetch_all(pool)
+    .await?;
     let invites: Vec<(Uuid, i64)> = sqlx::query_as(
         "SELECT hermes_id, expires_at FROM invite \
          WHERE organization_id = $1 AND state = 'issued'",
@@ -195,11 +208,21 @@ pub async fn list(
                 .iter()
                 .find(|(of, _)| *of == hermes.id)
                 .map(|(_, expires_at)| *expires_at);
+            let newest_final = finals
+                .iter()
+                .position(|d| d.hermes_id == hermes.id)
+                .map(|at| finals.swap_remove(at))
+                .filter(|last| {
+                    in_use.as_ref().is_none_or(|in_use| {
+                        (last.created_at, last.id) > (in_use.created_at, in_use.id)
+                    })
+                });
             HermesLine {
                 hermes,
                 in_use,
                 request,
                 invite_expires_at,
+                newest_final,
             }
         })
         .collect())

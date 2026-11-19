@@ -34,9 +34,9 @@ use crate::link::{self, End, Link, OpenError, RecvError};
 use crate::session::{self, Around, LeaveAsk, News};
 use crate::writes::{self, Saving};
 
-/// The version of the program, as `hello` declares it.
+/// The version of the program and the mark of its file, as `hello` declares them.
 pub(crate) fn version() -> DeclaredText {
-    DeclaredText::lossy(env!("CARGO_PKG_VERSION"))
+    DeclaredText::lossy(crate::build::declared())
 }
 
 /// How an attempt ended.

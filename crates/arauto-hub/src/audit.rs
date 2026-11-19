@@ -346,6 +346,17 @@ impl Details {
         self
     }
 
+    /// The three numbers of a version, written by the program. Never a declared text.
+    #[must_use]
+    pub fn version(
+        mut self,
+        key: &'static str,
+        value: crate::core::reconnect::CoreVersion,
+    ) -> Self {
+        self.0.insert(key.to_owned(), value.to_string().into());
+        self
+    }
+
     /// A word fixed in the program: a reason, a kind. Never a text made at run time.
     #[must_use]
     pub fn word(mut self, key: &'static str, value: &'static str) -> Self {

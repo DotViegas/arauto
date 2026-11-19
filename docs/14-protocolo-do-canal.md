@@ -87,6 +87,7 @@ All on the port of the connectors.
     the systems (what `uname -sm` prints, the file name, the digest line to use from the
     operator's message). The page is served when at least one connector is present. The digests
     still travel only in the sentence, one line per system.
+  - **Fixed sections of a reconnect (19/11/2026, [decision 0053](decisoes/0053-a-reconexao-diz-o-motivo.md), proposal, no new field).** The page is titled "Connect or reconnect a Hermes to an Arauto hub" and gains three fixed sections: "The deadline" (the hub decides whether the invite expired, not the Hermes; a Hermes that can read the page runs the steps now), "If you cannot run commands here" (run nothing, copy nothing, tell the operator a fixed sentence) and "Reconnect" (the same steps with the new invite; do not run `leave` or touch the .arauto folder; the Arauto tools keep working on the running connector; the memory notes of decision 0047; AR-105). The bullet about an expired invite names AR-101. Its fields are the same as before.
   - **What a GET does.** It only reads: one query, no lock; it never spends or changes the invite.
     Unknown, malformed, expired, cancelled or decided handles get one 404 with a fixed text,
     byte-identical in every case. Other methods on these addresses get today's empty 404.
@@ -679,7 +680,7 @@ Each message is a JSON object on one line, with `"v": 1`. An unknown version or 
 | `join` | `new_request` | The leader starts following the new request. |
 | `leave` | `leave` | The leader asks for the closing of each identity of the folder and returns one response per identity. |
 | `await-reply` | `await`, with `id`, `thread` (a UUID) and `minutes` (1 to 120) | Proposal, 15/11/2026 ([decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)). A long-lived operation, like `watch`. One final line: `{"v":1,"id":N,"ok":true,"arrived":true,"thread":"<uuid>","peer":"<name>"}`, or `"arrived":false` at the deadline, or `{"ok":false,"code":"AR-..."}`, or `{"ok":false,"error":"busy"}`. The thread and the name in the line were validated by the leader; no note text. At most 8 waits per Hermes and one per connection; a closed connection drops the wait. After a `{"restart":true}` line or a closed socket the client tries again every 5 seconds and registers again for the remaining time. |
-| `join` | `restart` | The leader ends, for Hermes to start it again in the new version. |
+| `join` | `restart` | Sent by `join` only when the program it installed cannot read the device folders (another folder format; decision 0053, proposal, 19/11/2026). No build sends it today: every folder `join` accepts is of format 1. |
 
 No operation of the socket returns the identity or the credential. In shielded mode, `leave` and
 `restart` stay out of the LLM's reach.

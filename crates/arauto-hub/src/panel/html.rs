@@ -31,6 +31,11 @@ pub enum Arg<'a> {
     Number(usize),
     /// A time left, in seconds, as `MM:SS`: the script of the panel counts it down.
     Clock(i64),
+    /// An absolute time, in milliseconds, written in UTC inside a `<time>` element: the script
+    /// of the panel shows it in the zone of the browser.
+    Time(i64),
+    /// A relative text, escaped, and the absolute time after it, in parentheses.
+    AgoTime(&'a str, i64),
 }
 
 /// A page, or a piece of one, being written.
@@ -87,6 +92,13 @@ impl Html {
                         }
                         Arg::Number(value) => self.out.push_str(&value.to_string()),
                         Arg::Clock(seconds) => self.clock(seconds),
+                        Arg::Time(at) => self.time(at),
+                        Arg::AgoTime(ago, at) => {
+                            escape_into(&mut self.out, ago);
+                            self.out.push_str(" (");
+                            self.time(at);
+                            self.out.push(')');
+                        }
                     }
                 }
             }
@@ -113,6 +125,16 @@ impl Html {
             None => escape_into(&mut self.out, text),
         }
         self
+    }
+
+    /// `<time datetime="2026-11-14T12:34:56Z">2026-11-14 12:34 UTC</time>`: both parts come from
+    /// numbers, so nothing from outside reaches the markup.
+    fn time(&mut self, at_ms: i64) {
+        let full = crate::admin::render::time(at_ms).replacen(' ', "T", 1);
+        self.out.push_str(&format!(
+            "<time datetime=\"{full}\">{} UTC</time>",
+            crate::join_page::utc_minute(at_ms)
+        ));
     }
 
     fn clock(&mut self, seconds: i64) {
@@ -209,6 +231,22 @@ mod tests {
         let mut html = Html::new(Lang::En);
         html.text(value);
         html.finish()
+    }
+
+    #[test]
+    fn a_time_is_written_in_utc_with_its_instant() {
+        let time = "<time datetime=\"2026-11-14T12:34:56Z\">2026-11-14 12:34 UTC</time>";
+        let mut html = Html::new(Lang::En);
+        html.fill("{at}", &[("at", Arg::Time(1_794_659_696_000))]);
+        assert_eq!(html.finish(), time);
+        let mut html = Html::new(Lang::En);
+        html.fill(
+            "{at}",
+            &[("at", Arg::AgoTime("<3 h> ago", 1_794_659_696_000))],
+        );
+        let out = html.finish();
+        assert!(out.starts_with("&lt;3 h&gt; ago ("), "{out}");
+        assert!(out.ends_with(&format!("{time})")), "{out}");
     }
 
     #[test]

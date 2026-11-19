@@ -34,7 +34,7 @@ use arauto_protocol::tools::ToolName;
 use serde_json::{Map, Value};
 use tokio::time::Instant;
 
-use crate::connector::{RawSocket, TestConnector, hello};
+use crate::connector::{CONNECTOR_VERSION, RawSocket, TestConnector, hello_with};
 use crate::{Ended, KitError};
 
 /// What the connector waits for each answer of the hub (`docs/14-protocolo-do-canal.md`,
@@ -181,6 +181,7 @@ pub struct Device {
     identity: Arc<StaticKeypair>,
     disk: Arc<Disk>,
     proto: (u32, u32),
+    connector: String,
 }
 
 impl std::fmt::Debug for Device {
@@ -214,6 +215,7 @@ impl Device {
             identity: Arc::new(identity),
             disk: Arc::new(Disk::default()),
             proto: (range.min(), range.max()),
+            connector: CONNECTOR_VERSION.to_owned(),
         }
     }
 
@@ -228,6 +230,13 @@ impl Device {
     #[must_use]
     pub fn speaking(mut self, proto: (u32, u32)) -> Self {
         self.proto = proto;
+        self
+    }
+
+    /// The same device, declaring another version of the connector in its `hello`.
+    #[must_use]
+    pub fn declaring(mut self, connector: &str) -> Self {
+        connector.clone_into(&mut self.connector);
         self
     }
 
@@ -264,6 +273,7 @@ impl Device {
             identity: Arc::new(identity),
             disk: Arc::new(disk),
             proto: self.proto,
+            connector: self.connector.clone(),
         }
     }
 
@@ -279,7 +289,9 @@ impl Device {
         connector: &mut TestConnector,
         purpose: Purpose,
     ) -> Result<HelloOk, KitError> {
-        connector.send(&hello(self.proto, purpose)?).await?;
+        connector
+            .send(&hello_with(self.proto, &self.connector, purpose)?)
+            .await?;
         match connector.recv(ANSWER).await? {
             Message::HelloOk(answer) => Ok(answer),
             other => Err(unexpected(&other)),

@@ -47,14 +47,23 @@ that has not received a credential yet.
 | There is already a device in the folder, of the same hub | It is treated as a reconnect, whatever the line of the invite in the panel. The current device keeps working until the new one has its first credential confirmed. When the new one takes over, the connector asks for the closing of the old one, if the hub has not yet given it as replaced, and of every other identity that is left in the folder; "already closed" and "I do not know this device" count as confirmation. Each folder is only deleted after the answer of the hub; until then, the leader repeats the request at every startup and every time the channel comes back. |
 | There is already a device in the folder, of another hub | It refuses (AR-105). Only after `leave`; if the old hub no longer exists or changed its key, after `leave --local`. The same address with another key counts as another hub. |
 
-At the end, `join` tells the running leader, through the local socket, that there is a new request.
-If the program was swapped for a new version, it asks the leader to exit, so that Hermes starts it
-again already in the new version. This depends on a proof: Hermes restarts a tool server that
-exits ([12-roteiro.md](12-roteiro.md), Phase 1). **Result of 15/11/2026, one Hermes (v0.22.5,
-Docker, Linux): a running gateway did not start a killed connector again in 15 minutes**
-([hermes-fatos.md](../referencia/hermes-fatos.md), K5), so with a single copy the connector stays
-gone until the gateway restarts. This is left for a decision. The alternative is for the leader to
-swap itself for the new program, without closing the connection with Hermes.
+At the end, `join` tells the running leader, through the local socket, that there is a new request;
+it does not ask it to end (decision 0053, proposal, 19/11/2026). The running program keeps the
+channel of the device in use, follows the new request, confirms its first credential after the
+approval and asks the hub to close the old device; the Arauto tools keep working all along. When
+the program was replaced, `join` prints one line (ProgramReplaced, or ProgramReplacedNoneRunning
+when no running connector answered); from the next restart of its gateway Hermes runs the new
+program (K5: a running gateway does not start a killed connector again,
+[hermes-fatos.md](../referencia/hermes-fatos.md)). Only a program that cannot read the device
+folders (another folder format) asks the leader to end and prints ProgramReplacedEnded; no build
+does that today. The connector also declares a build mark in `hello.connector`
+(`X.Y.Z+<sha256 of its own executable>`), so that the hub can tell which file runs.
+
+**Fact (19/11/2026, tests with two builds of the same commit):** a `join` with a new program leaves
+the leader and its copies running and serving, the new request is confirmed after the approval by the
+running (older) program, the old device is replaced, and a copy started afterwards is served; with
+no running connector, `join` prints ProgramReplacedNoneRunning. **Not tried:** an old 16/11 build
+following a request made by this `join`.
 
 ### Cases of `leave`
 
@@ -397,8 +406,29 @@ Hermes version or system.
 
 ## 7. Versions and distribution
 
-- Each version of the connector is published in the project's releases, signed with the release
-  key, with the SHA-256 digest beside it.
+- The connector has its own **build number** (`crates/arauto-connector/Cargo.toml`; 0.1.1 since
+  19/11/2026), which is not a published version. A published version is one in the project's
+  releases, signed with the release key, with the SHA-256 digest beside it. None exists yet:
+  until releases exist, no build number is called a published version.
+- **Bump policy** (decision 0053, proposal): the build number goes up by one patch in the commit
+  that changes the bytes of the connector (its code, `arauto-protocol`, `arauto-platform`, or its
+  dependencies in `Cargo.lock`), and by one minor when `PROTOCOL_VERSION` changes; `Cargo.lock`
+  goes in the same commit. A change only in the hub does not bump it. This is a process rule; no
+  code test checks it.
+- **The bundle** (proposal): the image builds the connectors first and compiles their build
+  number and the SHA-256 of each file into the hub (`ARAUTO_BUNDLE_CONNECTOR_VERSION` and
+  `ARAUTO_BUNDLE_CONNECTOR_SHA256`). At start the hub compares the files it serves with those
+  digests. Only when the names, the digests and the count all match is the bundle known: then
+  messages carry version numbers and the panel explains an outdated connector. A development
+  build, another download folder or any difference leaves it unknown, and the numbers are left
+  out. The image build itself was not run (the development machine has no Docker).
+- **Reproducibility check** (fact, 19/11/2026, [referencia/build-fatos.md](../referencia/build-fatos.md)):
+  two release builds of the Windows x86_64 connector (MSVC, no `tls`) from the same tree and path
+  gave **different** SHA-256 digests. The check of the image (build it twice from one commit and
+  compare the four digests) is pending for the server. Because builds of one commit can differ,
+  "Other build" can show after every image rebuild; the design does not change, because the
+  bundle check compares the served files with digests made in the same image build, which needs
+  no reproducibility.
 - Each version of the hub brings the connectors compatible with it and serves them at the download
   address.
 - **In every installation through the block**, the first and each reconnect, the check is the
@@ -483,6 +513,10 @@ The tools of a woken run (proposal, 18/11/2026), word for word:
 - **RunToolsNotConfirmed**: "The connector asked Hermes to add arauto to the list platform_toolsets.api_server and could not confirm the result. The operator checks that list in the configuration of Hermes: it keeps the other tools and includes arauto."
 - **RunToolsNotChecked**: "This connector has not checked the list platform_toolsets.api_server, which sets the tools of the runs a notice wakes. The status command of the connector reads it; that list must be absent or include arauto."
 - **RunToolsAddedByJoin**: "The join of this connector added arauto to the list platform_toolsets.api_server. Hermes may apply it only after its gateway restarts: if the gateway has not restarted since, the operator restarts it once."
+- **ProgramReplaced** (proposal, 19/11/2026): "This connector replaced the program of an older one. The older one keeps running, and with it the Arauto tools of this Hermes, until the gateway of this Hermes restarts; from that restart on, Hermes runs the new one. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard."
+- **ProgramReplacedNoneRunning**: "This connector replaced the program of an older one. No running connector of this Hermes answered, so the Arauto tools of this Hermes may be off until its gateway restarts, and the approval is confirmed at that restart. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard."
+- **ProgramReplacedEnded**: "This connector replaced the program of an older one that cannot read its files, and ended it: the Arauto tools of this Hermes are off until its gateway restarts, and the approval is confirmed at that restart. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard."
+- The three phrases above are longer than the 300 bytes of the other phrases (427, 430 and 419 bytes): their ceiling is 440; every other rule of the catalog holds for them.
 
 ## 9. Shielded mode (planned)
 

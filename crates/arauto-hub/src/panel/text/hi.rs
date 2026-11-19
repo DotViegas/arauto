@@ -197,8 +197,12 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "हब ने {name} का आमंत्रण तैयार किया।",
     ),
     (
-        "Invite for {name} · valid for another {time} · single use",
-        "{name} के लिए आमंत्रण · अभी {time} और मान्य · केवल एक बार इस्तेमाल",
+        "Invite for {name} · valid for another {time} · until {deadline} · single use",
+        "{name} के लिए आमंत्रण · अभी {time} और मान्य · {deadline} तक · केवल एक बार इस्तेमाल",
+    ),
+    (
+        "The Hermes reads the deadline in UTC: {utc}.",
+        "Hermes यह समय-सीमा UTC में पढ़ता है: {utc}।",
     ),
     ("Copied", "कॉपी किया गया"),
     (
@@ -739,10 +743,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Hub:", "हब:"),
     ("Hub key:", "हब की कुंजी:"),
     ("Connector sha256 ({system}):", "कनेक्टर sha256 ({system}):"),
-    (
-        "Invite (one use, until {deadline} UTC):",
-        "आमंत्रण (एक बार के लिए, {deadline} UTC तक):",
-    ),
     (
         "When it is done, send me the verification code and the lines the page asks for.",
         "काम पूरा होने पर मुझे सत्यापन कोड और वे पंक्तियाँ भेजें जो पेज माँगता है।",
@@ -1555,4 +1555,115 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
         "सहेजा गया। {hermes} अपने आदेश WhatsApp के बाहर से लेता है: Arauto उसके लिए कुछ भी मना नहीं करता।",
     ),
+    // decision 0053: the reason of an invite, the page of the actions, the standing
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it.",
+        "यह मेरा अपना अनुरोध है: इस Hermes को हमारे Arauto हब से \"{name}\" नाम से फिर से कनेक्ट करें। इसका इस हब से एक कनेक्शन है; यह उसे बदल देता है।",
+    ),
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It was connected before; this brings it back.",
+        "यह मेरा अपना अनुरोध है: इस Hermes को हमारे Arauto हब से \"{name}\" नाम से फिर से कनेक्ट करें। यह पहले कनेक्ट रह चुका है; यह उसे वापस लाता है।",
+    ),
+    ("Why:", "क्यों:"),
+    (
+        "the hub stopped trusting the credential of this Hermes (AR-501). Only a new connection brings it back.",
+        "हब ने इस Hermes की क्रेडेंशियल पर भरोसा करना बंद कर दिया (AR-501)। केवल नया कनेक्शन ही इसे वापस लाता है।",
+    ),
+    (
+        "this hub came back from a backup, and every Hermes comes back with a new connection.",
+        "यह हब बैकअप से वापस आया है, और हर Hermes नए कनेक्शन के साथ लौटता है।",
+    ),
+    (
+        "its previous request was approved, but its connector has not confirmed it yet; this new request replaces it.",
+        "इसका पिछला अनुरोध स्वीकृत हो गया था, लेकिन इसके कनेक्टर ने अभी उसकी पुष्टि नहीं की है; यह नया अनुरोध उसे बदल देता है।",
+    ),
+    (
+        "its previous request was still waiting for the verification code in the panel; this new request replaces it.",
+        "इसका पिछला अनुरोध अभी पैनल में सत्यापन कोड का इंतज़ार कर रहा था; यह नया अनुरोध उसे बदल देता है।",
+    ),
+    (
+        "its previous request was approved, but its connector did not confirm it within {hours} hours (AR-303). One cause is a gateway that was not restarted after the approval.",
+        "इसका पिछला अनुरोध स्वीकृत हो गया था, लेकिन इसके कनेक्टर ने {hours} घंटे के भीतर उसकी पुष्टि नहीं की (AR-303)। एक कारण यह हो सकता है कि स्वीकृति के बाद gateway को रीस्टार्ट नहीं किया गया।",
+    ),
+    (
+        "the verification code of its previous request was not typed within {minutes} minutes, and the request expired (AR-302).",
+        "इसके पिछले अनुरोध का सत्यापन कोड {minutes} मिनट के भीतर नहीं डाला गया, और अनुरोध की अवधि समाप्त हो गई (AR-302)।",
+    ),
+    (
+        "its previous request was closed before it connected.",
+        "इसका पिछला अनुरोध कनेक्ट होने से पहले ही बंद कर दिया गया।",
+    ),
+    (
+        "this Hermes did not reach the hub for {days} days, and its connection expired (AR-507).",
+        "यह Hermes {days} दिन तक हब तक नहीं पहुँचा, और इसका कनेक्शन समाप्त हो गया (AR-507)।",
+    ),
+    (
+        "the admin closed its previous connection in the hub (AR-502).",
+        "एडमिन ने हब में इसका पिछला कनेक्शन बंद कर दिया (AR-502)।",
+    ),
+    (
+        "its previous connection was closed at its own request.",
+        "इसका पिछला कनेक्शन इसी के अनुरोध पर बंद किया गया।",
+    ),
+    (
+        "the previous invite passed its {invite_minutes} minutes without being used.",
+        "पिछले आमंत्रण की {invite_minutes} मिनट की अवधि बिना उपयोग हुए बीत गई।",
+    ),
+    (
+        "the admin asked for a new connection.",
+        "एडमिन ने नया कनेक्शन माँगा।",
+    ),
+    (
+        "Its connector changes from version {old} to version {new}.",
+        "इसका कनेक्टर संस्करण {old} से संस्करण {new} में बदल रहा है।",
+    ),
+    (
+        "Its connector is older than the one this hub serves; this replaces it.",
+        "इसका कनेक्टर उस कनेक्टर से पुराना है जो यह हब देता है; यह उसे बदल देता है।",
+    ),
+    (
+        "Its connector is not the one this hub serves; this replaces it.",
+        "इसका कनेक्टर वह नहीं है जो यह हब देता है; यह उसे बदल देता है।",
+    ),
+    (
+        "Read {page} and follow it; its section \"Reconnect\" applies to you. Ask me if anything is unclear.",
+        "{page} पढ़ें और उसके अनुसार करें; उसका \"Reconnect\" अनुभाग आप पर लागू होता है। कुछ भी स्पष्ट न हो तो मुझसे पूछें।",
+    ),
+    (
+        "Invite (one use, valid for {minutes} minutes from when it was issued, until {deadline} UTC; the hub checks the time, not you):",
+        "आमंत्रण (एक बार के लिए, जारी होने से {minutes} मिनट तक मान्य, {deadline} UTC तक; समय हब जाँचता है, आप नहीं):",
+    ),
+    (
+        "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+        "{name} पुराना कनेक्टर{old} चला रहा है; यह हब {new} देता है। अपडेट करने के लिए इसे फिर से कनेक्ट करें। इसके Arauto टूल इसके gateway के रीस्टार्ट होने तक चलते रहते हैं, और नया कनेक्टर उसी रीस्टार्ट से चलता है।",
+    ),
+    (
+        "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+        "{name} में नया कनेक्टर इंस्टॉल है, लेकिन तब से उसका gateway रीस्टार्ट नहीं हुआ: वह अब भी पुराना चला रहा है। उसके ऑपरेटर से gateway एक बार रीस्टार्ट करने को कहें। दोबारा कनेक्ट करना ज़रूरी नहीं है।",
+    ),
+    (
+        "{name} declares a connector that is not one this hub serves.",
+        "{name} ऐसा कनेक्टर बता रहा है जो इस हब द्वारा दिए जाने वाले कनेक्टरों में से नहीं है।",
+    ),
+    (
+        "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+        "कनेक्टर चलने पर इस स्वीकृति की पुष्टि करता है। अगर Hermes ने कहा कि उसका प्रोग्राम बदला गया या कुंजी बनी, तो उसका gateway एक बार रीस्टार्ट करना होगा। दूसरा आमंत्रण जारी करने से यह स्वीकृति रद्द हो जाती है।",
+    ),
+    (
+        "{name} is connected to this hub, but its connector has not reached it since {ago}. Try a restart of its gateway first. Reconnect only when it moved to another machine or lost its .arauto folder.",
+        "{name} इस हब से कनेक्टेड है, लेकिन उसका कनेक्टर {ago} से हब तक नहीं पहुँचा है। पहले उसके gateway को रीस्टार्ट करके देखें। दोबारा कनेक्ट तभी करें जब वह दूसरी मशीन पर चला गया हो या उसका .arauto फ़ोल्डर खो गया हो।",
+    ),
+    (
+        "If you issue it now, the message tells the Hermes: Why: {reason}",
+        "अगर आप इसे अभी जारी करते हैं, तो संदेश Hermes से कहता है: क्यों: {reason}",
+    ),
+    (
+        "The state changed after you opened this window. The message gives the reason as it is now: {reason}",
+        "यह विंडो खोलने के बाद स्थिति बदल गई। संदेश कारण को वैसा बताता है जैसा वह अब है: {reason}",
+    ),
+    ("Outdated: {n}", "पुराने: {n}"),
+    ("Revoked", "निरस्त"),
+    ("Expired", "समाप्त"),
+    ("Left", "छोड़ा"),
+    ("Restart pending", "रीस्टार्ट बाकी"),
 ];

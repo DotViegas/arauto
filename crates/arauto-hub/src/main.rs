@@ -562,9 +562,17 @@ async fn serve() -> anyhow::Result<Report> {
     arauto_hub::logging::init_stderr();
     let config = ServeConfig::read(&ProcessEnv)?;
     install_if_new(&config.storage).await?;
+    let (served_files, listed) = downloads()?;
+    if arauto_hub::bundle::known_for(&listed).is_some() {
+        tracing::info!("the connectors served are the ones this hub was built with");
+    } else {
+        tracing::info!(
+            "the hub does not know the build of the connectors it serves: no message carries version numbers"
+        );
+    }
     let options = channel::Options {
         settings: ChannelSettings::default(),
-        downloads: downloads()?.0,
+        downloads: served_files,
         ..channel::Options::default()
     };
     let running = channel::start(&config, options, Arc::new(SystemClock)).await?;
@@ -943,8 +951,14 @@ async fn run_installed(
         InstalledCommand::Invite { name, command } => {
             let public_url = PublicUrl::read(&ProcessEnv)?;
             let listed = downloads()?.1;
+            let served = arauto_hub::core::reconnect::Served::of(
+                &listed,
+                arauto_hub::bundle::known_for(&listed),
+            );
             render::block(
-                &session.invite(&name, &public_url, now).await?,
+                &session
+                    .invite_serving(&name, &public_url, &served, now)
+                    .await?,
                 &listed,
                 now,
                 if command {

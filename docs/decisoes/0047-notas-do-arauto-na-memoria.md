@@ -72,3 +72,7 @@ The first approved text had two factual errors, found while checking it against 
 - **Longer tool descriptions:** descriptions stay per tool, and the lines cross tools.
 - **The connector writing the memory:** refused, principle 7.
 - **A skill file:** the page tells the agent not to keep a skill.
+
+## Amendment of 19/11/2026 (decision 0053, D8): the notes on a reconnect
+
+**Proposal, asked and approved by the maintainer on 19/11/2026.** On a reconnect, the "Reconnect" section of the page says: if the three Arauto notes are already in the main memory of the Hermes, exactly as written, it does not save them again; if older Arauto notes in its memory differ from them, it replaces those with the three lines. The confirmation line to the operator is the same, "Arauto notes saved in memory: yes". Nothing else of this decision changes: Arauto never writes to the memory of a Hermes, and the notes are the only thing the page asks to keep.

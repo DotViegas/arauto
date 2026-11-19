@@ -158,6 +158,7 @@ impl World {
             self.org,
             &self.admin,
             name,
+            &arauto_hub::core::reconnect::Served::nothing(),
             self.now(),
         )
         .await
@@ -175,6 +176,25 @@ impl World {
         issued: &IssuedInvite,
         identity: &PublicKey,
         origin: Option<IpAddr>,
+    ) -> (EnrollOutcome, VerificationCode) {
+        self.enroll_declaring(
+            issued,
+            identity,
+            origin,
+            "0.1.0",
+            arauto_protocol::message::PROTOCOL_VERSION,
+        )
+        .await
+    }
+
+    /// [`World::enroll_from`] for a connector that declares `version` and agreed on `proto`.
+    pub async fn enroll_declaring(
+        &self,
+        issued: &IssuedInvite,
+        identity: &PublicKey,
+        origin: Option<IpAddr>,
+        version: &str,
+        proto: u32,
     ) -> (EnrollOutcome, VerificationCode) {
         let mut hash = [0u8; 32];
         hash[..8].copy_from_slice(&next().to_be_bytes());
@@ -195,7 +215,8 @@ impl World {
             &Enrollment {
                 identity,
                 declared: &declared,
-                connector_version: &DeclaredText::parse("0.1.0").unwrap(),
+                connector_version: &DeclaredText::parse(version).unwrap(),
+                proto,
                 origin,
                 nonce: &nonce,
                 handshake_hash: &hash,
@@ -282,13 +303,24 @@ impl World {
     }
 
     pub async fn connect_from(&self, device: Uuid, from: Option<IpAddr>) -> ChannelConnection {
+        self.connect_declaring(device, from, "0.1.0", 1).await
+    }
+
+    /// A connection of `device` whose connector declares `version` and speaks `proto`.
+    pub async fn connect_declaring(
+        &self,
+        device: Uuid,
+        from: Option<IpAddr>,
+        version: &str,
+        proto: u32,
+    ) -> ChannelConnection {
         connection::open(
             self.pool(),
             self.org,
             device,
             from,
-            &DeclaredText::parse("0.1.0").unwrap(),
-            1,
+            &DeclaredText::parse(version).unwrap(),
+            proto,
             self.now(),
         )
         .await
@@ -370,6 +402,45 @@ impl World {
     pub async fn active(&self, name: &HermesName) -> Connected {
         let request = self.approved(name, None).await;
         self.first_swap(&request).await
+    }
+
+    /// A Hermes with an active device whose connector declares `version` and speaks `proto`.
+    pub async fn active_declaring(
+        &self,
+        name: &HermesName,
+        version: &str,
+        proto: u32,
+    ) -> Connected {
+        // The program that ran `join` is the one that runs: same text, same protocol.
+        let issued = self.invite(name).await;
+        let who = identity();
+        let (outcome, code) = self
+            .enroll_declaring(&issued, &who, address(10), version, proto)
+            .await;
+        let EnrollOutcome::Enrolled(accepted) = outcome else {
+            panic!("the enrollment was refused: {outcome:?}");
+        };
+        let approved = self.approve(name, code, None).await;
+        assert!(matches!(approved, ApproveOutcome::Approved(_)));
+        let request = Request {
+            device: accepted.device,
+            identity: who,
+            code,
+        };
+        let connection = self
+            .connect_declaring(request.device, address(20), version, proto)
+            .await;
+        let issued = self.issued(&connection, None).await;
+        let confirmed = self.confirm(&connection, &issued).await;
+        assert!(matches!(confirmed, ConfirmOutcome::Confirmed { .. }));
+        let issued = *issued;
+        Connected {
+            device: request.device,
+            identity: request.identity,
+            connection,
+            credential: issued.receipt.credential(),
+            sealed: issued.sealed,
+        }
     }
 
     /// One more full swap of an active device, on a new connection: presents the current

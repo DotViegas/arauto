@@ -158,6 +158,8 @@ pub struct PanelState {
     hub_url: PublicUrl,
     /// The connectors the hub serves that the sentence names, in the order of their systems.
     connectors: Vec<Listed>,
+    /// What the hub serves, for the standing of the connectors and the reason of an invite.
+    pub(crate) served: crate::core::reconnect::Served,
     /// The passkey ceremonies of this panel, for its own address. `None` when a browser
     /// would refuse a passkey at that address.
     relying: Option<RelyingParty>,
@@ -194,6 +196,10 @@ impl PanelState {
                 .into_iter()
                 .map(|(_, file)| file.clone())
                 .collect(),
+            served: crate::core::reconnect::Served::of(
+                &downloads.listed(),
+                crate::bundle::known_for(&downloads.listed()),
+            ),
             relying: RelyingParty::new(&url.origin()).ok(),
             pairings: pairing::Pairings::default(),
             orders_ack: arauto_protocol::secret::Secret::random()
@@ -1344,6 +1350,29 @@ mod tests {
                 "the script has a sentence of the page: {sentence}"
             );
         }
+    }
+
+    #[test]
+    fn the_script_shows_the_times_in_the_zone_of_the_browser_as_text() {
+        let script = std::str::from_utf8(ASSETS[1].2).unwrap();
+        for needed in ["getTimezoneOffset", "hourCycle: 'h23'", "time[datetime]"] {
+            assert!(script.contains(needed), "{needed}");
+        }
+        assert_eq!(script.matches("localTimes(region);").count(), 1);
+        // Only the text and the title of the element are written; the page stays text.
+        let normal = script.replace("\r\n", "\n");
+        let body = normal
+            .split("function localTimes(scope)")
+            .nth(1)
+            .unwrap()
+            .split("\n  }")
+            .next()
+            .unwrap();
+        assert!(!body.contains("innerHTML") && !body.contains("insertAdjacent"));
+        assert_eq!(body.matches("node.textContent = ").count(), 1);
+        assert_eq!(body.matches("setAttribute('title'").count(), 1);
+        assert_eq!(script.matches("innerHTML = ").count(), 1);
+        assert_eq!(script.matches("innerHTML").count(), 4);
     }
 
     #[test]

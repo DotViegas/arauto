@@ -57,7 +57,7 @@ Connector sha256 (linux x86_64): {SHA256_LINUX_X86_64}
 Connector sha256 (windows x86_64): {SHA256_WINDOWS_X86_64}
 Connector sha256 (macos arm64): {SHA256_MACOS_ARM64}
 Connector sha256 (macos x86_64): {SHA256_MACOS_X86_64}
-Invite (one use, until {DEADLINE} UTC): {INVITE}
+Invite (one use, valid for {MINUTES} minutes from when it was issued, until {DEADLINE} UTC; the hub checks the time, not you): {INVITE}
 When it is done, send me the verification code and the lines the page asks for.
 ```
 
@@ -72,6 +72,8 @@ notices. If it asks you to confirm, answer in your own words."
 | `{HUB_KEY}` | The public key of the hub. With it the connector recognizes the right hub. |
 | `Connector sha256 ({system}): {SHA256}` | One line per connector the hub holds, in this fixed order: `linux x86_64`, `windows x86_64`, `macos arm64`, `macos x86_64`. The text in parentheses is the fixed English name of the system, never translated. `{SHA256}` is the digest of that system's file. With only some of the four files present, only their lines appear. |
 | `{DEADLINE}` | The time the invite stops serving, in UTC, `YYYY-MM-DD HH:MM`. |
+| `{MINUTES}` | For how many minutes an invite is valid from when it was issued: 15. The hub checks the time, not the Hermes. |
+| `{WHY}` | The reason of the reconnect, as the hub derived it when it issued the invite (decision 0053): a fixed sentence of the catalog, never a text a device wrote. |
 | `{INVITE}` | The single-use secret. No characters that WhatsApp formats. |
 
 **Change of 14/11/2026, approved by the maintainer: three systems.** The single digest line became
@@ -79,10 +81,43 @@ one line per connector present, because a Hermes on Windows 11 could not connect
 offered only the Linux file. The sentence above shows the case with the four connectors. See
 [decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md).
 
-Only the three sentence lines and the labels (the digest label with its `{system}` slot included)
-are translated; {NAME}, {PAGE}, {DEADLINE} and {system} are filled into them. The hub address, the
+Only the sentence lines (the three first lines, the Why line, the read line and the invite line)
+and the labels (the digest label with its `{system}` slot included) are translated; {NAME}, {PAGE},
+{DEADLINE}, {MINUTES}, {WHY} and {system} are filled into them. The hub address, the
 hub key, the digests and the invite are appended by the code, never inside a translated string. The admin command prints the English sentence; `--command` prints
 the block.
+
+#### The reconnect sentence
+
+**Proposal (decision 0053, 19/11/2026, asked and approved by the maintainer).** When the invite is
+for a Hermes that is or was connected, or whose earlier attempt failed, the sentence has its own
+first line and says why on its second line. There are three first lines: the Hermes has a device in
+use (this replaces it); it has none but was connected before (this brings it back); a first
+connection (the first fence above). The "Why:" line appears on every reconnect, and on a first
+connection only when an earlier attempt failed or an invite was not used. The reason is derived by
+the hub itself, once, inside the write that issues the invite, from the state it locked before it
+closed the request in progress; the admin picks nothing. The English text, with `{WHY}` filled by
+one of the twelve fixed reasons (here, "the admin asked for a new connection."):
+
+```
+I am asking you myself: reconnect this Hermes to our Arauto hub as "{NAME}". It has a connection to this hub; this replaces it.
+Why: {WHY}
+Read {PAGE} and follow it; its section "Reconnect" applies to you. Ask me if anything is unclear.
+Hub: {HUB}
+Hub key: {HUB_KEY}
+Connector sha256 (linux x86_64): {SHA256_LINUX_X86_64}
+Connector sha256 (windows x86_64): {SHA256_WINDOWS_X86_64}
+Connector sha256 (macos arm64): {SHA256_MACOS_ARM64}
+Connector sha256 (macos x86_64): {SHA256_MACOS_X86_64}
+Invite (one use, valid for {MINUTES} minutes from when it was issued, until {DEADLINE} UTC; the hub checks the time, not you): {INVITE}
+When it is done, send me the verification code and the lines the page asks for.
+```
+
+The first line of a Hermes that was connected before and has no device in use reads: "I am asking you
+myself: reconnect this Hermes to our Arauto hub as "{NAME}". It was connected before; this brings
+it back." When the connector of the device in use is older than what the hub serves, or is not one
+the hub serves, the reason is followed by one more sentence about the connector; only the numbers
+of a version that parses reach it.
 
 Why the sentence is like this:
 
@@ -110,7 +145,10 @@ The page says what Arauto is, how the agent got there, that the address was made
 connection, that the page is not an order (the operator's sentence is), what the steps do, the steps
 themselves, a required step that asks the Hermes to save three fixed lines about Arauto in its own
 main memory, with its own memory tool ([decision 0047](decisoes/0047-notas-do-arauto-na-memoria.md)),
-and what to do when something fails. The steps are the same download, check and `join` of
+and what to do when something fails. Fixed sections added by decision 0053, with no new field:
+"The deadline" (the hub decides whether the invite expired, not the Hermes), "If you cannot run
+commands here" and "Reconnect" (the steps of a reconnect, what to do about the folder and the
+memory notes). The steps are the same download, check and `join` of
 the block below, but they no longer name one file: the page has a table of the systems (what `uname
 -sm` prints, the file name, the digest line to use), the agent picks its own row, and if its system
 is not in the table, or the operator's message has no digest line for it, it does nothing and tells
@@ -306,8 +344,7 @@ is off, the copy works; the panel shows the Hermes connected, with the address i
   quarantine or update the connector. The accesses continue. The current device keeps working until
   the new one confirms the first credential. At approval, the panel shows the last use of the
   current device, for you to say whether you recognize it; if you do not, it stops right there. The
-  sentence of the reconnect is the same as that of the first connection, with a new invite and a new
-  page: it downloads and checks again.
+  sentence of the reconnect has its own first line, says why on its second line (the reason the hub derived when it issued the invite, decision 0053) and points to the "Reconnect" section of the page; it comes with a new invite and a new page, and it downloads and checks again. `join` leaves the connector that is running: the Arauto tools keep working on it until the gateway of the Hermes restarts, and from that restart Hermes runs the new program. Until then the panel shows "Restart pending".
 - **Revoke:** closes the Hermes in the hub, through the panel: the device, the request in progress
   and the issued invite. The channel drops in seconds. The accesses are kept and apply again when a
   new device is connected.

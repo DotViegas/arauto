@@ -141,6 +141,7 @@ async fn enroll_at(
             identity: who,
             declared: &declared,
             connector_version: &DeclaredText::parse("0.1.0").unwrap(),
+            proto: arauto_protocol::message::PROTOCOL_VERSION,
             origin: address(31),
             nonce: &nonce,
             handshake_hash: &hash,
@@ -476,7 +477,7 @@ async fn the_admin_command_from_init_to_revoke() {
     );
     assert!(
         sentence.contains(&format!(
-            "until {} UTC): {}",
+            "until {} UTC; the hub checks the time, not you): {}",
             // The deadline of the invite, to the minute.
             arauto_hub::join_page::utc_minute(block.issued.expires_at),
             block.issued.invite.reveal().as_str()

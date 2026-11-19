@@ -215,8 +215,12 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Хаб сгенерировал приглашение для {name}.",
     ),
     (
-        "Invite for {name} · valid for another {time} · single use",
-        "Приглашение для {name} · действует ещё {time} · одноразовое",
+        "Invite for {name} · valid for another {time} · until {deadline} · single use",
+        "Приглашение для {name} · действует ещё {time} · до {deadline} · одноразовое",
+    ),
+    (
+        "The Hermes reads the deadline in UTC: {utc}.",
+        "Hermes читает срок в UTC: {utc}.",
     ),
     ("Copied", "Скопировано"),
     (
@@ -777,10 +781,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Connector sha256 ({system}):",
         "sha256 коннектора ({system}):",
-    ),
-    (
-        "Invite (one use, until {deadline} UTC):",
-        "Приглашение (одноразовое, до {deadline} UTC):",
     ),
     (
         "When it is done, send me the verification code and the lines the page asks for.",
@@ -1627,4 +1627,115 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
         "Сохранено. {hermes} принимает приказы вне WhatsApp: Arauto ничего для него не отклоняет.",
     ),
+    // decision 0053: the reason of an invite, the page of the actions, the standing
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it.",
+        "Это моя личная просьба: переподключите этот Hermes к нашему хабу Arauto под именем «{name}». У него есть подключение к этому хабу; это заменяет его.",
+    ),
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It was connected before; this brings it back.",
+        "Это моя личная просьба: переподключите этот Hermes к нашему хабу Arauto под именем «{name}». Он уже был подключён раньше; это возвращает его.",
+    ),
+    ("Why:", "Почему:"),
+    (
+        "the hub stopped trusting the credential of this Hermes (AR-501). Only a new connection brings it back.",
+        "хаб перестал доверять учётным данным этого Hermes (AR-501). Вернуть его может только новое подключение.",
+    ),
+    (
+        "this hub came back from a backup, and every Hermes comes back with a new connection.",
+        "этот хаб восстановлен из резервной копии, и каждый Hermes возвращается с новым подключением.",
+    ),
+    (
+        "its previous request was approved, but its connector has not confirmed it yet; this new request replaces it.",
+        "его предыдущий запрос был одобрен, но его коннектор ещё не подтвердил его; этот новый запрос заменяет прежний.",
+    ),
+    (
+        "its previous request was still waiting for the verification code in the panel; this new request replaces it.",
+        "его предыдущий запрос всё ещё ждал проверочный код в панели; этот новый запрос заменяет прежний.",
+    ),
+    (
+        "its previous request was approved, but its connector did not confirm it within {hours} hours (AR-303). One cause is a gateway that was not restarted after the approval.",
+        "его предыдущий запрос был одобрен, но его коннектор не подтвердил его в течение {hours} ч (AR-303). Одна из причин: gateway не перезапустили после одобрения.",
+    ),
+    (
+        "the verification code of its previous request was not typed within {minutes} minutes, and the request expired (AR-302).",
+        "проверочный код его предыдущего запроса не ввели в течение {minutes} мин, и срок запроса истёк (AR-302).",
+    ),
+    (
+        "its previous request was closed before it connected.",
+        "его предыдущий запрос был закрыт до того, как он подключился.",
+    ),
+    (
+        "this Hermes did not reach the hub for {days} days, and its connection expired (AR-507).",
+        "этот Hermes не связывался с хабом {days} дн., и его подключение истекло (AR-507).",
+    ),
+    (
+        "the admin closed its previous connection in the hub (AR-502).",
+        "админ закрыл его предыдущее подключение в хабе (AR-502).",
+    ),
+    (
+        "its previous connection was closed at its own request.",
+        "его предыдущее подключение было закрыто по его собственной просьбе.",
+    ),
+    (
+        "the previous invite passed its {invite_minutes} minutes without being used.",
+        "предыдущее приглашение не было использовано в течение {invite_minutes} мин, и срок его истёк.",
+    ),
+    (
+        "the admin asked for a new connection.",
+        "админ запросил новое подключение.",
+    ),
+    (
+        "Its connector changes from version {old} to version {new}.",
+        "Его коннектор меняется с версии {old} на версию {new}.",
+    ),
+    (
+        "Its connector is older than the one this hub serves; this replaces it.",
+        "Его коннектор старше того, что отдаёт этот хаб; это заменяет его.",
+    ),
+    (
+        "Its connector is not the one this hub serves; this replaces it.",
+        "Его коннектор не тот, что отдаёт этот хаб; это заменяет его.",
+    ),
+    (
+        "Read {page} and follow it; its section \"Reconnect\" applies to you. Ask me if anything is unclear.",
+        "Прочитайте {page} и выполняйте то, что там написано; на вас распространяется её раздел \"Reconnect\". Если что-то непонятно, спросите меня.",
+    ),
+    (
+        "Invite (one use, valid for {minutes} minutes from when it was issued, until {deadline} UTC; the hub checks the time, not you):",
+        "Приглашение (одноразовое, действует {minutes} мин с момента выдачи, до {deadline} UTC; время проверяет хаб, а не вы):",
+    ),
+    (
+        "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+        "{name} работает на более старом коннекторе{old}; этот хаб отдаёт {new}. Переподключите его, чтобы обновить. Его инструменты Arauto продолжают работать до перезапуска его gateway, а новый коннектор запускается с этого перезапуска.",
+    ),
+    (
+        "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+        "У {name} уже установлен новый коннектор, но его gateway с тех пор не перезапускали: он всё ещё работает на старом. Попросите его оператора один раз перезапустить gateway. Переподключение не нужно.",
+    ),
+    (
+        "{name} declares a connector that is not one this hub serves.",
+        "{name} заявляет коннектор, которого нет среди тех, что отдаёт этот хаб.",
+    ),
+    (
+        "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+        "Коннектор подтверждает это одобрение, когда запускается. Если Hermes сообщил, что его программа заменена или создан ключ, его gateway нужно один раз перезапустить. Выдача другого приглашения отменяет это одобрение.",
+    ),
+    (
+        "{name} is connected to this hub, but its connector has not reached it since {ago}. Try a restart of its gateway first. Reconnect only when it moved to another machine or lost its .arauto folder.",
+        "{name} подключён к этому хабу, но его коннектор не выходил на связь с хабом с {ago}. Сначала попробуйте перезапустить его gateway. Переподключайте, только если он переехал на другую машину или потерял папку .arauto.",
+    ),
+    (
+        "If you issue it now, the message tells the Hermes: Why: {reason}",
+        "Если вы выдадите его сейчас, в сообщении Hermes будет сказано: Почему: {reason}",
+    ),
+    (
+        "The state changed after you opened this window. The message gives the reason as it is now: {reason}",
+        "Состояние изменилось после того, как вы открыли это окно. В сообщении причина указана так, как она есть сейчас: {reason}",
+    ),
+    ("Outdated: {n}", "Устарело: {n}"),
+    ("Revoked", "Отозван"),
+    ("Expired", "Истёк"),
+    ("Left", "Вышел"),
+    ("Restart pending", "Ожидает перезапуска"),
 ];

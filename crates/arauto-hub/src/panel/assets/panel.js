@@ -16,6 +16,31 @@
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function clock(seconds) { return two(Math.floor(seconds / 60)) + ':' + two(seconds % 60); }
 
+  // The absolute times of the panel: the hub writes each one in UTC; this shows it in the zone of
+  // the browser, with its offset for that instant, and keeps the UTC text as the title. Text only.
+  function localTimes(scope) {
+    if (!window.Intl || !Intl.DateTimeFormat) return;
+    var format = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23', numberingSystem: 'latn'
+    });
+    if (!format.formatToParts) return;
+    Array.prototype.forEach.call(scope.querySelectorAll('time[datetime]'), function (node) {
+      if (node.hasAttribute('data-local')) return;
+      var at = new Date(node.getAttribute('datetime'));
+      if (isNaN(at.getTime())) return;
+      var part = {};
+      format.formatToParts(at).forEach(function (piece) { part[piece.type] = piece.value; });
+      var offset = -at.getTimezoneOffset();
+      var sign = offset < 0 ? '\u2212' : '+';
+      offset = Math.abs(offset);
+      node.setAttribute('title', node.textContent);
+      node.textContent = part.year + '-' + part.month + '-' + part.day + ' ' + part.hour + ':' +
+        part.minute + ' (UTC' + sign + two(Math.floor(offset / 60)) + ':' + two(offset % 60) + ')';
+      node.setAttribute('data-local', '1');
+    });
+  }
+
   function ready(run) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
     else run();
@@ -154,6 +179,7 @@
         var focused = document.activeElement;
         if (focused && focused !== document.body && region.contains(focused)) return;
         region.innerHTML = fresh.innerHTML;
+        localTimes(region);
       });
     }
 
@@ -188,6 +214,7 @@
   }
 
   ready(liveLists);
+  ready(function () { localTimes(document); });
 
   ready(function () {
     var guide = document.getElementById('guide');

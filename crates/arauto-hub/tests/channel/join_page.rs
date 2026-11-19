@@ -503,3 +503,29 @@ async fn a_read_over_the_ceiling_is_answered_busy_and_changes_nothing() {
     let (_, handle) = hub.invite_with_page(&name).await;
     assert_eq!(page(&hub, &handle).await.status, 200);
 }
+
+/// What the connector that ran `join` declared and agreed on is kept apart from what runs later
+/// (decision 0053): the testkit device can speak an older protocol and declare another build.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_enrollment_keeps_the_program_that_enrolled() {
+    let hub = served().await;
+    let name = hub.hermes().await;
+    let invite = hub.invite(&name).await;
+    let declared = format!("0.1.0+{}", "d".repeat(64));
+    let device = hub.device().speaking((1, 1)).declaring(&declared);
+    let Enrolled::Code(_) = device.enroll(&invite, device::declared()).await.unwrap() else {
+        panic!("the enrollment was refused");
+    };
+    let (connector, proto, running): (Option<String>, Option<i32>, Option<String>) =
+        sqlx::query_as(
+            "SELECT enrolled_connector, enrolled_proto, connector_version FROM device \
+             WHERE public_key = $1",
+        )
+        .bind(device.public().as_bytes().as_slice())
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    assert_eq!(connector.as_deref(), Some(declared.as_str()));
+    assert_eq!(proto, Some(1));
+    assert_eq!(running.as_deref(), Some(declared.as_str()));
+}

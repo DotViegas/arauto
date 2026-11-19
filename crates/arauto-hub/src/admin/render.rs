@@ -416,6 +416,15 @@ pub fn block(
         "Invite to {kind} Hermes {}. It is valid for {minutes} minutes and for one use.",
         issued.hermes.name.as_str()
     );
+    let _ = match issued.reason.clause {
+        Some(clause) => writeln!(
+            text,
+            "Reason: {} {}",
+            issued.reason.code.as_str(),
+            clause.as_str()
+        ),
+        None => writeln!(text, "Reason: {}", issued.reason.code.as_str()),
+    };
     if issued.cancelled.is_some() {
         let _ = writeln!(text, "The invite issued before was cancelled.");
     }

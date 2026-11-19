@@ -224,6 +224,8 @@ async fn run_inner(
     waking: impl FnOnce() -> (Option<OsString>, Option<OsString>),
     settings: Settings,
 ) -> Exit {
+    // Every process hashes its own executable now, before a `join` can replace the file.
+    crate::build::init();
     let cli = match Cli::try_parse_from(arguments) {
         Ok(cli) => cli,
         Err(error) => {
@@ -404,13 +406,16 @@ async fn register(home: &Home, hermes: &Hermes, settings: &Settings) -> Exit {
 }
 
 async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings) -> Exit {
-    match crate::join::join(home, args, hermes, settings, SystemClock.now_ms()).await {
-        Ok(Joined::Enrolled {
-            code,
-            minutes,
-            replaces,
-            entry,
-        }) => {
+    match crate::join::join_reporting(home, args, hermes, settings, SystemClock.now_ms()).await {
+        Ok((
+            Joined::Enrolled {
+                code,
+                minutes,
+                replaces,
+                entry,
+            },
+            program,
+        )) => {
             println!("Arauto connector {}", env!("CARGO_PKG_VERSION"));
             println!("Connection request sent to the hub.");
             print_entry(entry, false);
@@ -422,14 +427,20 @@ async fn join(home: &Home, args: JoinArgs, hermes: &Hermes, settings: &Settings)
             if replaces {
                 println!("This code replaces the one shown before, which is no longer valid.");
             }
+            if let Some(told) = program.told() {
+                println!("{}", told.phrase());
+            }
             key_step(entry, hermes, settings).await;
             tools_step(entry, hermes, settings, home).await;
             Exit::Done
         }
-        Ok(Joined::AlreadyApproved { entry }) => {
+        Ok((Joined::AlreadyApproved { entry }, program)) => {
             println!("{}", ErrorCode::Ar104.phrase(None));
             if matches!(entry, Entry::Saved { .. }) {
                 print_entry(entry, true);
+            }
+            if let Some(told) = program.told() {
+                println!("{}", told.phrase());
             }
             key_step(entry, hermes, settings).await;
             tools_step(entry, hermes, settings, home).await;

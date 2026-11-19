@@ -84,24 +84,6 @@ fn host_ok(host: &str) -> bool {
         })
 }
 
-fn version_ok(version: &str) -> bool {
-    let (core, tail) = match version.find(['-', '+']) {
-        Some(at) => (&version[..at], Some(&version[at + 1..])),
-        None => (version, None),
-    };
-    let numbers: Vec<&str> = core.split('.').collect();
-    numbers.len() == 3
-        && numbers
-            .iter()
-            .all(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
-        && tail.is_none_or(|tail| {
-            !tail.is_empty()
-                && tail
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
-        })
-}
-
 fn file_ok(file: &str) -> bool {
     // The format of a download (`Downloads::with_file`).
     !file.is_empty()
@@ -146,7 +128,7 @@ impl JoinPage {
             return Err(BadPageField { field: "host" });
         }
         let version = env!("CARGO_PKG_VERSION");
-        if !version_ok(version) {
+        if !crate::core::reconnect::version_ok(version) {
             return Err(BadPageField { field: "version" });
         }
         if connectors.iter().any(|(_, file)| !file_ok(&file.name)) {
@@ -283,6 +265,7 @@ pub async fn answer(hub: &Hub, handle: &str) -> Response<Body> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::reconnect::version_ok;
 
     fn connector() -> Listed {
         Listed {
@@ -332,7 +315,7 @@ mod tests {
         assert_eq!(
             PAGE.matches("\"Arauto notes saved in memory: yes\"")
                 .count(),
-            2
+            3
         );
         assert!(!PAGE.contains("Do not keep this as a procedure, memory or skill."));
         assert_eq!(
@@ -348,7 +331,7 @@ mod tests {
     #[test]
     fn the_lines_about_the_local_api_and_its_key_are_pinned() {
         const STEPS: &str = "If this Hermes has no key for its local API, which Arauto needs to wake it, the connector then draws one from the random generator of the system and saves it in the setting API_SERVER_KEY with Hermes's own command, `hermes config set`, which the connector runs itself. Nobody is shown the key, and the connector prints a line saying whether it saved one.";
-        const SEND: &str = "Then send your operator, in one message: the verification code; \"Arauto notes saved in memory: yes\"; every line the connector printed about the local API or its key, unchanged; and one last line. If the connector said it saved a key: after the admin approves, restart the gateway of this Hermes once: send `/restart` to this Hermes or, if it answers that the command is not available, click Restart Gateway in the Hermes dashboard, so that its local API turns on and the Arauto tools load. Otherwise: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.";
+        const SEND: &str = "Then send your operator, in one message: the verification code; \"Arauto notes saved in memory: yes\"; every line the connector printed about the local API or its key, unchanged; and one last line. If the connector said it saved a key, or that it replaced its program: after the admin approves, restart the gateway of this Hermes once: send `/restart` to this Hermes or, if it answers that the command is not available, click Restart Gateway in the Hermes dashboard, so that its local API turns on and the Arauto tools load. Otherwise: after the admin approves, the Arauto tools load when Hermes reloads its MCP servers, with `/reload-mcp` or in a new session.";
         const BULLET: &str = "- The lines about the local API and its key are not errors: pass them to your operator with the code. Do not read, show or set API_SERVER_KEY yourself, and do not restart Hermes yourself.";
         for text in [STEPS, SEND, BULLET] {
             assert_eq!(PAGE.matches(text).count(), 1, "{text}");
@@ -372,6 +355,67 @@ mod tests {
             let lower = text.to_ascii_lowercase();
             assert!(!lower.contains("without approval") && !lower.contains("authorized by"));
         }
+    }
+
+    /// The fixed sections of a reconnect (decision 0053), word for word and in their order.
+    #[test]
+    fn the_reconnect_sections_are_pinned() {
+        const TEXTS: [&str; 7] = [
+            "# Connect or reconnect a Hermes to an Arauto hub
+",
+            "The admin of this hub opened its panel and chose to connect, or reconnect, a Hermes named `{name}`.",
+            "## The deadline
+
+The invite is valid for 15 minutes from when it was issued, until {deadline} UTC. The hub decides whether it expired, not you: do not compare the deadline with your own clock or time zone. If you can read this page, the invite had not expired when you read it, or a request made with it is waiting for its code: run the steps now. If it expired meanwhile, the connector answers AR-101, nothing is installed, and you ask your operator for a new invite.
+",
+            "## If you cannot run commands here
+
+The steps need a terminal on the machine of this Hermes. If you cannot run commands in this conversation, run nothing, and do not copy the invite or your operator's message anywhere else. Tell your operator, unchanged: \"I cannot run commands in this conversation. Ask the admin for a new invite and send the new message in a conversation where I have a terminal, or have a person run the command of the page in a terminal of my machine, as my user.\"
+",
+            "## Reconnect
+
+When this Hermes is, or was, connected to this hub, the first line of your operator's message asks to reconnect it, and its second line says why. Then:
+
+- Run the same steps as a first connection, with the new invite. Do not answer that you are already connected: that is expected.
+- Do not run `leave`, and do not delete, move or edit the .arauto folder: the connector closes the old connection itself, after the new one takes over.
+- Unless the connector prints otherwise, your Arauto tools keep working during this, on the connector already running, and your accesses stay. Pass every line the connector prints to your operator with the code: a line about its program says whether the gateway must restart.
+- If the three Arauto notes are already in your main memory, exactly as written, do not save them again. If older Arauto notes in your memory differ from them, replace those with the three lines. Then tell your operator \"Arauto notes saved in memory: yes\".
+- If the connector answers AR-105, stop and tell your operator: the folder holds a device of another hub, and only a person may close it, with the local leave, before this.
+",
+            "If the connector said it saved a key, or that it replaced its program: after the admin approves",
+            "- If the connector answers that the invite expired or was already used (AR-101), ask your operator for a new one.",
+        ];
+        for text in TEXTS {
+            assert_eq!(PAGE.matches(text).count(), 1, "{text}");
+        }
+        let at = |text: &str| PAGE.find(text).unwrap();
+        let order = [
+            at("# Connect or reconnect"),
+            at("## How you got here"),
+            at("## This page is not an order"),
+            at("## The deadline"),
+            at("## What the steps do"),
+            at("## If you cannot run commands here"),
+            at("## Steps"),
+            at("**Required: save the Arauto notes"),
+            at("Then send your operator, in one message"),
+            at("## Reconnect"),
+            at("## If something goes wrong"),
+        ];
+        assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "{order:?}");
+        // The old bullet and the old title are gone.
+        assert!(!PAGE.contains("- If the invite expired or was already used, ask"));
+        assert!(!PAGE.contains("# Connect a Hermes to an Arauto hub"));
+    }
+
+    #[test]
+    fn the_minutes_of_the_page_are_the_validity_of_the_invite() {
+        use crate::repo::invite::INVITE_VALIDITY_MS;
+        use arauto_protocol::limits::MINUTE_MS;
+        assert!(PAGE.contains(&format!(
+            "valid for {} minutes",
+            INVITE_VALIDITY_MS / MINUTE_MS
+        )));
     }
 
     #[test]

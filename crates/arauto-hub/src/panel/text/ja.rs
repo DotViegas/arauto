@@ -206,8 +206,12 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "ハブが {name} の招待を生成しました。",
     ),
     (
-        "Invite for {name} · valid for another {time} · single use",
-        "{name} の招待 · 有効期間は残り {time} · 1 回限り",
+        "Invite for {name} · valid for another {time} · until {deadline} · single use",
+        "{name} の招待 · 有効期間は残り {time} · {deadline} まで · 1 回限り",
+    ),
+    (
+        "The Hermes reads the deadline in UTC: {utc}.",
+        "Hermes は期限を UTC で読みます: {utc}。",
     ),
     ("Copied", "コピーしました"),
     (
@@ -768,10 +772,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Connector sha256 ({system}):",
         "コネクター sha256 ({system}):",
-    ),
-    (
-        "Invite (one use, until {deadline} UTC):",
-        "招待（1回限り、{deadline} UTC まで）:",
     ),
     (
         "When it is done, send me the verification code and the lines the page asks for.",
@@ -1621,4 +1621,115 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
         "保存しました。{hermes} は WhatsApp の外から指示を受けます。Arauto はこれについて何も拒否しません。",
     ),
+    // decision 0053: the reason of an invite, the page of the actions, the standing
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it.",
+        "私自身がお願いしています。この Hermes を、私たちの Arauto ハブに「{name}」として再接続してください。この Hermes はすでにこのハブへの接続を持っています。今回の接続がそれを置き換えます。",
+    ),
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It was connected before; this brings it back.",
+        "私自身がお願いしています。この Hermes を、私たちの Arauto ハブに「{name}」として再接続してください。この Hermes は以前に接続されていました。今回の接続でそれを元に戻します。",
+    ),
+    ("Why:", "理由:"),
+    (
+        "the hub stopped trusting the credential of this Hermes (AR-501). Only a new connection brings it back.",
+        "ハブがこの Hermes の資格情報を信頼しなくなりました（AR-501）。新しい接続だけが元に戻します。",
+    ),
+    (
+        "this hub came back from a backup, and every Hermes comes back with a new connection.",
+        "このハブはバックアップから復元されたため、すべての Hermes は新しい接続で戻ります。",
+    ),
+    (
+        "its previous request was approved, but its connector has not confirmed it yet; this new request replaces it.",
+        "以前のリクエストは承認されましたが、コネクターがまだ確認していません。この新しいリクエストがそれを置き換えます。",
+    ),
+    (
+        "its previous request was still waiting for the verification code in the panel; this new request replaces it.",
+        "以前のリクエストはパネルでの確認コードを待っているところでした。この新しいリクエストがそれを置き換えます。",
+    ),
+    (
+        "its previous request was approved, but its connector did not confirm it within {hours} hours (AR-303). One cause is a gateway that was not restarted after the approval.",
+        "以前のリクエストは承認されましたが、コネクターが {hours} 時間以内に確認しませんでした（AR-303）。原因の一つは、承認後に gateway が再起動されなかったことです。",
+    ),
+    (
+        "the verification code of its previous request was not typed within {minutes} minutes, and the request expired (AR-302).",
+        "以前のリクエストの確認コードが {minutes} 分以内に入力されず、リクエストの期限が切れました（AR-302）。",
+    ),
+    (
+        "its previous request was closed before it connected.",
+        "以前のリクエストは、接続される前に閉じられました。",
+    ),
+    (
+        "this Hermes did not reach the hub for {days} days, and its connection expired (AR-507).",
+        "この Hermes は {days} 日間ハブに届かず、接続の期限が切れました（AR-507）。",
+    ),
+    (
+        "the admin closed its previous connection in the hub (AR-502).",
+        "管理者がハブでこれまでの接続を閉じました（AR-502）。",
+    ),
+    (
+        "its previous connection was closed at its own request.",
+        "これまでの接続は、本人の要望で閉じられました。",
+    ),
+    (
+        "the previous invite passed its {invite_minutes} minutes without being used.",
+        "以前の招待は、使われないまま {invite_minutes} 分の期限が過ぎました。",
+    ),
+    (
+        "the admin asked for a new connection.",
+        "管理者が新しい接続を求めました。",
+    ),
+    (
+        "Its connector changes from version {old} to version {new}.",
+        "コネクターはバージョン {old} からバージョン {new} に変わります。",
+    ),
+    (
+        "Its connector is older than the one this hub serves; this replaces it.",
+        "コネクターは、このハブが提供するものより古いです。今回の接続がそれを置き換えます。",
+    ),
+    (
+        "Its connector is not the one this hub serves; this replaces it.",
+        "コネクターは、このハブが提供するものではありません。今回の接続がそれを置き換えます。",
+    ),
+    (
+        "Read {page} and follow it; its section \"Reconnect\" applies to you. Ask me if anything is unclear.",
+        "{page} を読んで、その手順に従ってください。その中の「Reconnect」の節があなたに当てはまります。わからないことがあれば私に聞いてください。",
+    ),
+    (
+        "Invite (one use, valid for {minutes} minutes from when it was issued, until {deadline} UTC; the hub checks the time, not you):",
+        "招待（1回限り、発行から {minutes} 分間有効、{deadline} UTC まで。時刻を確認するのはハブで、あなたではありません）:",
+    ),
+    (
+        "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+        "{name} は古いコネクター{old}で動いています。このハブが提供するのは {new} です。更新するには再接続してください。その Arauto ツールは gateway が再起動するまで動き続け、新しいコネクターはその再起動から動きます。",
+    ),
+    (
+        "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+        "{name} には新しいコネクターがインストールされていますが、その後 gateway が再起動されていないため、まだ古いものが動いています。オペレーターに gateway を一度再起動してもらってください。再接続は必要ありません。",
+    ),
+    (
+        "{name} declares a connector that is not one this hub serves.",
+        "{name} が申告したコネクターは、このハブが提供するものではありません。",
+    ),
+    (
+        "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+        "コネクターは起動したときにこの承認を確認します。Hermes がプログラムが置き換えられた、またはキーが作られたと言った場合は、その gateway を一度再起動する必要があります。別の招待を発行すると、この承認は取り消されます。",
+    ),
+    (
+        "{name} is connected to this hub, but its connector has not reached it since {ago}. Try a restart of its gateway first. Reconnect only when it moved to another machine or lost its .arauto folder.",
+        "{name} はこのハブに接続されていますが、コネクターは {ago} からハブに届いていません。まず gateway の再起動を試してください。別のマシンに移った場合や .arauto フォルダーを失った場合にのみ再接続してください。",
+    ),
+    (
+        "If you issue it now, the message tells the Hermes: Why: {reason}",
+        "今すぐ発行すると、メッセージは Hermes に次のように伝えます。理由: {reason}",
+    ),
+    (
+        "The state changed after you opened this window. The message gives the reason as it is now: {reason}",
+        "このウィンドウを開いた後で状態が変わりました。メッセージには、現在の理由が書かれます: {reason}",
+    ),
+    ("Outdated: {n}", "古い: {n}"),
+    ("Revoked", "取り消し済み"),
+    ("Expired", "期限切れ"),
+    ("Left", "退出"),
+    ("Restart pending", "再起動待ち"),
 ];

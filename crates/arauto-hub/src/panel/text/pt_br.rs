@@ -116,8 +116,12 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "O hub sorteou o convite de {name}.",
     ),
     (
-        "Invite for {name} · valid for another {time} · single use",
-        "Convite para {name} · vale por mais {time} · uso único",
+        "Invite for {name} · valid for another {time} · until {deadline} · single use",
+        "Convite para {name} · vale por mais {time} · até {deadline} · uso único",
+    ),
+    (
+        "The Hermes reads the deadline in UTC: {utc}.",
+        "O Hermes lê o prazo em UTC: {utc}.",
     ),
     ("Copied", "Copiado"),
     (
@@ -771,10 +775,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Connector sha256 ({system}):",
         "sha256 do conector ({system}):",
-    ),
-    (
-        "Invite (one use, until {deadline} UTC):",
-        "Convite (uso único, até {deadline} UTC):",
     ),
     (
         "When it is done, send me the verification code and the lines the page asks for.",
@@ -1618,4 +1618,115 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
         "Salvo. {hermes} recebe suas ordens fora do WhatsApp: o Arauto não recusa nada para ele.",
     ),
+    // decision 0053: the reason of an invite, the page of the actions, the standing
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it.",
+        "Eu mesmo estou pedindo: reconecte este Hermes ao nosso hub Arauto como \"{name}\". Ele tem uma conexão com este hub; isto a substitui.",
+    ),
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It was connected before; this brings it back.",
+        "Eu mesmo estou pedindo: reconecte este Hermes ao nosso hub Arauto como \"{name}\". Ele já esteve conectado; isto o traz de volta.",
+    ),
+    ("Why:", "Por quê:"),
+    (
+        "the hub stopped trusting the credential of this Hermes (AR-501). Only a new connection brings it back.",
+        "o hub deixou de confiar na credencial deste Hermes (AR-501). Só uma nova conexão o traz de volta.",
+    ),
+    (
+        "this hub came back from a backup, and every Hermes comes back with a new connection.",
+        "este hub voltou de uma cópia de segurança, e cada Hermes volta com uma nova conexão.",
+    ),
+    (
+        "its previous request was approved, but its connector has not confirmed it yet; this new request replaces it.",
+        "o pedido anterior dele foi aprovado, mas o conector ainda não o confirmou; este pedido novo o substitui.",
+    ),
+    (
+        "its previous request was still waiting for the verification code in the panel; this new request replaces it.",
+        "o pedido anterior dele ainda esperava o código de verificação no painel; este pedido novo o substitui.",
+    ),
+    (
+        "its previous request was approved, but its connector did not confirm it within {hours} hours (AR-303). One cause is a gateway that was not restarted after the approval.",
+        "o pedido anterior dele foi aprovado, mas o conector não o confirmou em {hours} horas (AR-303). Uma das causas é um gateway que não foi reiniciado depois da aprovação.",
+    ),
+    (
+        "the verification code of its previous request was not typed within {minutes} minutes, and the request expired (AR-302).",
+        "o código de verificação do pedido anterior dele não foi digitado em {minutes} minutos, e o pedido expirou (AR-302).",
+    ),
+    (
+        "its previous request was closed before it connected.",
+        "o pedido anterior dele foi encerrado antes de se conectar.",
+    ),
+    (
+        "this Hermes did not reach the hub for {days} days, and its connection expired (AR-507).",
+        "este Hermes ficou {days} dias sem falar com o hub, e a conexão dele expirou (AR-507).",
+    ),
+    (
+        "the admin closed its previous connection in the hub (AR-502).",
+        "o admin encerrou a conexão anterior dele no hub (AR-502).",
+    ),
+    (
+        "its previous connection was closed at its own request.",
+        "a conexão anterior dele foi encerrada a pedido dele mesmo.",
+    ),
+    (
+        "the previous invite passed its {invite_minutes} minutes without being used.",
+        "o convite anterior passou do prazo de {invite_minutes} minutos sem ser usado.",
+    ),
+    (
+        "the admin asked for a new connection.",
+        "o admin pediu uma nova conexão.",
+    ),
+    (
+        "Its connector changes from version {old} to version {new}.",
+        "O conector dele muda da versão {old} para a versão {new}.",
+    ),
+    (
+        "Its connector is older than the one this hub serves; this replaces it.",
+        "O conector dele é mais antigo que o que este hub serve; este pedido o substitui.",
+    ),
+    (
+        "Its connector is not the one this hub serves; this replaces it.",
+        "O conector dele não é o que este hub serve; este pedido o substitui.",
+    ),
+    (
+        "Read {page} and follow it; its section \"Reconnect\" applies to you. Ask me if anything is unclear.",
+        "Leia {page} e siga; a seção \"Reconnect\" dela vale para você. Pergunte se algo não estiver claro.",
+    ),
+    (
+        "Invite (one use, valid for {minutes} minutes from when it was issued, until {deadline} UTC; the hub checks the time, not you):",
+        "Convite (um uso, vale {minutes} minutos a partir da emissão, até {deadline} UTC; quem confere o horário é o hub, não você):",
+    ),
+    (
+        "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+        "{name} roda um conector mais antigo{old}; este hub serve {new}. Reconecte para atualizar. As ferramentas do Arauto dele continuam funcionando até o gateway reiniciar, e o conector novo roda a partir desse reinício.",
+    ),
+    (
+        "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+        "{name} já tem o conector novo instalado, mas o gateway dele não reiniciou desde então: ele ainda roda o antigo. Peça ao operador dele para reiniciar o gateway uma vez. Não é preciso reconectar.",
+    ),
+    (
+        "{name} declares a connector that is not one this hub serves.",
+        "{name} declara um conector que não é um dos que este hub serve.",
+    ),
+    (
+        "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+        "O conector confirma esta aprovação quando roda. Se o Hermes disse que o programa foi substituído ou que uma chave foi criada, o gateway dele precisa reiniciar uma vez. Emitir outro convite cancela esta aprovação.",
+    ),
+    (
+        "{name} is connected to this hub, but its connector has not reached it since {ago}. Try a restart of its gateway first. Reconnect only when it moved to another machine or lost its .arauto folder.",
+        "{name} está conectado a este hub, mas o conector dele não fala com o hub desde {ago}. Tente primeiro reiniciar o gateway dele. Reconecte só se ele mudou de máquina ou perdeu a pasta .arauto.",
+    ),
+    (
+        "If you issue it now, the message tells the Hermes: Why: {reason}",
+        "Se você emitir agora, a mensagem diz ao Hermes: Por quê: {reason}",
+    ),
+    (
+        "The state changed after you opened this window. The message gives the reason as it is now: {reason}",
+        "O estado mudou depois que você abriu esta janela. A mensagem dá o motivo como está agora: {reason}",
+    ),
+    ("Outdated: {n}", "Desatualizados: {n}"),
+    ("Revoked", "Revogado"),
+    ("Expired", "Expirado"),
+    ("Left", "Saiu"),
+    ("Restart pending", "Reinício pendente"),
 ];

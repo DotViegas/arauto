@@ -14,8 +14,12 @@
 //!
 //! Once the hub accepted, the program copies itself to its fixed path (a temporary file and a
 //! rename: the old program may be running), registers in Hermes and tells the leader in
-//! execution, through the local socket, that there is a new request; when the program changed,
-//! it also asks the leader to end, so that Hermes starts the new version.
+//! execution, through the local socket, that there is a new request. It does not ask the leader
+//! to end while the folder format is the same (decision 0053): the running program keeps the
+//! channel of the device in use and the Arauto tools of Hermes keep working until its gateway
+//! restarts, and from then on Hermes runs the new file. [`Program`] says which case happened,
+//! and the command prints one fixed line about it. Only a program that cannot read the device
+//! folders (another folder format) makes `join` ask the leader to end; no build does that today.
 //!
 //! `join` holds the lock of the device folders while it runs: two of them never run at once,
 //! and no credential reaches a folder while `join` decides to discard it.
@@ -31,7 +35,7 @@ use zeroize::Zeroizing;
 
 use crate::address::{AddressError, HubAddress};
 use crate::ask;
-use crate::catalog::{Local, Said};
+use crate::catalog::{Local, Said, Told};
 use crate::hermes::{Budget, Hermes, Registration, Setting};
 use crate::home::Home;
 use crate::settings::Settings;
@@ -210,6 +214,49 @@ fn up_to_date(record: &HubRecord) -> bool {
     record.registered && record.key_reference == Some(true)
 }
 
+/// What `join` did to the program at the fixed path, and what it says about it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Program {
+    /// The program at the fixed path was not replaced (the same bytes, or none was there).
+    Same,
+    /// Replaced; the running connector answered `new_request` and was left running.
+    ReplacedRunning,
+    /// Replaced; no running connector answered.
+    ReplacedNoneRunning,
+    /// Replaced by a program of another folder format: the running one was asked to end.
+    ReplacedEnded,
+}
+
+impl Program {
+    /// The line `join` prints about it, when there is one.
+    #[must_use]
+    pub const fn told(self) -> Option<Told> {
+        match self {
+            Self::Same => None,
+            Self::ReplacedRunning => Some(Told::ProgramReplaced),
+            Self::ReplacedNoneRunning => Some(Told::ProgramReplacedNoneRunning),
+            Self::ReplacedEnded => Some(Told::ProgramReplacedEnded),
+        }
+    }
+}
+
+/// Whether `join` asks the running leader to end, and what it says (decision 0053).
+pub(crate) const fn after_install(
+    changed: bool,
+    answered: bool,
+    same_format: bool,
+) -> (bool, Program) {
+    if !changed {
+        (false, Program::Same)
+    } else if !answered {
+        (false, Program::ReplacedNoneRunning)
+    } else if same_format {
+        (false, Program::ReplacedRunning)
+    } else {
+        (true, Program::ReplacedEnded)
+    }
+}
+
 /// Runs `join`.
 ///
 /// # Errors
@@ -221,6 +268,22 @@ pub async fn join(
     settings: &Settings,
     now: i64,
 ) -> Result<Joined, Said> {
+    join_reporting(home, args, hermes, settings, now)
+        .await
+        .map(|(joined, _)| joined)
+}
+
+/// Runs `join` and says also what happened to the program at the fixed path.
+///
+/// # Errors
+/// What to say: a code of the catalog, or a local problem.
+pub async fn join_reporting(
+    home: &Home,
+    args: JoinArgs,
+    hermes: &Hermes,
+    settings: &Settings,
+    now: i64,
+) -> Result<(Joined, Program), Said> {
     let address = HubAddress::parse(&args.hub).map_err(|error| match error {
         AddressError::Form => Said::Local(Local::HubAddress),
         AddressError::PlainNotLocal => Said::Local(Local::PlainNotLocal),
@@ -253,10 +316,13 @@ pub async fn join(
     };
     let joined = locked(home, &block, invite, hermes, settings, now).await;
     drop(lock);
-    if let Ok((_, changed)) = &joined {
-        tell_the_leader(home, *changed, settings).await;
+    match joined {
+        Ok((joined, changed, same_format)) => {
+            let program = tell_the_leader(home, changed, same_format, settings).await;
+            Ok((joined, program))
+        }
+        Err(said) => Err(said),
     }
-    joined.map(|(joined, _)| joined)
 }
 
 /// What `join` was given, read: the hub, and what to do once it accepts.
@@ -268,7 +334,8 @@ struct Block {
 }
 
 /// The part of `join` that runs under the lock of the device folders. Returns also whether
-/// the program at the fixed path changed.
+/// the program at the fixed path changed, and whether the folders keep the format the new
+/// program reads.
 async fn locked(
     home: &Home,
     block: &Block,
@@ -276,7 +343,7 @@ async fn locked(
     hermes: &Hermes,
     settings: &Settings,
     now: i64,
-) -> Result<(Joined, bool), Said> {
+) -> Result<(Joined, bool, bool), Said> {
     let Block {
         address,
         key,
@@ -300,6 +367,10 @@ async fn locked(
     {
         return Err(Said::Local(Local::Damaged));
     }
+    // Every folder `join` gets past is of `FORMAT_VERSION` (`store::scan` reads another format as
+    // damaged), so the program it installs reads it. The first format change sets this from the
+    // format of the device in use.
+    let same_format = true;
     let current = layout.current().map(|folder| folder.id().clone());
     // The device in use is already registered in Hermes, under the fixed path of the program:
     // a reconnection registers nothing again when that entry has the reference to the key.
@@ -393,6 +464,7 @@ async fn locked(
                     entry,
                 },
                 changed,
+                same_format,
             ))
         }
         Enrolled::Refused(ErrorCode::Ar104) => {
@@ -401,11 +473,11 @@ async fn locked(
             let record = dir.record().ok();
             if !register {
                 let entry = Entry::NotAsked;
-                return Ok((Joined::AlreadyApproved { entry }, false));
+                return Ok((Joined::AlreadyApproved { entry }, false, same_format));
             }
             if record.as_ref().is_some_and(up_to_date) {
                 let entry = Entry::Kept;
-                return Ok((Joined::AlreadyApproved { entry }, false));
+                return Ok((Joined::AlreadyApproved { entry }, false, same_format));
             }
             let changed = install_program(program, &home.program()).await?;
             let registration = hermes
@@ -417,7 +489,7 @@ async fn locked(
                 registration,
                 replaced: record.is_some_and(|record| record.registered),
             };
-            Ok((Joined::AlreadyApproved { entry }, changed))
+            Ok((Joined::AlreadyApproved { entry }, changed, same_format))
         }
         Enrolled::Refused(
             code @ (ErrorCode::Ar101
@@ -508,21 +580,61 @@ async fn install_program(program: &Path, destination: &Path) -> Result<bool, Sai
     .map_err(|_| Said::Local(Local::Internal))?
 }
 
-/// Tells the leader in execution that there is a new request, and asks it to end when the
-/// program changed. No leader is fine: Hermes starts one.
-async fn tell_the_leader(home: &Home, changed: bool, settings: &Settings) {
+/// Tells the leader in execution that there is a new request, and says what happened to the
+/// program. The leader is asked to end only when [`after_install`] says so (another folder
+/// format). No leader is fine: Hermes starts one.
+async fn tell_the_leader(
+    home: &Home,
+    changed: bool,
+    same_format: bool,
+    settings: &Settings,
+) -> Program {
     let patience = settings.local_answer_ms;
-    match ask::ask(home, ask::operation("new_request"), patience).await {
-        Ok(_) if changed => {
-            let _ = ask::ask(home, ask::operation("restart"), patience).await;
-        }
-        Ok(_) | Err(_) => {}
+    let answered = ask::ask(home, ask::operation("new_request"), patience)
+        .await
+        .is_ok();
+    let (end, program) = after_install(changed, answered, same_format);
+    if end {
+        let _ = ask::ask(home, ask::operation("restart"), patience).await;
     }
+    program
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+    use super::{Program, Told, after_install};
+
+    #[test]
+    fn after_install_ends_the_old_leader_only_when_the_format_differs() {
+        for changed in [false, true] {
+            for answered in [false, true] {
+                for same_format in [false, true] {
+                    let expected = if !changed {
+                        (false, Program::Same)
+                    } else if !answered {
+                        (false, Program::ReplacedNoneRunning)
+                    } else if same_format {
+                        (false, Program::ReplacedRunning)
+                    } else {
+                        (true, Program::ReplacedEnded)
+                    };
+                    assert_eq!(after_install(changed, answered, same_format), expected);
+                }
+            }
+        }
+        assert_eq!(Program::Same.told(), None);
+        assert_eq!(Program::ReplacedRunning.told(), Some(Told::ProgramReplaced));
+        assert_eq!(
+            Program::ReplacedNoneRunning.told(),
+            Some(Told::ProgramReplacedNoneRunning)
+        );
+        assert_eq!(
+            Program::ReplacedEnded.told(),
+            Some(Told::ProgramReplacedEnded)
+        );
+    }
 
     use std::net::SocketAddr;
     use std::time::{Duration, Instant};

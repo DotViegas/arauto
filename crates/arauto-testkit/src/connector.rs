@@ -230,9 +230,22 @@ pub fn identity() -> Result<StaticKeypair, KitError> {
 /// # Errors
 /// [`KitError::Unexpected`] for a range the protocol does not allow.
 pub fn hello(proto: (u32, u32), purpose: Purpose) -> Result<Message, KitError> {
+    hello_with(proto, CONNECTOR_VERSION, purpose)
+}
+
+/// [`hello`] for a connector that declares `connector` as its version.
+///
+/// # Errors
+/// [`KitError::Unexpected`] for a range the protocol does not allow or a text the protocol
+/// does not accept.
+pub fn hello_with(
+    proto: (u32, u32),
+    connector: &str,
+    purpose: Purpose,
+) -> Result<Message, KitError> {
     let proto = ProtoRange::new(proto.0, proto.1)
         .ok_or_else(|| KitError::Unexpected("a protocol range from 1, lowest first".into()))?;
-    let connector = DeclaredText::parse(CONNECTOR_VERSION)
+    let connector = DeclaredText::parse(connector)
         .map_err(|_| KitError::Unexpected("the version of the test connector".into()))?;
     Ok(Message::Hello(Hello {
         proto,

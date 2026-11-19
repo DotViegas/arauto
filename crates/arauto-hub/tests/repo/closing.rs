@@ -565,6 +565,7 @@ async fn no_write_of_the_hub_goes_into_a_database_behind_the_mark() {
                 identity: &crate::support::identity(),
                 declared: &Default::default(),
                 connector_version: &Default::default(),
+                proto: arauto_protocol::message::PROTOCOL_VERSION,
                 origin: None,
                 nonce: &nonce,
                 handshake_hash: &hash,

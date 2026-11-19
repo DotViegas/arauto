@@ -316,6 +316,11 @@ pub struct Device {
     pub connector_version: Option<String>,
     /// The protocol version of its last accepted connection.
     pub proto: Option<i32>,
+    /// What the connector that ran `join` declared at the enrollment. Not verified; never
+    /// shown as text (decision 0053).
+    pub enrolled_connector: Option<String>,
+    /// The protocol agreed at that enrollment.
+    pub enrolled_proto: Option<i32>,
     /// When the row was created.
     pub created_at: i64,
     /// The admin who approved it.
@@ -512,6 +517,8 @@ impl sqlx::FromRow<'_, PgRow> for Device {
             enrolled_from: row.try_get("enrolled_from")?,
             connector_version: row.try_get("connector_version")?,
             proto: row.try_get("proto")?,
+            enrolled_connector: row.try_get("enrolled_connector")?,
+            enrolled_proto: row.try_get("enrolled_proto")?,
             created_at: row.try_get("created_at")?,
             approved_by: row.try_get("approved_by")?,
             approved_at: row.try_get("approved_at")?,

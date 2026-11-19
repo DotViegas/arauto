@@ -37,7 +37,7 @@ The maintainer asked that Arauto configure the key of Hermes's local API by itse
 
 - Option B: approve the key in the arguments of `config set`, the texts and the rehearsal outside Docker. Where no key is made, Option A is what the connector does.
 - Confirm the field `local_waking` and its name.
-- Decide what to do about K5 ([facts](../../referencia/hermes-fatos.md)): a `join` that installs a new program asks the leader to end, but a running gateway did not start a dead server again in 15 minutes.
+- Decide what to do about K5 ([facts](../../referencia/hermes-fatos.md)): a `join` that installs a new program asks the leader to end, but a running gateway did not start a dead server again in 15 minutes. Superseded in part by decision 0053 (proposal, 19/11/2026): `join` no longer asks the leader to end while the folder format is the same; the running program keeps serving until the gateway restarts.
 
 ## Alternatives considered
 

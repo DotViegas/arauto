@@ -5,7 +5,7 @@ outside it.
 
 | File | What it is |
 |---|---|
-| [`Dockerfile`](Dockerfile) | The image of the hub. It also builds the connector for four systems (Linux x86_64, Windows x86_64, macOS arm64 and macOS x86_64), served for download. Building the three extra files needs tools fetched at build time (`gcc-mingw-w64-x86-64`, and `ziglang` 0.17.1 and `cargo-zigbuild` 0.24.1 through `pip`): the two Python versions are pinned and their origin is not otherwise verified. The Windows and macOS files were compiled and linked, and **never run** (14/11/2026). |
+| [`Dockerfile`](Dockerfile) | The image of the hub. It also builds the connector for four systems (Linux x86_64, Windows x86_64, macOS arm64 and macOS x86_64), served for download. Building the three extra files needs tools fetched at build time (`gcc-mingw-w64-x86-64`, and `ziglang` 0.17.1 and `cargo-zigbuild` 0.24.1 through `pip`): the two Python versions are pinned and their origin is not otherwise verified. The Windows and macOS files were compiled and linked, and **never run** (14/11/2026). The image builds the connectors first and compiles their build number and digests into the hub, which serves version numbers only when the files it serves are exactly those (decision 0053, proposal). |
 | [`compose.yaml`](compose.yaml) | The hub and PostgreSQL 16, with the volumes and the networks. |
 | [`arauto.env.example`](arauto.env.example) | The variables you fill in. |
 

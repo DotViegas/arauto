@@ -11,8 +11,9 @@
 //!   hub comes back, and the copies are told the list changed.
 //! - **The commands:** `status` without secret; `leave` deletes the files and takes out the
 //!   registration; `--home`, `ARAUTO_HOME` and the default folder reach the registration and the
-//!   copies; a `join` with a new program replaces the one running, and every copy starts again
-//!   on it; a refused registration is AR-601, and the same `join` again registers.
+//!   copies; a `join` with a new program replaces the file but leaves the running one serving
+//!   until the gateway restarts, and says so in one line; a refused registration is AR-601, and
+//!   the same `join` again registers.
 //! - **The canary:** the output and the standard error of every process and the files: no
 //!   secret, and the code only in the output of the `join` that shows it.
 //! - **The key of the local API:** the entry carries the reference to the setting of Hermes, the
@@ -662,11 +663,27 @@ async fn the_folder_reaches_the_registration_and_the_copies() {
     }
 }
 
-/// A `join` with a new program copies it over the one that runs at the fixed path, and every
-/// copy ends, the leader because the `join` asked it and the others because the leader told
-/// them: Hermes starts them again, on the new program, and the new device takes over.
+/// The program at `path` with bytes after its end: another build.
+fn another_build(dir: &Path) -> (PathBuf, Vec<u8>) {
+    let newer = dir.join(format!(
+        "arauto-connector-new{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let mut bytes = std::fs::read(PROGRAM).unwrap();
+    bytes.extend_from_slice(b"\0another build of the tests");
+    std::fs::write(&newer, &bytes).unwrap();
+    (newer, bytes)
+}
+
+fn lines_with(stdout: &str, told: Told) -> usize {
+    stdout.lines().filter(|line| *line == told.phrase()).count()
+}
+
+/// A `join` with a new program copies it over the one that runs at the fixed path and does not
+/// ask the leader to end (decision 0053): the copies keep serving, the running program follows
+/// the new request, and Hermes runs the new file from its next gateway restart.
 #[tokio::test(flavor = "multi_thread")]
-async fn a_join_with_a_new_program_replaces_the_one_running_and_every_copy_starts_again() {
+async fn a_join_with_a_new_program_leaves_the_running_one_serving_until_the_gateway_restarts() {
     let _turn = AT_ONCE.acquire().await.unwrap();
     let fixture = Fixture::new(settings()).await;
     let hermes = fake_hermes();
@@ -680,16 +697,10 @@ async fn a_join_with_a_new_program_replaces_the_one_running_and_every_copy_start
     for copy in &mut copies {
         served(copy, &joined.name).await;
     }
+    let leader = leader_process(&home).await;
 
-    // Another build: the same program with bytes after its end.
     let download = tempfile::tempdir().unwrap();
-    let newer = download.path().join(format!(
-        "arauto-connector-new{}",
-        std::env::consts::EXE_SUFFIX
-    ));
-    let mut bytes = std::fs::read(PROGRAM).unwrap();
-    bytes.extend_from_slice(b"\0another build of the tests");
-    std::fs::write(&newer, &bytes).unwrap();
+    let (newer, bytes) = another_build(download.path());
     let invite = fixture.invite(&joined.name).await;
     let ran = join(&hermes, &newer, &fixture, &invite, &home).await;
     assert_eq!(ran.code, Some(0), "{ran:?}");
@@ -699,25 +710,25 @@ async fn a_join_with_a_new_program_replaces_the_one_running_and_every_copy_start
         hermes.registered(SERVER_NAME).map(|entry| entry.command),
         Some(program_at(&home))
     );
-
-    for copy in copies {
-        let (status, stdout, _) = copy.ended(PATIENCE).await;
-        assert_eq!(status.and_then(|status| status.code()), Some(0));
-        only_messages(&stdout);
+    assert_eq!(lines_with(&ran.stdout, Told::ProgramReplaced), 1, "{ran:?}");
+    assert_eq!(lines_with(&ran.stdout, Told::ProgramReplacedNoneRunning), 0);
+    assert_eq!(lines_with(&ran.stdout, Told::ProgramReplacedEnded), 0);
+    let at_code = ran.stdout.find("VERIFICATION CODE").unwrap();
+    let at_line = ran.stdout.find(Told::ProgramReplaced.phrase()).unwrap();
+    assert!(at_line > at_code, "{ran:?}");
+    assert_eq!(leader_process(&home).await, leader);
+    for copy in &mut copies {
+        assert!(copy.exited().is_none());
+        served(copy, &joined.name).await;
     }
-    let mut copies = started(&hermes, 3).await;
-    eventually("the new request waits for the admin", PATIENCE, || async {
-        ask(&home, r#"{"v":1,"op":"status"}"#)
-            .await
-            .is_some_and(|answer| answer["status"]["request"]["channel"] == "waiting")
-    })
-    .await;
+
     approve(&fixture, &joined.name, &code).await;
     eventually("the new device takes over", PATIENCE, || async {
         current(&home).is_some_and(|now| now != old)
     })
     .await;
     for copy in &mut copies {
+        assert!(copy.exited().is_none());
         served(copy, &joined.name).await;
     }
     eventually("the old folder goes", PATIENCE, || async {
@@ -725,6 +736,77 @@ async fn a_join_with_a_new_program_replaces_the_one_running_and_every_copy_start
     })
     .await;
     assert_eq!(fixture.state_of_key(&old_identity).await.0, "replaced");
+    close_all(copies).await;
+
+    // Hermes after a gateway restart: one copy, on the new program.
+    let mut copy = hermes.start(SERVER_NAME);
+    copy.initialize().await;
+    served(&mut copy, &joined.name).await;
+    close_all(vec![copy]).await;
+}
+
+/// With no running connector, `join` says so, and does not claim the tools keep working.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_join_with_a_new_program_and_no_running_connector_says_so() {
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let name = fixture.hermes().await;
+    let invite = fixture.invite(&name).await;
+    let first = join(&hermes, Path::new(PROGRAM), &fixture, &invite, &home).await;
+    assert_eq!(first.code, Some(0), "{first:?}");
+    for told in [
+        Told::ProgramReplaced,
+        Told::ProgramReplacedNoneRunning,
+        Told::ProgramReplacedEnded,
+    ] {
+        assert_eq!(lines_with(&first.stdout, told), 0, "{first:?}");
+    }
+    approve(&fixture, &name, &code_in(&first.stdout)).await;
+
+    let download = tempfile::tempdir().unwrap();
+    let (newer, _) = another_build(download.path());
+    let invite = fixture.invite(&name).await;
+    let ran = join(&hermes, &newer, &fixture, &invite, &home).await;
+    assert_eq!(ran.code, Some(0), "{ran:?}");
+    assert_eq!(
+        lines_with(&ran.stdout, Told::ProgramReplacedNoneRunning),
+        1,
+        "{ran:?}"
+    );
+    assert_eq!(lines_with(&ran.stdout, Told::ProgramReplaced), 0);
+    assert_eq!(lines_with(&ran.stdout, Told::ProgramReplacedEnded), 0);
+}
+
+/// The channel `hello` and the enrollment `hello` declare the number and the digest of the
+/// file that ran.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_declared_version_is_the_mark_of_the_file_that_ran() {
+    use sha2::{Digest, Sha256};
+
+    let _turn = AT_ONCE.acquire().await.unwrap();
+    let fixture = Fixture::new(settings()).await;
+    let hermes = fake_hermes();
+    let folder = Folder::new();
+    let home = folder.home.clone();
+    let joined = joined(&fixture, &hermes, &home).await;
+    let digest = Sha256::digest(std::fs::read(PROGRAM).unwrap());
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    let expected = format!("{}+{hex}", env!("CARGO_PKG_VERSION"));
+    let declared = || async {
+        sqlx::query_scalar::<_, Option<String>>("SELECT connector_version FROM device")
+            .fetch_all(&fixture.pool)
+            .await
+            .unwrap()
+    };
+    assert_eq!(declared().await, vec![Some(expected.clone())]);
+    let mut copies = started(&hermes, 3).await;
+    for copy in &mut copies {
+        served(copy, &joined.name).await;
+    }
+    assert_eq!(declared().await, vec![Some(expected)]);
     close_all(copies).await;
 }
 

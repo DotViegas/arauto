@@ -70,6 +70,10 @@ erased). (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pel
 - The hub does not keep the sealed credential: only the generation and the digest of the current one
   and of the pending one. They stay stored after the device is closed: it is by them that the hub
   recognizes a late reuse.
+- **Proposal, 19/11/2026 (decision 0053):** in the code, `enrolled_connector` (what the connector
+  that ran `join` declared at the enrollment, at most 128 characters, not verified, never shown as
+  text) and `enrolled_proto` (the protocol agreed at that enrollment). Written once, by the
+  enrollment; a swap overwrites `connector_version` and `proto` and leaves these two.
 - A device in generation zero has `vigente_geracao` equal to zero and no current digest; the
   pending one may already exist.
 - The line of a device is never erased, not even when the Hermes is deleted: it is by it that the hub
@@ -89,6 +93,12 @@ when there is no page): it is only set while the invite is `issued` or `used`, a
 invite is cancelled, expires or is superseded, and when the request of its device is approved,
 denied, expires or is closed ([decision 0042](decisoes/0042-frase-de-conexao-e-pagina-de-instrucoes.md)).
 The handle itself is never kept.
+**Proposal, 19/11/2026 (decision 0053):** in the code, the invite also keeps why it was issued:
+`reason` (one of twelve fixed words, or empty for an invite issued before the migration),
+`version_clause` (`numbers`, `older` or `other_build`), and `version_from` and `version_to` (three
+numbers each, `X.Y.Z`, only with the clause `numbers`; the database refuses any other form). The hub
+derives them inside the write that issues the invite, from the rows it locked before it closed the
+request in progress; no text a device declared reaches them.
 
 **conexao_canal**: `id`, `aparelho_id`, `ip`, `versao`, `aberta_em`, `troca_confirmada_em`,
 `fechada_em`, `motivo`. A connection without `troca_confirmada_em` never got to be a channel session.

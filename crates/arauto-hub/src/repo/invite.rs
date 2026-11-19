@@ -18,7 +18,8 @@ use uuid::Uuid;
 use super::closing::{ClosedDevice, cancel_issued_invite, close_device};
 use super::{Admin, RepoError, lock_hermes_by_name, notify_hub};
 use crate::audit::{self, Action, Details, Event, TargetKind};
-use crate::core::model::{DeviceState, Hermes, StateReason};
+use crate::core::model::{DeviceState, Hermes, InviteState, StateReason};
+use crate::core::reconnect::{PreviousInvite, Reason, Served, reconnect_reason};
 use crate::db::ResolvedOrg;
 use crate::join_page::{JoinFacts, PageDigest, PageHandle};
 use crate::mark::Mark;
@@ -47,6 +48,8 @@ pub struct IssuedInvite {
     pub cancelled: Option<Uuid>,
     /// The request in progress that was closed.
     pub closed_request: Option<ClosedDevice>,
+    /// Why it was issued, derived under the lock before the request was closed.
+    pub reason: Reason,
 }
 
 /// The outcome of [`issue`].
@@ -73,6 +76,7 @@ pub async fn issue(
     organization: ResolvedOrg,
     admin: &Admin,
     name: &HermesName,
+    served: &Served,
     now: i64,
 ) -> Result<IssueOutcome, RepoError> {
     let invite = InviteSecret::generate().map_err(|_| RepoError::Random)?;
@@ -82,6 +86,9 @@ pub async fn issue(
         write.rollback().await?;
         return Ok(IssueOutcome::NotFound);
     };
+    // The reason is read now: once the request in progress is closed, its state is gone.
+    let previous = previous_invite(write.connection(), organization, locked.hermes.id).await?;
+    let reason = reconnect_reason(&locked.devices, previous.as_ref(), served, now);
     let actor = admin.actor();
     let cancelled = cancel_issued_invite(
         &mut write,
@@ -119,8 +126,9 @@ pub async fn issue(
     let expires_at = now.saturating_add(INVITE_VALIDITY_MS);
     sqlx::query(
         "INSERT INTO invite (id, organization_id, hermes_id, digest, state, created_by, \
-                             created_at, expires_at, join_digest) \
-         VALUES ($1, $2, $3, $4, 'issued', $5, $6, $7, $8)",
+                             created_at, expires_at, join_digest, reason, version_clause, \
+                             version_from, version_to) \
+         VALUES ($1, $2, $3, $4, 'issued', $5, $6, $7, $8, $9, $10, $11, $12)",
     )
     .bind(id)
     .bind(organization.id())
@@ -130,6 +138,10 @@ pub async fn issue(
     .bind(now)
     .bind(expires_at)
     .bind(page.digest().as_bytes().as_slice())
+    .bind(reason.code.as_str())
+    .bind(reason.clause.map(|clause| clause.as_str()))
+    .bind(reason.version_from.map(|version| version.to_string()))
+    .bind(reason.version_to.map(|version| version.to_string()))
     .execute(write.connection())
     .await?;
     let reconnect = locked.in_use().is_some();
@@ -139,12 +151,12 @@ pub async fn issue(
             &Event::new(Action::InviteIssued, actor)
                 .in_organization(organization)
                 .about(TargetKind::Invite, id)
-                .with(
-                    Details::new()
-                        .id("hermes", locked.hermes.id)
-                        .flag("reconnect", reconnect)
-                        .number("expires_at", expires_at),
-                ),
+                .with(invite_details(
+                    locked.hermes.id,
+                    reconnect,
+                    expires_at,
+                    &reason,
+                )),
         )
         .await?;
     write.commit().await?;
@@ -157,7 +169,96 @@ pub async fn issue(
         reconnect,
         cancelled,
         closed_request,
+        reason,
     })))
+}
+
+fn invite_details(hermes: Uuid, reconnect: bool, expires_at: i64, reason: &Reason) -> Details {
+    let mut details = Details::new()
+        .id("hermes", hermes)
+        .flag("reconnect", reconnect)
+        .number("expires_at", expires_at)
+        .word("reason", reason.code.as_str());
+    if let Some(clause) = reason.clause {
+        details = details.word("version_clause", clause.as_str());
+    }
+    if let Some(version) = reason.version_from {
+        details = details.version("version_from", version);
+    }
+    if let Some(version) = reason.version_to {
+        details = details.version("version_to", version);
+    }
+    details
+}
+
+/// The newest invite of a Hermes, as the reason reads it.
+async fn previous_invite(
+    connection: &mut sqlx::PgConnection,
+    organization: ResolvedOrg,
+    hermes: Uuid,
+) -> Result<Option<PreviousInvite>, RepoError> {
+    let row: Option<(String, i64, i64, Option<Uuid>)> = sqlx::query_as(
+        "SELECT state, created_at, expires_at, device_id FROM invite \
+         WHERE organization_id = $1 AND hermes_id = $2 \
+         ORDER BY created_at DESC, id DESC LIMIT 1",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .fetch_optional(connection)
+    .await?;
+    row.map(|(state, created_at, expires_at, device_id)| {
+        InviteState::parse(&state)
+            .map(|state| PreviousInvite {
+                state,
+                created_at,
+                expires_at,
+                device_id,
+            })
+            .ok_or(RepoError::Inconsistent(
+                "an invite has a state this program does not know",
+            ))
+    })
+    .transpose()
+}
+
+/// What would be said if the invite were issued now: the same reason the write would store,
+/// from one read of the devices and one of the newest invite. No lock, no write. `None` when
+/// there is no such Hermes.
+///
+/// # Errors
+/// The database refused.
+pub async fn reason_preview(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    name: &HermesName,
+    served: &Served,
+    now: i64,
+) -> Result<Option<Reason>, RepoError> {
+    let hermes: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM hermes WHERE organization_id = $1 AND name = $2 AND deleted_at IS NULL",
+    )
+    .bind(organization.id())
+    .bind(name.as_str())
+    .fetch_optional(pool)
+    .await?;
+    let Some(hermes) = hermes else {
+        return Ok(None);
+    };
+    let devices: Vec<crate::core::model::Device> = sqlx::query_as(
+        "SELECT * FROM device WHERE organization_id = $1 AND hermes_id = $2 ORDER BY id",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .fetch_all(pool)
+    .await?;
+    let mut connection = pool.acquire().await?;
+    let previous = previous_invite(&mut connection, organization, hermes).await?;
+    Ok(Some(reconnect_reason(
+        &devices,
+        previous.as_ref(),
+        served,
+        now,
+    )))
 }
 
 /// Erases the digest of the handle of the page of the invite that made `device_id`: the

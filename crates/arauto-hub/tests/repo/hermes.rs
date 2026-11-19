@@ -234,6 +234,7 @@ async fn removing_a_hermes_takes_its_links_and_closes_what_is_connected() {
         world.org,
         &world.admin,
         &leaving,
+        &arauto_hub::core::reconnect::Served::nothing(),
         world.now(),
     )
     .await

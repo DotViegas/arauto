@@ -95,14 +95,27 @@ The label of the line is computed from the device and the channel.
 | Incompatible | The connector is below the minimum version. |
 | In quarantine | The hub no longer trusts the credential. |
 | Suspended | The hub came back from a backup. This Hermes needs to be reconnected. |
-| Revoked | The device was closed. |
+| Revoked | The line was connected before, and its last device was closed by the admin. The line offers Reconnect. |
+| Left | The line was connected before, and its last device was closed at its own request. The line offers Reconnect. |
+| Expired | The line was connected before, and its last device expired for inactivity. The line offers Reconnect. |
+
+**Proposal, 19/11/2026 (decision 0053, built, tested without a real Hermes).** "Revoked", "Left" and
+"Expired" are labels of a line with no device in use, no request in progress and no live invite,
+whose newest closed device (not a replaced one, and not one closed by a newer invite) confirmed a
+credential and is newer than the device in use, if there was one. A line that never connected says
+"No device". All three have the neutral tone and are not counted in the line of counters. In the
+connector column of a line with an active device the panel adds a mark, never a state: "Restart
+pending" (the program that enrolled is a served one, but what runs is not; or the enrollment was
+made on the current protocol and the connection still speaks an older one: in both cases the
+gateway has not restarted since `join`), and the number of a connector that is older than what the hub serves in
+the colour of waiting ("Outdated" is a mark on the connector, not a state of the line; the counter
+line adds "Outdated: {n}" only when it is above zero).
 
 The accesses belong to the line of the Hermes and apply to the active device. Changing devices does
 not touch them. With the device in any other state, every call is denied.
 
-The label of the device expired by inactivity is not written yet
-([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)). By the rules above, the line appears as
-"No device".
+The label of the device expired by inactivity is "Expired" since decision 0053 (19/11/2026); it was
+"No device" before ([decisoes/0021](decisoes/0021-prazo-de-inatividade.md)).
 
 ## 4. Number
 

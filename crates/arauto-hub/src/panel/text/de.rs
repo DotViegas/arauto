@@ -221,8 +221,12 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Der Hub hat die Einladung für {name} erzeugt.",
     ),
     (
-        "Invite for {name} · valid for another {time} · single use",
-        "Einladung für {name} · noch {time} gültig · einmalig verwendbar",
+        "Invite for {name} · valid for another {time} · until {deadline} · single use",
+        "Einladung für {name} · noch {time} gültig · bis {deadline} · einmalig verwendbar",
+    ),
+    (
+        "The Hermes reads the deadline in UTC: {utc}.",
+        "Der Hermes liest die Frist in UTC: {utc}.",
     ),
     ("Copied", "Kopiert"),
     (
@@ -780,10 +784,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     (
         "Connector sha256 ({system}):",
         "sha256 des Connectors ({system}):",
-    ),
-    (
-        "Invite (one use, until {deadline} UTC):",
-        "Einladung (einmalig, bis {deadline} UTC):",
     ),
     (
         "When it is done, send me the verification code and the lines the page asks for.",
@@ -1639,4 +1639,115 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
         "Gespeichert. {hermes} erhält seine Befehle außerhalb von WhatsApp: Arauto verweigert dafür nichts.",
     ),
+    // decision 0053: the reason of an invite, the page of the actions, the standing
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it.",
+        "Ich bitte Sie persönlich darum: Verbinden Sie diesen Hermes erneut als „{name}“ mit unserem Arauto-Hub. Er hat eine Verbindung zu diesem Hub; dies ersetzt sie.",
+    ),
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It was connected before; this brings it back.",
+        "Ich bitte Sie persönlich darum: Verbinden Sie diesen Hermes erneut als „{name}“ mit unserem Arauto-Hub. Er war schon einmal verbunden; dies holt ihn zurück.",
+    ),
+    ("Why:", "Warum:"),
+    (
+        "the hub stopped trusting the credential of this Hermes (AR-501). Only a new connection brings it back.",
+        "der Hub vertraut den Zugangsdaten dieses Hermes nicht mehr (AR-501). Nur eine neue Verbindung holt ihn zurück.",
+    ),
+    (
+        "this hub came back from a backup, and every Hermes comes back with a new connection.",
+        "dieser Hub wurde aus einem Backup wiederhergestellt, und jeder Hermes kommt mit einer neuen Verbindung zurück.",
+    ),
+    (
+        "its previous request was approved, but its connector has not confirmed it yet; this new request replaces it.",
+        "seine vorherige Anfrage wurde genehmigt, aber sein Connector hat sie noch nicht bestätigt; diese neue Anfrage ersetzt sie.",
+    ),
+    (
+        "its previous request was still waiting for the verification code in the panel; this new request replaces it.",
+        "seine vorherige Anfrage wartete noch auf den Bestätigungscode im Panel; diese neue Anfrage ersetzt sie.",
+    ),
+    (
+        "its previous request was approved, but its connector did not confirm it within {hours} hours (AR-303). One cause is a gateway that was not restarted after the approval.",
+        "seine vorherige Anfrage wurde genehmigt, aber sein Connector hat sie nicht innerhalb von {hours} Stunden bestätigt (AR-303). Eine Ursache ist ein Gateway, das nach der Genehmigung nicht neu gestartet wurde.",
+    ),
+    (
+        "the verification code of its previous request was not typed within {minutes} minutes, and the request expired (AR-302).",
+        "der Bestätigungscode seiner vorherigen Anfrage wurde nicht innerhalb von {minutes} Minuten eingegeben, und die Anfrage ist abgelaufen (AR-302).",
+    ),
+    (
+        "its previous request was closed before it connected.",
+        "seine vorherige Anfrage wurde geschlossen, bevor er sich verbunden hat.",
+    ),
+    (
+        "this Hermes did not reach the hub for {days} days, and its connection expired (AR-507).",
+        "dieser Hermes hat den Hub {days} Tage lang nicht erreicht, und seine Verbindung ist abgelaufen (AR-507).",
+    ),
+    (
+        "the admin closed its previous connection in the hub (AR-502).",
+        "der Admin hat seine vorherige Verbindung im Hub geschlossen (AR-502).",
+    ),
+    (
+        "its previous connection was closed at its own request.",
+        "seine vorherige Verbindung wurde auf seinen eigenen Wunsch geschlossen.",
+    ),
+    (
+        "the previous invite passed its {invite_minutes} minutes without being used.",
+        "die vorherige Einladung hat ihre {invite_minutes} Minuten überschritten, ohne verwendet zu werden.",
+    ),
+    (
+        "the admin asked for a new connection.",
+        "der Admin hat eine neue Verbindung angefordert.",
+    ),
+    (
+        "Its connector changes from version {old} to version {new}.",
+        "Sein Connector wechselt von Version {old} auf Version {new}.",
+    ),
+    (
+        "Its connector is older than the one this hub serves; this replaces it.",
+        "Sein Connector ist älter als der, den dieser Hub bereitstellt; dies ersetzt ihn.",
+    ),
+    (
+        "Its connector is not the one this hub serves; this replaces it.",
+        "Sein Connector ist nicht der, den dieser Hub bereitstellt; dies ersetzt ihn.",
+    ),
+    (
+        "Read {page} and follow it; its section \"Reconnect\" applies to you. Ask me if anything is unclear.",
+        "Lesen Sie {page} und befolgen Sie die Anweisungen darauf; der Abschnitt „Reconnect“ gilt für Sie. Fragen Sie mich, wenn etwas unklar ist.",
+    ),
+    (
+        "Invite (one use, valid for {minutes} minutes from when it was issued, until {deadline} UTC; the hub checks the time, not you):",
+        "Einladung (einmalig, gültig {minutes} Minuten ab Ausstellung, bis {deadline} UTC; die Uhrzeit prüft der Hub, nicht Sie):",
+    ),
+    (
+        "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+        "{name} betreibt einen älteren Connector{old}; dieser Hub stellt {new} bereit. Verbinden Sie ihn erneut, um zu aktualisieren. Seine Arauto-Werkzeuge funktionieren weiter, bis sein Gateway neu startet, und der neue Connector läuft ab diesem Neustart.",
+    ),
+    (
+        "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+        "{name} hat den neuen Connector installiert, aber sein Gateway wurde seitdem nicht neu gestartet: Es läuft noch der ältere. Bitten Sie seinen Operator, das Gateway einmal neu zu starten. Eine erneute Verbindung ist nicht nötig.",
+    ),
+    (
+        "{name} declares a connector that is not one this hub serves.",
+        "{name} meldet einen Connector, der keiner von denen ist, die dieser Hub bereitstellt.",
+    ),
+    (
+        "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+        "Der Connector bestätigt diese Genehmigung, wenn er läuft. Wenn der Hermes gesagt hat, sein Programm sei ersetzt oder ein Schlüssel erzeugt worden, muss sein Gateway einmal neu starten. Eine weitere Einladung auszustellen, widerruft diese Genehmigung.",
+    ),
+    (
+        "{name} is connected to this hub, but its connector has not reached it since {ago}. Try a restart of its gateway first. Reconnect only when it moved to another machine or lost its .arauto folder.",
+        "{name} ist mit diesem Hub verbunden, aber sein Connector hat ihn seit {ago} nicht erreicht. Versuchen Sie zuerst, sein Gateway neu zu starten. Verbinden Sie nur dann erneut, wenn er auf eine andere Maschine umgezogen ist oder seinen .arauto-Ordner verloren hat.",
+    ),
+    (
+        "If you issue it now, the message tells the Hermes: Why: {reason}",
+        "Wenn Sie sie jetzt ausstellen, sagt die Nachricht dem Hermes: Warum: {reason}",
+    ),
+    (
+        "The state changed after you opened this window. The message gives the reason as it is now: {reason}",
+        "Der Zustand hat sich geändert, nachdem Sie dieses Fenster geöffnet haben. Die Nachricht nennt den Grund so, wie er jetzt ist: {reason}",
+    ),
+    ("Outdated: {n}", "Veraltet: {n}"),
+    ("Revoked", "Widerrufen"),
+    ("Expired", "Abgelaufen"),
+    ("Left", "Ausgetreten"),
+    ("Restart pending", "Neustart ausstehend"),
 ];

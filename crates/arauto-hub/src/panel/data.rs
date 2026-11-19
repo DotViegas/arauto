@@ -18,11 +18,11 @@ use super::view::{
     AccessPage, AccessRow, Cell, EngineLine, Frame, HermesPage, HermesRow, LineAction, Notice,
     NumberRow, NumbersPage, OrderTag, RowAction, StatusKind, StatusLine, Tone,
 };
-use crate::admin::render;
 use crate::channel::Hub;
 use crate::core::access::{Scope, Verbs};
-use crate::core::model::{Device, DeviceState};
+use crate::core::model::{Device, DeviceState, StateReason};
 use crate::core::number::NumberState;
+use crate::core::reconnect::{Served, Standing, connector_standing, read_declared};
 use crate::db::ResolvedOrg;
 use crate::engine::Phone;
 use crate::repo::access::Listed;
@@ -106,8 +106,72 @@ pub(super) fn standing(line: &HermesLine, in_session: bool) -> (Tone, &'static s
         (Tone::Bad, k("In quarantine"))
     } else if in_use == Some(DeviceState::Suspended) {
         (Tone::Bad, k("Suspended"))
+    } else if let Some(last) = line
+        .newest_final
+        .as_ref()
+        .filter(|device| device.first_confirmed_at.is_some())
+    {
+        // A line that was connected before and has no device now says how it ended.
+        match (last.state, last.state_reason) {
+            (DeviceState::Revoked, Some(StateReason::Left)) => (Tone::Idle, k("Left")),
+            (DeviceState::Revoked, _) => (Tone::Idle, k("Revoked")),
+            (DeviceState::Expired, _) => (Tone::Idle, k("Expired")),
+            _ => (Tone::Idle, k("No device")),
+        }
     } else {
         (Tone::Idle, k("No device"))
+    }
+}
+
+/// What the column of the connector shows: the numbers of a declared version that parses, for
+/// a connector the hub compares; the declared text (escaped by the page) otherwise.
+fn connector_shown(declared: &str, standing: Option<Standing>) -> String {
+    match standing {
+        Some(Standing::Current | Standing::Outdated | Standing::OtherBuild) => {
+            read_declared(declared)
+                .core
+                .map_or_else(|| declared.to_owned(), |core| core.to_string())
+        }
+        _ => declared.to_owned(),
+    }
+}
+
+/// The line under a row whose connector is not what the hub serves, when there is one to say.
+fn connector_explain(
+    lang: Lang,
+    name: &str,
+    declared: Option<&str>,
+    standing: Standing,
+    served: &Served,
+) -> Option<String> {
+    match standing {
+        Standing::RestartPending => Some(text::fill(
+            lang,
+            k(
+                "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+            ),
+            &[("name", name)],
+        )),
+        Standing::OtherBuild => Some(text::fill(
+            lang,
+            k("{name} declares a connector that is not one this hub serves."),
+            &[("name", name)],
+        )),
+        Standing::Outdated => {
+            let bundle = served.bundle()?;
+            let old = read_declared(declared.unwrap_or_default())
+                .core
+                .map(|core| format!(" ({core})"))
+                .unwrap_or_default();
+            Some(text::fill(
+                lang,
+                k(
+                    "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+                ),
+                &[("name", name), ("old", &old), ("new", &bundle.to_string())],
+            ))
+        }
+        Standing::Current | Standing::NotKnown => None,
     }
 }
 
@@ -236,17 +300,7 @@ pub(super) async fn frame(
     let restored = restore::installation(hub.pool())
         .await?
         .filter(|installation| installation.restored_mode)
-        .map(|installation| {
-            let copy = installation.restored_copy_of.map_or_else(
-                || text::tr(lang, k("an unknown date")).to_owned(),
-                render::time,
-            );
-            text::fill(
-                lang,
-                k("The hub came back from a backup of {date}. What was approved, revoked, reconnected or changed in the accesses after that is lost. Reconnect each Hermes and check the accesses."),
-                &[("date", &copy)],
-            )
-        });
+        .map(|installation| installation.restored_copy_of);
     let alerts = repo::alert::list(hub.pool(), organization, AlertFilter::Unseen, READ_MAX).await?;
     let unknown_devices = repo::device::unknown_listed(hub.pool(), organization, READ_MAX)
         .await?
@@ -289,6 +343,14 @@ pub(super) async fn hermes(
             Tone::Idle => {}
         }
         let name = line.hermes.name.as_str();
+        let standing = line
+            .in_use
+            .as_ref()
+            .filter(|device| device.state == DeviceState::Active)
+            .map(|device| connector_standing(device, hub.served()));
+        if standing == Some(Standing::Outdated) {
+            page.outdated = page.outdated.saturating_add(1);
+        }
         let explain = stopped(line).filter(|_| tone == Tone::Bad).map(|device| {
             if device.state == DeviceState::Suspended {
                 text::fill(
@@ -305,6 +367,19 @@ pub(super) async fn hermes(
                 )
             }
         });
+        let explain = explain.or_else(|| {
+            standing.and_then(|standing| {
+                connector_explain(
+                    lang,
+                    name,
+                    line.in_use
+                        .as_ref()
+                        .and_then(|device| device.connector_version.as_deref()),
+                    standing,
+                    hub.served(),
+                )
+            })
+        });
         let device = line.in_use.as_ref().or(line.request.as_ref());
         let record = repo::orders::get(hub.pool(), organization, &key, line.hermes.id).await?;
         let (orders, orders_recorded) = orders_summary(lang, &record);
@@ -317,7 +392,10 @@ pub(super) async fn hermes(
                 .filter(|access| access.hermes.as_str() == name)
                 .map(|access| access.number.as_str().to_owned())
                 .collect(),
-            connector: device.and_then(|device| device.connector_version.clone()),
+            connector: device
+                .and_then(|device| device.connector_version.as_deref())
+                .map(|declared| connector_shown(declared, standing)),
+            standing,
             seen: if in_session {
                 text::tr(lang, k("now")).to_owned()
             } else {
@@ -336,12 +414,35 @@ pub(super) async fn hermes(
                 RowAction::Continue
             } else if line.in_use.is_some() {
                 RowAction::Reconnect
+            } else if line
+                .newest_final
+                .as_ref()
+                .is_some_and(|device| device.first_confirmed_at.is_some())
+            {
+                RowAction::Return
             } else {
                 RowAction::Connect
             },
         });
     }
     Ok(page)
+}
+
+/// What the window of the actions of a line says of the invite it would issue: the reason as
+/// the write would store it now. `None` when there is no such Hermes.
+pub(super) async fn preview(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    lang: Lang,
+    name: &HermesName,
+    served: &Served,
+) -> Result<Option<super::actions::Preview>, RepoError> {
+    let now = hub.now_ms();
+    let reason = repo::invite::reason_preview(hub.pool(), organization, name, served, now).await?;
+    Ok(reason.map(|reason| super::actions::Preview {
+        seen: reason.seen(),
+        body: super::block::why(lang, &reason),
+    }))
 }
 
 /// How the orders of a Hermes read in a list, and whether any are recorded.
@@ -465,10 +566,7 @@ pub(super) async fn guide(
                             device: last.device,
                             at: last.at,
                             state: last.state.as_str(),
-                            when: last.at.map_or_else(
-                                || text::tr(lang, k("never")).to_owned(),
-                                |at| format!("{} ({})", ago(lang, now, Some(at)), render::time(at)),
-                            ),
+                            ago: ago(lang, now, last.at),
                             address: last.address.clone(),
                         })
                     }),
@@ -967,5 +1065,120 @@ mod tests {
         // A Hermes that does the thing nowhere meets no one, even one that does it everywhere.
         assert!(!everywhere.meets(&nowhere) && !nowhere.meets(&everywhere));
         assert!(!nowhere.meets(&nowhere));
+    }
+
+    fn line_with(newest_final: Option<Device>) -> HermesLine {
+        use crate::core::model::{Hermes, HermesMode};
+        HermesLine {
+            hermes: Hermes {
+                id: Uuid::nil(),
+                organization_id: Uuid::nil(),
+                name: HermesName::parse("ana").unwrap(),
+                mode: HermesMode::Fast,
+                created_at: 0,
+                deleted_at: None,
+            },
+            in_use: None,
+            request: None,
+            invite_expires_at: None,
+            newest_final,
+        }
+    }
+
+    #[test]
+    fn a_line_that_was_connected_says_how_it_ended() {
+        use crate::core::model::StateReason;
+        use crate::core::reconnect::test_device;
+        let closed = |state, reason, confirmed: bool| {
+            line_with(Some(test_device(
+                state,
+                Some(reason),
+                None,
+                confirmed.then_some(5),
+                5,
+            )))
+        };
+        let said = |line: &HermesLine| standing(line, false);
+        assert_eq!(
+            said(&closed(DeviceState::Revoked, StateReason::Admin, true)),
+            (Tone::Idle, "Revoked")
+        );
+        assert_eq!(
+            said(&closed(DeviceState::Revoked, StateReason::Left, true)),
+            (Tone::Idle, "Left")
+        );
+        assert_eq!(
+            said(&closed(DeviceState::Expired, StateReason::Inactivity, true)),
+            (Tone::Idle, "Expired")
+        );
+        // A request that never connected, or a Hermes with nothing: no device.
+        assert_eq!(
+            said(&closed(
+                DeviceState::Denied,
+                StateReason::CodeAttempts,
+                false
+            )),
+            (Tone::Idle, "No device")
+        );
+        assert_eq!(said(&line_with(None)), (Tone::Idle, "No device"));
+    }
+
+    #[test]
+    fn an_outdated_connector_is_explained_only_with_a_known_bundle() {
+        let nothing = Served::nothing();
+        let known = Served::of(
+            &[],
+            crate::core::reconnect::CoreVersion::parse_core("0.1.1"),
+        );
+        let say = |served: &Served| {
+            connector_explain(Lang::En, "ana", Some("0.1.0"), Standing::Outdated, served)
+        };
+        assert!(say(&nothing).is_none());
+        let text = say(&known).unwrap();
+        assert!(text.contains(" (0.1.0)"), "{text}");
+        assert!(text.contains("0.1.1"), "{text}");
+    }
+
+    #[test]
+    fn the_connector_is_explained_only_when_there_is_something_to_say() {
+        let nothing = Served::nothing();
+        let bundle = crate::core::reconnect::CoreVersion::parse_core("0.1.1");
+        let known = Served::of(&[], bundle);
+        let say = |standing, declared: Option<&str>, served: &Served| {
+            connector_explain(Lang::En, "ana", declared, standing, served)
+        };
+        // The gateway has not restarted.
+        let restart = say(Standing::RestartPending, None, &nothing).unwrap();
+        assert!(restart.starts_with("ana has the new connector installed"));
+        assert!(restart.contains("A reconnect is not needed."));
+        // A connector the hub does not serve.
+        assert_eq!(
+            say(Standing::OtherBuild, None, &nothing).unwrap(),
+            "ana declares a connector that is not one this hub serves."
+        );
+        // Outdated says something only when the hub knows its bundle.
+        assert!(say(Standing::Outdated, Some("0.1.0"), &nothing).is_none());
+        let older = say(Standing::Outdated, Some("0.1.0"), &known).unwrap();
+        assert!(
+            older.starts_with("ana runs an older connector (0.1.0); this hub serves 0.1.1."),
+            "{older}"
+        );
+        let unnumbered = say(Standing::Outdated, Some("nonsense"), &known).unwrap();
+        assert!(
+            unnumbered.starts_with("ana runs an older connector; this hub serves 0.1.1."),
+            "{unnumbered}"
+        );
+        assert!(say(Standing::Current, None, &known).is_none());
+        assert!(say(Standing::NotKnown, None, &known).is_none());
+        // What the column shows: the numbers when the hub compared it, the text otherwise.
+        let marked = format!("0.1.0+{}", "a".repeat(64));
+        assert_eq!(connector_shown(&marked, Some(Standing::Current)), "0.1.0");
+        assert_eq!(connector_shown(&marked, Some(Standing::Outdated)), "0.1.0");
+        assert_eq!(
+            connector_shown("nonsense", Some(Standing::OtherBuild)),
+            "nonsense"
+        );
+        assert_eq!(connector_shown(&marked, Some(Standing::NotKnown)), marked);
+        assert_eq!(connector_shown(&marked, None), marked);
     }
 }

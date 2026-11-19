@@ -119,6 +119,7 @@ async fn issue(
     lang: Lang,
     admin: &admin::Session,
     name: &HermesName,
+    reason_seen: Option<&str>,
 ) -> Result<Response<Body>, RepoError> {
     let found = crate::download::connectors(&panel.connectors);
     if found.is_empty() {
@@ -128,7 +129,10 @@ async fn issue(
         return shown(hub, organization, lang, StatusCode::OK, &screen).await;
     }
     let now = hub.now_ms();
-    let issued = match admin.invite(name.as_str(), &panel.hub_url, now).await {
+    let issued = match admin
+        .invite_serving(name.as_str(), &panel.hub_url, &panel.served, now)
+        .await
+    {
         Ok(issued) => issued,
         Err(AdminError::NoSuchHermes) => return Ok(http::see_other("/")),
         Err(error) => return failed(hub, organization, lang, error).await,
@@ -144,14 +148,21 @@ async fn issue(
         },
         None => None,
     };
+    // The window that issued this showed a reason; the write derived its own under the lock.
+    // When they differ, the screen says what the message gives now.
+    let changed = reason_seen
+        .filter(|seen| *seen != issued.issued.reason.seen())
+        .and_then(|_| block::why(lang, &issued.issued.reason));
     let screen = Screen::Block {
         name: name.as_str().to_owned(),
         sentence,
         command,
         seconds: issued.issued.expires_at.saturating_sub(now).max(0) / 1_000,
+        expires_at: issued.issued.expires_at,
         reconnect: issued.issued.reconnect,
         cancelled: issued.issued.cancelled.is_some(),
         closed_request: issued.issued.closed_request.is_some(),
+        changed,
     };
     shown(hub, organization, lang, StatusCode::OK, &screen).await
 }
@@ -378,10 +389,10 @@ pub(super) async fn answer(
         };
         // Without a connector to serve there is no block: the line is not created either.
         if panel.connectors.is_empty() {
-            return issue(hub, panel, organization, lang, &admin, &name).await;
+            return issue(hub, panel, organization, lang, &admin, &name, None).await;
         }
         return match admin.hermes_add(name.as_str(), now).await {
-            Ok(_) => issue(hub, panel, organization, lang, &admin, &name).await,
+            Ok(_) => issue(hub, panel, organization, lang, &admin, &name, None).await,
             Err(AdminError::InvalidName(error)) => {
                 shown(
                     hub,
@@ -422,7 +433,17 @@ pub(super) async fn answer(
             if form.field("replaces").as_deref().map(String::as_str) != Some(current.as_str()) {
                 return Ok(wait_of(&name));
             }
-            issue(hub, panel, organization, lang, &admin, &name).await
+            let seen = form.field("reason_seen");
+            issue(
+                hub,
+                panel,
+                organization,
+                lang,
+                &admin,
+                &name,
+                seen.as_deref().map(String::as_str),
+            )
+            .await
         }
         "/hermes/approve" => approve(hub, organization, lang, &admin, &name, &form).await,
         _ => match admin.deny(name.as_str(), now).await {

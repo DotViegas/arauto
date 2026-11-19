@@ -7,6 +7,7 @@
 
 use super::html::{Arg, Html};
 use super::text::{Lang, k, tr};
+use crate::core::reconnect::Standing;
 
 /// The logo, written by the project: no value of anyone goes inside it.
 const LOGO: &str = include_str!("assets/logo.svg");
@@ -141,8 +142,9 @@ pub enum Tab {
 pub struct Frame {
     /// The language of the page.
     pub lang: Lang,
-    /// The sentence of the restored mode, while it is on (C11).
-    pub restored: Option<String>,
+    /// The restored mode, while it is on (C11): the date of the copy the hub came back from,
+    /// when it is known.
+    pub restored: Option<Option<i64>>,
     /// The alerts nobody marked as seen, the newest first.
     pub notices: Vec<Notice>,
     /// How many more there are than the ones shown.
@@ -162,8 +164,12 @@ pub struct HermesRow {
     pub state: &'static str,
     /// The aliases of the numbers it reaches.
     pub numbers: Vec<String>,
-    /// The version its connector declared. Not verified.
+    /// The version its connector declared, or its numbers when the hub compared it. Not
+    /// verified.
     pub connector: Option<String>,
+    /// How the connector of the device in use compares with what the hub serves. Only for a
+    /// device that is active.
+    pub standing: Option<Standing>,
     /// When the hub last saw it, in words.
     pub seen: String,
     /// What the admin needs to know about a Hermes that stopped.
@@ -186,13 +192,16 @@ pub enum RowAction {
     Continue,
     /// It has a device: issue an invite for another one.
     Reconnect,
+    /// It has no device, no request and no invite, but it was connected before (revoked, left
+    /// or expired): issue an invite to bring it back. Nothing is left to revoke.
+    Return,
 }
 
 impl RowAction {
     /// Whether the Hermes has something a revocation would close: a device, a request or an
     /// invite.
     pub(super) const fn has_something(self) -> bool {
-        !matches!(self, RowAction::Connect)
+        !matches!(self, RowAction::Connect | RowAction::Return)
     }
 }
 
@@ -207,6 +216,8 @@ pub struct HermesPage {
     pub waiting: usize,
     /// How many are in quarantine or suspended.
     pub stopped: usize,
+    /// How many run a connector older than what the hub serves.
+    pub outdated: usize,
     /// What a write of a Hermes just did, above the table.
     pub said: Option<StatusLine>,
 }
@@ -652,10 +663,19 @@ pub(super) fn open(html: &mut Html, frame: &Frame, tab: Tab, over: Over) {
         html.raw("<ul class=\"alerts\" aria-label=\"")
             .t(k("Alerts"))
             .raw("\">");
-        if let Some(restored) = &frame.restored {
-            html.raw("<li class=\"alert restored\">")
-                .text(restored)
-                .raw("</li>");
+        if let Some(copy) = frame.restored {
+            let key = k(
+                "The hub came back from a backup of {date}. What was approved, revoked, reconnected or changed in the accesses after that is lost. Reconnect each Hermes and check the accesses.",
+            );
+            html.raw("<li class=\"alert restored\">");
+            match copy {
+                Some(at) => html.fill(key, &[("date", Arg::Time(at))]),
+                None => html.fill(
+                    key,
+                    &[("date", Arg::Text(tr(html.lang(), k("an unknown date"))))],
+                ),
+            };
+            html.raw("</li>");
         }
         let back = match tab {
             Tab::Hermes => Some("/"),
@@ -803,8 +823,12 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
                 ("waiting", Arg::Number(page.waiting)),
                 ("stopped", Arg::Number(page.stopped)),
             ],
-        )
-        .raw("</p></div><a class=\"button primary\" href=\"/hermes/connect\">")
+        );
+    if page.outdated > 0 {
+        html.raw(" · ")
+            .fill(k("Outdated: {n}"), &[("n", Arg::Number(page.outdated))]);
+    }
+    html.raw("</p></div><a class=\"button primary\" href=\"/hermes/connect\">")
         .t(k("Connect Hermes"))
         .raw("</a></div>");
     if let Some(said) = &page.said {
@@ -850,10 +874,23 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
             .raw("\">")
             .text(&row.orders)
             .raw("</a></td><td class=\"wide-only mono\">");
-        match &row.connector {
-            Some(version) => html.text(version),
-            None => html.raw("—"),
-        };
+        match (&row.connector, row.standing) {
+            (Some(version), Some(Standing::Outdated)) => {
+                html.raw("<span class=\"state wait\">")
+                    .text(version)
+                    .raw("</span>");
+            }
+            (Some(version), Some(Standing::RestartPending)) => {
+                html.text(version).raw(" ");
+                state(html, Tone::Wait, k("Restart pending"));
+            }
+            (Some(version), _) => {
+                html.text(version);
+            }
+            (None, _) => {
+                html.raw("—");
+            }
+        }
         html.raw("</td><td class=\"wide-only num\">")
             .text(&row.seen)
             .raw("</td><td class=\"actions-cell act\"><div class=\"actions\">");
@@ -1117,10 +1154,34 @@ mod tests {
         assert!(page.ends_with("</html>"));
     }
 
+    #[test]
+    fn the_restored_banner_holds_the_date_in_a_time_element_or_says_it_is_unknown() {
+        let shown = |copy| {
+            hermes(
+                &Frame {
+                    restored: Some(copy),
+                    ..Frame::default()
+                },
+                &HermesPage::default(),
+            )
+        };
+        let known = shown(Some(1_794_659_696_000));
+        assert!(
+            known.contains("The hub came back from a backup of <time datetime=\"2026-11-14T12:34:56Z\">2026-11-14 12:34 UTC</time>. What was approved"),
+            "{known}"
+        );
+        let unknown = shown(None);
+        assert!(
+            unknown.contains("a backup of an unknown date. What was approved")
+                && !unknown.contains("<time"),
+            "{unknown}"
+        );
+    }
+
     fn hostile_frame() -> Frame {
         Frame {
             lang: Lang::En,
-            restored: Some(HOSTILE.to_owned()),
+            restored: Some(Some(7)),
             notices: vec![Notice {
                 id: uuid::Uuid::nil(),
                 grave: true,
@@ -1142,6 +1203,7 @@ mod tests {
                 state: k("In quarantine"),
                 numbers: vec![HOSTILE.to_owned(), HOSTILE.to_owned()],
                 connector: Some(HOSTILE.to_owned()),
+                standing: Some(Standing::RestartPending),
                 seen: HOSTILE.to_owned(),
                 explain: Some(HOSTILE.to_owned()),
                 action: RowAction::Reconnect,
@@ -1151,13 +1213,14 @@ mod tests {
             connected: 0,
             waiting: 0,
             stopped: 1,
+            outdated: 1,
             said: None,
         };
         let page = hermes(&frame, &hermes_page);
         clean(&page);
         // The values of the row (its name three times: in the list, in the form of its button
         // and in the address of its revocation), and the ones of the frame: all escaped.
-        assert_eq!(page.matches("&lt;script&gt;").count(), 12);
+        assert_eq!(page.matches("&lt;script&gt;").count(), 11);
 
         let numbers_page = NumbersPage {
             rows: vec![NumberRow {
@@ -1513,5 +1576,55 @@ mod tests {
         ] {
             assert_eq!(write(kind), format!("{open}{body}{close}"));
         }
+    }
+
+    fn connector_row(standing: Option<Standing>, connector: &str) -> HermesRow {
+        HermesRow {
+            name: "ana".to_owned(),
+            tone: Tone::Ok,
+            state: k("Connected"),
+            numbers: vec![],
+            connector: Some(connector.to_owned()),
+            standing,
+            seen: "now".to_owned(),
+            explain: None,
+            action: RowAction::Reconnect,
+            orders: String::new(),
+            orders_recorded: false,
+        }
+    }
+
+    #[test]
+    fn the_connector_column_marks_what_is_outdated_or_waits_for_a_restart() {
+        let frame = Frame::default();
+        let page = |rows, outdated| HermesPage {
+            rows,
+            outdated,
+            ..HermesPage::default()
+        };
+        let outdated = hermes(
+            &frame,
+            &page(vec![connector_row(Some(Standing::Outdated), "0.1.0")], 1),
+        );
+        assert!(outdated.contains("<span class=\"state wait\">0.1.0</span>"));
+        assert!(outdated.contains("Outdated: 1"));
+        let restart = hermes(
+            &frame,
+            &page(
+                vec![connector_row(Some(Standing::RestartPending), "0.1.0")],
+                0,
+            ),
+        );
+        assert!(restart.contains("0.1.0 <span class=\"state wait\">Restart pending</span>"));
+        assert!(
+            !restart.contains("Outdated:"),
+            "the counter only shows when it is above zero"
+        );
+        let plain = hermes(
+            &frame,
+            &page(vec![connector_row(Some(Standing::Current), "0.1.0")], 0),
+        );
+        assert!(!plain.contains("Restart pending") && !plain.contains("Outdated"));
+        assert!(plain.contains(">0.1.0</td>"));
     }
 }

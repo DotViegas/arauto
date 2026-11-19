@@ -74,7 +74,7 @@ These are the assumptions about Hermes:
 | Whether the block triggers the terminal's approval request or not. | The flow works in both cases; the screen needs to say what to expect. |
 | Hermes keeps procedures in memory or as a skill from what it executes. | The block asks it not to keep them. |
 | ~~Address, body and repetition identifier of the call to the local API.~~ A wake by the fixed sentence was accepted and answered on 15/11/2026, one Hermes (K4). The use of the repetition identifier was not separately checked. | It is through it that Hermes is woken. |
-| Hermes restarts a tool server that exits. Observed on 15/11/2026: a running gateway did **not** restart a killed connector in 15 minutes (K5). | It is how the connector changes version on a reconnect. |
+| Hermes restarts a tool server that exits. Observed on 15/11/2026: a running gateway did **not** restart a killed connector in 15 minutes (K5). | Since decision 0053 (19/11/2026) a reconnect no longer ends the running connector while the folder format is the same; the new file runs at the next gateway restart. It still matters when the format differs. |
 | The behavior of version 0.23.0 on each line of this file. | 0.23 opens more tools by default. |
 | What an empty `platform_toolsets.api_server` means and whether a running gateway applies a changed list (P6, below; how `config get` and `config set` handle the list is N25). | The connector appends `arauto` to that list at `join` ([decision 0046](../docs/decisoes/0046-chave-pela-entrada-e-hermes-sem-chave.md)). |
 
@@ -188,7 +188,7 @@ separate user folder (the configuration in use was not touched).**
 |---|---|
 | W8 | [observed] The terminal of the agent is Git Bash: `uname -sm` printed `MSYS_NT-10.0-26300 x86_64`; `curl` (the one of Git, a native Windows program) and `sha256sum` were on the `PATH`, and so was `hermes`; `MSYS_NO_PATHCONV` was `1`. |
 | W9 | [observed] With that setting, `curl -o` given a path in the form `/c/Users/...` fails with `curl: (23) client returned ERROR on write`: the program does not understand the path and Git Bash does not convert it. This stopped a real connection attempt. With the download written by the shell (`curl ... > "$D/$F"`) it works. |
-| W10 | [observed] The launcher is `hermes.exe` in `%LOCALAPPDATA%\hermesin`, beside a `hermes.cmd`. |
+| W10 | [observed] The launcher is `hermes.exe` in `%LOCALAPPDATA%\hermes\bin`, beside a `hermes.cmd`. |
 | W11 | [observed] The registration with answers on the input and the output discarded saves the entry enabled, and `hermes mcp list` read by a program shows the row; the lines end in CR LF. |
 | W12 | [observed] The first command of Hermes in a data folder it never used took 47 s; the next ones about 2 s. With a limit of 30 s the registration of the trial failed the first time and passed when the same command was repeated. The limit of the connector is 90 s since then. |
 | W13 | [observed] The whole command of the page, then the approval, then the connector started with the arguments of the saved entry: the hub showed the Hermes of the trial as active and `arauto_status` answered connected. |

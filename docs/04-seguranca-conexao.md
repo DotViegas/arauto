@@ -60,7 +60,9 @@ connecting is exactly what the project makes cheap. Before that, each Hermes nee
 done by a person (C10): the connector does not change hubs by itself.
 
 The release key belongs to the project, not to the hub. It signs each published version of the
-connector. In the first version of the project there is no automatic update: every installation
+connector. The number a hub shows for the connectors it serves is the build number of those files.
+A published version is one in the project's releases, signed with the release key. In the first
+version of the project there is no automatic update: every installation
 goes through the block, and the check is the digest that comes in it
 ([11-conector.md](11-conector.md), section 7).
 

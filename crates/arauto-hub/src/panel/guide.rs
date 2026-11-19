@@ -32,6 +32,11 @@ const SEND_HINT: &str = k(
 );
 
 /// Inside the fallback: the sentence and the command carry the same invite.
+/// What the window of an approved line and the screen after the approval say of the
+/// confirmation.
+pub(super) const APPROVED_WAITING: &str = k(
+    "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+);
 const ONE_OR_OTHER: &str = k("Send one or the other, not both: they carry the same invite.");
 
 /// What the hub observes, one after the other, while a Hermes connects.
@@ -69,8 +74,8 @@ pub struct LastUse {
     pub at: Option<i64>,
     /// The state of the device, as stored.
     pub state: &'static str,
-    /// When, in words.
-    pub when: String,
+    /// How long ago, in words.
+    pub ago: String,
     /// From where. Stored as it came: shown escaped.
     pub address: Option<String>,
 }
@@ -108,12 +113,17 @@ pub enum Screen {
         command: Option<Zeroizing<String>>,
         /// For how many seconds the invite is still accepted.
         seconds: i64,
+        /// When the invite stops being accepted, in milliseconds.
+        expires_at: i64,
         /// The Hermes has a device in use.
         reconnect: bool,
         /// An invite issued before was cancelled by this one.
         cancelled: bool,
         /// A request in progress was closed by this one.
         closed_request: bool,
+        /// The reason the message gives, when it is not the one the admin saw in the window
+        /// that issued it: the state changed in between.
+        changed: Option<String>,
     },
     /// The hub serves no connector, so there is no block to make. Nothing was issued.
     NoConnector {
@@ -316,9 +326,11 @@ fn body(html: &mut Html, screen: &Screen) {
             sentence,
             command,
             seconds,
+            expires_at,
             reconnect,
             cancelled,
             closed_request,
+            changed,
         } => {
             html.raw("<div class=\"center preparation\">");
             mascot(html, true);
@@ -328,8 +340,12 @@ fn body(html: &mut Html, screen: &Screen) {
                 .fill(k("The hub drew the invite of {name}."), &[("name", Arg::Text(name))])
                 .raw("</p></div><div class=\"after\"><p class=\"deadline\">")
                 .fill(
-                    k("Invite for {name} · valid for another {time} · single use"),
-                    &[("name", Arg::Strong(name)), ("time", Arg::Clock(*seconds))],
+                    k("Invite for {name} · valid for another {time} · until {deadline} · single use"),
+                    &[
+                        ("name", Arg::Strong(name)),
+                        ("time", Arg::Clock(*seconds)),
+                        ("deadline", Arg::Time(*expires_at)),
+                    ],
                 )
                 .raw("</p><div class=\"block\" id=\"guide-block\" aria-describedby=\"guide-how\"><pre id=\"guide-text\">")
                 .text(sentence)
@@ -343,6 +359,18 @@ fn body(html: &mut Html, screen: &Screen) {
                 .t(k("It only appears here, once."))
                 .raw("</p><p class=\"copied-note\" id=\"guide-copied\" role=\"status\" hidden></p>");
             hint(html, SEND_HINT);
+            html.raw("<p class=\"hint\">")
+                .fill(
+                    k("The Hermes reads the deadline in UTC: {utc}."),
+                    &[(
+                        "utc",
+                        Arg::Text(&format!(
+                            "{} UTC",
+                            crate::join_page::utc_minute(*expires_at)
+                        )),
+                    )],
+                )
+                .raw("</p>");
             // The block of the command stays behind a control: the same invite, the way it
             // always was, for a Hermes the sentence does not move.
             if let Some(command) = command {
@@ -359,6 +387,14 @@ fn body(html: &mut Html, screen: &Screen) {
                     .raw(" </span></p>");
                 hint(html, ONE_OR_OTHER);
                 html.raw("</details>");
+            }
+            if let Some(reason) = changed {
+                html.raw("<p class=\"hint\">")
+                    .fill(
+                        k("The state changed after you opened this window. The message gives the reason as it is now: {reason}"),
+                        &[("reason", Arg::Text(reason))],
+                    )
+                    .raw("</p>");
             }
             if *cancelled {
                 hint(html, k("The invite issued before was cancelled."));
@@ -478,14 +514,18 @@ fn body(html: &mut Html, screen: &Screen) {
                 html.raw("\"><input type=\"hidden\" name=\"seen_state\" value=\"")
                     .raw(last.state)
                     .raw("\"><fieldset class=\"recognize\"><legend>");
+                let never = super::text::tr(lang, k("never"));
+                let when = last
+                    .at
+                    .map_or(Arg::Text(never), |at| Arg::AgoTime(&last.ago, at));
                 match &last.address {
                     Some(address) => html.fill(
                         k("Last use of the current device: {when}, from {address}. Do you recognize it?"),
-                        &[("when", Arg::Text(&last.when)), ("address", Arg::Text(address))],
+                        &[("when", when), ("address", Arg::Text(address))],
                     ),
                     None => html.fill(
                         k("Last use of the current device: {when}. Do you recognize it?"),
-                        &[("when", Arg::Text(&last.when))],
+                        &[("when", when)],
                     ),
                 };
                 html.raw("</legend><label class=\"option\"><input type=\"radio\" name=\"use\" value=\"recognized\" required><span>")
@@ -576,6 +616,9 @@ fn body(html: &mut Html, screen: &Screen) {
                     ),
                 },
             );
+            if !*connected {
+                hint(html, APPROVED_WAITING);
+            }
             html.raw("</div>");
         }
         Screen::Failed { sentence } => {
@@ -753,6 +796,107 @@ mod tests {
         assert!(!page.contains(" onclick=") && !page.contains("javascript:"));
     }
 
+    const TIME: &str = "<time datetime=\"2026-11-14T12:34:56Z\">2026-11-14 12:34 UTC</time>";
+
+    fn block_screen() -> Screen {
+        Screen::Block {
+            name: "ana".to_owned(),
+            sentence: Zeroizing::new("the sentence".to_owned()),
+            command: None,
+            seconds: 900,
+            expires_at: 1_794_659_696_000,
+            reconnect: false,
+            cancelled: false,
+            closed_request: false,
+            changed: None,
+        }
+    }
+
+    fn code_screen() -> Screen {
+        Screen::Code {
+            name: "ana".to_owned(),
+            facts: Box::new(Facts {
+                address: None,
+                when: "now".to_owned(),
+                hostname: "pc".to_owned(),
+                os: "linux".to_owned(),
+                hermes: "0.22".to_owned(),
+            }),
+            last_use: Some(Box::new(LastUse {
+                device: Uuid::nil(),
+                at: Some(1_794_659_696_000),
+                state: "active",
+                ago: "3 h ago".to_owned(),
+                address: None,
+            })),
+            error: None,
+            seconds: 0,
+        }
+    }
+
+    #[test]
+    fn the_block_screen_gives_the_deadline_in_a_time_element_and_in_utc_for_the_hermes() {
+        let page = shown(&block_screen());
+        assert!(
+            page.contains(&format!(
+                "valid for another <b data-seconds=\"900\">15:00</b> · until {TIME} · single use"
+            )),
+            "{page}"
+        );
+        assert!(
+            page.contains(
+                "<p class=\"hint\">The Hermes reads the deadline in UTC: 2026-11-14 12:34 UTC.</p>"
+            ),
+            "{page}"
+        );
+    }
+
+    #[test]
+    fn the_last_use_of_the_current_device_has_a_time_element() {
+        let page = shown(&code_screen());
+        assert!(
+            page.contains(&format!(
+                "Last use of the current device: 3 h ago ({TIME}). Do you recognize it?"
+            )),
+            "{page}"
+        );
+    }
+
+    #[test]
+    fn pages_have_no_absolute_time_outside_a_time_element() {
+        let frame = Frame {
+            restored: Some(Some(1_794_659_696_000)),
+            ..Frame::default()
+        };
+        for screen in [block_screen(), code_screen()] {
+            let page = page(&frame, &HermesPage::default(), &screen);
+            assert!(page.contains(TIME), "{page}");
+            let bytes = page.as_bytes();
+            let mut found = 0;
+            for at in 0..bytes.len().saturating_sub(16) {
+                let w = &bytes[at..at + 16];
+                let shaped = w.iter().enumerate().all(|(i, b)| match i {
+                    4 | 7 => *b == b'-',
+                    10 => *b == b' ',
+                    13 => *b == b':',
+                    _ => b.is_ascii_digit(),
+                });
+                if !shaped {
+                    continue;
+                }
+                found += 1;
+                let inside = page[..at].ends_with("UTC\">") || page[..at].ends_with("Z\">");
+                let hint = page[..at].ends_with("reads the deadline in UTC: ");
+                assert!(
+                    inside || hint,
+                    "a bare time at {at}: {}",
+                    &page[at.saturating_sub(40)..at + 20]
+                );
+            }
+            assert!(found >= 2, "the times were looked for: {found}");
+        }
+    }
+
     #[test]
     fn what_came_from_outside_is_shown_as_text_in_every_screen() {
         let hostile = || HOSTILE.to_owned();
@@ -767,7 +911,7 @@ mod tests {
             device: Uuid::nil(),
             at: Some(7),
             state: "active",
-            when: hostile(),
+            ago: hostile(),
             address: Some(hostile()),
         };
         for screen in [
@@ -780,9 +924,11 @@ mod tests {
                 sentence: Zeroizing::new(hostile()),
                 command: Some(Zeroizing::new(hostile())),
                 seconds: 900,
+                expires_at: 1_794_659_696_000,
                 reconnect: true,
                 cancelled: true,
                 closed_request: true,
+                changed: Some(hostile()),
             },
             Screen::NoConnector { name: hostile() },
             Screen::Waiting {
@@ -819,7 +965,7 @@ mod tests {
             device: Uuid::nil(),
             at: Some(7),
             state: "active",
-            when: "now".to_owned(),
+            ago: "now".to_owned(),
             address: None,
         };
         let page = shown(&Screen::Code {
@@ -931,6 +1077,7 @@ mod tests {
                 state: "x",
                 numbers: vec![],
                 connector: None,
+                standing: None,
                 seen: String::new(),
                 explain: None,
                 action: crate::panel::view::RowAction::Continue,
@@ -974,9 +1121,11 @@ mod tests {
             sentence: Zeroizing::new("the sentence".to_owned()),
             command: Some(Zeroizing::new("the command".to_owned())),
             seconds: 900,
+            expires_at: 1_794_659_696_000,
             reconnect: false,
             cancelled: false,
             closed_request: false,
+            changed: None,
         });
         assert!(block.contains("class=\"modal guide preparing\""));
         assert!(block.contains("<pre id=\"guide-text\">the sentence</pre>"));
@@ -1005,11 +1154,47 @@ mod tests {
             sentence: Zeroizing::new("the sentence".to_owned()),
             command: None,
             seconds: 900,
+            expires_at: 1_794_659_696_000,
             reconnect: false,
             cancelled: false,
             closed_request: false,
+            changed: None,
         });
         assert!(bare.contains("the sentence"));
         assert!(!bare.contains("Show the command instead") && !bare.contains("guide-command"));
+    }
+
+    #[test]
+    fn the_block_says_when_the_reason_changed_and_the_approval_says_when_it_is_confirmed() {
+        let screen = |changed| Screen::Block {
+            name: "ana".to_owned(),
+            sentence: Zeroizing::new("the sentence".to_owned()),
+            command: None,
+            seconds: 900,
+            expires_at: 1_794_659_696_000,
+            reconnect: true,
+            cancelled: false,
+            closed_request: false,
+            changed,
+        };
+        let changed = shown(&screen(Some(
+            "the admin asked for a new connection.".to_owned(),
+        )));
+        assert!(changed.contains(
+            "The state changed after you opened this window. The message gives the reason as it is now: the admin asked for a new connection."
+        ));
+        assert!(!shown(&screen(None)).contains("The state changed after you opened this window."));
+        let approved = shown(&Screen::Done {
+            name: "ana".to_owned(),
+            connected: false,
+            reconnect: false,
+        });
+        assert!(approved.contains("The connector confirms this approval when it runs."));
+        let connected = shown(&Screen::Done {
+            name: "ana".to_owned(),
+            connected: true,
+            reconnect: false,
+        });
+        assert!(!connected.contains("The connector confirms this approval"));
     }
 }

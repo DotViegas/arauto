@@ -194,8 +194,12 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "hub 已为 {name} 生成邀请。",
     ),
     (
-        "Invite for {name} · valid for another {time} · single use",
-        "{name} 的邀请 · 剩余有效期 {time} · 仅限使用一次",
+        "Invite for {name} · valid for another {time} · until {deadline} · single use",
+        "{name} 的邀请 · 剩余有效期 {time} · 截止 {deadline} · 仅限使用一次",
+    ),
+    (
+        "The Hermes reads the deadline in UTC: {utc}.",
+        "Hermes 按 UTC 读取该截止时间：{utc}。",
     ),
     ("Copied", "已复制"),
     ("Click the block to copy it.", "点击文本块即可复制。"),
@@ -715,10 +719,6 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
     ("Hub:", "hub："),
     ("Hub key:", "hub 密钥："),
     ("Connector sha256 ({system}):", "连接器 sha256 ({system})："),
-    (
-        "Invite (one use, until {deadline} UTC):",
-        "邀请（仅限一次，有效期至 {deadline} UTC）：",
-    ),
     (
         "When it is done, send me the verification code and the lines the page asks for.",
         "完成后，请把验证码和页面要求的那几行发给我。",
@@ -1513,4 +1513,115 @@ pub(super) const PAIRS: &[(&str, &str)] = &[
         "Saved. {hermes} takes its orders outside WhatsApp: Arauto refuses nothing for it.",
         "已保存。{hermes} 的指令来自 WhatsApp 之外：Arauto 不会为它拒绝任何内容。",
     ),
+    // decision 0053: the reason of an invite, the page of the actions, the standing
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it.",
+        "是我本人在请你：把这个 Hermes 以“{name}”的名称重新连接到我们的 Arauto hub。它已有一个到此 hub 的连接；这次会替换它。",
+    ),
+    (
+        "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It was connected before; this brings it back.",
+        "是我本人在请你：把这个 Hermes 以“{name}”的名称重新连接到我们的 Arauto hub。它以前连接过；这次会把它带回来。",
+    ),
+    ("Why:", "原因："),
+    (
+        "the hub stopped trusting the credential of this Hermes (AR-501). Only a new connection brings it back.",
+        "hub 不再信任这个 Hermes 的凭据（AR-501）。只有重新连接才能让它恢复。",
+    ),
+    (
+        "this hub came back from a backup, and every Hermes comes back with a new connection.",
+        "此 hub 从备份中恢复了，每个 Hermes 都要通过新的连接回来。",
+    ),
+    (
+        "its previous request was approved, but its connector has not confirmed it yet; this new request replaces it.",
+        "它之前的请求已获批准，但它的连接器尚未确认；这个新请求会替换它。",
+    ),
+    (
+        "its previous request was still waiting for the verification code in the panel; this new request replaces it.",
+        "它之前的请求仍在等待面板中的验证码；这个新请求会替换它。",
+    ),
+    (
+        "its previous request was approved, but its connector did not confirm it within {hours} hours (AR-303). One cause is a gateway that was not restarted after the approval.",
+        "它之前的请求已获批准，但它的连接器在 {hours} 小时内没有确认（AR-303）。原因之一是批准后 gateway 没有重启。",
+    ),
+    (
+        "the verification code of its previous request was not typed within {minutes} minutes, and the request expired (AR-302).",
+        "它之前请求的验证码没有在 {minutes} 分钟内输入，请求已过期（AR-302）。",
+    ),
+    (
+        "its previous request was closed before it connected.",
+        "它之前的请求在它连接之前就被关闭了。",
+    ),
+    (
+        "this Hermes did not reach the hub for {days} days, and its connection expired (AR-507).",
+        "这个 Hermes 已 {days} 天没有联系 hub，它的连接已过期（AR-507）。",
+    ),
+    (
+        "the admin closed its previous connection in the hub (AR-502).",
+        "管理员已在 hub 中关闭了它之前的连接（AR-502）。",
+    ),
+    (
+        "its previous connection was closed at its own request.",
+        "它之前的连接是应它自己的要求关闭的。",
+    ),
+    (
+        "the previous invite passed its {invite_minutes} minutes without being used.",
+        "上一个邀请已超过 {invite_minutes} 分钟仍未被使用。",
+    ),
+    (
+        "the admin asked for a new connection.",
+        "管理员要求建立新的连接。",
+    ),
+    (
+        "Its connector changes from version {old} to version {new}.",
+        "它的连接器将从版本 {old} 变为版本 {new}。",
+    ),
+    (
+        "Its connector is older than the one this hub serves; this replaces it.",
+        "它的连接器比此 hub 提供的旧；这次会替换它。",
+    ),
+    (
+        "Its connector is not the one this hub serves; this replaces it.",
+        "它的连接器不是此 hub 提供的那个；这次会替换它。",
+    ),
+    (
+        "Read {page} and follow it; its section \"Reconnect\" applies to you. Ask me if anything is unclear.",
+        "请阅读 {page} 并按其中的说明操作；其中的“Reconnect”一节适用于你。如有不清楚的地方，请问我。",
+    ),
+    (
+        "Invite (one use, valid for {minutes} minutes from when it was issued, until {deadline} UTC; the hub checks the time, not you):",
+        "邀请（仅限一次，自签发起 {minutes} 分钟内有效，截止 {deadline} UTC；由 hub 核对时间，而不是你）：",
+    ),
+    (
+        "{name} runs an older connector{old}; this hub serves {new}. Reconnect it to update. Its Arauto tools keep working until its gateway restarts, and the new connector runs from that restart.",
+        "{name} 运行的是较旧的连接器{old}；此 hub 提供的是 {new}。重新连接即可更新。它的 Arauto 工具会继续工作，直到它的 gateway 重启，新连接器从那次重启起运行。",
+    ),
+    (
+        "{name} has the new connector installed, but its gateway has not restarted since: it still runs the older one. Ask its operator to restart the gateway once. A reconnect is not needed.",
+        "{name} 已安装新的连接器，但它的 gateway 此后没有重启：它仍在运行旧的连接器。请让它的操作员重启一次 gateway。无需重新连接。",
+    ),
+    (
+        "{name} declares a connector that is not one this hub serves.",
+        "{name} 声明的连接器不是此 hub 提供的连接器之一。",
+    ),
+    (
+        "The connector confirms this approval when it runs. If the Hermes said its program was replaced or a key was made, its gateway must restart once. Issuing another invite cancels this approval.",
+        "连接器运行时会确认此批准。如果 Hermes 说它的程序已被替换或已生成密钥，它的 gateway 必须重启一次。签发另一个邀请会取消此批准。",
+    ),
+    (
+        "{name} is connected to this hub, but its connector has not reached it since {ago}. Try a restart of its gateway first. Reconnect only when it moved to another machine or lost its .arauto folder.",
+        "{name} 已连接到此 hub，但它的连接器自 {ago} 起没有联系过 hub。请先尝试重启它的 gateway。只有当它换了机器或丢失了 .arauto 文件夹时才重新连接。",
+    ),
+    (
+        "If you issue it now, the message tells the Hermes: Why: {reason}",
+        "如果你现在签发，消息会对 Hermes 说：原因：{reason}",
+    ),
+    (
+        "The state changed after you opened this window. The message gives the reason as it is now: {reason}",
+        "你打开此窗口之后，状态发生了变化。消息给出的是现在的原因：{reason}",
+    ),
+    ("Outdated: {n}", "已过时：{n}"),
+    ("Revoked", "已撤销"),
+    ("Expired", "已过期"),
+    ("Left", "已退出"),
+    ("Restart pending", "等待重启"),
 ];

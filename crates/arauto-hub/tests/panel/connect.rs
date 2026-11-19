@@ -983,7 +983,7 @@ async fn the_sentence_follows_the_language_of_the_panel() {
     for label in [
         "Chave do hub: arh1",
         "sha256 do conector (linux x86_64): ",
-        "Convite (uso único, até ",
+        "Convite (um uso, vale 15 minutos a partir da emissão, até ",
         "Quando terminar, me envie o código de verificação e as linhas que a página pedir.",
     ] {
         assert!(sentence.contains(label), "{label}: {sentence}");
@@ -1000,7 +1000,7 @@ async fn the_sentence_follows_the_language_of_the_panel() {
     assert!(
         served
             .text()
-            .starts_with("# Connect a Hermes to an Arauto hub")
+            .starts_with("# Connect or reconnect a Hermes to an Arauto hub")
     );
 }
 
@@ -1044,4 +1044,112 @@ async fn a_hub_with_only_the_windows_file_issues_its_line_and_no_fallback() {
         .await
         .unwrap();
     assert_eq!(served.status, 200);
+}
+
+/// A reconnect has its own first line, says why on its second, and points at the "Reconnect"
+/// section of the page (decision 0053).
+#[tokio::test(flavor = "multi_thread")]
+async fn a_reconnect_says_why_and_points_to_the_reconnect_section() {
+    let fixture = serving().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    let (name, session) = fixture.connected().await;
+    drop(session);
+    let issued = browser
+        .post(
+            "/hermes/invite",
+            Some(&cookie),
+            &format!("name={name}&replaces=none"),
+        )
+        .await;
+    assert_eq!(issued.status, 200, "{}", issued.text());
+    let page = issued.text();
+    let sentence = sentence_of(&page);
+    let lines: Vec<&str> = sentence.lines().collect();
+    assert_eq!(
+        lines[0],
+        format!(
+            "I am asking you myself: reconnect this Hermes to our Arauto hub as \"{name}\". It has a connection to this hub; this replaces it."
+        )
+    );
+    assert_eq!(lines[1], "Why: the admin asked for a new connection.");
+    assert!(
+        lines[2].starts_with("Read http://127.0.0.1:1/v1/join/")
+            && lines[2].ends_with(
+                "; its section \"Reconnect\" applies to you. Ask me if anything is unclear."
+            ),
+        "{}",
+        lines[2]
+    );
+    let invite_line = lines
+        .iter()
+        .find(|line| line.starts_with("Invite ("))
+        .unwrap();
+    assert!(
+        invite_line
+            .starts_with("Invite (one use, valid for 15 minutes from when it was issued, until ")
+            && invite_line.contains(" UTC; the hub checks the time, not you): arc1"),
+        "{invite_line}"
+    );
+    // 6 lines, the Why line, and one digest line.
+    assert_eq!(lines.len(), 8, "{sentence}");
+    // The audit holds the reason as a fixed word.
+    let audit = rows(&fixture, "audit").await.join("\n");
+    assert!(audit.contains("\"reason\": \"other\""), "{audit}");
+}
+
+/// The window of the actions previews the reason, and a reason that moved on the way is said.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_window_of_the_actions_previews_the_reason_and_a_stale_one_is_said() {
+    let fixture = serving().await;
+    let browser = Browser::of(&fixture);
+    let cookie = browser.signed_in(&fixture).await;
+    let (name, session) = fixture.connected().await;
+    drop(session);
+    let actions = browser
+        .get(&format!("/hermes/actions?name={name}"), Some(&cookie))
+        .await
+        .text();
+    assert!(
+        actions.contains(
+            "If you issue it now, the message tells the Hermes: Why: the admin asked for a new connection."
+        ),
+        "{actions}"
+    );
+    assert_eq!(hidden(&actions, "reason_seen"), "other/none");
+
+    // Another reason was on the screen: the page says what the message gives now.
+    let stale = browser
+        .post(
+            "/hermes/invite",
+            Some(&cookie),
+            &format!("name={name}&replaces=none&reason_seen=request_pending%2Fnone"),
+        )
+        .await;
+    assert_eq!(stale.status, 200);
+    assert!(
+        stale.text().contains(
+            "The state changed after you opened this window. The message gives the reason as it is now: the admin asked for a new connection."
+        ),
+        "{}",
+        stale.text()
+    );
+
+    // A second Hermes: what the window showed is what the write derived, so nothing is said.
+    let (other, session) = fixture.connected().await;
+    drop(session);
+    // What the window showed is what the write derived: nothing to say.
+    let same = browser
+        .post(
+            "/hermes/invite",
+            Some(&cookie),
+            &format!("name={other}&replaces=none&reason_seen=other%2Fnone"),
+        )
+        .await;
+    assert_eq!(same.status, 200);
+    assert!(
+        !same
+            .text()
+            .contains("The state changed after you opened this window.")
+    );
 }

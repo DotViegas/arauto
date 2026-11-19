@@ -172,6 +172,12 @@ pub enum Told {
     RunToolsNotChecked,
     /// Reminder after `join` appended arauto.
     RunToolsAddedByJoin,
+    /// `join` replaced the program; the older one keeps running (decision 0053).
+    ProgramReplaced,
+    /// `join` replaced the program; no running connector answered.
+    ProgramReplacedNoneRunning,
+    /// `join` replaced the program and ended the older one, which cannot read the folders.
+    ProgramReplacedEnded,
 }
 
 impl Told {
@@ -199,6 +205,9 @@ impl Told {
         Told::RunToolsNotConfirmed,
         Told::RunToolsNotChecked,
         Told::RunToolsAddedByJoin,
+        Told::ProgramReplaced,
+        Told::ProgramReplacedNoneRunning,
+        Told::ProgramReplacedEnded,
     ];
 
     /// The fixed phrase.
@@ -290,6 +299,15 @@ impl Told {
             Told::RunToolsAddedByJoin => {
                 "The join of this connector added arauto to the list platform_toolsets.api_server. Hermes may apply it only after its gateway restarts: if the gateway has not restarted since, the operator restarts it once."
             }
+            Told::ProgramReplaced => {
+                "This connector replaced the program of an older one. The older one keeps running, and with it the Arauto tools of this Hermes, until the gateway of this Hermes restarts; from that restart on, Hermes runs the new one. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard."
+            }
+            Told::ProgramReplacedNoneRunning => {
+                "This connector replaced the program of an older one. No running connector of this Hermes answered, so the Arauto tools of this Hermes may be off until its gateway restarts, and the approval is confirmed at that restart. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard."
+            }
+            Told::ProgramReplacedEnded => {
+                "This connector replaced the program of an older one that cannot read its files, and ended it: the Arauto tools of this Hermes are off until its gateway restarts, and the approval is confirmed at that restart. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard."
+            }
         }
     }
 }
@@ -329,7 +347,7 @@ mod tests {
 
     /// The rules of the catalog: ASCII, one line, a whole sentence, and nothing an LLM could
     /// take as a command to run.
-    fn check_rules(phrases: &[&str]) {
+    fn check_rules(phrases: &[&str], ceiling: usize) {
         let forbidden = [
             "`",
             "$",
@@ -356,7 +374,7 @@ mod tests {
                 "{phrase}"
             );
             assert!(phrase.ends_with('.'), "{phrase}");
-            assert!(phrase.len() >= 30 && phrase.len() <= 300, "{phrase}");
+            assert!(phrase.len() >= 30 && phrase.len() <= ceiling, "{phrase}");
             assert!(!phrase.contains("  "), "{phrase}");
             for piece in forbidden {
                 assert!(!phrase.contains(piece), "{piece:?} in: {phrase}");
@@ -367,13 +385,25 @@ mod tests {
     #[test]
     fn local_phrases_follow_the_rules_of_the_catalog() {
         let phrases: Vec<&str> = Local::ALL.iter().map(|local| local.phrase()).collect();
-        check_rules(&phrases);
+        check_rules(&phrases, 300);
     }
 
     #[test]
     fn told_phrases_follow_the_rules_and_name_the_setting_of_hermes() {
         let told: Vec<&str> = Told::ALL.iter().map(|told| told.phrase()).collect();
-        check_rules(&told);
+        // The three phrases of a replaced program are longer than 300 bytes (approved texts);
+        // every other rule holds for them, and the ceiling for them is 440.
+        let long = [
+            Told::ProgramReplaced,
+            Told::ProgramReplacedNoneRunning,
+            Told::ProgramReplacedEnded,
+        ];
+        let (long, short): (Vec<&str>, Vec<&str>) = told
+            .iter()
+            .copied()
+            .partition(|phrase| long.iter().any(|told| told.phrase() == *phrase));
+        check_rules(&short, 300);
+        check_rules(&long, 440);
         // Distinct across both lists.
         let mut all: Vec<&str> = Local::ALL.iter().map(|local| local.phrase()).collect();
         all.extend(&told);
@@ -484,6 +514,30 @@ mod tests {
             if told != Told::RunToolsRestart {
                 assert!(text.contains("platform_toolsets.api_server"), "{text}");
             }
+        }
+    }
+
+    /// The three phrases of a replaced program are the approved texts, character by character.
+    #[test]
+    fn the_phrases_of_a_replaced_program_are_the_approved_texts() {
+        let approved: [(Told, &str); 3] = [
+            (
+                Told::ProgramReplaced,
+                "This connector replaced the program of an older one. The older one keeps running, and with it the Arauto tools of this Hermes, until the gateway of this Hermes restarts; from that restart on, Hermes runs the new one. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard.",
+            ),
+            (
+                Told::ProgramReplacedNoneRunning,
+                "This connector replaced the program of an older one. No running connector of this Hermes answered, so the Arauto tools of this Hermes may be off until its gateway restarts, and the approval is confirmed at that restart. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard.",
+            ),
+            (
+                Told::ProgramReplacedEnded,
+                "This connector replaced the program of an older one that cannot read its files, and ended it: the Arauto tools of this Hermes are off until its gateway restarts, and the approval is confirmed at that restart. After the approval, the operator restarts the gateway of this Hermes, once: with the restart command of Hermes in the chat or, where the chat refuses it, with the Restart Gateway button of the Hermes dashboard.",
+            ),
+        ];
+        let sizes = [427, 430, 419];
+        for ((told, text), size) in approved.into_iter().zip(sizes) {
+            assert_eq!(told.phrase(), text);
+            assert_eq!(text.len(), size, "{text}");
         }
     }
 
