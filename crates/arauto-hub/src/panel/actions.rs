@@ -500,6 +500,7 @@ mod tests {
             standing: None,
             seen: "3 h ago".to_owned(),
             explain: None,
+            explain_tone: Tone::Idle,
             action,
             orders: "not recorded".to_owned(),
             orders_recorded: false,

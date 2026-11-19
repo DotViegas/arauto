@@ -174,6 +174,9 @@ pub struct HermesRow {
     pub seen: String,
     /// What the admin needs to know about a Hermes that stopped.
     pub explain: Option<String>,
+    /// The tone of `explain`. `Wait` draws it on the amber ground: it waits for someone (a
+    /// gateway restart, a reconnect).
+    pub explain_tone: Tone,
     /// What the button of its line does.
     pub action: RowAction,
     /// Who gives it orders on WhatsApp, as a muted state of its action: a sentence of the
@@ -897,9 +900,13 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
         more_button(html, "/hermes/actions?name=", &row.name);
         html.raw("</div></td></tr>");
         if let Some(explain) = &row.explain {
-            html.raw("<tr class=\"explain\"><td colspan=\"7\">")
-                .text(explain)
-                .raw("</td></tr>");
+            html.raw(if row.explain_tone == Tone::Wait {
+                "<tr class=\"explain wait\"><td colspan=\"7\">"
+            } else {
+                "<tr class=\"explain\"><td colspan=\"7\">"
+            })
+            .text(explain)
+            .raw("</td></tr>");
         }
     }
     html.raw("</tbody></table></div><p class=\"note\">")
@@ -1206,6 +1213,7 @@ mod tests {
                 standing: Some(Standing::RestartPending),
                 seen: HOSTILE.to_owned(),
                 explain: Some(HOSTILE.to_owned()),
+                explain_tone: Tone::Bad,
                 action: RowAction::Reconnect,
                 orders: HOSTILE.to_owned(),
                 orders_recorded: true,
@@ -1588,10 +1596,32 @@ mod tests {
             standing,
             seen: "now".to_owned(),
             explain: None,
+            explain_tone: Tone::Idle,
             action: RowAction::Reconnect,
             orders: String::new(),
             orders_recorded: false,
         }
+    }
+
+    #[test]
+    fn a_line_that_waits_for_a_restart_is_explained_on_the_amber_ground() {
+        let frame = Frame::default();
+        let row = |tone| HermesRow {
+            explain: Some("a gateway restart is pending".to_owned()),
+            explain_tone: tone,
+            ..connector_row(Some(Standing::RestartPending), "0.1.0")
+        };
+        let page = |row| HermesPage {
+            rows: vec![row],
+            ..HermesPage::default()
+        };
+        let waits = hermes(&frame, &page(row(Tone::Wait)));
+        assert!(waits.contains(
+            "<tr class=\"explain wait\"><td colspan=\"7\">a gateway restart is pending</td></tr>"
+        ));
+        let stopped = hermes(&frame, &page(row(Tone::Bad)));
+        assert!(stopped.contains("<tr class=\"explain\"><td colspan=\"7\">"));
+        assert!(!stopped.contains("explain wait"));
     }
 
     #[test]

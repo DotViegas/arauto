@@ -175,6 +175,15 @@ fn connector_explain(
     }
 }
 
+/// The tone of the line under a row about its connector: amber while it waits for someone (a
+/// gateway restart, a reconnect), as the mark in the connector column.
+const fn explain_tone(standing: Option<Standing>) -> Tone {
+    match standing {
+        Some(Standing::RestartPending | Standing::Outdated) => Tone::Wait,
+        _ => Tone::Idle,
+    }
+}
+
 /// The sentence of an alert. The name of the Hermes and the address in it are values: the
 /// page escapes the whole sentence.
 fn notice(lang: Lang, alert: &Alert) -> Notice {
@@ -367,19 +376,23 @@ pub(super) async fn hermes(
                 )
             }
         });
-        let explain = explain.or_else(|| {
-            standing.and_then(|standing| {
-                connector_explain(
-                    lang,
-                    name,
-                    line.in_use
-                        .as_ref()
-                        .and_then(|device| device.connector_version.as_deref()),
-                    standing,
-                    hub.served(),
-                )
-            })
-        });
+        let (explain, explain_tone) = match explain {
+            Some(explain) => (Some(explain), Tone::Bad),
+            None => (
+                standing.and_then(|standing| {
+                    connector_explain(
+                        lang,
+                        name,
+                        line.in_use
+                            .as_ref()
+                            .and_then(|device| device.connector_version.as_deref()),
+                        standing,
+                        hub.served(),
+                    )
+                }),
+                explain_tone(standing),
+            ),
+        };
         let device = line.in_use.as_ref().or(line.request.as_ref());
         let record = repo::orders::get(hub.pool(), organization, &key, line.hermes.id).await?;
         let (orders, orders_recorded) = orders_summary(lang, &record);
@@ -408,6 +421,7 @@ pub(super) async fn hermes(
                 )
             },
             explain,
+            explain_tone,
             orders,
             orders_recorded,
             action: if line.request.is_some() || line.invite_expires_at.is_some() {
@@ -1137,6 +1151,15 @@ mod tests {
         let text = say(&known).unwrap();
         assert!(text.contains(" (0.1.0)"), "{text}");
         assert!(text.contains("0.1.1"), "{text}");
+    }
+
+    #[test]
+    fn a_restart_or_an_update_that_waits_is_explained_in_amber() {
+        assert_eq!(explain_tone(Some(Standing::RestartPending)), Tone::Wait);
+        assert_eq!(explain_tone(Some(Standing::Outdated)), Tone::Wait);
+        assert_eq!(explain_tone(Some(Standing::OtherBuild)), Tone::Idle);
+        assert_eq!(explain_tone(Some(Standing::Current)), Tone::Idle);
+        assert_eq!(explain_tone(None), Tone::Idle);
     }
 
     #[test]

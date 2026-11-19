@@ -1080,6 +1080,7 @@ mod tests {
                 standing: None,
                 seen: String::new(),
                 explain: None,
+                explain_tone: crate::panel::view::Tone::Idle,
                 action: crate::panel::view::RowAction::Continue,
                 orders: String::new(),
                 orders_recorded: false,
