@@ -12,7 +12,8 @@
 # knows the build of the connectors it serves (decision 0053, proposal).
 #
 # Fact stated by the maintainer's assistant on 14/11/2026: the Windows and macOS builds below
-# compile and link in this build image. None of those files was ever run.
+# compile and link in this build image. Fact of 24/11/2026: the Windows file of this image runs a
+# real Hermes. The macOS files were never run.
 
 # ---------------------------------------------------------------------------- build
 FROM rust:1.98-bookworm AS build
@@ -25,12 +26,24 @@ RUN cargo build --release --locked -p arauto-connector --features tls \
  && mkdir -p /out/download \
  && cp target/release/arauto-connector /out/download/arauto-connector-linux-x86_64
 # The connector for Windows x86_64: the GNU target, linked by mingw-w64.
+# `--no-insert-timestamp`: by default this linker writes the time of the link into the PE header
+# (TimeDateStamp, and the CheckSum changes with it), so two builds of the same sources gave two
+# files with two SHA-256 digests, and a rebuild of the image for the hub alone changed the digest
+# it serves for Windows: a connector installed before it showed as "Other build". With the option
+# the field is zero; Windows does not read it to run a program. Cargo reads the variable for this
+# target only: the Linux file above is built without it. The last two lines read the field and
+# fail the build when it is not zero, for instance if a RUSTFLAGS set elsewhere made Cargo ignore
+# the variable. Checked on 24/11/2026: two builds with the option are byte-identical
+# (referencia/build-fatos.md).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 \
  && rm -rf /var/lib/apt/lists/* \
  && rustup target add x86_64-pc-windows-gnu \
- && cargo build --release --locked -p arauto-connector --features tls --target x86_64-pc-windows-gnu \
- && cp target/x86_64-pc-windows-gnu/release/arauto-connector.exe /out/download/arauto-connector-windows-x86_64.exe
+ && CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS='-C link-arg=-Wl,--no-insert-timestamp' \
+    cargo build --release --locked -p arauto-connector --features tls --target x86_64-pc-windows-gnu \
+ && cp target/x86_64-pc-windows-gnu/release/arauto-connector.exe /out/download/arauto-connector-windows-x86_64.exe \
+ && pe="$(od -An -tu4 -j60 -N4 /out/download/arauto-connector-windows-x86_64.exe | tr -d ' ')" \
+ && test "$(od -An -tx4 -j"$((pe + 8))" -N4 /out/download/arauto-connector-windows-x86_64.exe | tr -d ' ')" = 00000000
 # The connector for macOS (arm64 and x86_64): linked by zig through cargo-zigbuild. The linker
 # warns that no Apple SDK was found and still links.
 RUN apt-get update \

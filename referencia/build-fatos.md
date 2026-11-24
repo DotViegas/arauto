@@ -22,6 +22,9 @@ The cause was not investigated. A likely one is a value the MSVC linker writes i
 
 ## What this does not prove
 
+(24/11/2026: the Linux and Windows GNU files of the image were checked since; see "The
+connectors of the image" below.)
+
 - The Linux image builds (with `tls`, in Docker), the Windows GNU build and the two macOS builds
   were not checked: the development machine has no Docker and no C compiler for those targets.
 - The image check stays pending for the server: build the image twice from one commit and compare
@@ -35,3 +38,36 @@ made in the same image build (`docs/11-conector.md`, section 7), so the bundle i
 rebuild of the image. What a rebuild changes is the digest a device declared: a connector installed
 from an earlier build of the same sources can show as "Other build" until that Hermes is
 reconnected.
+
+## The connectors of the image (checked 24/11/2026)
+
+**Result: the Linux file is reproducible. The Windows GNU file was not, because of the time of the
+link, and is reproducible with `--no-insert-timestamp`.**
+
+- Two builds of the image on the server, from commits `e0b146f` and `7350b2e` (the second changes
+  only the hub): the Linux x86_64 connector had the same SHA-256 in both images; the Windows
+  x86_64 GNU connector had two different digests. A Windows connector installed from the first
+  image showed as "Other build" after the second one was deployed.
+- In the build image (`rust:1.98-bookworm`, `gcc-mingw-w64-x86-64` of Debian bookworm), source
+  `7350b2e`, the Windows connector linked twice, 34 seconds apart (only the connector crate built
+  again): 3 bytes differ, two in the TimeDateStamp of the PE file header and one in the CheckSum of
+  the optional header. `objdump -p` shows the two link times.
+- The same two links with `CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS='-C
+  link-arg=-Wl,--no-insert-timestamp'`: byte-identical files, TimeDateStamp zero, no debug
+  directory. The Dockerfile now builds the Windows connector this way and fails the build when the
+  field is not zero.
+- A build made by hand in a container, with the source on a bind mount, differed from the file of
+  the image in the symbol table after the sections (about 372,000 bytes), with the same sections
+  and the same code. Not investigated.
+
+Not checked:
+
+- The two macOS files (reproducible by reading the sources of the zig linker, not by a build).
+- That two builds of the image with the option give the same Windows digest: expected, to be seen
+  on the next two deploys.
+
+What follows: with the option, a rebuild of the image from sources that do not change the
+connector keeps the digests it serves, and a connector installed from an earlier build stays
+"Current". The first image built with the option serves a Windows file with a new digest: a
+Windows connector installed before it shows as "Other build" once, until its file is replaced by
+the one served or the Hermes reconnects.
