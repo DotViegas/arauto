@@ -126,12 +126,12 @@ async fn a_device_leaves_by_a_short_connection_and_the_database_says_so() {
 async fn hello_agrees_on_the_highest_common_version_or_closes_with_ar402() {
     let hub = support::start(support::settings(), TestPurposes(Behavior::Park)).await;
     for purpose in [Purpose::Enroll, Purpose::Channel, Purpose::Leave] {
-        // Newer than the hub.
+        // Newer than the hub, whatever its version.
         let mut connector = TestConnector::connect(hub.addr(), &identity().unwrap(), &hub.hub_key)
             .await
             .unwrap();
         connector
-            .send(&hello((3, 4), purpose).unwrap())
+            .send(&hello((PROTOCOL_VERSION + 1, PROTOCOL_VERSION + 2), purpose).unwrap())
             .await
             .unwrap();
         let ended = connector.ended(PATIENCE).await.unwrap();

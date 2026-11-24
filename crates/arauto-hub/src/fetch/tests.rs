@@ -1,8 +1,8 @@
 //! The rules of the download by address (decision 0055), each with a test that fails when the
 //! rule is taken away: the ranges that are not public, `http://`, a name that resolves to a
 //! private IP (refused before any connection), a redirect to a private IP, the 10 MB cut, the
-//! time of the whole download, and one download that goes through, by the allowance that only
-//! a test build has.
+//! time of the whole download, and one download that goes through, with the name in TLS and in
+//! `Host`, by the allowance that only a test build has.
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -154,13 +154,20 @@ async fn answer<S: AsyncReadExt + AsyncWriteExt + Unpin>(
     let redirect = |location: String| {
         format!("HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\n\r\n")
     };
+    // The file goes only to a request whose `Host` is the name and the port of the address: a
+    // request that carries the IP it connected to, no port or no `Host` at all gets 421.
+    let wanted = format!("{NAME}:{port}");
     match path.as_str() {
+        "/file.pdf" if host != wanted => {
+            stream
+                .write_all(b"HTTP/1.1 421 Misdirected Request\r\nContent-Length: 0\r\n\r\n")
+                .await?;
+        }
         "/file.pdf" => {
             stream
                 .write_all(
                     format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\nContent-Length: {}\r\n\
-                         X-Host-Seen: {host}\r\n\r\n",
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\nContent-Length: {}\r\n\r\n",
                         FILE.len()
                     )
                     .as_bytes(),
@@ -465,7 +472,9 @@ async fn a_name_that_resolves_to_a_private_ip_is_refused_before_any_connection()
 // ---------------------------------------------------------------------------- a download
 
 /// The positive path, by the allowance of a test build: the name in `Host` and in TLS, the file
-/// and its media type; a redirect to a path of the same host is followed.
+/// and its media type; a redirect to a path of the same host is followed. The server of the test
+/// gives the file only when `Host` is the name and the port of the address, so a request that
+/// carries the IP it connected to fails here.
 #[tokio::test]
 async fn a_public_file_is_downloaded_with_its_media_type() {
     let server = Server::start().await;
