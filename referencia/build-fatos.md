@@ -60,11 +60,16 @@ link, and is reproducible with `--no-insert-timestamp`.**
   the image in the symbol table after the sections (about 372,000 bytes), with the same sections
   and the same code. Not investigated.
 
+- The image of commit `90911e1`, the first with the option, built on the server on 24/11/2026:
+  Windows file with TimeDateStamp zero; the Linux file and the two macOS files with the same
+  digests as in the image of `7350b2e`. The macOS layer was built again (the Windows layer before
+  it changed), so the two macOS files came out byte-identical from two builds.
+
 Not checked:
 
-- The two macOS files (reproducible by reading the sources of the zig linker, not by a build).
 - That two builds of the image with the option give the same Windows digest: expected, to be seen
-  on the next two deploys.
+  on the next deploy.
+- No macOS file was ever run.
 
 What follows: with the option, a rebuild of the image from sources that do not change the
 connector keeps the digests it serves, and a connector installed from an earlier build stays
