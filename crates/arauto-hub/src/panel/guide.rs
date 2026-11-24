@@ -1077,6 +1077,7 @@ mod tests {
                 state: "x",
                 numbers: vec![],
                 connector: None,
+                connector_declared: None,
                 standing: None,
                 seen: String::new(),
                 explain: None,

@@ -497,6 +497,7 @@ mod tests {
             state,
             numbers: vec![],
             connector: None,
+            connector_declared: None,
             standing: None,
             seen: "3 h ago".to_owned(),
             explain: None,

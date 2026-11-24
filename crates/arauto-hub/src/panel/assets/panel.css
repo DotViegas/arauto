@@ -137,6 +137,8 @@ td { color: var(--strong); }
 .list .name { overflow-wrap: anywhere; }
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mono { font-family: var(--f-mono); white-space: nowrap; }
+/* A connector that declares a text with no numbers: it breaks inside the cell, never stretches the table. */
+.list td.version { white-space: normal; overflow-wrap: anywhere; }
 .tag { margin-left: 8px; font-size: var(--t-label); color: var(--text); white-space: nowrap; }
 .tag { text-decoration: underline; text-underline-offset: 3px; }
 .button .muted { font-weight: 400; color: var(--text); }

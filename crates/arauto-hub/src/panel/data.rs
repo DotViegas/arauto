@@ -123,17 +123,14 @@ pub(super) fn standing(line: &HermesLine, in_session: bool) -> (Tone, &'static s
     }
 }
 
-/// What the column of the connector shows: the numbers of a declared version that parses, for
-/// a connector the hub compares; the declared text (escaped by the page) otherwise.
-fn connector_shown(declared: &str, standing: Option<Standing>) -> String {
-    match standing {
-        Some(Standing::Current | Standing::Outdated | Standing::OtherBuild) => {
-            read_declared(declared)
-                .core
-                .map_or_else(|| declared.to_owned(), |core| core.to_string())
-        }
-        _ => declared.to_owned(),
-    }
+/// What the column of the connector shows: the numbers of a declared version that parses,
+/// whatever the standing (the build digest after `+` has 64 characters with no place to break
+/// and stretched the table; the whole text goes to the tooltip of the cell); the declared text
+/// (escaped by the page) otherwise.
+fn connector_shown(declared: &str) -> String {
+    read_declared(declared)
+        .core
+        .map_or_else(|| declared.to_owned(), |core| core.to_string())
 }
 
 /// The line under a row whose connector is not what the hub serves, when there is one to say.
@@ -407,7 +404,8 @@ pub(super) async fn hermes(
                 .collect(),
             connector: device
                 .and_then(|device| device.connector_version.as_deref())
-                .map(|declared| connector_shown(declared, standing)),
+                .map(connector_shown),
+            connector_declared: device.and_then(|device| device.connector_version.clone()),
             standing,
             seen: if in_session {
                 text::tr(lang, k("now")).to_owned()
@@ -1193,15 +1191,10 @@ mod tests {
         );
         assert!(say(Standing::Current, None, &known).is_none());
         assert!(say(Standing::NotKnown, None, &known).is_none());
-        // What the column shows: the numbers when the hub compared it, the text otherwise.
+        // What the column shows: the numbers whenever they parse, the text otherwise.
         let marked = format!("0.1.0+{}", "a".repeat(64));
-        assert_eq!(connector_shown(&marked, Some(Standing::Current)), "0.1.0");
-        assert_eq!(connector_shown(&marked, Some(Standing::Outdated)), "0.1.0");
-        assert_eq!(
-            connector_shown("nonsense", Some(Standing::OtherBuild)),
-            "nonsense"
-        );
-        assert_eq!(connector_shown(&marked, Some(Standing::NotKnown)), marked);
-        assert_eq!(connector_shown(&marked, None), marked);
+        assert_eq!(connector_shown(&marked), "0.1.0");
+        assert_eq!(connector_shown("0.2.0"), "0.2.0");
+        assert_eq!(connector_shown("nonsense"), "nonsense");
     }
 }

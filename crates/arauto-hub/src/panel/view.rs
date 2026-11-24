@@ -164,9 +164,12 @@ pub struct HermesRow {
     pub state: &'static str,
     /// The aliases of the numbers it reaches.
     pub numbers: Vec<String>,
-    /// The version its connector declared, or its numbers when the hub compared it. Not
-    /// verified.
+    /// The numbers of the version its connector declared, or the declared text when it has
+    /// none. Not verified.
     pub connector: Option<String>,
+    /// The whole version its connector declared, the tooltip of the cell when it says more
+    /// than `connector` (the build digest after `+`). Not verified.
+    pub connector_declared: Option<String>,
     /// How the connector of the device in use compares with what the hub serves. Only for a
     /// device that is active.
     pub standing: Option<Standing>,
@@ -876,19 +879,19 @@ pub(super) fn hermes_into(html: &mut Html, frame: &Frame, page: &HermesPage, ove
             .text(&row.name)
             .raw("\">")
             .text(&row.orders)
-            .raw("</a></td><td class=\"wide-only mono\">");
+            .raw("</a></td><td class=\"wide-only mono version\">");
+        let declared = row.connector_declared.as_deref();
         match (&row.connector, row.standing) {
             (Some(version), Some(Standing::Outdated)) => {
-                html.raw("<span class=\"state wait\">")
-                    .text(version)
-                    .raw("</span>");
+                connector_version(html, version, declared, Some("state wait"));
             }
             (Some(version), Some(Standing::RestartPending)) => {
-                html.text(version).raw(" ");
+                connector_version(html, version, declared, None);
+                html.raw(" ");
                 state(html, Tone::Wait, k("Restart pending"));
             }
             (Some(version), _) => {
-                html.text(version);
+                connector_version(html, version, declared, None);
             }
             (None, _) => {
                 html.raw("—");
@@ -922,6 +925,30 @@ pub fn numbers(frame: &Frame, page: &NumbersPage) -> String {
     numbers_into(&mut html, frame, page, Over::Nothing);
     html.raw(TAIL);
     html.finish()
+}
+
+/// The version of a connector in its cell: its numbers, with the whole declared text as the
+/// tooltip when that says more (the build digest after `+`, 64 characters with no place to
+/// break, stretched the table). `class` colours it.
+fn connector_version(
+    html: &mut Html,
+    shown: &str,
+    declared: Option<&str>,
+    class: Option<&'static str>,
+) {
+    let title = declared.filter(|declared| *declared != shown);
+    if class.is_none() && title.is_none() {
+        html.text(shown);
+        return;
+    }
+    html.raw("<span");
+    if let Some(class) = class {
+        html.raw(" class=\"").raw(class).raw("\"");
+    }
+    if let Some(title) = title {
+        html.raw(" title=\"").text(title).raw("\"");
+    }
+    html.raw(">").text(shown).raw("</span>");
 }
 
 /// The one button of every line: a link to the window of the actions of that line. `path`
@@ -1210,6 +1237,7 @@ mod tests {
                 state: k("In quarantine"),
                 numbers: vec![HOSTILE.to_owned(), HOSTILE.to_owned()],
                 connector: Some(HOSTILE.to_owned()),
+                connector_declared: Some(HOSTILE.to_owned()),
                 standing: Some(Standing::RestartPending),
                 seen: HOSTILE.to_owned(),
                 explain: Some(HOSTILE.to_owned()),
@@ -1593,6 +1621,7 @@ mod tests {
             state: k("Connected"),
             numbers: vec![],
             connector: Some(connector.to_owned()),
+            connector_declared: Some(connector.to_owned()),
             standing,
             seen: "now".to_owned(),
             explain: None,
@@ -1656,5 +1685,47 @@ mod tests {
         );
         assert!(!plain.contains("Restart pending") && !plain.contains("Outdated"));
         assert!(plain.contains(">0.1.0</td>"));
+    }
+
+    #[test]
+    fn the_connector_cell_shows_the_numbers_and_keeps_the_build_in_its_tooltip() {
+        let frame = Frame::default();
+        let page = |row| HermesPage {
+            rows: vec![row],
+            ..HermesPage::default()
+        };
+        let declared = format!("0.1.1+{}", "2b".repeat(32));
+        // The digest stretched the table: the cell shows the numbers, the tooltip the rest.
+        let restart = hermes(
+            &frame,
+            &page(HermesRow {
+                connector_declared: Some(declared.clone()),
+                ..connector_row(Some(Standing::RestartPending), "0.1.1")
+            }),
+        );
+        assert!(restart.contains(&format!(
+            "<td class=\"wide-only mono version\"><span title=\"{declared}\">0.1.1</span> <span class=\"state wait\">Restart pending</span>"
+        )));
+        assert_eq!(restart.matches(declared.as_str()).count(), 1);
+        let outdated = hermes(
+            &frame,
+            &page(HermesRow {
+                connector_declared: Some(declared.clone()),
+                ..connector_row(Some(Standing::Outdated), "0.1.1")
+            }),
+        );
+        assert!(outdated.contains(&format!(
+            "<span class=\"state wait\" title=\"{declared}\">0.1.1</span>"
+        )));
+        // A declared text is hostile: in the tooltip it is escaped like everywhere else.
+        let hostile = hermes(
+            &frame,
+            &page(HermesRow {
+                connector_declared: Some(HOSTILE.to_owned()),
+                ..connector_row(Some(Standing::Current), "0.1.1")
+            }),
+        );
+        assert!(hostile.contains("title=\"&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&gt;"));
+        assert!(!hostile.contains(HOSTILE));
     }
 }
