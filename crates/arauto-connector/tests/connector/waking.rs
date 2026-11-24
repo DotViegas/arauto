@@ -247,14 +247,16 @@ async fn the_leader_status_carries_its_waking() {
         with_key.status().await.waking,
         Some(Waking {
             key_received: true,
-            last: None
+            last: None,
+            wakes_without_session: 0,
         })
     );
     assert_eq!(
         without_key.status().await.waking,
         Some(Waking {
             key_received: false,
-            last: None
+            last: None,
+            wakes_without_session: 0,
         })
     );
 

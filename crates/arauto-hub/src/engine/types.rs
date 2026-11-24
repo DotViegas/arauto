@@ -412,6 +412,23 @@ impl EngineMessageId {
         FullMessageId::parse(&self.0).ok()
     }
 
+    /// The identifier WhatsApp gave the message, with no chat and no author around it: the same
+    /// value whether the engine wrote the identifier in the complete form or alone. What the
+    /// hub keeps as a digest to tell a message it sent from one it did not.
+    #[must_use]
+    pub fn whatsapp_id(&self) -> &str {
+        let rest = self
+            .0
+            .strip_prefix("true_")
+            .or_else(|| self.0.strip_prefix("false_"));
+        match rest {
+            Some(rest) if FullMessageId::parse(&self.0).is_ok() => {
+                rest.split('_').nth(1).unwrap_or(&self.0)
+            }
+            _ => &self.0,
+        }
+    }
+
     pub(crate) fn segment(&self) -> String {
         path_segment(&self.0)
     }

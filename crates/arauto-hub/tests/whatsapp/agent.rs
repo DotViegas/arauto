@@ -202,6 +202,20 @@ impl World {
         Agent::from_session(name, session)
     }
 
+    /// A new Hermes in session through a connector that offers protocol versions 1 and 2 only,
+    /// as every connector built before decision 0054 (version 3) does.
+    pub async fn agent_of_version_2(&self) -> Agent {
+        let (name, device) = self.fixture.approved().await;
+        let session = device
+            .speaking((1, 2))
+            .channel(Faults::default())
+            .await
+            .unwrap()
+            .session()
+            .unwrap();
+        Agent::from_session(name, session)
+    }
+
     /// `admin access grant`.
     pub async fn grant(&self, hermes: &str, number: &str, grant: Grant) {
         self.fixture

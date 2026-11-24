@@ -46,7 +46,8 @@ mod tests;
 
 /// The highest protocol version this build speaks. Version 2 is version 1 with one addition: a
 /// `result` may carry AR-714 ([`ErrorCode::since`]; `docs/14-protocolo-do-canal.md`, section 5.1).
-pub const PROTOCOL_VERSION: u32 = 2;
+/// Version 3 adds the optional field `session` to the `whatsapp` notice (decision 0054).
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// The lowest protocol version this build speaks: a program of version 1 still works with it.
 pub const PROTOCOL_VERSION_MIN: u32 = 1;

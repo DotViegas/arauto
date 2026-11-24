@@ -152,6 +152,8 @@ The word "session" always comes with its owner:
 | **Channel session** | See above. |
 | **Engine session** | The link between the engine and a WhatsApp account. Whoever copies it has the number. |
 | **Panel session** | The login of an admin in the browser. |
+| **Hermes session** | A conversation that a Hermes keeps in its own database, with its history. Arauto never reads it, ends it or resets it. For a WhatsApp contact the connector names it by its key on every wake (proposal, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md)). |
+| **Hermes session key** | The name of the Hermes session of one contact of one number: `arauto-wa1-`, `arauto-wg1-` or `arauto-wh1-` and a SHA-256 of the telephones (or of the number and the group, or of the hidden identifier) with fixed words. Anyone who knows the telephones can compute it: it is not a secret and not a credential (proposal, decision 0054). |
 
 ## Origin
 
@@ -172,6 +174,7 @@ The word "session" always comes with its owner:
 | tenant, slot | Hermes, organization | They were names from the source service. |
 | device, for WhatsApp | linked device | A device is an installation of the connector. |
 | channel, for Telegram or e-mail | conversation platform | The channel is the connection from the connector to the hub. |
+| session ID, session key, alone | Hermes session key | "Session" always comes with its owner (decision 0054, proposal). |
 | order, command, for a kind of link | instruction | The follow mark asks a Hermes to follow another for one run, below its operator's instructions; it gives no power in the hub. |
 | command number, command phone, operator number | the telephone a Hermes's own WhatsApp runs on; the telephone that gives it orders | The old mark "command" of a number did not say whether the number gives orders or takes them, and was removed on 17/11/2026 ([0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)). Every name now says the direction. |
 | customer, client, meaning whoever uses the project | whoever installs, organization | The project is free. The technical sense ("unofficial client", "MCP client") still holds. |

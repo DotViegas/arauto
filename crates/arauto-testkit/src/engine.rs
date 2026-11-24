@@ -1001,6 +1001,17 @@ fn route(
                 None => not_found(),
             }
         }
+        // From a telephone to its hidden identifier (`GET /api/{session}/lids/pn/{phone}`).
+        ["api", session, "lids", "pn", phone] if get => {
+            if !state.sessions.contains_key(*session) {
+                return not_found();
+            }
+            let pn = format!("{}@c.us", phone.trim_end_matches("@c.us"));
+            match state.lids.iter().find(|(_, known)| **known == pn) {
+                Some((lid, _)) => ok(json!({"lid": lid, "pn": pn})),
+                None => not_found(),
+            }
+        }
         ["api", session, "groups"] if get => {
             let Some(found) = state.sessions.get(*session) else {
                 return not_found();

@@ -172,6 +172,9 @@ pub(crate) struct Around<'a> {
     pub(crate) news: &'a mpsc::UnboundedSender<News>,
     pub(crate) leave: &'a mut mpsc::Receiver<LeaveAsk>,
     pub(crate) stop: &'a mut watch::Receiver<bool>,
+    /// The protocol version agreed on this channel: the key of the Hermes session is used only
+    /// from 3 (decision 0054).
+    pub(crate) agreed: u32,
 }
 
 /// Serves the session until the connection ends.
@@ -230,10 +233,11 @@ pub(crate) async fn serve(mut link: Link, session: Session, around: Around<'_>) 
                     let home = around.saving.home.clone();
                     let settings = Arc::clone(&around.saving.settings);
                     let calls = notice_calls.clone();
+                    let agreed = around.agreed;
                     tokio::spawn(async move {
                         let outcome = settings
                             .waker
-                            .handle(&home, &notice, &settings, &calls)
+                            .handle(&home, &notice, &settings, &calls, agreed)
                             .await;
                         let ack = Message::NoticeAck(NoticeAck {
                             id: notice.id,

@@ -127,6 +127,10 @@ may appear with more than one), `nome_exibido` (untrusted text), `ultima_mensage
 
 **hermes_orders_outside_whatsapp** (18/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal; migration 0023): `organization_id`, `hermes_id`, `created_at`. One row per Hermes: the admin recorded that its orders come from outside WhatsApp. The row exists only while the Hermes has no `hermes_whatsapp_phone` row: the single write (under the lock of the Hermes row) deletes both and writes one; on a hand edit that leaves both, the telephones win. It is removed with the Hermes. The gate never reads it. The hub cannot check the answer.
 
+**sent_message** (24/11/2026, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built; migration 0025; Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.): the messages a Hermes sent through Arauto, so that `whatsapp_read_chat` can say who sent each message of the number. `organization_id`, `number_id`, `chat_id`, `hermes_id` (nullable, `ON DELETE SET NULL`: a removed Hermes leaves the row as "another Hermes"), `id_digest` (the keyed digest of the engine message id, made like `chat_engine_id.id_digest`; the id is never kept in clear), `sent_at`, `purge_at`. It is written right after the engine returns an id (a send for which the engine returns no id leaves no row). **Retention:** a `retention` row of 30 days (open choice C9) and a purge target in `purge.rs`. No telephone, no text and no engine message id in clear in this table, the log or the audit.
+
+**Hidden identifier linked to a telephone chat** (24/11/2026, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), section 10, open choice C13, proposal): the hub keeps one chat for a person whose telephone chat it has. When the engine answers that a hidden identifier (`@lid`) belongs to a telephone the hub has a chat for, the hidden identifier is recorded as one more engine identifier of that chat (one more row of `chat_engine_id`), instead of a second chat. The same is done after a sending to a telephone, when the engine offers the hidden identifier of that telephone (WAHA `GET /api/{session}/lids/pn/{phone}`; a 404 or any refusal means "not offered" and changes nothing). A pairing is recorded only from an answer of the engine, never from the text of a message. Chats already kept apart are not merged. Not guaranteed: the hub trusts the engine's table, and a wrong pairing would put two people in one chat.
+
 Hermes never states the name of the engine session. It states the alias of the number, and the hub
 resolves the engine session from the accesses of the Hermes of that device.
 
@@ -156,7 +160,7 @@ leaves after it is handled.
 
 **aviso** (outbound): `id`, `organizacao_id`, `hermes_id`, `tipo` (WhatsApp message or note),
 `numero_id` and `conversa_id` (only in the WhatsApp type), `remetente_id` (only in the note type),
-`quantidade`, `estado`, `tentativas`, `nao_antes_de`, `posse_ate`, `expira_em`. There is only one
+`quantidade`, `estado`, `tentativas`, `nao_antes_de`, `posse_ate`, `expira_em` and (24/11/2026, decision 0054, proposal) `falhas_do_motor` (`engine_failures` in the code: the engine errors in a row while the key of the Hermes session was built; after 5 the hidden key is used). There is only one
 pending notice per Hermes, type and target: what arrives later adds to the quantity.
 
 This design of queues in the database comes from the source service.

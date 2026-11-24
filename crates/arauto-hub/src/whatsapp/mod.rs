@@ -27,9 +27,11 @@
 //! after the checks above: the one place where a call of a Hermes meets the engine.
 
 pub mod ceiling;
+pub(crate) mod hermes_session;
 mod refusals;
 mod token;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use arauto_protocol::errors::{ErrorCode, RetryAfter};
@@ -58,6 +60,7 @@ use crate::engine::{
     Role, SendFile, SendText, SessionName,
 };
 use crate::repo::access::HermesAccess;
+use crate::repo::sent_message::SentBy;
 use crate::repo::{self, RepoError};
 use crate::vault::OrganizationKey;
 
@@ -353,6 +356,25 @@ impl<'a> Call<'a> {
         )
         .await
         .map_err(|error| failed(&error, "the identifiers of a chat could not be read"))
+    }
+
+    /// The telephone of the contact of `chat`, as `+digits`: the telephone identifier when the
+    /// chat has one, otherwise what the engine says for its hidden identifier. `None` for a
+    /// group, and for a hidden contact whose telephone the engine does not give (a failure of
+    /// the engine is the same as not knowing).
+    async fn chat_phone(&self, engine: &Authorized<'_>, chat: Uuid) -> Option<String> {
+        let ids = self.engine_ids(chat).await.ok()?;
+        if let Some(phone) = ids.iter().find_map(EngineChatId::phone) {
+            return Some(format!("+{}", phone.digits()));
+        }
+        let hidden = ids.iter().find(|id| id.as_str().ends_with("@lid"))?;
+        let phone = engine
+            .engine
+            .client
+            .phone_of_hidden(engine.session, hidden)
+            .await
+            .ok()??;
+        Some(format!("+{}", phone.digits()))
     }
 
     async fn line(&self, chat: Uuid) -> Result<Option<crate::core::access::Verbs>, Refusal> {
@@ -716,12 +738,49 @@ impl<'a> Call<'a> {
 
     /// What a sending answers: the chat and the new message. A failure of the hub here does
     /// not undo the sending: the answer says that its result is unknown (AR-713), so the
-    /// Hermes reads the chat instead of sending again.
-    async fn sent(&self, destination: &Destination, id: Option<&EngineMessageId>) -> Answer {
+    /// Hermes reads the chat instead of sending again. Once the engine gave the identifier of
+    /// the new message, the hub records that this Hermes sent it (decision 0054, section 7):
+    /// a failure of that record is logged and changes nothing in the answer.
+    async fn sent(
+        &self,
+        destination: &Destination,
+        id: Option<&EngineMessageId>,
+        by_phone: bool,
+    ) -> Answer {
         let chat = self
             .chat_of(destination)
             .await
             .map_err(|_| Refusal::from(ErrorCode::Ar713))?;
+        if let Some(id) = id {
+            let recorded = repo::sent_message::record(
+                self.hub.pool(),
+                self.organization,
+                self.key,
+                self.access.number.id,
+                chat,
+                self.hermes,
+                id,
+                self.hub.now_ms(),
+            )
+            .await;
+            if let Err(error) = recorded {
+                tracing::error!(%error, "a message sent through Arauto could not be recorded");
+            }
+        }
+        // After a sending to a telephone, the engine may tell the hidden identifier of that
+        // telephone (decision 0054, section 10): the pairing is recorded from its answer only.
+        if by_phone {
+            hermes_session::record_pairing_after_sending(
+                self.hub,
+                self.organization,
+                self.key,
+                self.access.number.id,
+                &self.access.number.session,
+                chat,
+                &destination.engine_chat,
+            )
+            .await;
+        }
         Ok(json!({
             "number": self.alias(),
             "chat": chat.as_hyphenated().to_string(),
@@ -792,7 +851,7 @@ impl<'a> Call<'a> {
                     .send_text(engine.session, &text)
                     .await
                     .map_err(after_sending)?;
-                self.sent(&destination, sent.id.as_ref()).await
+                self.sent(&destination, sent.id.as_ref(), by_phone).await
             }
             WhatsappOp::SendFile(send) => {
                 let engine = self.authorized().await?;
@@ -831,7 +890,7 @@ impl<'a> Call<'a> {
                     .send_file(engine.session, &file)
                     .await
                     .map_err(after_sending)?;
-                self.sent(&destination, sent.id.as_ref()).await
+                self.sent(&destination, sent.id.as_ref(), by_phone).await
             }
             WhatsappOp::MarkRead { chat } => {
                 let reached = self.chat(*chat, Verb::Send).await?;
@@ -889,7 +948,7 @@ impl<'a> Call<'a> {
                         }
                         other => message_error(other),
                     })?;
-                self.sent(&destination, sent.id.as_ref()).await
+                self.sent(&destination, sent.id.as_ref(), by_phone).await
             }
             WhatsappOp::EditMessage { message, text } => {
                 let (_, message) = self.message(message, Verb::Modify).await?;
@@ -1029,7 +1088,7 @@ impl<'a> Call<'a> {
                 "kind": summary.id.kind().as_str(),
                 "name": summary.name.as_ref().map(|name| name.expose()),
                 "phone": phone_of(&summary.id),
-                "last_message": summary.last.as_ref().map(|last| self.message_item(chat, last)),
+                "last_message": summary.last.as_ref().map(|last| self.message_item(chat, last, None)),
             });
             if !budget.fits(&item)? {
                 next = Some(index);
@@ -1107,10 +1166,42 @@ impl<'a> Call<'a> {
             .client
             .messages(engine.session, &reached.engine_chat, query)
             .await?;
+        // Who sent each message the number wrote: the records of what Hermes sent through
+        // Arauto (decision 0054, section 7). A message with no record is `outside_arauto`.
+        let mine: Vec<(usize, &EngineMessageId)> = messages
+            .iter()
+            .take(asked)
+            .enumerate()
+            .filter(|(_, message)| message.author == Author::Me)
+            .map(|(index, message)| (index, &message.id))
+            .collect();
+        let refs: Vec<&EngineMessageId> = mine.iter().map(|(_, id)| *id).collect();
+        let found = repo::sent_message::labels(
+            self.hub.pool(),
+            self.organization,
+            self.key,
+            self.access.number.id,
+            self.hermes,
+            &refs,
+        )
+        .await
+        .map_err(|error| failed(&error, "the records of sent messages could not be read"))?;
+        let sent_by: HashMap<usize, SentBy> = mine
+            .iter()
+            .enumerate()
+            .map(|(position, (index, _))| {
+                let label = found
+                    .get(&position)
+                    .copied()
+                    .unwrap_or(SentBy::OutsideArauto);
+                (*index, label)
+            })
+            .collect();
+        let phone = self.chat_phone(&engine, reached.chat).await;
         let mut budget = Budget::new();
         let mut kept: Vec<(i64, Value)> = Vec::with_capacity(messages.len().min(asked));
-        for message in messages.iter().take(asked) {
-            let item = self.message_item(reached.chat, message);
+        for (index, message) in messages.iter().take(asked).enumerate() {
+            let item = self.message_item(reached.chat, message, sent_by.get(&index).copied());
             if !budget.fits(&item)? {
                 break;
             }
@@ -1139,6 +1230,7 @@ impl<'a> Call<'a> {
         Ok(json!({
             "number": self.alias(),
             "chat": reached.chat.as_hyphenated().to_string(),
+            "phone": phone,
             "messages": messages,
             "more": more,
             "next_before": next_before,
@@ -1221,13 +1313,13 @@ impl<'a> Call<'a> {
 
     /// A message as a reading shows it. The text, the name of the file and the author are of
     /// the other side: they go to the Hermes, which the descriptions tell they are data.
-    fn message_item(&self, chat: Uuid, message: &Message) -> Value {
+    fn message_item(&self, chat: Uuid, message: &Message, sent_by: Option<SentBy>) -> Value {
         let (from_me, author) = match &message.author {
             Author::Me => (true, None),
             Author::Other(id) => (false, phone_of(id)),
             Author::Unknown => (false, None),
         };
-        json!({
+        let mut item = json!({
             "message_id": token::sign(self.key, chat, &message.id),
             "time": message.at_ms.div_euclid(1_000),
             "from_me": from_me,
@@ -1241,7 +1333,12 @@ impl<'a> Call<'a> {
                 .reply_to
                 .as_ref()
                 .map(|reply| token::sign(self.key, chat, reply)),
-        })
+        });
+        // Only a message the number wrote says who sent it.
+        if let (Some(sent_by), Some(object)) = (sent_by, item.as_object_mut()) {
+            object.insert("sent_by".to_owned(), Value::from(sent_by.as_str()));
+        }
+        item
     }
 }
 

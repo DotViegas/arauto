@@ -201,6 +201,42 @@ fn message_id(payload: &Value) -> Option<EngineMessageId> {
     EngineMessageId::parse(&id).ok()
 }
 
+/// A message under a hidden identifier the hub does not know yet (decision 0054, section 10):
+/// the engine is asked for its telephone before the message is written, and the identifier joins
+/// the chat of that telephone when the hub has it. Nothing here can fail the message.
+async fn link_before_the_write(
+    hub: &Hub,
+    organization: ResolvedOrg,
+    engine: Uuid,
+    session: &SessionName,
+    key: &crate::vault::OrganizationKey,
+    payload: &Value,
+) {
+    let Some(message) = crate::engine::waha::parse_message(payload, None) else {
+        return;
+    };
+    if message.author == crate::engine::Author::Me || !message.chat.as_str().ends_with("@lid") {
+        return;
+    }
+    let Ok(mut connection) = hub.pool().acquire().await else {
+        return;
+    };
+    let number = number::by_session(&mut connection, organization, engine, session).await;
+    drop(connection);
+    let Ok(Some(number)) = number else {
+        return;
+    };
+    crate::whatsapp::hermes_session::link_on_arrival(
+        hub,
+        organization,
+        key,
+        number.id,
+        session,
+        &message.chat,
+    )
+    .await;
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn store(
     hub: &Hub,
@@ -251,6 +287,9 @@ async fn store(
         envelope.timestamp
     };
     let key = hub.organization_key(organization).await.map_err(|_| ())?;
+    if kind == EventKind::Message {
+        link_before_the_write(hub, organization, engine, session, &key, &envelope.payload).await;
+    }
     let mut transaction = hub.pool().begin().await.map_err(|_| ())?;
     let Some(number) = number::by_session(&mut transaction, organization, engine, session)
         .await

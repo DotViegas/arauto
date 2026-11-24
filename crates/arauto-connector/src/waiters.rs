@@ -779,6 +779,7 @@ mod tests {
             number: arauto_protocol::names::NumberAlias::parse("balcao").unwrap(),
             chat: arauto_protocol::names::ChatId::parse("abc").unwrap(),
             count: arauto_protocol::notice::NoticeCount::new(1).unwrap(),
+            session: None,
         };
         assert!(!waiters.on_notice(id(2), &whatsapp, &[row(1, "ana", 1)], now, times()));
         assert!(told.try_recv().is_err());

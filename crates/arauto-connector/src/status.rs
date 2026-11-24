@@ -112,7 +112,11 @@ fn waking_json(waking: &Waking) -> Value {
         LastWake::Refused => "refused",
         LastWake::NoAnswer => "no_answer",
     });
-    json!({"key_received": waking.key_received, "last": last})
+    json!({
+        "key_received": waking.key_received,
+        "last": last,
+        "wakes_without_session": waking.wakes_without_session,
+    })
 }
 
 /// Out of form is `None`: the rest of the status is still read.
@@ -129,7 +133,15 @@ fn waking_from(value: Option<&Value>) -> Option<Waking> {
         }),
         _ => return None,
     };
-    Some(Waking { key_received, last })
+    // Absent in a status of an older leader: none counted.
+    let wakes_without_session = object
+        .get("wakes_without_session")
+        .map_or(Some(0), Value::as_u64)?;
+    Some(Waking {
+        key_received,
+        last,
+        wakes_without_session,
+    })
 }
 
 fn channel_json(channel: &ChannelStatus) -> Value {
@@ -290,6 +302,7 @@ mod tests {
             waking: Some(Waking {
                 key_received: true,
                 last: Some(LastWake::Refused),
+                wakes_without_session: 2,
             }),
         };
         assert_eq!(Status::from_json(&status.to_json()), Some(status.clone()));
@@ -316,6 +329,7 @@ mod tests {
         none.waking = Some(Waking {
             key_received: false,
             last: None,
+            wakes_without_session: 0,
         });
         assert_eq!(Status::from_json(&none.to_json()), Some(none));
     }

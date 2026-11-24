@@ -137,3 +137,9 @@ appears with the state.
   read, which prevents Hermes from recognizing what it already read); the raw identifier of the
   engine (Hermes could write one of another chat); a ceiling in the database (it survives the
   restart, but puts a write in each send).
+
+## Note of 24/11/2026 (decision 0054)
+
+Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."). Wording by his assistant, not reviewed word for word by him.
+
+`whatsapp_read_chat` gains two fields: a chat-level `phone` (`+digits` for a contact chat, null for a group or a hidden identifier whose telephone the engine does not know) and `sent_by` on each message sent by the number (`you_through_arauto`, `another_hermes_through_arauto`, `outside_arauto`; the name of another Hermes is never given). The contact's telephone already reached the Hermes through `whatsapp_get_contact` and `whatsapp_list_chats`, so `phone` exposes nothing new. The telephone of the business number still reaches no Hermes by any tool; the key of the Hermes session is a digest, not the telephone ([0054](0054-uma-sessao-do-hermes-por-contato.md), section 7). The rest of this decision is unchanged.

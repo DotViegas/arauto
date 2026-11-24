@@ -1,7 +1,7 @@
 [package]
 name = "arauto-connector"
 description = "The Arauto connector: runs beside a Hermes, speaks MCP over stdio and keeps the channel to the hub."
-version = "0.1.1"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

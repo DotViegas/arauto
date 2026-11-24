@@ -151,6 +151,7 @@ The label of the device expired by inactivity is "Expired" since decision 0053 (
 | pending | **sent** | The hub delivered it to the connector. |
 | sent | **confirmed** | The connector confirmed after Hermes's local API accepted. |
 | sent | **pending** | The connector did not confirm in time, or answered that it failed or that it reached its ceiling; the hub tries again. |
+| sent | **pending** (24/11/2026, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built) | The hub could not compute the key of the Hermes session because the engine failed (the question of the telephone of a hidden identifier). The lease is released and the notice goes back to pending **without counting a try** against the Hermes. After 5 consecutive engine errors for that notice, the hub uses the hidden key (`arauto-wh1-`) and sends it. A short failure of the engine therefore does not split a conversation. |
 | pending, sent | **expired** | 24 hours in the queue, or the queue of the Hermes went past 1,000 and this was the oldest. |
 | pending, sent | **discarded** | The access or the link left before the confirmation, or the connector refused the notice for being out of format. For a WhatsApp notice (16/11/2026, [decision 0049](decisoes/0049-acordar-pelo-whatsapp-so-pelo-verbo.md)): the verb "be woken" is gone, on the access or on the line of the chat, or the number is not connected. Nothing about a switch of the Hermes discards it any more. |
 

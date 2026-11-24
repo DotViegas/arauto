@@ -83,7 +83,7 @@ that answers the tool is the connector, and that answer is not written yet.
 |---|---|
 | `whatsapp_status` | State of the number: connected or not, and limits that WhatsApp imposed. |
 | `whatsapp_list_chats` | Lists the chats and the groups, from the most recent to the oldest, with the last message. |
-| `whatsapp_read_chat` | Reads the messages of a chat: author, text, file (without downloading), quote, edit, deletion and reactions. Default 30, maximum 200, within a budget of 256 KiB per answer: it cuts at whole messages and says whether there are more. `before` and `after` to move in time. |
+| `whatsapp_read_chat` | Reads the messages of a chat: author, text, file (without downloading), quote, edit, deletion and reactions. Default 30, maximum 200, within a budget of 256 KiB per answer: it cuts at whole messages and says whether there are more. `before` and `after` to move in time. Since 24/11/2026 ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built): the answer has a chat-level `phone` (`+digits` for a contact chat; `null` for a group or a hidden contact whose telephone the engine does not know), and each message sent by the number (`from_me` true) has `sent_by`: `you_through_arauto` (the reading Hermes sent it), `another_hermes_through_arauto` (another or a removed Hermes; the name is never given) or `outside_arauto` (no record: sent from the WhatsApp app or another bridge, older than the 30-day record, or a send whose id the hub did not receive). |
 | `whatsapp_get_contact` | Public data of the contact: name, profile text, photo and whether it is a business account. |
 | `whatsapp_download_media` | Downloads a photo, PDF, audio or document of a message, up to 7 MB. An image arrives for the LLM to see. |
 | `whatsapp_list_groups` | Lists the groups of the number, with the number of participants. |
@@ -158,8 +158,11 @@ deletion and reaction are recorded and appear in the reading, but do not wake.
 | `chat` | Opaque identifier of the chat. |
 | `count` | How many new messages. |
 | `id` | Identifier of the notice, to discard repetition. |
+| `session` | Optional (24/11/2026, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built; Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.). The key of the Hermes session of that contact: `arauto-wa1-` (contact), `arauto-wg1-` (group) or `arauto-wh1-` (contact known only by a hidden identifier) followed by 64 lowercase hexadecimal characters, a SHA-256 digest of telephones or identifiers and fixed words. The connector accepts only `^arauto-(wa1|wg1|wh1)-[0-9a-f]{64}$`; any other value makes it answer `rejected`. It never enters a sentence and the `Debug` output of the notice never prints it. The hub sends it only on a channel whose agreed protocol version is 3 or more. |
 
-The notice carries no message text, contact name or group subject.
+The notice carries no message text, contact name or group subject. The key is a digest and carries no telephone in clear.
+
+On waking, the connector sends the key as the body field `session_id` of `POST /v1/runs`, next to `input`, and never the header `X-Hermes-Session-Key`; a peer notice carries no key and wakes a new Hermes session each time. A WhatsApp notice without `session` on an agreed version of 3 wakes once with the sentence of before and no `session_id`, is counted in the status of the connector (`wakes_without_session`) and logs one warning without content (open choice C12). The rule of the key is in [14](14-protocolo-do-canal.md).
 
 The second is a new note from another Hermes: `kind` is `peer`, with `from`, `count` and `id`
 ([13](13-conversa-entre-hermes.md), section 5). Since 15/11/2026 (proposal, [decision 0048](decisoes/0048-resposta-na-conversa-que-perguntou.md)) the fixed sentence of a peer notice also says that what a run writes reaches no one and how to answer: by `hermes_send_message`, in the same thread, even when the answer is that the Hermes cannot or will not do it. The connector checks the format of each field before

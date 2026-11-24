@@ -18,16 +18,16 @@ const CANARY: &str = "CANARY-text-of-a-whatsapp-message-91c2";
 /// How long a test waits to say that no notice came: the hub looks at its queues every 200 ms.
 const QUIET: Duration = Duration::from_millis(900);
 
-fn chat_of(n: u32) -> String {
+pub fn chat_of(n: u32) -> String {
     format!("{}@c.us", phone(n))
 }
 
-fn now_s() -> i64 {
+pub fn now_s() -> i64 {
     SystemClock.now_ms() / 1_000
 }
 
 /// The next `notice` of the session; a `tools` on the way is kept.
-async fn next_notice(agent: &mut Agent) -> NoticeMsg {
+pub async fn next_notice(agent: &mut Agent) -> NoticeMsg {
     loop {
         match agent.session.pump(PATIENCE).await {
             Ok(Some(Message::Notice(notice))) => return notice,
@@ -41,7 +41,7 @@ async fn next_notice(agent: &mut Agent) -> NoticeMsg {
 }
 
 /// How many notices come while the session is kept for [`QUIET`].
-async fn notices_while_quiet(agent: &mut Agent) -> usize {
+pub async fn notices_while_quiet(agent: &mut Agent) -> usize {
     let until = tokio::time::Instant::now() + QUIET;
     let mut came = 0;
     loop {
@@ -59,7 +59,7 @@ async fn notices_while_quiet(agent: &mut Agent) -> usize {
     }
 }
 
-async fn acknowledge(agent: &mut Agent, notice: &NoticeMsg, outcome: AckOutcome) {
+pub async fn acknowledge(agent: &mut Agent, notice: &NoticeMsg, outcome: AckOutcome) {
     let ack = Message::NoticeAck(NoticeAck {
         id: notice.id,
         outcome,
@@ -69,12 +69,13 @@ async fn acknowledge(agent: &mut Agent, notice: &NoticeMsg, outcome: AckOutcome)
     ok(agent.call("arauto_status", json!({})).await);
 }
 
-fn pointer(notice: &NoticeMsg) -> (String, String, u16) {
+pub fn pointer(notice: &NoticeMsg) -> (String, String, u16) {
     match notice.validate().unwrap() {
         Notice::Whatsapp {
             number,
             chat,
             count,
+            ..
         } => (
             number.as_str().to_owned(),
             chat.as_str().to_owned(),
@@ -103,7 +104,7 @@ async fn open_events(world: &World) -> i64 {
 }
 
 /// The messages of `alias` wake `agent` at once: the tests that do not look at the wait.
-async fn at_once(world: &World, agent: &Agent, alias: &str) {
+pub async fn at_once(world: &World, agent: &Agent, alias: &str) {
     world
         .fixture
         .admin
@@ -114,7 +115,7 @@ async fn at_once(world: &World, agent: &Agent, alias: &str) {
 
 /// A Hermes in session. What wakes it by WhatsApp is the verb "be woken" alone (decision 0049),
 /// so a new Hermes needs nothing else besides the grant of each test.
-async fn wakeable(world: &World) -> Agent {
+pub async fn wakeable(world: &World) -> Agent {
     world.agent().await
 }
 
@@ -147,6 +148,32 @@ async fn a_message_wakes_with_a_pointer_that_carries_no_text_and_no_telephone() 
     assert!(!travelled.contains(CANARY), "{travelled}");
     assert!(!travelled.contains(&phone(101)), "{travelled}");
     assert!(!travelled.contains("Someone"), "{travelled}");
+    // No telephone in any spelling, the contact's or the number's: the key is a digest.
+    for telephone in [phone(101), phone(1)] {
+        let without_ninth = format!("{}{}", &telephone[..4], &telephone[5..]);
+        for spelling in [
+            telephone.clone(),
+            format!("+{telephone}"),
+            without_ninth.clone(),
+            format!("+{without_ninth}"),
+            format!("{telephone}@c.us"),
+        ] {
+            assert!(!travelled.contains(&spelling), "{spelling} in {travelled}");
+        }
+    }
+    // The notice carries the key of the Hermes session of this contact (decision 0054), the
+    // one anybody computes from the two telephones.
+    let Notice::Whatsapp {
+        session: Some(key), ..
+    } = notice.validate().unwrap()
+    else {
+        panic!("a notice of WhatsApp with a key")
+    };
+    assert_eq!(
+        key.as_str(),
+        arauto_protocol::session_key::whatsapp_contact_key(&phone(1), &phone(101))
+    );
+    assert!(travelled.contains(key.as_str()), "{travelled}");
     assert_eq!(open_events(&world).await, 0, "the event was handled");
 
     acknowledge(&mut agent, &notice, AckOutcome::Accepted).await;

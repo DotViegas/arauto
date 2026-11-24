@@ -108,3 +108,9 @@ Dated notes in [03](../03-arquitetura.md), [05](../05-modelo-de-ameacas.md), [06
 Tests that fail when their rule is removed: the write in the chat refused for every Hermes (with the gate disabled, 10 of the 16 tests of the rule fail), the removal of a record with its Hermes, the migrations 0020 and 0021, the hidden identifier refused when the engine does not answer, the refusal event once an hour, the telephone of the bridge refused as a telephone that gives orders (command and panel), and a warned line saved only with a valid acknowledgement.
 
 R1 and R2 (18/11/2026) add tests: the ownership test fails when the check of whose record it is is removed or inverted, and the version-1 test fails when the version gate is removed. Docs touched: [08](../08-permissoes.md), [09](../09-contrato-mcp.md), [11](../11-conector.md), [14](../14-protocolo-do-canal.md), the [glossary](../glossario.md) and `referencia/hermes-fatos.md` (N24).
+
+## Note of 24/11/2026 (decision 0054)
+
+Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."). Wording by his assistant, not reviewed word for word by him.
+
+For the Hermes that takes orders in a chat, the admin keeps "be woken" off in that chat, with a line of the chat ([0049](0049-acordar-pelo-whatsapp-so-pelo-verbo.md) already allows it). Reason: the bridge of that Hermes already delivers those messages as orders, and a wake by Arauto would start a second run that reads them as data, in the Hermes session of the contact ([0054](0054-uma-sessao-do-hermes-por-contato.md), open choice C7, answered as the recommended column: no rule of the hub). For every other Hermes, that chat is a contact chat like any other. The warning of part C, in the panel when "be woken" is turned on there, is **still not built**. Nothing else in this decision is reopened.

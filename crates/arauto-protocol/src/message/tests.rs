@@ -111,7 +111,7 @@ fn golden() -> Vec<(Message, String)> {
     vec![
         (
             hello(Purpose::Channel),
-            r#"{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"channel"}"#.to_owned(),
+            r#"{"t":"hello","proto":[1,3],"connector":"0.1.0","purpose":"channel"}"#.to_owned(),
         ),
         (
             Message::Hello(Hello {
@@ -123,7 +123,7 @@ fn golden() -> Vec<(Message, String)> {
         ),
         (
             hello(Purpose::Leave),
-            r#"{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"leave"}"#.to_owned(),
+            r#"{"t":"hello","proto":[1,3],"connector":"0.1.0","purpose":"leave"}"#.to_owned(),
         ),
         (Message::HelloOk(HelloOk::Agreed(1)), r#"{"t":"hello_ok","proto":1}"#.to_owned()),
         (
@@ -274,6 +274,7 @@ fn golden() -> Vec<(Message, String)> {
                     number: NumberAlias::parse("balcao").unwrap(),
                     chat: ChatId::parse("abc-123").unwrap(),
                     count: NoticeCount::new(9_999).unwrap(),
+                    session: None,
                 },
             )),
             format!(
@@ -345,12 +346,12 @@ fn the_golden_list_covers_every_type_of_message() {
 
 #[test]
 fn the_hello_of_the_document() {
-    let text = r#"{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"channel"}"#;
+    let text = r#"{"t":"hello","proto":[1,3],"connector":"0.1.0","purpose":"channel"}"#;
     let message = read(text).unwrap();
     let Message::Hello(hello) = &message else {
         panic!("not a hello: {message:?}")
     };
-    assert_eq!((hello.proto.min(), hello.proto.max()), (1, 2));
+    assert_eq!((hello.proto.min(), hello.proto.max()), (1, 3));
     assert_eq!(hello.connector.as_str(), "0.1.0");
     assert_eq!(hello.purpose, Purpose::Channel);
     assert_eq!(write(&message), text);
@@ -391,7 +392,7 @@ fn unknown_fields_are_ignored() {
     );
     assert!(matches!(read(&text), Ok(Message::Enroll(_))));
     // And in a different order, with white space around.
-    let text = " {\n  \"purpose\": \"channel\",\n  \"connector\": \"0.1.0\",\n  \"proto\": [1, 2],\n  \"t\": \"hello\"\n}\n";
+    let text = " {\n  \"purpose\": \"channel\",\n  \"connector\": \"0.1.0\",\n  \"proto\": [1, 3],\n  \"t\": \"hello\"\n}\n";
     assert_eq!(read(text), Ok(hello(Purpose::Channel)));
 }
 
@@ -1167,7 +1168,8 @@ fn the_connector_checks_the_agreed_version_against_what_it_offered() {
     assert!(!ProtoRange::CURRENT.contains(0));
     assert!(ProtoRange::CURRENT.contains(1));
     assert!(ProtoRange::CURRENT.contains(2));
-    assert!(!ProtoRange::CURRENT.contains(3));
+    assert!(ProtoRange::CURRENT.contains(3));
+    assert!(!ProtoRange::CURRENT.contains(4));
     assert!(range(u32::MAX, u32::MAX).contains(u32::MAX));
     assert!(range(1, u32::MAX).contains(1));
 
@@ -2059,14 +2061,14 @@ fn protocol_versions_are_negotiated_to_the_highest_in_common() {
     assert_eq!(ProtoRange::new(0, 1), None);
     assert_eq!(ProtoRange::new(2, 1), None);
     assert_eq!(ProtoRange::new(0, 0), None);
-    assert_eq!(ProtoRange::CURRENT, range(1, 2));
+    assert_eq!(ProtoRange::CURRENT, range(1, 3));
     assert_eq!(
         (
             PROTOCOL_VERSION,
             ProtoRange::CURRENT.min(),
             ProtoRange::CURRENT.max()
         ),
-        (2, 1, 2)
+        (3, 1, 3)
     );
 
     let hub = range(3, 5);
@@ -2082,7 +2084,7 @@ fn protocol_versions_are_negotiated_to_the_highest_in_common() {
     assert_eq!(hub.negotiate(range(6, 6)), Negotiation::ConnectorTooNew);
     assert_eq!(
         ProtoRange::CURRENT.negotiate(ProtoRange::CURRENT),
-        Negotiation::Agreed(2)
+        Negotiation::Agreed(3)
     );
     // A connector of the first version keeps working.
     assert_eq!(
@@ -2094,7 +2096,7 @@ fn protocol_versions_are_negotiated_to_the_highest_in_common() {
         Negotiation::Agreed(2)
     );
     assert_eq!(
-        ProtoRange::CURRENT.negotiate(range(3, 3)),
+        ProtoRange::CURRENT.negotiate(range(4, 4)),
         Negotiation::ConnectorTooNew
     );
 }

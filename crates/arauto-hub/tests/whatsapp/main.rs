@@ -22,6 +22,7 @@ mod adapter;
 mod admin;
 mod ceiling;
 mod chats;
+mod hermes_session;
 mod hostile;
 mod inbox;
 mod installation;

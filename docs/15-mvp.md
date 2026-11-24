@@ -42,6 +42,7 @@ are in [0031](decisoes/0031-banco-postgresql.md),
 | Org chart tab, stage A: levels, places, role text and links on a map, edited as a draft and published in one write ([decision 0043](decisoes/0043-organograma-e-niveis.md), proposal, tried only in a desktop Chrome without a window (15/11/2026)) | Notes that know the levels (the levels never reach a Hermes; see the next row for the follow mark) |
 | Org chart stage B, the follow mark of a link: the notice of a note on a marked instruction arrow asks the receiver to follow it in that run ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md), proposal; built and covered by automatic tests against a fake Hermes; not tried on a real Hermes or in a browser) | Asking for the passkey at publish (waits for [0019](decisoes/0019-painel-com-passkey.md)) |
 | Notices and waking, with the fixed sentence | List of versions of the program, with revocation and signature |
+| One Hermes session per WhatsApp contact: key in the notice, `session_id` in the wake, `sent_message` and the labels of `whatsapp_read_chat`, protocol 3 and connector 0.2.0 ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), 24/11/2026, proposal, being built; not tried on a real Hermes) | The panel texts of that decision (A6, A7), not built now; seeding the history from another bridge (C10); sending a file by address |
 | Audit that only grows, and alerts read by command | Adjustable ceilings |
 | Send ceiling (20 per minute, per Hermes and per number) and note ceilings | Private authority in the connector's TLS |
 

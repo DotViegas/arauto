@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::RepoError;
 use crate::db::ResolvedOrg;
-use crate::engine::EngineChatId;
+use crate::engine::{EngineChatId, Phone};
 use crate::vault::{OrganizationKey, WhatsappField};
 
 /// The chat of `number` that the engine knows as `engine_chat`, if the hub has it.
@@ -236,4 +236,74 @@ pub async fn find_many(
         }
     }
     Ok(found)
+}
+
+/// The chat of `number` the hub has for the telephone `phone`, in either form of a Brazilian
+/// mobile (with or without the ninth digit).
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn find_by_phone(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    key: &OrganizationKey,
+    number: Uuid,
+    phone: &Phone,
+) -> Result<Option<Uuid>, RepoError> {
+    for form in phone.forms() {
+        if let Some(chat) = find(pool, organization, key, number, &form.chat_id()).await? {
+            return Ok(Some(chat));
+        }
+    }
+    Ok(None)
+}
+
+/// Records the hidden identifier `hidden` (`digits@lid`) as one more identifier of the chat
+/// `chat` of `number`, which is the chat of the telephone the engine says it stands for
+/// (decision 0054, section 10). It is recorded only when no chat of the number has that
+/// identifier yet: chats already kept apart are not merged. Returns whether a row was written.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses; [`RepoError::Vault`] when the
+/// identifier cannot be sealed.
+pub async fn link_hidden(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    key: &OrganizationKey,
+    number: Uuid,
+    chat: Uuid,
+    hidden: &EngineChatId,
+    now: i64,
+) -> Result<bool, RepoError> {
+    if !is_hidden(hidden) {
+        return Ok(false);
+    }
+    let digest = key.whatsapp_digest(
+        WhatsappField::ChatEngineId,
+        number,
+        hidden.as_str().as_bytes(),
+    );
+    let id_enc = key.seal_whatsapp(
+        WhatsappField::ChatEngineId,
+        chat,
+        hidden.as_str().as_bytes(),
+    )?;
+    let written = sqlx::query(
+        "INSERT INTO chat_engine_id (organization_id, number_id, chat_id, id_digest, id_enc, \
+                                     created_at) \
+         SELECT $1, $2, c.id, $4, $5, $6 FROM chat c \
+         WHERE c.organization_id = $1 AND c.number_id = $2 AND c.id = $3 \
+           AND c.kind = 'contact' \
+         ON CONFLICT (number_id, id_digest) DO NOTHING",
+    )
+    .bind(organization.id())
+    .bind(number)
+    .bind(chat)
+    .bind(digest.as_slice())
+    .bind(id_enc)
+    .bind(now)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(written > 0)
 }

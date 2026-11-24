@@ -262,7 +262,7 @@ the hundredth closes with AR-204.
 The first message is the connector's:
 
 ```json
-{"t":"hello","proto":[1,2],"connector":"0.1.0","purpose":"channel"}
+{"t":"hello","proto":[1,3],"connector":"0.2.0","purpose":"channel"}
 ```
 
 | Field | Content |
@@ -288,6 +288,8 @@ What decides AR-401 is the version of the **protocol**. The list of versions of 
 revocation, is left for after the MVP.
 
 **Version 2** (18/11/2026, decision 0051, proposal: built, covered by automatic tests against a fake engine and a fake Hermes, not tried on a real Hermes). Version 2 is version 1 with one addition: a `result` may carry the code AR-714. The hub sends AR-714 only on a connection where version 2 was agreed; on a connection of version 1 it sends AR-705 or AR-712 in its place, as before. Both programs speak versions 1 to 2, so an installed connector of version 1 keeps working with this hub. A connector of version 1 cannot read AR-714: an unknown code makes the whole `result` invalid. Not guaranteed: a newer copy of the connector that leads older copies on the same machine (section 11) passes AR-714 on, and an older copy answers AR-207 for that call.
+
+**Version 3** (24/11/2026, decision 0054, proposal: built, covered by automatic tests against a fake engine and a fake Hermes, not tried on a real Hermes). Version 3 is version 2 with one addition: the `whatsapp` notice may carry the optional field `session`, the key of the Hermes session of that contact (section 5.3). The hub sends the field only on a connection where version 3 or more was agreed; the bytes of a notice on a connection of version 2 do not change. Both programs speak versions 1 to 3, so an installed connector of version 2 keeps working with this hub, waking as before, with a new Hermes session each time. A connector of version 2 ignores unknown fields of a notice, so it would also survive the field, but the hub does not send it. Under the bump policy of [decision 0053](decisoes/0053-a-reconexao-diz-o-motivo.md) the connector build goes from 0.1.1 to 0.2.0, and every connector below it shows as Outdated in the panel.
 
 **Frozen forever**, so that a connector of any age still receives the right error: the handshake
 and the prologue, the frame header, and the messages `hello`, `hello_ok`, `state`, `present`,
@@ -396,10 +398,22 @@ is too old presents itself this way at the leader's startup and, after that, onc
 
 | `kind` | Fields | Validation in the connector, before building the fixed sentence |
 |---|---|---|
-| `whatsapp` | `number` (alias), `chat` (opaque identifier), `count`; the `id` of every notice is a UUID | `number` in the name format; `chat` with up to 64 characters of `A-Z a-z 0-9 _ -`; `count` from 1 to 9,999 |
+| `whatsapp` | `number` (alias), `chat` (opaque identifier), `count`, and optionally `session` (the key of the Hermes session of the contact; protocol 3, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md)); the `id` of every notice is a UUID | `number` in the name format; `chat` with up to 64 characters of `A-Z a-z 0-9 _ -`; `count` from 1 to 9,999; `session` absent or `null`, or exactly `^arauto-(wa1\|wg1\|wh1)-[0-9a-f]{64}$`, and anything else (uppercase, another prefix, 63 or 65 hexadecimal characters, `..`, a telephone, a number, a list) is `rejected` |
 | `peer` | `from` (name of the Hermes), `count`, and optionally `follow` (boolean; proposal, [decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md)) | `from` in the name format; `count` from 1 to 9,999; `follow` absent, `null`, `true` or `false`, and anything else (`"true"`, `1`, `[]`, `{}`) is `rejected` |
 
 The hub writes `"follow": true` only when the link has the follow mark at the moment the notice leaves, and omits the field otherwise, so a notice without the mark is byte-identical to the one before the field existed. In the connector, `true` selects the second fixed sentence ([13](13-conversa-entre-hermes.md), section 5); absent, `null` and `false` select the first. A connector of an older version ignores the field. The field and the sentence are built in the protocol crate and the connector, and the hub sends the field for a marked link; all covered by automatic tests against a fake Hermes, nothing tried on a real Hermes.
+
+**The key of the Hermes session (protocol 3, proposal, 24/11/2026, [decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md)).** The hub computes the key and sends it in `session`; the connector checks the format, sends it as the body field `session_id` of `POST /v1/runs` and never puts it into a sentence, nor into the header `X-Hermes-Session-Key`. A peer notice carries no key (a `session` on a peer notice is ignored). The connector decides by the version agreed on the channel, not by its own: on 2 it ignores a valid field and wakes as before (a field out of format is still `rejected`: the notice is validated before the version is looked at; the hub never sends the field on 2); on 3 or more a field out of format is `rejected`, and a `whatsapp` notice without the field (a defect of the hub) wakes once with the sentence of before the key, with no `session_id`, is counted in the status of the connector (`wakes_without_session`) and logs one warning with no content. The sentence of a notice that carries a key is in [docs/11](11-conector.md), section 6.
+
+**The rule of the key, published** so that an outside sender, such as a campaign routine that wakes a Hermes through its own local API, builds the same key without Arauto's code. The key is a prefix followed by the 64 lowercase hexadecimal characters of the SHA-256 of a canonical string, in UTF-8, with `\n` between the lines and no final newline. SHA-256 is used as it is: no key, no secret, no construction of our own. The digest is not secret: the space of telephones is small, so the telephones can be found by trying them.
+
+| Kind of chat | Key | Canonical string, one line each |
+|---|---|---|
+| Contact with a known telephone | `arauto-wa1-<hex>` | `arauto-hermes-session-v1`, `whatsapp-contact`, `+<business number>`, `+<contact>` |
+| Group | `arauto-wg1-<hex>` | `arauto-hermes-session-v1`, `whatsapp-group`, `+<business number>`, `<group identifier of the engine, without the @ suffix>` |
+| Contact known only by a hidden identifier | `arauto-wh1-<hex>` | `arauto-hermes-session-v1`, `whatsapp-hidden`, `+<business number>`, `<hidden identifier, digits, without the @ suffix>` |
+
+A telephone is E.164 digits with a leading `+`, in its canonical form: a `55` telephone of 12 digits whose fifth digit is from 6 to 9 gets a `9` after the area code, so the 13-digit Brazilian form is the only one; every other telephone is used as it is. The same person written without that rule gets another key. Test vector, with numbers reserved for documentation: business number `+15555550100` and contact `+15555550123` give `arauto-wa1-6335221bb43b84c8931d4447bc2a89f739f1fc9e08d205886c855b0e34a1edb4`, which the unit tests of `arauto-protocol` (`session_key`) pin. The function lives in that crate: `canonical_phone`, `whatsapp_contact_key`, `whatsapp_group_key`, `whatsapp_hidden_key`.
 
 The name format is `^[a-z0-9][a-z0-9_-]{0,31}$`, and it holds for the name of the Hermes and for the
 alias of the number. The validation is **compiled into the connector**: even an invaded hub only

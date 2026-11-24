@@ -23,3 +23,9 @@ Principle 6 of the `CLAUDE.md` gains a sentence: the hub may serve a fixed page 
 ## Change of 16/11/2026 (reopened by the maintainer)
 
 The notice of a note may carry one more field of strict format, the boolean `follow`, and the connector then wakes Hermes with a second fixed sentence compiled into it ([0050](0050-etapa-b-marca-de-seguir.md)). The hub still sends no text, but with this boolean it chooses which of two fixed sentences the LLM reads: "the hub cannot change a text the LLM reads" holds with this one exception. An invaded hub can make the connector use the second sentence for any note notice. The descriptions of the tools do not change.
+
+## Change of 24/11/2026 (decision 0054)
+
+Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."). Wording by his assistant, not reviewed word for word by him.
+
+The notice of a WhatsApp chat may carry one more field of strict format, `session`: the key of the Hermes session of that contact, `arauto-wa1-`, `arauto-wg1-` or `arauto-wh1-` followed by 64 lowercase hexadecimal characters ([0054](0054-uma-sessao-do-hermes-por-contato.md)). It is not text and never enters the sentence. It carries no telephone, no name and no message text. The sentence that "the hub cannot change a text the LLM reads" still holds for the sentence and the tool descriptions, but the key chooses which earlier turns of the conversation the LLM reads: an invaded hub can make a run load the history of another contact of the same Hermes. Nothing else in this decision is reopened.

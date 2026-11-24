@@ -279,7 +279,16 @@ Through the channel pass tool calls (Hermes → hub) and notices (hub → Hermes
   number, verb, chat) on every call and on every notice. Taking an access away applies on the next
   call.
 - **The hub does not send free text.** The notice is a pointer: which number, which chat, how many
-  messages. The sentence that wakes the Hermes is fixed and stays in the connector.
+  messages and, for a WhatsApp chat, the key of the Hermes session of that contact, a SHA-256 digest
+  of fixed format built from telephones and fixed words (decision 0054). The connector checks the
+  format of every field and never puts the key into a sentence. The sentence that wakes the Hermes
+  is fixed and stays in the connector. The key chooses which earlier turns of that Hermes a run
+  loads: a compromised hub can point a run at the history of another contact of the same Hermes,
+  and at nothing outside the prefixes of Arauto.
+
+  *Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir
+  como implementar para que tudo funcione."): wording by his assistant, not reviewed word for word by
+  him.*
 - **The descriptions of the tools stay in the connector.** The hub only says which names are
   allowed.
 - **The connector does not execute a command from the hub.** There is no message from the hub that

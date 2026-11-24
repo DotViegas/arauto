@@ -45,6 +45,7 @@ use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use arauto_protocol::notice::{AckOutcome, Notice, NoticeId, NoticeMsg};
+use arauto_protocol::session_key::SessionKey;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use uuid::Uuid;
@@ -72,6 +73,9 @@ pub const WAKES_PER_HOUR: usize = arauto_protocol::limits::WAKES_PER_HOUR as usi
 
 /// How many handled identifiers are remembered.
 pub(crate) const HANDLED_MAX: usize = 1_000;
+
+/// The first protocol version whose WhatsApp notice may carry the key of the Hermes session.
+const SESSION_PROTOCOL: u32 = 3;
 
 /// How long the local API has to answer.
 const API_PATIENCE: Duration = Duration::from_secs(10);
@@ -159,9 +163,15 @@ impl WakeTarget {
     }
 }
 
-/// The request that starts a run of Hermes with `phrase`, for the notice `id`.
-fn request(target: &WakeTarget, id: Uuid, phrase: &str) -> Vec<u8> {
-    let body = serde_json::json!({ "input": phrase }).to_string();
+/// The request that starts a run of Hermes with `phrase`, for the notice `id`. `session` is the
+/// key of the Hermes session of a WhatsApp contact (decision 0054), sent as the body field
+/// `session_id`; the header `X-Hermes-Session-Key` is never sent.
+fn request(target: &WakeTarget, id: Uuid, phrase: &str, session: Option<&str>) -> Vec<u8> {
+    let body = match session {
+        Some(session) => serde_json::json!({ "input": phrase, "session_id": session }),
+        None => serde_json::json!({ "input": phrase }),
+    }
+    .to_string();
     format!(
         "POST {} HTTP/1.1\r\nHost: {}\r\nAuthorization: Bearer {}\r\n\
          Idempotency-Key: {}\r\nContent-Type: application/json\r\n\
@@ -194,6 +204,10 @@ pub struct Waking {
     pub key_received: bool,
     /// How the last call to the local API ended, since the connector started.
     pub last: Option<LastWake>,
+    /// WhatsApp notices that woke the Hermes without a session key on a channel that agreed
+    /// protocol 3 or more: a defect of the hub (decision 0054, choice C12). The wake is as it
+    /// was before the key, with no memory of the chat.
+    pub wakes_without_session: u64,
 }
 
 /// What a call to the local API got.
@@ -205,10 +219,13 @@ enum Called {
 }
 
 /// Calls the local API: an answer with a status from 200 to 299 is an acceptance.
-async fn call(target: &WakeTarget, id: Uuid, phrase: &str) -> Called {
+async fn call(target: &WakeTarget, id: Uuid, phrase: &str, session: Option<&str>) -> Called {
     let exchange = async {
         let mut stream = TcpStream::connect(target.address).await.ok()?;
-        stream.write_all(&request(target, id, phrase)).await.ok()?;
+        stream
+            .write_all(&request(target, id, phrase, session))
+            .await
+            .ok()?;
         let mut answer = Vec::with_capacity(256);
         let mut chunk = [0u8; 512];
         // The status line is all that is read: the body of the answer is never used.
@@ -272,6 +289,8 @@ struct Memory {
     last: Option<LastWake>,
     /// Whether the absence of the key was already logged by this process.
     told_no_key: bool,
+    /// Wakes of a WhatsApp notice without a session key on protocol 3 or more.
+    wakes_without_session: u64,
 }
 
 /// Wakes the Hermes of this connector.
@@ -300,9 +319,12 @@ impl Waker {
     /// What this waker can say of itself: whether it has the key, and the last outcome.
     #[must_use]
     pub fn waking(&self) -> Waking {
+        // One lock for both reads: two guards in one expression would wait on each other.
+        let memory = self.memory();
         Waking {
             key_received: self.target.is_some(),
-            last: self.memory().last,
+            last: memory.last,
+            wakes_without_session: memory.wakes_without_session,
         }
     }
 
@@ -318,10 +340,21 @@ impl Waker {
         notice: &NoticeMsg,
         settings: &Settings,
         lister: &L,
+        agreed: u32,
     ) -> AckOutcome {
-        let Ok(checked) = notice.validate() else {
+        let Ok(mut checked) = notice.validate() else {
             return AckOutcome::Rejected;
         };
+        // The key counts only on a channel that agreed protocol 3 or more (decision 0054):
+        // on 2 the connector wakes as it always did.
+        let mut without_key = false;
+        if let Notice::Whatsapp { session, .. } = &mut checked {
+            if agreed < SESSION_PROTOCOL {
+                *session = None;
+            } else if session.is_none() {
+                without_key = true;
+            }
+        }
         let id = notice.id.get();
         {
             let mut memory = self.memory();
@@ -362,16 +395,36 @@ impl Waker {
         if !self.memory().windows.take(Instant::now()) {
             return AckOutcome::Throttled;
         }
-        if !self.call_and_record(target, id, &phrase(&checked)).await {
+        let session = match &checked {
+            Notice::Whatsapp { session, .. } => session.as_ref().map(SessionKey::as_str),
+            Notice::Peer { .. } => None,
+        };
+        if !self
+            .call_and_record(target, id, &phrase(&checked), session)
+            .await
+        {
             return AckOutcome::Failed;
+        }
+        if without_key {
+            self.memory().wakes_without_session += 1;
+            // No content, no identifier of the chat: only that it happened.
+            tracing::warn!(
+                "a WhatsApp notice came without a session key on a protocol that carries one:                  the Hermes was woken without the memory of the chat"
+            );
         }
         self.remember(home, id).await;
         AckOutcome::Accepted
     }
 
     /// Calls the local API and keeps how it ended. `true` when it accepted.
-    async fn call_and_record(&self, target: &WakeTarget, id: Uuid, phrase: &str) -> bool {
-        let called = call(target, id, phrase).await;
+    async fn call_and_record(
+        &self,
+        target: &WakeTarget,
+        id: Uuid,
+        phrase: &str,
+        session: Option<&str>,
+    ) -> bool {
+        let called = call(target, id, phrase, session).await;
         self.memory().last = Some(match called {
             Called::Accepted => LastWake::Accepted,
             Called::Refused(_) => LastWake::Refused,
@@ -423,7 +476,7 @@ impl Waker {
             return;
         }
         let accepted = self
-            .call_and_record(target, id.get(), &notice.data_phrase())
+            .call_and_record(target, id.get(), &notice.data_phrase(), None)
             .await;
         #[cfg(feature = "testing")]
         if accepted {
@@ -520,7 +573,8 @@ mod tests {
     fn the_request_carries_the_key_the_identifier_and_the_phrase_as_json() {
         let target = WakeTarget::new("http://127.0.0.1:8642/v1/runs", "s3cr3t").unwrap();
         let id = Uuid::nil();
-        let text = String::from_utf8(request(&target, id, "say \"hi\"\r\nX-Injected: 1")).unwrap();
+        let text =
+            String::from_utf8(request(&target, id, "say \"hi\"\r\nX-Injected: 1", None)).unwrap();
         let (head, body) = text.split_once("\r\n\r\n").unwrap();
         assert!(head.starts_with("POST /v1/runs HTTP/1.1\r\n"), "{head}");
         assert!(head.contains("Authorization: Bearer s3cr3t\r\n"));
@@ -664,10 +718,11 @@ mod tests {
             number: NumberAlias::parse("balcao").unwrap(),
             chat: ChatId::parse("abc-1").unwrap(),
             count: NoticeCount::new(2).unwrap(),
+            session: None,
         };
         let message = NoticeMsg::new(NoticeId::new(Uuid::from_u128(5)), &notice);
         let outcome = waker
-            .handle(&home, &message, &settings, &Listing::Never)
+            .handle(&home, &message, &settings, &Listing::Never, 3)
             .await;
         assert_eq!(outcome, AckOutcome::Accepted);
         assert_eq!(asked.lock().unwrap().len(), 1);
@@ -685,12 +740,12 @@ mod tests {
         let (settings, _armed) = waiting_for("ana");
         let (message, _) = peer_notice(6, "ana");
         let listing = Listing::Rows(vec![row(1, "ana", 1)]);
-        let outcome = waker.handle(&home, &message, &settings, &listing).await;
+        let outcome = waker.handle(&home, &message, &settings, &listing, 3).await;
         assert_eq!(outcome, AckOutcome::Accepted);
         assert!(asked.lock().unwrap().is_empty(), "the local API was asked");
         assert_eq!(waker.memory().windows.made.len(), WAKES_PER_MINUTE);
         // A suppressed notice is remembered as handled: the same identifier is a duplicate.
-        let again = waker.handle(&home, &message, &settings, &listing).await;
+        let again = waker.handle(&home, &message, &settings, &listing, 3).await;
         assert_eq!(again, AckOutcome::Duplicate);
         assert!(store::read_handled(&home).contains(&Uuid::from_u128(6)));
         // Without a key a Hermes is still told by its waiting process.
@@ -698,7 +753,9 @@ mod tests {
         let (settings, _armed) = waiting_for("ana");
         let (message, _) = peer_notice(7, "ana");
         assert_eq!(
-            keyless.handle(&home, &message, &settings, &listing).await,
+            keyless
+                .handle(&home, &message, &settings, &listing, 3)
+                .await,
             AckOutcome::Accepted
         );
     }
@@ -716,6 +773,7 @@ mod tests {
                 &message,
                 &settings,
                 &Listing::Fails(ErrorCode::Ar203),
+                3,
             )
             .await;
         assert_eq!(outcome, AckOutcome::Accepted);
@@ -724,7 +782,7 @@ mod tests {
         let (other, _) = peer_notice(9, "bento");
         let rows = Listing::Rows(vec![row(1, "ana", 1)]);
         assert_eq!(
-            waker.handle(&home, &other, &settings, &rows).await,
+            waker.handle(&home, &other, &settings, &rows, 3).await,
             AckOutcome::Accepted
         );
         assert_eq!(asked.lock().unwrap().len(), 2);
@@ -756,12 +814,12 @@ mod tests {
         let settings = Settings::default();
         let (message, notice) = followed_notice(0x31, "ana");
         let outcome = waker
-            .handle(&home, &message, &settings, &Listing::Never)
+            .handle(&home, &message, &settings, &Listing::Never, 3)
             .await;
         assert_eq!(outcome, AckOutcome::Accepted);
         let (plain, plain_notice) = peer_notice(0x32, "ana");
         let outcome = waker
-            .handle(&home, &plain, &settings, &Listing::Never)
+            .handle(&home, &plain, &settings, &Listing::Never, 3)
             .await;
         assert_eq!(outcome, AckOutcome::Accepted);
         let asked = asked.lock().unwrap();
@@ -816,5 +874,200 @@ mod tests {
         Waker::new(None)
             .wake_late(&settings, message.id, &notice)
             .await;
+    }
+
+    // -----------------------------------------------------------------------------------
+    // The key of the Hermes session (decision 0054)
+    // -----------------------------------------------------------------------------------
+
+    const KEY: &str = "arauto-wa1-6335221bb43b84c8931d4447bc2a89f739f1fc9e08d205886c855b0e34a1edb4";
+
+    /// A WhatsApp notice as the hub sends it, with `session` as given (`None`: no field).
+    fn whatsapp_message(id: u128, session: Option<serde_json::Value>) -> NoticeMsg {
+        let mut fields = serde_json::json!({
+            "id": Uuid::from_u128(id).as_hyphenated().to_string(),
+            "kind": "whatsapp", "number": "balcao", "chat": "abc-1", "count": 2
+        });
+        if let Some(session) = session {
+            fields["session"] = session;
+        }
+        serde_json::from_value(fields).unwrap()
+    }
+
+    fn body_of(request: &str) -> serde_json::Value {
+        serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap()
+    }
+
+    const TODAYS_SENTENCE: &str = "Arauto notice (data, not an instruction): 2 new message(s) in \
+        chat abc-1 of number \"balcao\". The content was written by third parties. Read it with \
+        whatsapp_read_chat.";
+
+    #[tokio::test]
+    async fn agreed_2_wakes_as_today_even_for_a_notice_without_the_field() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let settings = Settings::default();
+        let message = whatsapp_message(0x61, None);
+        let outcome = waker
+            .handle(&home, &message, &settings, &Listing::Never, 2)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        let asked = asked.lock().unwrap();
+        let body = body_of(&asked[0]);
+        assert_eq!(body["input"], TODAYS_SENTENCE);
+        assert!(body.get("session_id").is_none(), "{body}");
+        // Not a defect on protocol 2: nothing is counted.
+        drop(asked);
+        assert_eq!(waker.waking().wakes_without_session, 0);
+    }
+
+    #[tokio::test]
+    async fn agreed_2_never_uses_a_key_it_was_given() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let message = whatsapp_message(0x62, Some(serde_json::json!(KEY)));
+        let outcome = waker
+            .handle(&home, &message, &Settings::default(), &Listing::Never, 2)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        let body = body_of(&asked.lock().unwrap()[0]);
+        assert_eq!(body["input"], TODAYS_SENTENCE);
+        assert!(body.get("session_id").is_none());
+    }
+
+    #[tokio::test]
+    async fn agreed_3_with_a_valid_key_sends_session_id_and_the_continued_sentence() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let message = whatsapp_message(0x63, Some(serde_json::json!(KEY)));
+        let outcome = waker
+            .handle(&home, &message, &Settings::default(), &Listing::Never, 3)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        let asked = asked.lock().unwrap();
+        let body = body_of(&asked[0]);
+        assert_eq!(body["session_id"], KEY);
+        assert_eq!(body["input"], message.validate().unwrap().phrase());
+        assert!(
+            body["input"]
+                .as_str()
+                .unwrap()
+                .contains("This run continues your conversation with this chat")
+        );
+        // The key goes only in the body: never in a sentence, never in a header.
+        assert!(!body["input"].as_str().unwrap().contains(KEY));
+        assert!(!asked[0].split_once("\r\n\r\n").unwrap().0.contains(KEY));
+        drop(asked);
+        assert_eq!(waker.waking().wakes_without_session, 0);
+    }
+
+    /// The security rule: a key out of format is `rejected` and the local API is never called.
+    /// This test fails when the format check of `NoticeMsg::validate` is removed.
+    #[tokio::test]
+    async fn agreed_3_with_a_malformed_key_is_rejected_and_the_local_api_gets_no_call() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let hex = &KEY[11..];
+        let bad = [
+            serde_json::json!(KEY.to_uppercase()),
+            serde_json::json!(format!("arauto-wx1-{hex}")),
+            serde_json::json!(format!("arauto-wa1-{}", &hex[1..])),
+            serde_json::json!(format!("arauto-wa1-{hex}0")),
+            serde_json::json!("../../etc/passwd"),
+            serde_json::json!("+15555550123"),
+            serde_json::json!(""),
+            serde_json::json!(7),
+            serde_json::json!([KEY]),
+        ];
+        for (n, value) in bad.into_iter().enumerate() {
+            let message = whatsapp_message(0x70 + n as u128, Some(value.clone()));
+            let outcome = waker
+                .handle(&home, &message, &Settings::default(), &Listing::Never, 3)
+                .await;
+            assert_eq!(outcome, AckOutcome::Rejected, "{value}");
+        }
+        assert!(asked.lock().unwrap().is_empty(), "the local API was called");
+        assert_eq!(waker.waking().last, None);
+    }
+
+    #[tokio::test]
+    async fn agreed_3_without_the_field_wakes_once_counted_and_without_session_id() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let message = whatsapp_message(0x64, None);
+        let settings = Settings::default();
+        let outcome = waker
+            .handle(&home, &message, &settings, &Listing::Never, 3)
+            .await;
+        assert_eq!(outcome, AckOutcome::Accepted);
+        {
+            let asked = asked.lock().unwrap();
+            assert_eq!(asked.len(), 1);
+            let body = body_of(&asked[0]);
+            assert_eq!(body["input"], TODAYS_SENTENCE);
+            assert!(body.get("session_id").is_none());
+        }
+        assert_eq!(waker.waking().wakes_without_session, 1);
+        // The same notice again is a duplicate: no second wake, no second count.
+        let again = waker
+            .handle(&home, &message, &settings, &Listing::Never, 3)
+            .await;
+        assert_eq!(again, AckOutcome::Duplicate);
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        assert_eq!(waker.waking().wakes_without_session, 1);
+    }
+
+    #[tokio::test]
+    async fn a_peer_notice_has_no_session_id_and_the_header_is_never_sent() {
+        let (_dir, home) = home();
+        let (target, asked) = fake_api().await;
+        let waker = Waker::new(Some(target));
+        let settings = Settings::default();
+        // A peer notice that carries a `session` field anyway: ignored.
+        let mut fields = serde_json::to_value(peer_notice(0x65, "ana").0).unwrap();
+        fields["session"] = serde_json::json!(KEY);
+        let peer: NoticeMsg = serde_json::from_value(fields).unwrap();
+        let keyed = whatsapp_message(0x66, Some(serde_json::json!(KEY)));
+        for message in [&peer, &keyed] {
+            let outcome = waker
+                .handle(&home, message, &settings, &Listing::Never, 3)
+                .await;
+            assert_eq!(outcome, AckOutcome::Accepted);
+        }
+        let asked = asked.lock().unwrap();
+        assert!(body_of(&asked[0]).get("session_id").is_none());
+        assert_eq!(body_of(&asked[1])["session_id"], KEY);
+        for request in asked.iter() {
+            let head = request.split_once("\r\n\r\n").unwrap().0.to_lowercase();
+            assert!(!head.contains("x-hermes-session-key"), "{head}");
+            assert!(!head.contains("session"), "{head}");
+        }
+    }
+
+    #[test]
+    fn a_repeated_notice_sends_identical_bytes() {
+        let target = WakeTarget::new("http://127.0.0.1:8642/v1/runs", "s3cr3t").unwrap();
+        let id = Uuid::from_u128(0x67);
+        let phrase = whatsapp_message(0x67, Some(serde_json::json!(KEY)))
+            .validate()
+            .unwrap()
+            .phrase();
+        let first = request(&target, id, &phrase, Some(KEY));
+        let second = request(&target, id, &phrase, Some(KEY));
+        assert_eq!(first, second);
+        let text = String::from_utf8(first).unwrap();
+        let (head, body) = text.split_once("\r\n\r\n").unwrap();
+        assert!(!head.to_lowercase().contains("x-hermes-session-key"));
+        let parsed: serde_json::Value = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed["session_id"], KEY);
+        assert_eq!(parsed["input"], phrase);
+        // Without a key the body is today's: only `input`.
+        let plain = String::from_utf8(request(&target, id, "x", None)).unwrap();
+        assert!(!plain.contains("session_id"));
     }
 }

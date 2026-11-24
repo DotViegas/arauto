@@ -137,6 +137,8 @@ building the sentence ([14](14-protocolo-do-canal.md), section 5.3). The wording
 await approval ([decision 0016](decisoes/0016-idioma.md)). The notice of a note between Hermes has
 its own sentence ([13](13-conversa-entre-hermes.md), section 5).
 
+Since 24/11/2026 ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built; Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.), the notice of a WhatsApp chat also carries the key of the Hermes session of that contact, a digest of fixed format computed by the hub after the lease. The connector checks the format, sends it as the body `session_id` of `POST /v1/runs` and builds a sentence that says the run continues the conversation with that chat ([14](14-protocolo-do-canal.md)). It still sends no telephone and never puts the key in a sentence. A peer notice is unchanged. Not tried on a real Hermes.
+
 Hermes's local API requires a key of its own. The order of the paths for the connector to obtain it
 is decided ([decisoes/0023](decisoes/0023-chave-da-api-local.md)), and the test belongs to Phase 1
 ([11-conector.md](11-conector.md), section 6). While no path is confirmed, the verb "be woken" does

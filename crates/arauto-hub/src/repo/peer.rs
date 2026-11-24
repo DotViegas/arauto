@@ -1296,6 +1296,9 @@ pub struct DueNotice {
     pub target: NoticeTarget,
     /// How many new messages.
     pub count: u16,
+    /// How many times in a row the engine failed while the key of this notice was being built
+    /// (decision 0054, section 1). Always 0 for a notice of a Hermes.
+    pub engine_failures: u32,
 }
 
 /// What a notice points at.
@@ -1312,6 +1315,8 @@ pub enum NoticeTarget {
     Whatsapp {
         /// The alias of the number.
         number: NumberAlias,
+        /// The number, by the identifier of the hub.
+        number_id: Uuid,
         /// The chat, by the identifier of the hub.
         chat: Uuid,
     },
@@ -1389,8 +1394,10 @@ pub async fn lease(
     .bind(i64::from(limit))
     .fetch_all(&mut *tx)
     .await?;
-    let mut judged: Vec<(Uuid, i32, Option<NoticeTarget>)> = Vec::new();
+    let mut judged: Vec<(Uuid, i32, i32, Option<NoticeTarget>)> = Vec::new();
     for (id, count, from, still, follow) in rows {
+        // A notice of a Hermes has no key to build: no engine failures to count.
+        let failures = 0;
         let target = if still {
             Some(NoticeTarget::Peer {
                 from: name_of(&from)?,
@@ -1399,11 +1406,11 @@ pub async fn lease(
         } else {
             None
         };
-        judged.push((id, count, target));
+        judged.push((id, count, failures, target));
     }
     let left = i64::from(limit).saturating_sub(i64::try_from(judged.len()).unwrap_or(i64::MAX));
-    let rows: Vec<(Uuid, i32, String, Uuid, bool)> = sqlx::query_as(
-        "SELECT n.id, n.count, m.alias, n.chat_id, \
+    let rows: Vec<(Uuid, i32, String, Uuid, Uuid, i32, bool)> = sqlx::query_as(
+        "SELECT n.id, n.count, m.alias, n.chat_id, n.number_id, n.engine_failures, \
                 (h.deleted_at IS NULL AND m.state = 'connected' \
                  AND COALESCE(c.can_wake, \
                               a.scope = 'all' AND a.can_wake AND ch.kind = 'contact' \
@@ -1431,20 +1438,21 @@ pub async fn lease(
     .bind(left.max(0))
     .fetch_all(&mut *tx)
     .await?;
-    for (id, count, alias, chat, still) in rows {
+    for (id, count, alias, chat, number_id, failures, still) in rows {
         let target = if still {
             Some(NoticeTarget::Whatsapp {
                 number: NumberAlias::parse(&alias)
                     .map_err(|_| RepoError::Inconsistent("the alias of a number"))?,
+                number_id,
                 chat,
             })
         } else {
             None
         };
-        judged.push((id, count, target));
+        judged.push((id, count, failures, target));
     }
     let mut due = Vec::new();
-    for (id, count, target) in judged {
+    for (id, count, failures, target) in judged {
         if let Some(target) = target {
             sqlx::query(
                 "UPDATE notice SET state = 'sent', leased_until = $2, sent_at = $3, \
@@ -1459,6 +1467,7 @@ pub async fn lease(
                 id,
                 target,
                 count: u16::try_from(count).unwrap_or(NOTICE_COUNT_MAX),
+                engine_failures: u32::try_from(failures).unwrap_or(0),
             });
         } else {
             sqlx::query(
@@ -1475,6 +1484,83 @@ pub async fn lease(
     Ok(due)
 }
 
+/// How long a notice whose key could not be built waits before it is judged again.
+pub const ENGINE_RETRY_MS: i64 = 5 * SECOND_MS;
+
+/// How many failures of the engine in a row a notice may meet while its key is built: past it,
+/// the hidden key is used instead of waiting for the engine (decision 0054, section 1).
+pub const ENGINE_FAILURES_MAX: u32 = 5;
+
+/// Puts a notice of `hermes` that is out (leased) back in the queue because the engine failed
+/// while its key was being built, and counts that failure on the notice. The try the lease
+/// counted is given back: the Hermes did nothing. The notice leaves again from
+/// [`ENGINE_RETRY_MS`] on. A notice that is not out changes nothing.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn release_for_engine(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    hermes: Uuid,
+    id: Uuid,
+    now: i64,
+) -> Result<(), RepoError> {
+    let mut tx = pool.begin().await?;
+    let found: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM notice \
+         WHERE organization_id = $1 AND hermes_id = $2 AND id = $3 AND state = 'sent' \
+         FOR UPDATE",
+    )
+    .bind(organization.id())
+    .bind(hermes)
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if found.is_none() {
+        return Ok(());
+    }
+    sqlx::query(
+        "UPDATE notice SET engine_failures = engine_failures + 1, \
+                attempts = GREATEST(attempts - 1, 0) \
+         WHERE organization_id = $1 AND id = $2",
+    )
+    .bind(organization.id())
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    back_to_pending(
+        &mut tx,
+        organization,
+        id,
+        now.saturating_add(ENGINE_RETRY_MS),
+        now,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// The engine answered while the key of the notice `id` was built: the failures in a row start
+/// again from zero.
+///
+/// # Errors
+/// [`RepoError::Database`] when the database refuses.
+pub async fn engine_answered(
+    pool: &PgPool,
+    organization: ResolvedOrg,
+    id: Uuid,
+) -> Result<(), RepoError> {
+    sqlx::query(
+        "UPDATE notice SET engine_failures = 0 \
+         WHERE organization_id = $1 AND id = $2 AND engine_failures > 0",
+    )
+    .bind(organization.id())
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Puts a sent notice back in the queue, to leave again from `not_before`. When its sender
 /// already has another pending notice, the two become one: the count is added to that one.
 async fn back_to_pending(
@@ -1485,7 +1571,8 @@ async fn back_to_pending(
     now: i64,
 ) -> Result<(), RepoError> {
     let merged: Option<Uuid> = sqlx::query_scalar(
-        "UPDATE notice p SET count = LEAST(p.count + s.count, $2) \
+        "UPDATE notice p SET count = LEAST(p.count + s.count, $2), \
+                engine_failures = GREATEST(p.engine_failures, s.engine_failures) \
          FROM notice s \
          WHERE s.id = $1 AND s.organization_id = $3 AND p.organization_id = $3 \
            AND p.kind = s.kind AND p.state = 'pending' AND p.hermes_id = s.hermes_id \

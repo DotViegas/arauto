@@ -306,6 +306,13 @@ pub fn render(report: &Report) -> String {
             );
             if let Some(waking) = &leader.waking {
                 let _ = writeln!(text, "Last wake: {}", last_line(waking.last));
+                if waking.wakes_without_session > 0 {
+                    let _ = writeln!(
+                        text,
+                        "WhatsApp wakes without a session key from the hub: {}",
+                        waking.wakes_without_session
+                    );
+                }
                 if matches!(waking.last, Some(LastWake::Refused | LastWake::NoAnswer)) {
                     let _ = writeln!(text, "{}", ErrorCode::Ar602.phrase(None));
                 }
@@ -386,10 +393,12 @@ mod tests {
         let received = Waking {
             key_received: true,
             last: None,
+            wakes_without_session: 0,
         };
         let missing = Waking {
             key_received: false,
             last: None,
+            wakes_without_session: 0,
         };
         // Received: the key line, the last wake, and no sentence about missing keys.
         let text = render(&report(
@@ -476,6 +485,7 @@ mod tests {
             let waking = Waking {
                 key_received: true,
                 last: Some(last),
+                wakes_without_session: 0,
             };
             let text = render(&report(None, Some(leader(Some(waking), None))));
             assert!(text.contains(&format!("Last wake: {line}\n")), "{text}");
@@ -492,6 +502,7 @@ mod tests {
         let waking = Waking {
             key_received: true,
             last: None,
+            wakes_without_session: 0,
         };
         for channel in [
             None,

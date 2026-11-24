@@ -57,3 +57,4 @@ prototype, or is **pending**.
 | 0051 | [The chat where a Hermes takes orders on WhatsApp is refused for writing](0051-quem-da-ordens-a-um-hermes-no-whatsapp.md) | proposal (built and tested against a fake engine on 17/11/2026; the texts were not approved word for word; not tried on a real Hermes or WhatsApp) |
 | 0052 | [The installation brings the engine](0052-a-instalacao-traz-o-motor.md) | proposal (the direction, the form and the rule in CLAUDE.md were approved on 17/11/2026; nothing built) |
 | 0053 | [The reconnect says why](0053-a-reconexao-diz-o-motivo.md) | proposal (asked and approved by the maintainer on 19/11/2026, texts included; built and tested without a real Hermes) |
+| 0054 | [One Hermes session per contact, which never starts over](0054-uma-sessao-do-hermes-por-contato.md) | proposal, being built (asked on 24/11/2026; choices and wording by the assistant, not reviewed by the maintainer) |

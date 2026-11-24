@@ -185,6 +185,15 @@ pub trait WhatsappEngine: Send + Sync + std::fmt::Debug {
         hidden: &'a EngineChatId,
     ) -> BoxFuture<'a, Result<Option<Phone>, EngineError>>;
 
+    /// The hidden identifier (`digits@lid`) the engine keeps for a telephone, when it offers
+    /// that question and has one. A refusal or an unknown telephone is `None`: the hub then
+    /// changes nothing (decision 0054, section 10). Reads only.
+    fn lid_of_phone<'a>(
+        &'a self,
+        session: &'a SessionName,
+        phone: &'a Phone,
+    ) -> BoxFuture<'a, Result<Option<EngineChatId>, EngineError>>;
+
     /// Sends a text, optionally answering a message and marking people of a group.
     fn send_text<'a>(
         &'a self,

@@ -812,6 +812,11 @@ mod tests {
         );
     }
 
+    /// The protocol version the hub speaks now.
+    fn current() -> i32 {
+        i32::try_from(PROTOCOL_VERSION).unwrap_or(i32::MAX)
+    }
+
     fn running(connector: &str, proto: i32) -> Device {
         let mut d = active(1);
         d.connector_version = Some(connector.to_owned());
@@ -824,25 +829,25 @@ mod tests {
         let served = served_with(&['a'], None);
         let plain = format!("0.1.0+{}", mark('a'));
         // A served mark: current.
-        let mut d = running(&plain, 2);
+        let mut d = running(&plain, current());
         assert_eq!(connector_standing(&d, &served), Standing::Current);
-        // Unmarked at protocol 2 with the same enrolled text: not known, not a restart.
-        let mut d2 = running("0.1.0", 2);
+        // Unmarked at the current protocol with the same enrolled text: not known, not a restart.
+        let mut d2 = running("0.1.0", current());
         d2.enrolled_connector = Some("0.1.0".to_owned());
-        d2.enrolled_proto = Some(2);
+        d2.enrolled_proto = Some(current());
         assert_eq!(connector_standing(&d2, &served), Standing::NotKnown);
         // Enrolled with a served mark, running unmarked: restart pending.
         d2.enrolled_connector = Some(plain.clone());
         assert_eq!(connector_standing(&d2, &served), Standing::RestartPending);
-        // Enrolled at protocol 2 and still connecting at 1: restart pending.
+        // Enrolled at the current protocol and still connecting at 1: restart pending.
         let mut d3 = running("0.1.0", 1);
-        d3.enrolled_proto = Some(2);
+        d3.enrolled_proto = Some(current());
         assert_eq!(connector_standing(&d3, &served), Standing::RestartPending);
         // Protocol 1 alone: outdated.
         let d4 = running("0.1.0", 1);
         assert_eq!(connector_standing(&d4, &served), Standing::Outdated);
         // A mark the hub does not serve, no bundle: other build.
-        let other = running(&format!("0.1.0+{}", mark('b')), 2);
+        let other = running(&format!("0.1.0+{}", mark('b')), current());
         assert_eq!(connector_standing(&other, &served), Standing::OtherBuild);
         // With a bundle above its numbers: outdated.
         let bundle = CoreVersion::parse_core("0.1.1");
@@ -887,7 +892,7 @@ mod tests {
             (Some(Clause::Older), None, None)
         );
         // With a bundle and a lower core: numbers.
-        let marked = running(&format!("0.1.0+{}", mark('b')), 2);
+        let marked = running(&format!("0.1.0+{}", mark('b')), current());
         devices = [marked];
         let r = reconnect_reason(&devices, None, &served_with(&['a'], bundle), NOW);
         assert_eq!(r.clause, Some(Clause::Numbers));
@@ -900,15 +905,15 @@ mod tests {
             (r.clause, r.version_from, r.version_to),
             (Some(Clause::Older), None, None)
         );
-        // A mark of 63 hex characters is no mark: nothing at protocol 2, older at 1.
+        // A mark of 63 hex characters is no mark: nothing at the current protocol, older at 1.
         let short = format!("0.1.0+{}", "c".repeat(63));
-        let r = reconnect_reason(&[running(&short, 2)], None, &Served::nothing(), NOW);
+        let r = reconnect_reason(&[running(&short, current())], None, &Served::nothing(), NOW);
         assert_eq!(r.clause, None);
         let r = reconnect_reason(&[running(&short, 1)], None, &Served::nothing(), NOW);
         assert_eq!(r.clause, Some(Clause::Older));
         // The other build.
         let r = reconnect_reason(
-            &[running(&format!("0.1.1+{}", mark('b')), 2)],
+            &[running(&format!("0.1.1+{}", mark('b')), current())],
             None,
             &served_with(&['a'], bundle),
             NOW,

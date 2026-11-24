@@ -80,6 +80,8 @@ use crate::repo::swap::{
     self, ConfirmOutcome, IssueOutcome, Issued, IssuedHere, SavedRefused, SessionStart,
 };
 use crate::repo::{self, RepoError};
+use crate::whatsapp;
+use crate::whatsapp::hermes_session::Keyed;
 
 /// The names of the tools `grants` release, as `session` and `tools` carry them.
 fn released_tools(grants: &Grants) -> ToolList {
@@ -180,6 +182,10 @@ pub(crate) async fn leave(
 
 /// The most notices a session sends in one look at its queue.
 const NOTICES_PER_ROUND: u32 = 16;
+
+/// The version of the channel from which a WhatsApp notice carries the key of the Hermes
+/// session of its contact (decision 0054).
+const SESSION_KEY_SINCE: u32 = 3;
 
 /// The identifiers of the calls in progress of one session.
 type InFlight = Arc<Mutex<HashSet<u64>>>;
@@ -484,15 +490,63 @@ impl Serving<'_> {
                     count,
                     follow,
                 },
-                NoticeTarget::Whatsapp { number, chat } => {
+                NoticeTarget::Whatsapp {
+                    number,
+                    number_id,
+                    chat,
+                } => {
                     // A UUID is always an opaque identifier of a chat.
-                    let Ok(chat) = ChatId::parse(&chat.as_hyphenated().to_string()) else {
+                    let Ok(chat_id) = ChatId::parse(&chat.as_hyphenated().to_string()) else {
                         continue;
+                    };
+                    // The key of the Hermes session of the contact (decision 0054): only on a
+                    // channel that agreed version 3 or more. On a lower one the bytes of the
+                    // notice do not change, and the engine is not asked anything.
+                    let session = if self.record.proto >= SESSION_KEY_SINCE {
+                        let keyed = whatsapp::hermes_session::key_of(
+                            &self.hub,
+                            self.organization,
+                            notice.id,
+                            &number,
+                            number_id,
+                            chat,
+                            notice.engine_failures,
+                        )
+                        .await;
+                        match keyed {
+                            Ok(Keyed::Key(key)) => Some(key),
+                            // The engine failed: back to the queue, without a try counted
+                            // against the Hermes. The next sending judges it again.
+                            Ok(Keyed::EngineFailed) => {
+                                if let Err(error) = repo::peer::release_for_engine(
+                                    self.hub.pool(),
+                                    self.organization,
+                                    self.hermes,
+                                    notice.id,
+                                    now,
+                                )
+                                .await
+                                {
+                                    tracing::error!(%error, "a notice could not be put back in the queue");
+                                }
+                                continue;
+                            }
+                            // Nothing to build it from, or the hub failed: the notice is left
+                            // to its lease, which puts it back in the queue.
+                            Ok(Keyed::Nothing) => continue,
+                            Err(error) => {
+                                tracing::error!(%error, "the key of a Hermes session could not be built");
+                                continue;
+                            }
+                        }
+                    } else {
+                        None
                     };
                     Notice::Whatsapp {
                         number,
-                        chat,
+                        chat: chat_id,
                         count,
+                        session,
                     }
                 }
             };

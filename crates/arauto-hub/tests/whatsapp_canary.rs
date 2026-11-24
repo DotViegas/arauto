@@ -20,6 +20,10 @@ use arauto_testkit::hub::fixture;
 #[path = "whatsapp/world.rs"]
 mod world;
 
+#[allow(dead_code)]
+#[path = "whatsapp/agent.rs"]
+mod agent;
+
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -165,6 +169,94 @@ async fn no_secret_of_the_whatsapp_reaches_the_log_the_errors_the_audit_or_the_a
     }
     let text = format!("canary text {}", Uuid::new_v4().simple());
     secrets.push(("text of a message".to_owned(), text.clone()));
+
+    // A Hermes in session (decision 0054): the key of the notice, a reading and a sending. The
+    // telephones and the identifier the engine gives the new message must reach no log, no
+    // audit and no table in the clear. This is the first sending of the engine, so its
+    // identifier is known: the fake counts from one.
+    let engine_id = "3EB00000000000000001";
+    secrets.push(("engine message id".to_owned(), engine_id.to_owned()));
+    secrets.push((
+        "engine message id".to_owned(),
+        format!("true_{chat}_{engine_id}"),
+    ));
+    let mut hermes = world.agent().await;
+    world
+        .grant(
+            &hermes.name,
+            "canary",
+            arauto_hub::core::access::Grant {
+                scope: arauto_hub::core::access::Scope::All,
+                verbs: agent::ALL_VERBS,
+                can_start_chats: true,
+            },
+        )
+        .await;
+    world
+        .fixture
+        .admin
+        .access_wake_wait(&hermes.name, "canary", 0, world.now())
+        .await
+        .unwrap();
+    let first = SystemClock.now_ms() / 1_000;
+    // The first sending of the engine, to the telephone of the contact: its chat is created.
+    world.fake.register(&contact, &chat);
+    let sent = agent::ok(
+        hermes
+            .call(
+                "whatsapp_send_text",
+                json!({"to": format!("+{contact}"), "text": text}),
+            )
+            .await,
+    );
+    assert!(sent["message_id"].is_string());
+    world.fake.add_message(
+        &session,
+        &chat,
+        message(&chat, engine_id, first + 1, true, &text),
+    );
+    assert_eq!(
+        world
+            .fake
+            .emit(
+                &session,
+                "message.any",
+                message(&chat, "3EB0CB0001", first, false, &text)
+            )
+            .await
+            .unwrap(),
+        200
+    );
+    let woken = loop {
+        match hermes.session.pump(agent::PATIENCE).await.unwrap() {
+            Some(arauto_protocol::message::Message::Notice(notice)) => break notice,
+            Some(arauto_protocol::message::Message::Tools(_)) | None => {}
+            Some(other) => panic!("the hub sent {:?}", other.kind()),
+        }
+    };
+    let arauto_protocol::notice::Notice::Whatsapp {
+        session: Some(key),
+        chat: woken_chat,
+        ..
+    } = woken.validate().unwrap()
+    else {
+        panic!("a notice of WhatsApp with a key")
+    };
+    assert_eq!(
+        key.as_str(),
+        arauto_protocol::session_key::whatsapp_contact_key(&own, &contact)
+    );
+    assert_eq!(woken_chat.as_str(), sent["chat"].as_str().unwrap());
+    let read = agent::ok(
+        hermes
+            .call("whatsapp_read_chat", json!({"chat": woken_chat.as_str()}))
+            .await,
+    );
+    assert!(
+        read["messages"].to_string().contains("you_through_arauto"),
+        "{read:?}"
+    );
+    assert_eq!(read["phone"], format!("+{contact}"));
 
     // Events: received, repeated, from the number itself, forged, malformed and late.
     let now_s = SystemClock.now_ms() / 1_000;
@@ -352,6 +444,8 @@ async fn no_secret_of_the_whatsapp_reaches_the_log_the_errors_the_audit_or_the_a
         "chat",
         "chat_engine_id",
         "engine_event",
+        "sent_message",
+        "notice",
     ] {
         let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT row_to_json(t)::text FROM {table} t"

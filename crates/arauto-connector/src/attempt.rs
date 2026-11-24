@@ -105,6 +105,7 @@ pub(crate) async fn run(ctx: Ctx<'_>) -> Outcome {
     let mut attempt = Attempt {
         ctx,
         outcome: Outcome::new(),
+        agreed: 1,
     };
     let outcome = attempt.converse().await;
     #[cfg(feature = "testing")]
@@ -125,6 +126,8 @@ pub(crate) async fn run(ctx: Ctx<'_>) -> Outcome {
 }
 
 struct Attempt<'a> {
+    /// The protocol version the hub agreed on, once `hello_ok` came (decision 0054).
+    agreed: u32,
     ctx: Ctx<'a>,
     outcome: Outcome,
 }
@@ -221,6 +224,9 @@ impl Attempt<'_> {
             Step::Go(Message::HelloOk(answer)) if answer.fits(offered) => {
                 if answer == HelloOk::Outdated {
                     tracing::warn!("the hub says this connector is outdated");
+                }
+                if let HelloOk::Agreed(version) = answer {
+                    self.agreed = version;
                 }
             }
             // A version that was never offered, or another message: a broken hub.
@@ -423,6 +429,7 @@ impl Attempt<'_> {
                 news: self.ctx.news,
                 leave: self.ctx.leave,
                 stop: self.ctx.stop,
+                agreed: self.agreed,
             },
         )
         .await;

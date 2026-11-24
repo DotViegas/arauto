@@ -104,6 +104,7 @@ full reports are not published. Review by people, from outside, has not happened
 | 15 | The access is removed and the open session keeps being valid. | Authorization on every call, against the current state. | Nothing known. |
 | 16 | A paired number is also the command channel of some Hermes. | The admin records, per Hermes, the telephone its own WhatsApp runs on and who gives it orders there; the hub refuses every Hermes writing in that chat ([08](08-permissoes.md), section 3; 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal, tested against a fake engine, not tried on a real Hermes). The old "command" mark of a number and its alert are gone. | Only what is recorded is refused: the hub does not know the lists of each Hermes, and a channel nobody recorded is open to writing. A Hermes that can read that chat reads the orders and the connection sentence. Groups, owner forwarding and the open policy of the bridge are not modelled. The command and `number list` say the risk; the panel does not yet. |
 | 17 | The hub, compromised, dictates what the LLM reads. | A notice is a pointer; the fixed sentence and the tool descriptions stay in the connector; the connector does not execute a remote command. | The content of the messages, which is already treated as coming from third parties. |
+| 17a | The hub, compromised, points a run at another contact's history ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), 24/11/2026, proposal, being built). | The notice carries a key of strict format, checked in the connector (`^arauto-(wa1\|wg1\|wh1)-[0-9a-f]{64}$`), so the hub can name no Hermes session outside the prefixes `arauto-w`; Hermes refuses a body `session_id` that addresses a Hermes session of another platform (N31). | **The history of other contacts of the same Hermes.** The connector cannot check that the key matches the chat, because both come from the hub. The key is a digest, not a secret: anyone with it and a guess of the business number can find the contact by trying telephones. |
 
 ### In the conversation between Hermes
 
@@ -142,6 +143,8 @@ It comes in with the first MVP. The design and the limits are in
 
 - The conduct of Hermes: what it does with what it reads.
 - The security of Hermes's command channel, which exists outside Arauto. Except one thing: when that channel is a WhatsApp chat with one end on a number of the hub and the admin recorded it, the hub refuses every Hermes writing in it ([decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal).
+- Text a contact wrote now persists across wakes ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), 24/11/2026, proposal): a Hermes session that never starts over keeps, in its history, text that tries to instruct the Hermes. Each run still reads it as a tool result marked as written by third parties, but a long conversation gives such text more chances.
+- The campaign path of decision 0054, section 6: an outside sender that holds the key of the Hermes local API starts a run on the Hermes session of a contact, and its input carries the operator's authority. Arauto does not see that run and checks nothing in it.
 - The machine of whoever administers: whoever administers Hermes's server reads the connector files.
 
 ## 6. How to test

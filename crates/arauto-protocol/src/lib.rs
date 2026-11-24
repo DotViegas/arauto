@@ -33,6 +33,7 @@
 //! | [`invite`] | The invite, its strict text form and its digest. |
 //! | [`code`] | The verification code. |
 //! | [`digest`] | The digest of a sealed credential. |
+//! | [`session_key`] | The key of the Hermes session of a WhatsApp contact (decision 0054). |
 //! | [`notice`] | The check of a notice and the fixed phrase that wakes the Hermes. |
 //! | [`memory`] | The three lines a Hermes keeps in its own main memory about Arauto (decision 0047). |
 //! | [`tools`] | The catalog of tools and the check of each call. |
@@ -60,6 +61,7 @@ pub mod names;
 pub mod noise;
 pub mod notice;
 pub mod secret;
+pub mod session_key;
 pub mod tools;
 
 #[cfg(test)]

@@ -128,6 +128,9 @@ pub enum WhatsappField {
     /// on WhatsApp, in either role. Its digests are of the field [`WhatsappField::Phone`], so
     /// they compare with `number.phone_digest`.
     HermesWhatsappPhone,
+    /// `sent_message.id_digest`: the digest of the identifier WhatsApp gave a message a Hermes
+    /// sent through Arauto. Kept only as a digest.
+    SentMessageId,
 }
 
 impl WhatsappField {
@@ -140,6 +143,7 @@ impl WhatsappField {
             WhatsappField::EventKey => 5,
             WhatsappField::MessageRef => 6,
             WhatsappField::HermesWhatsappPhone => 7,
+            WhatsappField::SentMessageId => 8,
         }
     }
 }

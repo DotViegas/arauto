@@ -14,6 +14,7 @@
 //! | `unknown_device` | a listing that is no pending proof of a restoration: that proof stays until a restored mode handles it (`docs/14-protocolo-do-canal.md`, section 6) | `seen_at`, the first time the identity presented its seal |
 //! | `panel_entry` | every installation code of the panel that stopped being accepted: used, cancelled, or a command code past its 10 minutes. A start code that is still unspent is never purged | `used_at`, `cancelled_at`, or the `expires_at` of a command code |
 //! | `panel_session` | every session of the panel, closed or not | its `expires_at`: past it no session is served |
+//! | `sent_message` | every record of a message a Hermes sent through Arauto (decision 0054, section 7) | its `purge_at`, written with the row: the sending plus the days of `retention` |
 //!
 //! A deadline has passed when the time of the hub **reached** it, as in [`super::sweep`]. A
 //! table without a row in `retention` is left as it is.
@@ -60,11 +61,13 @@ pub enum Target {
     PanelEntries,
     /// `panel_session`: the sessions of the panel, the days after their hours ended.
     PanelSessions,
+    /// `sent_message`: the records of messages sent through Arauto, past their `purge_at`.
+    SentMessages,
 }
 
 impl Target {
     /// Every target, in the order of a run: the messages before the threads they leave empty.
-    pub const ALL: [Target; 9] = [
+    pub const ALL: [Target; 10] = [
         Target::PeerMessages,
         Target::EmptyThreads,
         Target::ToolCalls,
@@ -74,6 +77,7 @@ impl Target {
         Target::EngineEvents,
         Target::PanelEntries,
         Target::PanelSessions,
+        Target::SentMessages,
     ];
 
     /// The row of `retention` whose days this target keeps.
@@ -88,6 +92,7 @@ impl Target {
             Target::EngineEvents => "engine_event",
             Target::PanelEntries => "panel_entry",
             Target::PanelSessions => "panel_session",
+            Target::SentMessages => "sent_message",
         }
     }
 
@@ -104,6 +109,7 @@ impl Target {
             Target::EngineEvents => "engine_event",
             Target::PanelEntries => "panel_entry",
             Target::PanelSessions => "panel_session",
+            Target::SentMessages => "sent_message",
         }
     }
 
@@ -111,7 +117,7 @@ impl Target {
     /// retention. A message carries its own time, `purge_at`: for it, the deadline is now.
     fn deadline(self, days: i64, now: i64) -> i64 {
         match self {
-            Target::PeerMessages => now,
+            Target::PeerMessages | Target::SentMessages => now,
             _ => now.saturating_sub(days.saturating_mul(DAY_MS)),
         }
     }
@@ -187,6 +193,12 @@ impl Target {
                 "DELETE FROM panel_session WHERE organization_id = $1 AND id IN ( \
                      SELECT id FROM panel_session \
                      WHERE organization_id = $1 AND expires_at <= $2 \
+                     LIMIT $3 FOR UPDATE SKIP LOCKED)"
+            }
+            Target::SentMessages => {
+                "DELETE FROM sent_message WHERE organization_id = $1 AND id IN ( \
+                     SELECT id FROM sent_message \
+                     WHERE organization_id = $1 AND purge_at <= $2 \
                      LIMIT $3 FOR UPDATE SKIP LOCKED)"
             }
         }
@@ -353,7 +365,8 @@ mod tests {
                 "unknown_device",
                 "engine_event",
                 "panel_entry",
-                "panel_session"
+                "panel_session",
+                "sent_message"
             ]
         );
         // The threads follow the days of the messages that leave them empty.

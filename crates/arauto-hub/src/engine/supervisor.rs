@@ -296,6 +296,18 @@ async fn catch_up(
         if found.len() >= settings.catch_up_messages as usize {
             whole = false;
         }
+        if found.iter().any(|message| message.at_ms >= since) {
+            // Before the write: a hidden identifier of a telephone the hub has joins its chat.
+            crate::whatsapp::hermes_session::link_on_arrival(
+                hub,
+                organization,
+                key,
+                number.id,
+                &number.session,
+                &chat.id,
+            )
+            .await;
+        }
         let mut transaction = hub.pool().begin().await?;
         let mut woken = Vec::new();
         for message in found.iter().filter(|message| message.at_ms >= since) {

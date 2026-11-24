@@ -15,7 +15,7 @@ use arauto_protocol::digest::CredentialDigest;
 use arauto_protocol::errors::ErrorCode;
 use arauto_protocol::message::{
     Call, CallId, CallOutcome, ChannelState, CheckOk, Generation, HelloOk, LeftStatus, Message,
-    MessageType, Payload, Ping, Pong, ProtoRange, Purpose, Saved,
+    MessageType, PROTOCOL_VERSION, Payload, Ping, Pong, ProtoRange, Purpose, Saved,
 };
 use arauto_protocol::secret::SealedCredential;
 use arauto_protocol::tools::{ARAUTO_STATUS, ToolName};
@@ -422,7 +422,8 @@ async fn a_connector_too_old_is_looked_at_and_told_ar401() {
 
     // The hub now speaks only a version above every version of this connector.
     fixture.stop().await;
-    fixture.settings.versions = ProtoRange::new(3, 3).unwrap();
+    fixture.settings.versions =
+        ProtoRange::new(PROTOCOL_VERSION + 1, PROTOCOL_VERSION + 1).unwrap();
     fixture.start().await;
     let device = device.at(fixture.addr());
     let reused = reused.at(fixture.addr());

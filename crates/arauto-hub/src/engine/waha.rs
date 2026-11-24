@@ -368,6 +368,30 @@ impl Waha {
             .ok_or_else(EngineError::malformed)
     }
 
+    /// `GET /api/{s}/lids/pn/{phone}` answers `{"lid", "pn"}`. Whether the engine offers it was
+    /// not checked (decision 0054, section 10): a 404 or any refusal is "not offered".
+    async fn lid_for(
+        &self,
+        session: &SessionName,
+        phone: &Phone,
+    ) -> Result<Option<EngineChatId>, EngineError> {
+        let call = Call::new(
+            Method::GET,
+            format!("/api/{}/lids/pn/{}", session.segment(), phone.digits()),
+            Expect::Json(JSON_ANSWER_MAX),
+        );
+        let raw: RawLid = match self.typed(call).await {
+            Ok(raw) => raw,
+            Err(EngineError::NotFound | EngineError::Refused) => return Ok(None),
+            Err(other) => return Err(other),
+        };
+        Ok(raw
+            .lid
+            .as_deref()
+            .filter(|lid| lid.ends_with("@lid"))
+            .and_then(|lid| EngineChatId::parse(lid).ok()))
+    }
+
     async fn post_sent(&self, path: &str, body: &Value) -> Result<Sent, EngineError> {
         let answer = self
             .http
@@ -642,6 +666,8 @@ struct RawCheck {
 struct RawLid {
     #[serde(default)]
     pn: Option<String>,
+    #[serde(default)]
+    lid: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1128,6 +1154,14 @@ impl WhatsappEngine for Waha {
         hidden: &'a EngineChatId,
     ) -> BoxFuture<'a, Result<Option<Phone>, EngineError>> {
         Box::pin(self.hidden_phone(session, hidden))
+    }
+
+    fn lid_of_phone<'a>(
+        &'a self,
+        session: &'a SessionName,
+        phone: &'a Phone,
+    ) -> BoxFuture<'a, Result<Option<EngineChatId>, EngineError>> {
+        Box::pin(self.lid_for(session, phone))
     }
 
     fn send_text<'a>(

@@ -114,6 +114,8 @@ What Hermes does on waking is defined by the instructions of Hermes itself, not 
 | Connector ceiling | 30 wakes per minute and 300 per hour, adding up the types. Above that the connector refuses, and the hub tries again in 5 minutes. |
 | Message from the number itself | It wakes nobody. It avoids a loop. |
 
+Since 24/11/2026 ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built), the wake of a WhatsApp chat names the Hermes session of that contact: the notice carries the key and the connector sends it as the body `session_id`, so each run continues the earlier turns of that contact. This changes no check of permission. For the Hermes that takes orders in a chat ([0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md)), the admin keeps "be woken" off there, with a line of the chat; the hub has no rule that does it (C7).
+
 The notice of a note between Hermes follows the same rules, with the ceilings of
 [13-conversa-entre-hermes.md](13-conversa-entre-hermes.md), section 6.
 
