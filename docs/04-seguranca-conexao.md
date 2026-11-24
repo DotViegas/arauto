@@ -287,8 +287,8 @@ Through the channel pass tool calls (Hermes → hub) and notices (hub → Hermes
   and at nothing outside the prefixes of Arauto.
 
   *Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir
-  como implementar para que tudo funcione."): wording by his assistant, not reviewed word for word by
-  him.*
+  como implementar para que tudo funcione."): wording by his assistant, approved by him on
+  24/11/2026.*
 - **The descriptions of the tools stay in the connector.** The hub only says which names are
   allowed.
 - **The connector does not execute a command from the hub.** There is no message from the hub that
@@ -477,7 +477,7 @@ handled restoration. It is a deliverable of Phase 1.
 
 ### C12. Files by address, both ways (24/11/2026, [decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal, being built)
 
-Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.
+Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, approved by him on 24/11/2026.
 
 **Proposal, not tried on a real Hermes or a real engine.** Two additions to what the hub serves and reaches:
 
@@ -611,7 +611,7 @@ of the design: they only become a guarantee after the tests of Phase 1 and Phase
     what it did or kept in its memory is not undone when the mark is removed. The mark never
     widens what the receiver may do on numbers: its accesses are checked on every call
     ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md)).
-22. **A leaked media address gives its file to whoever has it for 10 minutes.** The address is not single-use (a read request does not change state), so it cannot be taken back before its end. A Hermes induced by a text it read can pass it to a tool or a person it should not; it could already send the file through WhatsApp. The checks of the download by address trust the system's resolver and the moment of the check; what a tool of another system does with a file is not seen. Nothing of this was tried on a real Hermes ([decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal; changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.)
+22. **A leaked media address gives its file to whoever has it for 10 minutes.** The address is not single-use (a read request does not change state), so it cannot be taken back before its end. A Hermes induced by a text it read can pass it to a tool or a person it should not; it could already send the file through WhatsApp. The checks of the download by address trust the system's resolver and the moment of the check; what a tool of another system does with a file is not seen. Nothing of this was tried on a real Hermes ([decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal; changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, approved by him on 24/11/2026.)
 
 ## 7. To be proven before implementing
 

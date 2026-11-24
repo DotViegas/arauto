@@ -110,7 +110,7 @@ The `Idempotency-Key` stays the notice id. A repeated notice sends the same body
 
 **Pending for the maintainer.**
 
-- [docs/04](../04-seguranca-conexao.md) C8 says "The notice is a pointer: which number, which chat, how many messages." The new field changes that sentence, and any change in docs/04 needs his approval (text A2).
+- [docs/04](../04-seguranca-conexao.md) C8 says "The notice is a pointer: which number, which chat, how many messages." The new field changes that sentence, and any change in docs/04 needs his approval (text A2, approved on 24/11/2026).
 - [0018](0018-aviso-e-ponteiro.md) (decided) says "The hub sends only a pointer: number, chat and count", and "The hub cannot change a text the LLM reads". The key does not change a text, but it does choose which earlier turns the LLM reads. A dated change of 0018 needs him (text A3).
 - The hub test `a_message_wakes_with_a_pointer_that_carries_no_text_and_no_telephone` stays and gains assertions: still no telephone in any spelling, and the key equals the one computed.
 
@@ -299,9 +299,9 @@ Under the maintainer's request of 24/11/2026, every choice below is answered wit
 
 ## Pending for the maintainer
 
-- **Written at his request of 24/11/2026, awaiting his word-for-word review:** A2 (now in docs/04, C8), A3 (now in 0018) and A4 (now in 0005), as dated changes; A1 is built in the connector. The changes say they were made at his request, with the wording by his assistant. **A6 and A7 (panel) are not built now.**
-- The word-for-word approval of every text above (A1 to A7, and A1b if A4 is not approved).
-- The change of [docs/04](../04-seguranca-conexao.md) C8 (A2).
+- **Approved on 24/11/2026:** A2, the change of [docs/04](../04-seguranca-conexao.md) C8, approved by him as written.
+- **Written at his request of 24/11/2026, awaiting his word-for-word review:** A3 (now in 0018) and A4 (now in 0005), as dated changes; A1 is built in the connector. The changes say they were made at his request, with the wording by his assistant. **A6 and A7 (panel) are not built now.**
+- The word-for-word approval of the other texts above (A1 and A3 to A7, and A1b if A4 is not approved).
 - The dated changes of [0018](0018-aviso-e-ponteiro.md) (A3) and [0005](0005-comando-e-dado-sao-separados.md) (A4), both decided.
 - A dated change of [0049](0049-acordar-pelo-whatsapp-so-pelo-verbo.md) (decided), only if C4 or C7 is answered with a rule of the hub.
 - The open choices C1 to C13.

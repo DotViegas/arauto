@@ -58,7 +58,7 @@ A tool that takes a file must accept an address and download it itself; a tool t
 ## Pending for the maintainer
 
 - The word-for-word review of F1, F2 and the sentence of AR-715.
-- The change of [docs/04](../04-seguranca-conexao.md): written at his request of 24/11/2026, wording by the assistant, not reviewed by him. It is section C12 and item 22 of section 6, and it waits for his review, as do the rows of [docs/05](../05-modelo-de-ameacas.md) and the notes in docs/06, 09, 14 and 15.
+- The rows of [docs/05](../05-modelo-de-ameacas.md) and the notes in docs/06, 09, 14 and 15: written at his request of 24/11/2026, wording by the assistant, not reviewed by him. The change of [docs/04](../04-seguranca-conexao.md) (section C12 and item 22 of section 6) was approved by him as written on 24/11/2026.
 - What a connection below protocol version 3 gets in place of AR-715: built as AR-711 (section 2, "Below protocol version 3"), a choice of the assistant that waits for his review.
 
 ## What is not guaranteed
