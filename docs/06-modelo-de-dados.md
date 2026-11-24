@@ -241,6 +241,8 @@ The alert types in the hub, on 11/11/2026:
 
 **retencao**: the retention period of each table that has purge.
 
+**media_link** (24/11/2026, [decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal, being built; migration 0026; Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.): the media addresses a Hermes asked for with `whatsapp_media_link`. `organization_id`, `number_id`, `chat_id`, `hermes_id`, `message_enc` (the engine id of the message, sealed: it has to be read back to fetch the file), `token_digest` (SHA-256 of the token, unique: the token itself is never kept), `created_at`, `expires_at` (10 minutes after creation). Opening an address writes no row. **Retention:** a `retention` row of 1 day after `expires_at` and a purge target in `purge.rs`. An expired row already gives the same 404 as an unknown token; the purge only removes it. No token, no telephone and no clear engine message id in this table, the log or the audit.
+
 ## 11. The org chart (proposal, stage A, 14/11/2026)
 
 Decision [0043](decisoes/0043-organograma-e-niveis.md). Built in the hub; tried only in a desktop Chrome without a window (15/11/2026). Migration 0017 only adds the two tables and writes no row: on a database with data, every live Hermes is "not placed yet" and there is no level.

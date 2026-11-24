@@ -451,6 +451,25 @@ pub const WHATSAPP_SEND_FILE_MAX_BYTES: usize = 3 * 1024 * 1024;
 /// Largest file downloaded from a message (`docs/09-contrato-mcp.md`, section 3).
 pub const WHATSAPP_DOWNLOAD_MAX_BYTES: usize = 7 * 1024 * 1024;
 
+/// Largest file that travels by address, either way (decision 0055): the file a short-lived
+/// address of `whatsapp_media_link` serves, and the file the hub downloads for
+/// `whatsapp_send_file` with `url`.
+pub const WHATSAPP_FILE_BY_ADDRESS_MAX_BYTES: usize = 10 * 1024 * 1024;
+
+/// Longest address `whatsapp_send_file` takes in `url` (decision 0055).
+pub const WHATSAPP_FILE_URL_MAX_LEN: usize = 2_048;
+
+/// How long the address of `whatsapp_media_link` serves (decision 0055).
+pub const WHATSAPP_MEDIA_LINK_VALIDITY_MS: i64 = 10 * MINUTE_MS;
+
+/// The whole download of a file for `whatsapp_send_file` with `url`, redirects included
+/// (decision 0055).
+pub const WHATSAPP_FETCH_DEADLINE_MS: i64 = 20 * SECOND_MS;
+
+/// Most redirects followed by the download of a file for `whatsapp_send_file` with `url`
+/// (decision 0055).
+pub const WHATSAPP_FETCH_REDIRECTS_MAX: usize = 3;
+
 /// Most people one text marks in a group.
 pub const WHATSAPP_MENTIONS_MAX: usize = 50;
 
@@ -585,5 +604,11 @@ mod tests {
         assert_eq!((WHATSAPP_READ_DEFAULT, WHATSAPP_READ_MAX), (30, 200));
         assert_eq!(WHATSAPP_SEND_FILE_MAX_BYTES, 3_145_728);
         assert_eq!(WHATSAPP_DOWNLOAD_MAX_BYTES, 7_340_032);
+        // Decision 0055.
+        assert_eq!(WHATSAPP_FILE_BY_ADDRESS_MAX_BYTES, 10_485_760);
+        assert_eq!(WHATSAPP_FILE_URL_MAX_LEN, 2_048);
+        assert_eq!(WHATSAPP_MEDIA_LINK_VALIDITY_MS, 600_000);
+        assert_eq!(WHATSAPP_FETCH_DEADLINE_MS, 20_000);
+        assert_eq!(WHATSAPP_FETCH_REDIRECTS_MAX, 3);
     }
 }

@@ -40,6 +40,7 @@
 //! | [`orders`] | Who gives a Hermes orders on WhatsApp, and the counterparts the hub refuses writing to. |
 //! | [`chat`] | The chats of a number, by their identifiers in the engine. |
 //! | [`sent_message`] | The messages a Hermes sent through Arauto, as digests, to label a reading. |
+//! | [`media_link`] | The short-lived addresses of the files of messages, kept as digests (decision 0055). |
 //! | [`engine_event`] | The inbox of events of the engine. |
 //! | [`access`] | The matrix of accesses: what each Hermes may do on each number and in each chat. |
 //! | [`org`] | The org chart of the Hermes: levels, places, roles, and Publish, which writes them with the links in one write. |
@@ -69,6 +70,7 @@ pub mod engine_event;
 pub mod enroll;
 pub mod hermes;
 pub mod invite;
+pub mod media_link;
 pub mod number;
 pub mod orders;
 pub mod org;

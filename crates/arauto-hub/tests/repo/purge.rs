@@ -371,7 +371,7 @@ async fn the_purge_goes_in_batches_of_at_most_the_size_it_is_given() {
             );
         }
     }
-    assert_eq!(asked, 14, "asked before each batch");
+    assert_eq!(asked, 15, "asked before each batch");
 
     // A batch that finds exactly its size is followed by one more.
     for _ in 0..10 {
@@ -572,6 +572,7 @@ async fn every_table_of_the_retention_is_purged_and_the_days_are_the_documented_
         [
             ("channel_connection", Some(90)),
             ("engine_event", Some(2)),
+            ("media_link", Some(1)),
             ("notice", Some(7)),
             ("panel_entry", Some(30)),
             ("panel_session", Some(30)),

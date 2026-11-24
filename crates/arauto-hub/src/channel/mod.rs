@@ -63,7 +63,7 @@ use self::registry::{Registry, Status};
 use self::settings::duration;
 use crate::admin::{self, AdminError};
 use crate::audit::AuditError;
-use crate::config::{ClientIpSource, ServeConfig, StorageConfig};
+use crate::config::{ClientIpSource, PublicUrl, ServeConfig, StorageConfig};
 use crate::db::{self, DbError, PoolOptions, ResolvedOrg, SystemTask};
 use crate::engine::{self, Engines};
 use crate::join_page::{BadPageField, JoinPage};
@@ -219,6 +219,13 @@ pub struct Hub {
     join_page: Option<JoinPage>,
     /// How many instruction pages are read from the database at one time.
     join_lookups: Semaphore,
+    /// The address of the hub as the connectors reach it: what a short-lived address of a file
+    /// starts with (decision 0055).
+    public_url: PublicUrl,
+    /// How many short-lived addresses of files are served at one time (decision 0055).
+    media_served: Semaphore,
+    /// The HTTPS client of the files `whatsapp_send_file` names by address (decision 0055).
+    fetcher: crate::fetch::Fetcher,
     admission: Arc<Admission>,
     budget: Arc<HubBudget>,
     links: DashMap<u64, LinkHandle>,
@@ -317,6 +324,20 @@ impl Hub {
 
     pub(crate) fn join_lookups(&self) -> &Semaphore {
         &self.join_lookups
+    }
+
+    /// The address of the hub as the connectors reach it.
+    #[must_use]
+    pub fn public_url(&self) -> &PublicUrl {
+        &self.public_url
+    }
+
+    pub(crate) fn media_served(&self) -> &Semaphore {
+        &self.media_served
+    }
+
+    pub(crate) fn fetcher(&self) -> &crate::fetch::Fetcher {
+        &self.fetcher
     }
 
     pub(crate) fn admission(&self) -> &Arc<Admission> {
@@ -752,6 +773,9 @@ pub async fn start<P: Purposes>(
         downloads: options.downloads,
         join_page,
         join_lookups: Semaphore::new(settings.join_lookups_max),
+        public_url: config.public_url.clone(),
+        media_served: Semaphore::new(crate::media::MEDIA_SERVED_MAX),
+        fetcher: crate::fetch::Fetcher::system(),
         admission: Admission::new(
             settings.without_session_max,
             settings.without_session_per_origin_max,

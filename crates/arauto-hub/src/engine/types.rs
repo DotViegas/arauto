@@ -32,6 +32,12 @@ pub const SEND_FILE_MAX_BYTES: usize = 3 * 1024 * 1024;
 /// Largest file downloaded from a message (`docs/09-contrato-mcp.md`, section 3).
 pub const DOWNLOAD_MAX_BYTES: usize = 7 * 1024 * 1024;
 
+/// Largest file that travels by address, either way (decision 0055): what a short-lived
+/// address serves and what the hub downloads for a sending. The ceiling of every file the
+/// engine is asked for or given.
+pub const FILE_BY_ADDRESS_MAX_BYTES: usize =
+    arauto_protocol::limits::WHATSAPP_FILE_BY_ADDRESS_MAX_BYTES;
+
 /// Most items of one page asked of the engine.
 pub const PAGE_MAX: u32 = 200;
 
@@ -896,7 +902,7 @@ pub struct SendText {
     pub mentions: Vec<EngineChatId>,
 }
 
-/// A file to send by content, up to 3 MB.
+/// A file to send: up to 3 MB given by content, up to 10 MB downloaded from an address.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SendFile {
     /// The chat.

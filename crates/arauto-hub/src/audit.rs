@@ -134,6 +134,9 @@ actions! {
     /// A call of a Hermes that would write in the chat where a Hermes takes orders was refused:
     /// one row per Hermes, number and chat per hour. Never a telephone.
     WhatsappOrderChatRefused => "whatsapp.order_chat_refused", false;
+    /// A short-lived address of the file of a message was given to a Hermes (decision 0055).
+    /// The event names the Hermes, the number and the chat; never the address.
+    MediaLinkIssued => "media_link.issued", false;
     /// A message ceiling was reached: one row per link and per hour.
     PeerCeilingReached => "peer.ceiling_reached", false;
     /// The hub noticed it came back from an older copy.

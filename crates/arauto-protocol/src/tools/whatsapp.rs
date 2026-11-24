@@ -13,8 +13,13 @@
 //! - **`message_id`** is the identifier of a message exactly as a reading of the hub gave it.
 //!   The hub signs it; here only its alphabet and its length are checked.
 //!
-//! Telephones, texts, files and identifiers of messages are personal data of third parties:
-//! their `Debug` prints neither them nor a part of them.
+//! - **`url`** of `whatsapp_send_file` is an address the hub downloads a file from
+//!   (decision 0055). Here only its form is checked: text of visible ASCII, at most 2,048
+//!   characters. Whether it is a public `https://` address is the hub's to say, before any
+//!   connection, and its refusal is AR-715, not AR-711.
+//!
+//! Telephones, texts, files, addresses and identifiers of messages are personal data of third
+//! parties: their `Debug` prints neither them nor a part of them.
 
 use core::fmt;
 
@@ -23,10 +28,10 @@ use uuid::Uuid;
 
 use super::{ToolArgError, only, optional, optional_uuid};
 use crate::limits::{
-    WHATSAPP_LIST_DEFAULT, WHATSAPP_LIST_MAX, WHATSAPP_MENTIONS_MAX, WHATSAPP_MESSAGE_ID_MAX_LEN,
-    WHATSAPP_OFFSET_MAX, WHATSAPP_PARTICIPANTS_DEFAULT, WHATSAPP_PARTICIPANTS_MAX,
-    WHATSAPP_READ_DEFAULT, WHATSAPP_READ_MAX, WHATSAPP_SEND_FILE_MAX_BYTES,
-    WHATSAPP_TEXT_MAX_BYTES, WHATSAPP_TIME_MAX_S,
+    WHATSAPP_FILE_URL_MAX_LEN, WHATSAPP_LIST_DEFAULT, WHATSAPP_LIST_MAX, WHATSAPP_MENTIONS_MAX,
+    WHATSAPP_MESSAGE_ID_MAX_LEN, WHATSAPP_OFFSET_MAX, WHATSAPP_PARTICIPANTS_DEFAULT,
+    WHATSAPP_PARTICIPANTS_MAX, WHATSAPP_READ_DEFAULT, WHATSAPP_READ_MAX,
+    WHATSAPP_SEND_FILE_MAX_BYTES, WHATSAPP_TEXT_MAX_BYTES, WHATSAPP_TIME_MAX_S,
 };
 use crate::names::NumberAlias;
 
@@ -40,6 +45,8 @@ pub const WHATSAPP_READ_CHAT: &str = "whatsapp_read_chat";
 pub const WHATSAPP_GET_CONTACT: &str = "whatsapp_get_contact";
 /// Downloads the file of a message.
 pub const WHATSAPP_DOWNLOAD_MEDIA: &str = "whatsapp_download_media";
+/// Gives a short-lived address of the file of a message (decision 0055).
+pub const WHATSAPP_MEDIA_LINK: &str = "whatsapp_media_link";
 /// Lists the groups of a number.
 pub const WHATSAPP_LIST_GROUPS: &str = "whatsapp_list_groups";
 /// Shows one group and its participants.
@@ -48,7 +55,7 @@ pub const WHATSAPP_GET_GROUP: &str = "whatsapp_get_group";
 pub const WHATSAPP_CHECK_NUMBER: &str = "whatsapp_check_number";
 /// Sends a text.
 pub const WHATSAPP_SEND_TEXT: &str = "whatsapp_send_text";
-/// Sends a file by content.
+/// Sends a file by content, or by a public address the hub downloads it from.
 pub const WHATSAPP_SEND_FILE: &str = "whatsapp_send_file";
 /// Marks a chat as read.
 pub const WHATSAPP_MARK_READ: &str = "whatsapp_mark_read";
@@ -234,22 +241,70 @@ pub enum FileKind {
     Voice,
 }
 
-/// A file a Hermes sends by content.
+/// The address a file is downloaded from, as `url` gave it: from 1 to 2,048 characters of
+/// visible ASCII. Its scheme and where it leads are checked by the hub (decision 0055). Its
+/// `Debug` prints no part of it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct FileUrl(String);
+
+impl fmt::Debug for FileUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("FileUrl([redacted])")
+    }
+}
+
+impl FileUrl {
+    /// Checks the length and the characters.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        (!text.is_empty()
+            && text.len() <= WHATSAPP_FILE_URL_MAX_LEN
+            && text.bytes().all(|b| b.is_ascii_graphic()))
+        .then(|| Self(text.to_owned()))
+    }
+
+    /// The address. Whoever calls this answers for where it goes: never a log or an error.
+    #[must_use]
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Where the bytes of a file to send come from: one of the two, never both.
+#[derive(Clone, PartialEq, Eq)]
+pub enum FileSource {
+    /// `data`: the bytes, at most 3 MB.
+    Content(Vec<u8>),
+    /// `url`: a public address the hub downloads the file from, at most 10 MB.
+    Address(FileUrl),
+}
+
+impl fmt::Debug for FileSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileSource::Content(data) => write!(f, "Content({} bytes)", data.len()),
+            FileSource::Address(_) => f.write_str("Address([redacted])"),
+        }
+    }
+}
+
+/// A file a Hermes sends.
 #[derive(Clone, PartialEq, Eq)]
 pub struct FileArg {
     /// How it shows.
     pub kind: FileKind,
-    /// The media type, `type/subtype`, with an optional parameter.
-    pub mimetype: String,
+    /// The media type, `type/subtype`, with an optional parameter. Always given with `data`;
+    /// with `url`, when absent, the media type the server answers is used.
+    pub mimetype: Option<String>,
     /// The name, when given.
     pub filename: Option<String>,
-    /// The bytes, at most 3 MB.
-    pub data: Vec<u8>,
+    /// The bytes, or the address to download them from.
+    pub source: FileSource,
 }
 
 impl fmt::Debug for FileArg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FileArg({:?}, {} bytes)", self.kind, self.data.len())
+        write!(f, "FileArg({:?}, {:?})", self.kind, self.source)
     }
 }
 
@@ -329,6 +384,11 @@ pub enum WhatsappOp {
         /// The message.
         message: MessageRef,
     },
+    /// `whatsapp_media_link`
+    MediaLink {
+        /// The message.
+        message: MessageRef,
+    },
     /// `whatsapp_list_groups`
     ListGroups(Listing),
     /// `whatsapp_get_group`
@@ -403,6 +463,7 @@ impl WhatsappOp {
             WhatsappOp::ReadChat(_) => WHATSAPP_READ_CHAT,
             WhatsappOp::GetContact { .. } => WHATSAPP_GET_CONTACT,
             WhatsappOp::DownloadMedia { .. } => WHATSAPP_DOWNLOAD_MEDIA,
+            WhatsappOp::MediaLink { .. } => WHATSAPP_MEDIA_LINK,
             WhatsappOp::ListGroups(_) => WHATSAPP_LIST_GROUPS,
             WhatsappOp::GetGroup(_) => WHATSAPP_GET_GROUP,
             WhatsappOp::CheckNumber { .. } => WHATSAPP_CHECK_NUMBER,
@@ -427,6 +488,7 @@ impl WhatsappOp {
             | WhatsappOp::ReadChat(_)
             | WhatsappOp::GetContact { .. }
             | WhatsappOp::DownloadMedia { .. }
+            | WhatsappOp::MediaLink { .. }
             | WhatsappOp::ListGroups(_)
             | WhatsappOp::GetGroup(_) => WhatsappVerb::Read,
             WhatsappOp::CheckNumber { .. }
@@ -498,6 +560,12 @@ pub(super) fn parse(tool: &str, a: &Map<String, Value>) -> Result<WhatsappCall, 
                 message: message(a, "message_id")?,
             }
         }
+        WHATSAPP_MEDIA_LINK => {
+            only(a, &["number", "message_id"])?;
+            WhatsappOp::MediaLink {
+                message: message(a, "message_id")?,
+            }
+        }
         WHATSAPP_LIST_GROUPS => {
             only(a, &["number", "limit", "offset"])?;
             WhatsappOp::ListGroups(listing(a, WHATSAPP_LIST_DEFAULT, WHATSAPP_LIST_MAX)?)
@@ -534,7 +602,7 @@ pub(super) fn parse(tool: &str, a: &Map<String, Value>) -> Result<WhatsappCall, 
             only(
                 a,
                 &[
-                    "number", "to", "kind", "mimetype", "filename", "data", "caption",
+                    "number", "to", "kind", "mimetype", "filename", "data", "url", "caption",
                 ],
             )?;
             WhatsappOp::SendFile(SendFileArgs {
@@ -669,11 +737,14 @@ fn file(a: &Map<String, Value>) -> Result<FileArg, ToolArgError> {
         _ => return Err(ToolArgError::Invalid("kind")),
     };
     let mimetype = optional(a, "mimetype")
-        .ok_or(ToolArgError::Missing("mimetype"))?
-        .as_str()
-        .filter(|text| mimetype_ok(text))
-        .ok_or(ToolArgError::Invalid("mimetype"))?
-        .to_owned();
+        .map(|value| {
+            value
+                .as_str()
+                .filter(|text| mimetype_ok(text))
+                .map(str::to_owned)
+                .ok_or(ToolArgError::Invalid("mimetype"))
+        })
+        .transpose()?;
     let filename = optional(a, "filename")
         .map(|value| {
             value
@@ -683,20 +754,33 @@ fn file(a: &Map<String, Value>) -> Result<FileArg, ToolArgError> {
                 .ok_or(ToolArgError::Invalid("filename"))
         })
         .transpose()?;
-    let data = optional(a, "data")
-        .ok_or(ToolArgError::Missing("data"))?
-        .as_str()
-        .ok_or(ToolArgError::Invalid("data"))?;
-    // The size is checked on the text, before anything is decoded.
-    let data = crate::base64::decode(data, WHATSAPP_SEND_FILE_MAX_BYTES)
-        .ok()
-        .filter(|bytes| !bytes.is_empty())
-        .ok_or(ToolArgError::Invalid("data"))?;
+    let source = match (optional(a, "data"), optional(a, "url")) {
+        (Some(_), Some(_)) => return Err(ToolArgError::Invalid("url")),
+        (None, None) => return Err(ToolArgError::Missing("data")),
+        (Some(data), None) => {
+            // By content, the media type is said by the Hermes.
+            if mimetype.is_none() {
+                return Err(ToolArgError::Missing("mimetype"));
+            }
+            let data = data.as_str().ok_or(ToolArgError::Invalid("data"))?;
+            // The size is checked on the text, before anything is decoded.
+            let data = crate::base64::decode(data, WHATSAPP_SEND_FILE_MAX_BYTES)
+                .ok()
+                .filter(|bytes| !bytes.is_empty())
+                .ok_or(ToolArgError::Invalid("data"))?;
+            FileSource::Content(data)
+        }
+        (None, Some(url)) => FileSource::Address(
+            url.as_str()
+                .and_then(FileUrl::parse)
+                .ok_or(ToolArgError::Invalid("url"))?,
+        ),
+    };
     Ok(FileArg {
         kind,
         mimetype,
         filename,
-        data,
+        source,
     })
 }
 
@@ -970,7 +1054,7 @@ pub(super) fn send_file_schema() -> Value {
             "mimetype": {
                 "type": "string",
                 "maxLength": MIMETYPE_MAX_LEN,
-                "description": "The media type of the file, like image/jpeg or application/pdf."
+                "description": "The media type of the file, like image/jpeg or application/pdf. Required with `data`."
             },
             "filename": {
                 "type": "string",
@@ -980,11 +1064,17 @@ pub(super) fn send_file_schema() -> Value {
             "data": {
                 "type": "string",
                 "contentEncoding": "base64",
-                "description": "The file in standard base64, with padding: at most 3 MB once decoded."
+                "description": "The file in standard base64, with padding: at most 3 MB once decoded. Give `data` or `url`, not both."
+            },
+            "url": {
+                "type": "string",
+                "pattern": "^https://",
+                "maxLength": WHATSAPP_FILE_URL_MAX_LEN,
+                "description": "A public https address the hub downloads the file from, at most 10 MB. Give `data` or `url`, not both; with `url`, `mimetype` may be left out."
             },
             "caption": text_property("The text that goes with an image or a document")
         }),
-        &["to", "kind", "mimetype", "data"],
+        &["to", "kind"],
     )
 }
 
@@ -1071,6 +1161,7 @@ pub(super) mod tests {
             (WHATSAPP_READ_CHAT, json!({"chat": CHAT})),
             (WHATSAPP_GET_CONTACT, json!({"chat": CHAT})),
             (WHATSAPP_DOWNLOAD_MEDIA, json!({"message_id": MESSAGE})),
+            (WHATSAPP_MEDIA_LINK, json!({"message_id": MESSAGE})),
             (WHATSAPP_LIST_GROUPS, json!({})),
             (WHATSAPP_GET_GROUP, json!({"chat": CHAT})),
             (WHATSAPP_CHECK_NUMBER, json!({"phone": "+5511987650001"})),
@@ -1094,7 +1185,7 @@ pub(super) mod tests {
     #[test]
     fn every_tool_reads_its_valid_arguments() {
         let calls = one_valid_call_of_each_tool();
-        assert_eq!(calls.len(), 16);
+        assert_eq!(calls.len(), 17);
         let read = call(
             WHATSAPP_READ_CHAT,
             json!({"number": "balcao", "chat": CHAT, "limit": 200, "before": 1_700_000_000,
@@ -1158,11 +1249,92 @@ pub(super) mod tests {
         let WhatsappOp::SendFile(file) = file.op else {
             panic!("not a file");
         };
-        assert_eq!(file.file.data, [1, 2, 3]);
+        assert_eq!(file.file.source, FileSource::Content(vec![1, 2, 3]));
         assert_eq!(file.file.kind, FileKind::Image);
+        assert_eq!(file.file.mimetype.as_deref(), Some("image/jpeg"));
         assert_eq!(
             file.caption.map(|c| c.expose().to_owned()).as_deref(),
             Some("look")
+        );
+        let link = call(
+            WHATSAPP_MEDIA_LINK,
+            json!({"number": "balcao", "message_id": MESSAGE}),
+        )
+        .unwrap();
+        assert_eq!(
+            link.op,
+            WhatsappOp::MediaLink {
+                message: MessageRef::parse(MESSAGE).unwrap()
+            }
+        );
+    }
+
+    /// `whatsapp_send_file` takes `data` or `url`, one of the two and never both
+    /// (decision 0055). The form of the address is checked here; whether it is a public
+    /// https address is the hub's (AR-715).
+    #[test]
+    fn a_file_is_sent_by_content_or_by_address_never_both() {
+        let base = || json!({"to": CHAT, "kind": "document"});
+        let with = |extra: Value| {
+            let mut value = base();
+            for (key, item) in args(extra) {
+                value[key] = item;
+            }
+            call(WHATSAPP_SEND_FILE, value)
+        };
+        let url = "https://files.example.org/report.pdf";
+        let by_address = with(json!({"url": url})).unwrap();
+        let WhatsappOp::SendFile(sent) = by_address.op else {
+            panic!("not a file");
+        };
+        assert_eq!(
+            sent.file.source,
+            FileSource::Address(FileUrl::parse(url).unwrap())
+        );
+        assert_eq!(
+            sent.file.mimetype, None,
+            "with `url` the media type may be left out"
+        );
+        let typed = with(json!({"url": url, "mimetype": "application/pdf"})).unwrap();
+        let WhatsappOp::SendFile(typed) = typed.op else {
+            panic!("not a file");
+        };
+        assert_eq!(typed.file.mimetype.as_deref(), Some("application/pdf"));
+        // Both, or neither.
+        let data = crate::base64::encode(b"x");
+        assert_eq!(
+            with(json!({"url": url, "data": data, "mimetype": "application/pdf"})),
+            Err(ToolArgError::Invalid("url"))
+        );
+        assert_eq!(with(json!({})), Err(ToolArgError::Missing("data")));
+        assert_eq!(
+            with(json!({"url": null, "data": null})),
+            Err(ToolArgError::Missing("data"))
+        );
+        // By content the media type is still required.
+        assert_eq!(
+            with(json!({"data": data})),
+            Err(ToolArgError::Missing("mimetype"))
+        );
+        // The form: visible ASCII, at most 2,048 characters. The scheme is the hub's to check.
+        let longest = format!("https://files.example.org/{}", "a".repeat(2_048 - 26));
+        assert_eq!(longest.len(), 2_048);
+        assert!(with(json!({"url": longest})).is_ok());
+        let above = format!("{longest}a");
+        let spaced = "https://files.example.org/a b";
+        let accented = "https://files.example.org/\u{e9}";
+        let broken = "https://files.example.org/a\nb";
+        for bad in ["", above.as_str(), spaced, accented, broken] {
+            assert_eq!(
+                with(json!({"url": bad})),
+                Err(ToolArgError::Invalid("url")),
+                "{bad:?}"
+            );
+        }
+        assert_eq!(with(json!({"url": 7})), Err(ToolArgError::Invalid("url")));
+        assert!(
+            with(json!({"url": "http://files.example.org/x"})).is_ok(),
+            "the scheme is refused by the hub, with AR-715"
         );
     }
 
@@ -1479,6 +1651,7 @@ pub(super) mod tests {
                 (WHATSAPP_READ_CHAT, Read, false),
                 (WHATSAPP_GET_CONTACT, Read, false),
                 (WHATSAPP_DOWNLOAD_MEDIA, Read, false),
+                (WHATSAPP_MEDIA_LINK, Read, false),
                 (WHATSAPP_LIST_GROUPS, Read, false),
                 (WHATSAPP_GET_GROUP, Read, false),
                 (WHATSAPP_CHECK_NUMBER, Send, true),
@@ -1519,9 +1692,16 @@ pub(super) mod tests {
             schema(WHATSAPP_DELETE_MESSAGE)["required"],
             json!(["message_id"])
         );
+        let file = schema(WHATSAPP_SEND_FILE);
+        assert_eq!(file["required"], json!(["to", "kind"]));
         assert_eq!(
-            schema(WHATSAPP_SEND_FILE)["required"],
-            json!(["to", "kind", "mimetype", "data"])
+            file["properties"]["url"]["maxLength"],
+            WHATSAPP_FILE_URL_MAX_LEN
+        );
+        assert_eq!(file["properties"]["url"]["pattern"], "^https://");
+        assert_eq!(
+            schema(WHATSAPP_MEDIA_LINK)["required"],
+            json!(["message_id"])
         );
         for name in [WHATSAPP_STATUS, WHATSAPP_LIST_CHATS, WHATSAPP_LIST_GROUPS] {
             assert!(schema(name).get("required").is_none(), "{name}");
@@ -1563,6 +1743,16 @@ pub(super) mod tests {
         let shown = format!("{file:?}");
         assert!(
             !shown.contains("CANARY") && !shown.contains("Q0FOQVJZ"),
+            "{shown}"
+        );
+        let by_address = call(
+            WHATSAPP_SEND_FILE,
+            json!({"to": CHAT, "kind": "document", "url": "https://canary.example.org/CANARY"}),
+        )
+        .unwrap();
+        let shown = format!("{by_address:?}");
+        assert!(
+            !shown.contains("CANARY") && !shown.contains("canary"),
             "{shown}"
         );
     }

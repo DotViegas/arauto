@@ -15,6 +15,7 @@
 //! | A write in the chat where a Hermes takes orders (decision 0051) | AR-705, AR-712; AR-714 to the Hermes whose command channel it is, on protocol version 2 |
 //! | The number is not connected to WhatsApp | AR-702 |
 //! | The engine is not there | AR-703 |
+//! | `whatsapp_send_file` with `url`: the file at the address (decision 0055) | AR-715, on protocol version 3; AR-711 below it |
 //! | The send limit | AR-704, with `retry_after_s` |
 //! | What the engine answered | its code |
 //!
@@ -39,8 +40,8 @@ use arauto_protocol::limits::WHATSAPP_READ_BUDGET_BYTES;
 use arauto_protocol::message::{CallOutcome, Payload};
 use arauto_protocol::names::NumberAlias;
 use arauto_protocol::tools::{
-    FileKind as ArgFileKind, Grants, Listing, MessageRef, ReadChat, Recipient, WhatsappCall,
-    WhatsappOp, WhatsappVerb,
+    FileKind as ArgFileKind, FileSource, Grants, Listing, MessageRef, ReadChat, Recipient,
+    SendFileArgs, WhatsappCall, WhatsappOp, WhatsappVerb,
 };
 use data_encoding::BASE64;
 use serde_json::{Value, json};
@@ -55,9 +56,9 @@ use crate::core::number::NumberState;
 use crate::db::ResolvedOrg;
 use crate::engine::registry::LoadedEngine;
 use crate::engine::{
-    Author, ChatKind, EngineChatId, EngineError, EngineMessageId, FileContent, FileKind, FileName,
-    FullMessageId, Message, MessageBody, MessageQuery, MimeType, PAGE_MAX, Page, Phone, Reaction,
-    Role, SendFile, SendText, SessionName,
+    Author, ChatKind, DOWNLOAD_MAX_BYTES, EngineChatId, EngineError, EngineMessageId, FileContent,
+    FileKind, FileName, FullMessageId, Message, MessageBody, MessageQuery, MimeType, PAGE_MAX,
+    Page, Phone, Reaction, Role, SendFile, SendText, SessionName,
 };
 use crate::repo::access::HermesAccess;
 use crate::repo::sent_message::SentBy;
@@ -499,6 +500,57 @@ impl<'a> Call<'a> {
         }
     }
 
+    /// The code of a file at an address that could not be fetched (decision 0055): AR-715 on a
+    /// channel whose version can read it, AR-711 below it, where the catalog of the connector
+    /// has no `url` at all.
+    fn fetch_refusal_code(&self) -> ErrorCode {
+        if self.proto >= ErrorCode::Ar715.since() {
+            ErrorCode::Ar715
+        } else {
+            ErrorCode::Ar711
+        }
+    }
+
+    /// The bytes and the media type of a file to send: given by content, or downloaded by the
+    /// hub from the address (decision 0055). The media type given wins; otherwise the one the
+    /// server answered, when it is in the format; otherwise `application/octet-stream`. Nothing
+    /// of the address goes into the log: only the fixed word of the refusal.
+    async fn file_of(&self, send: &SendFileArgs) -> Result<FileContent, Refusal> {
+        let (data, answered) = match &send.file.source {
+            FileSource::Content(data) => (data.clone(), None),
+            FileSource::Address(url) => {
+                let fetched = self
+                    .hub
+                    .fetcher()
+                    .fetch(url.expose())
+                    .await
+                    .map_err(|why| {
+                        tracing::info!(why = why.as_str(), "a file by address was not fetched");
+                        Refusal::from(self.fetch_refusal_code())
+                    })?;
+                (fetched.data, fetched.mimetype)
+            }
+        };
+        let mimetype = match (&send.file.mimetype, answered) {
+            (Some(given), _) => MimeType::parse(given)?,
+            (None, Some(answered)) => match MimeType::parse(&answered) {
+                Ok(mimetype) => mimetype,
+                Err(_) => MimeType::parse("application/octet-stream")?,
+            },
+            (None, None) => MimeType::parse("application/octet-stream")?,
+        };
+        Ok(FileContent {
+            mimetype,
+            filename: send
+                .file
+                .filename
+                .as_deref()
+                .map(FileName::parse)
+                .transpose()?,
+            data,
+        })
+    }
+
     /// The counterparts of this number, read now (rule 9).
     async fn counterparts(&self) -> Result<repo::orders::Counterparts, Refusal> {
         repo::orders::counterparts(self.hub.pool(), self.organization, self.access.number.id)
@@ -799,6 +851,7 @@ impl<'a> Call<'a> {
             WhatsappOp::ReadChat(read) => self.read_chat(read).await,
             WhatsappOp::GetContact { chat } => self.contact(*chat).await,
             WhatsappOp::DownloadMedia { message } => self.download(message).await,
+            WhatsappOp::MediaLink { message } => self.media_link(message).await,
             WhatsappOp::ListGroups(listing) => self.list_groups(*listing).await,
             WhatsappOp::GetGroup(group) => self.group(group.chat, group.participants).await,
             WhatsappOp::CheckNumber { phone } => {
@@ -858,6 +911,13 @@ impl<'a> Call<'a> {
                 self.hold_phone(&send.to).await?;
                 let by_phone = self.spend_for_a_phone(op, &send.to)?;
                 let destination = self.destination(&engine, &send.to).await?;
+                // A voice message takes no caption: refused before any download.
+                if send.file.kind == ArgFileKind::Voice && send.caption.is_some() {
+                    return Err(ErrorCode::Ar711.into());
+                }
+                // Only after every check of the access: the hub downloads nothing for a call
+                // it would refuse.
+                let content = self.file_of(send).await?;
                 let file = SendFile {
                     chat: destination.engine_chat.clone(),
                     kind: match send.file.kind {
@@ -865,16 +925,7 @@ impl<'a> Call<'a> {
                         ArgFileKind::Document => FileKind::Document,
                         ArgFileKind::Voice => FileKind::Voice,
                     },
-                    file: FileContent {
-                        mimetype: MimeType::parse(&send.file.mimetype)?,
-                        filename: send
-                            .file
-                            .filename
-                            .as_deref()
-                            .map(FileName::parse)
-                            .transpose()?,
-                        data: send.file.data.clone(),
-                    },
+                    file: content,
                     caption: send
                         .caption
                         .as_ref()
@@ -1266,7 +1317,12 @@ impl<'a> Call<'a> {
         let file = engine
             .engine
             .client
-            .download_media(engine.session, &reached.engine_chat, &message)
+            .download_media(
+                engine.session,
+                &reached.engine_chat,
+                &message,
+                DOWNLOAD_MAX_BYTES,
+            )
             .await
             .map_err(message_error)?;
         Ok(json!({
@@ -1275,6 +1331,45 @@ impl<'a> Call<'a> {
             "filename": file.filename.as_ref().map(FileName::as_str),
             "size": file.data.len(),
             "data": BASE64.encode(&file.data),
+        }))
+    }
+
+    /// `whatsapp_media_link` (decision 0055): a short-lived address of the file of a message
+    /// this Hermes may read. The address goes only into this answer; the audit names the
+    /// Hermes, the number and the chat, never the address.
+    async fn media_link(&self, given: &MessageRef) -> Answer {
+        let (reached, message) = self.message(given, Verb::Read).await?;
+        // The number serves calls and its engine is there, as for a download.
+        self.authorized().await?;
+        let issued = crate::media::issue(
+            self.hub,
+            self.organization,
+            self.key,
+            &repo::media_link::NewLink {
+                number: self.access.number.id,
+                chat: reached.chat,
+                hermes: self.hermes,
+                message: &message,
+            },
+        )
+        .await
+        .map_err(|error| failed(&error, "a media address could not be issued"))?;
+        let event = Event::new(Action::MediaLinkIssued, Actor::System)
+            .in_organization(self.organization)
+            .about(TargetKind::Hermes, self.hermes)
+            .with(
+                Details::new()
+                    .alias("alias", &self.access.number.alias)
+                    .id("number", self.access.number.id)
+                    .id("chat", reached.chat),
+            );
+        if let Err(error) = audit::record(self.hub.pool(), self.hub.now_ms(), &event).await {
+            tracing::error!(%error, "the issue of a media address could not be audited");
+        }
+        Ok(json!({
+            "number": self.alias(),
+            "url": issued.url.as_str(),
+            "expires_at": issued.expires_at_s,
         }))
     }
 

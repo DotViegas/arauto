@@ -23,12 +23,13 @@ fn contact(n: u32) -> String {
     format!("{}@c.us", phone(n))
 }
 
-const READ_TOOLS: [&str; 7] = [
+const READ_TOOLS: [&str; 8] = [
     "whatsapp_status",
     "whatsapp_list_chats",
     "whatsapp_read_chat",
     "whatsapp_get_contact",
     "whatsapp_download_media",
+    "whatsapp_media_link",
     "whatsapp_list_groups",
     "whatsapp_get_group",
 ];
@@ -783,7 +784,7 @@ async fn a_number_that_is_not_connected_answers_ar702_and_a_swapped_one_stops_it
         second.next_tools().await,
         expected(&[&READ_TOOLS, &SEND_TOOLS])
     );
-    assert_eq!(names(second.tools.last().unwrap()).len(), 15);
+    assert_eq!(names(second.tools.last().unwrap()).len(), 16);
 }
 
 /// With the sweep far away, the notice of the admin command is what tells the sessions: an

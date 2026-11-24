@@ -104,6 +104,7 @@ error_codes! {
     Ar712 = "AR-712", "Message not found: it does not exist, is outside what this Hermes can use, or WhatsApp no longer allows it.";
     Ar713 = "AR-713", "The result of the sending is unknown: the message may have been sent. Read the chat before sending it again.";
     Ar714 = "AR-714", "This chat is your command channel, as the admin recorded it, so Arauto does not write in it. Reply or report in it through your own WhatsApp, outside Arauto.";
+    Ar715 = "AR-715", "The file at that address could not be fetched: it is not a public https address, it is too large, or it did not answer in time.";
 }
 
 impl ErrorCode {
@@ -114,6 +115,7 @@ impl ErrorCode {
     pub const fn since(self) -> u32 {
         match self {
             ErrorCode::Ar714 => 2,
+            ErrorCode::Ar715 => 3,
             _ => 1,
         }
     }
@@ -214,12 +216,12 @@ mod tests {
     use std::collections::HashSet;
 
     /// The catalog of `docs/11-conector.md`, section 8, written a second time.
-    const CATALOG: [&str; 40] = [
+    const CATALOG: [&str; 41] = [
         "AR-101", "AR-102", "AR-104", "AR-105", "AR-201", "AR-202", "AR-203", "AR-204", "AR-205",
         "AR-206", "AR-207", "AR-208", "AR-301", "AR-302", "AR-303", "AR-401", "AR-402", "AR-501",
         "AR-502", "AR-503", "AR-504", "AR-505", "AR-506", "AR-507", "AR-601", "AR-602", "AR-701",
         "AR-702", "AR-703", "AR-704", "AR-705", "AR-706", "AR-707", "AR-708", "AR-709", "AR-710",
-        "AR-711", "AR-712", "AR-713", "AR-714",
+        "AR-711", "AR-712", "AR-713", "AR-714", "AR-715",
     ];
 
     fn every_phrase() -> Vec<(ErrorCode, String)> {
@@ -351,7 +353,14 @@ mod tests {
             "\\",
             "/",
         ];
-        for (_, phrase) in every_phrase() {
+        for (code, phrase) in every_phrase() {
+            // AR-715 names the kind of address it takes, in words, and no address: the one
+            // place where "https" may stand, as a word between spaces.
+            let phrase = if code == ErrorCode::Ar715 {
+                phrase.replacen(" a public https address,", " a public address,", 1)
+            } else {
+                phrase
+            };
             for piece in forbidden {
                 assert!(!phrase.contains(piece), "{piece:?} in: {phrase}");
             }
@@ -456,10 +465,22 @@ mod tests {
     }
 
     #[test]
-    fn only_ar714_needs_version_2() {
+    fn the_phrase_of_ar715_is_fixed() {
+        assert_eq!(
+            ErrorCode::Ar715.phrase(None),
+            "AR-715: The file at that address could not be fetched: it is not a public https address, it is too large, or it did not answer in time."
+        );
+    }
+
+    #[test]
+    fn only_ar714_needs_version_2_and_only_ar715_needs_version_3() {
         use crate::message::{PROTOCOL_VERSION, PROTOCOL_VERSION_MIN};
         for code in ErrorCode::ALL {
-            let expected = if *code == ErrorCode::Ar714 { 2 } else { 1 };
+            let expected = match *code {
+                ErrorCode::Ar714 => 2,
+                ErrorCode::Ar715 => 3,
+                _ => 1,
+            };
             assert_eq!(code.since(), expected, "{code}");
             assert!(
                 (PROTOCOL_VERSION_MIN..=PROTOCOL_VERSION).contains(&code.since()),

@@ -86,6 +86,7 @@ that answers the tool is the connector, and that answer is not written yet.
 | `whatsapp_read_chat` | Reads the messages of a chat: author, text, file (without downloading), quote, edit, deletion and reactions. Default 30, maximum 200, within a budget of 256 KiB per answer: it cuts at whole messages and says whether there are more. `before` and `after` to move in time. Since 24/11/2026 ([decision 0054](decisoes/0054-uma-sessao-do-hermes-por-contato.md), proposal, being built): the answer has a chat-level `phone` (`+digits` for a contact chat; `null` for a group or a hidden contact whose telephone the engine does not know), and each message sent by the number (`from_me` true) has `sent_by`: `you_through_arauto` (the reading Hermes sent it), `another_hermes_through_arauto` (another or a removed Hermes; the name is never given) or `outside_arauto` (no record: sent from the WhatsApp app or another bridge, older than the 30-day record, or a send whose id the hub did not receive). |
 | `whatsapp_get_contact` | Public data of the contact: name, profile text, photo and whether it is a business account. |
 | `whatsapp_download_media` | Downloads a photo, PDF, audio or document of a message, up to 7 MB. An image arrives for the LLM to see. |
+| `whatsapp_media_link` | Gives a short-lived https address of the file of one message (photo, PDF, audio or document), for a tool that downloads files by address. Arguments `number` and `message_id`; it answers `number`, `url`, `expires_at` (unix seconds) and the `mimetype` when known. The address works for 10 minutes, up to 10 MB, and gives the file to whoever has it. The description is the fixed text F1 of [decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md). Read family: the Hermes needs the verb read on the chat. |
 | `whatsapp_list_groups` | Lists the groups of the number, with the number of participants. |
 | `whatsapp_get_group` | Data of a group and the participants, in parts when the group is large. |
 
@@ -102,7 +103,7 @@ After the first version, with the message archive (Phase 6):
 |---|---|
 | `whatsapp_check_number` | Asks whether a telephone has WhatsApp and returns the exact identifier. It writes to nobody. |
 | `whatsapp_send_text` | Sends text. It accepts replying to a message and mentioning people in a group. |
-| `whatsapp_send_file` | Sends an image, document or audio, by public address (up to 15 MB) or by content (up to 3 MB). In the first MVP, only by content. |
+| `whatsapp_send_file` | Sends an image, document or audio, by content in `data` (base64, up to 3 MB) or, since 24/11/2026, by public https address in `url` (at most 2,048 characters, up to 10 MB): one of the two, never both. The hub downloads the address ([decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal, being built). With `kind` "voice" and a file that is not `audio/ogg`, the engine converts it; a voice message still takes no caption. |
 | `whatsapp_mark_read` | Marks the chat as read. |
 | `whatsapp_set_typing` | Turns "typing" on or off. |
 | `whatsapp_react` | Reacts to a message. |
@@ -139,12 +140,22 @@ They come from the experience of the source service:
 - `to` and `message_id` are validated and encoded before going to the engine. Without that, a value
   with `../` would reach the engine session of another number.
 - Sending by address: the one that downloads is the hub, and only from a public address. The first
-  version keeps sending by address, beside sending by content
-  ([decisoes/0024](decisoes/0024-envio-de-arquivo-por-endereco.md)).
+  MVP sent only by content; the sending by address was built on 24/11/2026
+  ([decisoes/0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal), keeping
+  [decisoes/0024](decisoes/0024-envio-de-arquivo-por-endereco.md).
 - Brazilian telephone with and without the ninth digit: the hub tests both forms.
 - A write in the chat where a Hermes takes orders on WhatsApp, or to its telephone, is refused to every Hermes. Every Hermes but one gets AR-705 (AR-712 for a message of that chat), the same answers as for a chat that does not exist or a message that cannot be changed, without saying why. The Hermes whose own command channel it is gets AR-714 on protocol version 2 ([14](14-protocolo-do-canal.md), section 5.1), and AR-705 or AR-712 otherwise. Reading is not refused. Only what the admin recorded is refused ([08](08-permissoes.md), section 3, rule 7; 17/11/2026, [decision 0051](decisoes/0051-quem-da-ordens-a-um-hermes-no-whatsapp.md), proposal). `arauto_status` does not change, and the names of the tools do not change; the descriptions of `whatsapp_send_text`, `whatsapp_send_file` and `whatsapp_forward` end with "Do not write through Arauto in a chat where you take orders: reply or report in that chat the way its orders reach you, outside Arauto.", and a Hermes has them only with a connector built after 18/11/2026 (proposal).
 - Editing without stating the text and deleting without the full identifier are refused: in the
   engine, both have dangerous behavior by default.
+
+### 4.1 Files by address (24/11/2026, [decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal, being built)
+
+Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him. Not tried on a real Hermes.
+
+- **`whatsapp_media_link`**: in the table above. Its description is the text F1 of the decision, fixed in the connector. The address it gives is a short-lived secret: it appears once, in the answer, and is not logged or audited in the clear ([04](04-seguranca-conexao.md), C12).
+- **`whatsapp_send_file` by `url`**: its description gains, after "by content", the text F2: "or by a public https address in `url` instead of `data`: the hub downloads it, up to 10 MB." The send limit of the number counts the file once.
+- **AR-715** (protocol version 3 and later): "The file at that address could not be fetched: it is not a public https address, it is too large, or it did not answer in time." Every refusal of the address answers it, whatever the reason, and says no more. On a connection of protocol version 2 or less the hub answers AR-711 in its place, since the catalog of that connector has no `url` at all ([14](14-protocolo-do-canal.md), section 5.1; built 24/11/2026, proposal).
+- What another system does with an address, or what address it gives back, is outside Arauto.
 
 ## 5. Notices
 

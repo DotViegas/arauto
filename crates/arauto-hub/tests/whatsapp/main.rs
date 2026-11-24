@@ -27,6 +27,7 @@ mod hostile;
 mod inbox;
 mod installation;
 mod isolation;
+mod media;
 mod numbers;
 mod orders;
 mod supervision;

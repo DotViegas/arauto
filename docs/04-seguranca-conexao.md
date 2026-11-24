@@ -475,6 +475,17 @@ and would suspend everyone once more. It remains to decide how to tell them apar
 write the issue date in the seal and treat as a leftover what was issued before the end of the last
 handled restoration. It is a deliverable of Phase 1.
 
+### C12. Files by address, both ways (24/11/2026, [decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal, being built)
+
+Changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.
+
+**Proposal, not tried on a real Hermes or a real engine.** Two additions to what the hub serves and reaches:
+
+- **The public listener serves `/v1/media/{token}`** (besides `/v1/download/`). The address is made by `whatsapp_media_link`, and it is a short-lived secret (principle 2): 32 bytes from the system's generator, written in 43 base64url characters, shown once in the answer of the tool, never logged or audited in the clear; the database keeps only its SHA-256 digest. It lasts **10 minutes** and gives **one file** (the one message it was made for), at most **10 MB**, with `Content-Disposition: attachment`. It is read-only: a `GET` or `HEAD` writes no row and spends nothing (principle 5), and the log line carries the status only. A token that is malformed, unknown or expired gets one identical 404. The permission to make it is checked on the call that makes it (principle 9); after that, the address is the permission, until its end.
+- **The hub downloads from an address for `whatsapp_send_file` with `url`.** Only `https://`, at most 2,048 characters. The hub resolves the name with the system's resolver and refuses it if any resolved IP is not public (loopback, private, link-local, shared 100.64/10, unique local, multicast, unspecified, `0.0.0.0/8`, broadcast, the documentation ranges, and IPv4 inside IPv6). It connects to the IP it checked, never resolving the name again, with the name in TLS and in `Host`, and checks the certificate. At most 3 redirects, each `https://` and checked again after its own resolution. 10 MB cut while streaming, 20 seconds for the whole download. Every refusal is AR-715 and no part of the address is logged.
+
+What is not guaranteed is in section 6, item 22, and in [05](05-modelo-de-ameacas.md).
+
 ## 4. What each side keeps
 
 **In the hub**
@@ -600,6 +611,7 @@ of the design: they only become a guarantee after the tests of Phase 1 and Phase
     what it did or kept in its memory is not undone when the mark is removed. The mark never
     widens what the receiver may do on numbers: its accesses are checked on every call
     ([decision 0050](decisoes/0050-etapa-b-marca-de-seguir.md)).
+22. **A leaked media address gives its file to whoever has it for 10 minutes.** The address is not single-use (a read request does not change state), so it cannot be taken back before its end. A Hermes induced by a text it read can pass it to a tool or a person it should not; it could already send the file through WhatsApp. The checks of the download by address trust the system's resolver and the moment of the check; what a tool of another system does with a file is not seen. Nothing of this was tried on a real Hermes ([decision 0055](decisoes/0055-arquivos-por-endereco-nos-dois-sentidos.md), proposal; changed at the maintainer's request of 24/11/2026 ("Começe implementando tudo. Você pode decidir como implementar para que tudo funcione."); wording by his assistant, not reviewed word for word by him.)
 
 ## 7. To be proven before implementing
 

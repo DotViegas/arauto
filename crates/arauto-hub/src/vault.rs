@@ -131,6 +131,9 @@ pub enum WhatsappField {
     /// `sent_message.id_digest`: the digest of the identifier WhatsApp gave a message a Hermes
     /// sent through Arauto. Kept only as a digest.
     SentMessageId,
+    /// `media_link.message_enc`: the identifier in the engine of the message whose file a
+    /// short-lived address serves (decision 0055).
+    MediaLinkMessage,
 }
 
 impl WhatsappField {
@@ -144,6 +147,7 @@ impl WhatsappField {
             WhatsappField::MessageRef => 6,
             WhatsappField::HermesWhatsappPhone => 7,
             WhatsappField::SentMessageId => 8,
+            WhatsappField::MediaLinkMessage => 9,
         }
     }
 }

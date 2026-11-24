@@ -35,7 +35,9 @@ http-body-util = "0.1.5"
 hyper = { version = "1.12.0", features = ["http1", "server", "client"] }
 hyper-util = { version = "0.1.21", features = ["tokio", "server", "http1", "service"] }
 # The TLS of the connector (`wss://`), only under its `tls` feature: the `ring` provider compiles
-# C, and the development machine has no C compiler for the Linux target.
+# C, and the development machine has no C compiler for the Linux target. The hub uses it too,
+# always, for the one HTTPS client it has: the download of a file `whatsapp_send_file` names by
+# address (decision 0055). A check of the hub for the Linux target therefore needs a C compiler.
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
@@ -48,6 +50,9 @@ sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio
 subtle = "2.6.1"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", default-features = false }
+# The TLS stream of the hub's HTTPS client (decision 0055), over the same rustls and `ring`; the
+# default features would pull `aws-lc-rs`.
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 # Client side only (the test connector, later the connector). No TLS here: `ws://` on the
 # local machine. The connector adds its TLS feature in its own manifest.
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "handshake"] }
@@ -55,7 +60,8 @@ tower = { version = "0.5.3", features = ["util"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "1.29.2", features = ["serde"] }
-# The public roots built into the connector, for its `tls` feature.
+# The public roots built into the connector, for its `tls` feature, and into the hub, for the
+# download of a file by address (decision 0055).
 webpki-roots = "0.26.11"
 x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 zeroize = "1.9.1"

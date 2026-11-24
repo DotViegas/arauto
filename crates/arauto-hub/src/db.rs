@@ -524,7 +524,8 @@ pub async fn require_current_schema(pool: &PgPool, migrator: &Migrator) -> Resul
 /// without saying whose data it reads. There is no public constructor: the only ways in are
 /// [`organization_of_device`], [`organization_of_invite`], [`organization_of_engine_events`],
 /// the three of the panel ([`organization_of_panel_entry`], [`organization_of_panel_session`]
-/// and [`organization_of_panel_passkey`]) and [`organizations_for_system_task`].
+/// and [`organization_of_panel_passkey`]), the short-lived address of a file
+/// ([`organization_of_media_link`]) and [`organizations_for_system_task`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ResolvedOrg {
     id: Uuid,
@@ -609,6 +610,26 @@ pub async fn organization_of_panel_session<'e>(
             .bind(digest.as_bytes().as_slice())
             .fetch_optional(executor)
             .await?;
+    Ok(id.map(|id| ResolvedOrg { id }))
+}
+
+/// The organization of the short-lived address of a file with this digest, while it serves
+/// (decision 0055). One read-only `SELECT`.
+///
+/// # Errors
+/// [`DbError::Query`] when the database does not answer.
+pub async fn organization_of_media_link<'e>(
+    executor: impl PgExecutor<'e>,
+    digest: &crate::media::MediaDigest,
+    now: i64,
+) -> Result<Option<ResolvedOrg>, DbError> {
+    let id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT organization_id FROM media_link WHERE token_digest = $1 AND expires_at > $2",
+    )
+    .bind(digest.as_bytes().as_slice())
+    .bind(now)
+    .fetch_optional(executor)
+    .await?;
     Ok(id.map(|id| ResolvedOrg { id }))
 }
 

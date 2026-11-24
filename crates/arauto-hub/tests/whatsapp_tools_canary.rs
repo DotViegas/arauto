@@ -143,6 +143,16 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         &chat,
         message(&chat, "3EB0CA0002", 1_800_000_001, true, &text),
     );
+    // A message with a file, the oldest: its short-lived address is a secret too (decision
+    // 0055).
+    let mut with_file = message(&chat, "3EB0CA0003", 1_799_999_999, false, "");
+    with_file["hasMedia"] = json!(true);
+    let stored = format!("false_{chat}_3EB0CA0003.pdf");
+    with_file["media"] = json!({"file": stored, "mimetype": "application/pdf"});
+    world.fake.add_message(&session, &chat, with_file);
+    world
+        .fake
+        .add_file(&stored, "application/pdf", text.as_bytes().to_vec());
 
     let mut agent = world.agent().await;
     let mut refusals = String::new();
@@ -177,6 +187,51 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         .await);
     let mine = read["messages"][0]["message_id"].clone();
     let theirs = read["messages"][1]["message_id"].clone();
+    let with_a_file = read["messages"][2]["message_id"].clone();
+    // The short-lived address of the file: given once, opened by GET and HEAD, and found in
+    // no log, no refusal, no audit and no table.
+    let link = ok(agent
+        .call("whatsapp_media_link", json!({"message_id": with_a_file}))
+        .await);
+    let url = link["url"].as_str().unwrap().to_owned();
+    let token = url.rsplit('/').next().unwrap().to_owned();
+    assert_eq!(token.len(), 43);
+    secrets.push(("media token".to_owned(), token.clone()));
+    secrets.push(("media address".to_owned(), url.clone()));
+    let raw = data_encoding::BASE64URL_NOPAD
+        .decode(token.as_bytes())
+        .unwrap();
+    secrets.push(("media token in hex".to_owned(), HEXLOWER.encode(&raw)));
+    secrets.push(("media token in base64".to_owned(), BASE64.encode(&raw)));
+    let path = format!("/v1/media/{token}");
+    let addr = world.fixture.running().connectors_addr();
+    let got = arauto_testkit::http::get(addr, &path, &[], Duration::from_secs(10))
+        .await
+        .unwrap();
+    assert_eq!(got.status, 200);
+    let headed = arauto_testkit::http::send("HEAD", addr, &path, &[], &[], Duration::from_secs(10))
+        .await
+        .unwrap();
+    assert_eq!(headed.status, 200);
+    // Addresses to send a file from that are refused: no part of them reaches the log.
+    let address_secret = format!("canaryaddress{}", Uuid::new_v4().simple());
+    secrets.push(("address of a file".to_owned(), address_secret.clone()));
+    for url in [
+        format!("https://10.9.8.7/{address_secret}.pdf"),
+        format!("http://files.example.org/{address_secret}.pdf"),
+        format!("https://{address_secret}@files.example.org/a.pdf"),
+    ] {
+        let outcome = refused(
+            agent
+                .call(
+                    "whatsapp_send_file",
+                    json!({"to": hub_chat, "kind": "document", "url": url}),
+                )
+                .await,
+            &mut refusals,
+        );
+        assert!(matches!(outcome, CallOutcome::Refused { .. }));
+    }
     // Sendings and changes, with the text and the telephones in them.
     ok(agent
         .call(
@@ -346,6 +401,8 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         "engine",
         "hermes_whatsapp_phone",
         "hermes_whatsapp_phone_digest",
+        "media_link",
+        "tool_call",
     ] {
         let rows: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT row_to_json(t)::text FROM {table} t"
@@ -365,6 +422,11 @@ async fn no_secret_of_the_whatsapp_tools_reaches_the_log_the_refusals_the_audit_
         changes >= 4,
         "the changes of the matrix are audited ({changes})"
     );
+    let links: i64 = sqlx::query_scalar("SELECT count(*) FROM media_link")
+        .fetch_one(world.hub().pool())
+        .await
+        .unwrap();
+    assert_eq!(links, 1, "the address is recorded, by its digest");
     for (place, text) in [
         ("log", &log),
         ("refusals", &refusals),

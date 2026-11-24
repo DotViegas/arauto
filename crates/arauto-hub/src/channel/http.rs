@@ -10,6 +10,7 @@
 //! | connectors | `GET /v1/channel` | the websocket, after the ceiling of connections without a session (503, 429) |
 //! | connectors | `GET /v1/download/{file}` | a file of the fixed list, or 404 |
 //! | connectors | `GET /v1/join/{handle}` | the instruction page of one invite, or one fixed 404 |
+//! | connectors | `GET` and `HEAD /v1/media/{token}` | the file of a message by its short-lived address (decision 0055), or one fixed 404 |
 //! | connectors | `GET /llms.txt` | a fixed text for agents: what this address is |
 //! | connectors | `GET /` | a fixed text that says this is not the panel |
 //! | internal | `GET /health` | `ok`, without any secret |
@@ -49,6 +50,7 @@ use super::settings::{READ_BUFFER_BYTES, duration};
 use super::{Hub, Purposes, TaskGuard, handshake};
 use crate::engine::inbox;
 use crate::join_page::{JOIN_PREFIX, LLMS_PATH};
+use crate::media::MEDIA_PREFIX;
 
 /// The path of the websocket.
 pub const CHANNEL_PATH: &str = "/v1/channel";
@@ -236,6 +238,13 @@ async fn route<P: Purposes>(
             }
             None => status(StatusCode::NOT_FOUND),
         };
+    }
+    // A short-lived address of a file answers `HEAD` as well; it only reads.
+    if port == Port::Connectors
+        && (request.method() == Method::GET || request.method() == Method::HEAD)
+        && let Some(token) = path.strip_prefix(MEDIA_PREFIX)
+    {
+        return crate::media::answer(&hub, token, request.method() == Method::HEAD).await;
     }
     if request.method() != Method::GET {
         return status(StatusCode::NOT_FOUND);

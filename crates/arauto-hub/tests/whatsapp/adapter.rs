@@ -261,7 +261,7 @@ async fn a_file_is_downloaded_from_the_engine_only_and_up_to_7_mb() {
     fake.add_file(&stored, "image/jpeg", vec![7u8; 1_000]);
     let id = EngineMessageId::parse(&format!("false_{CHAT}_3EB0F1")).unwrap();
     let file = adapter
-        .download_media(&name, &chat(CHAT), &id)
+        .download_media(&name, &chat(CHAT), &id, DOWNLOAD_MAX_BYTES)
         .await
         .unwrap();
     assert_eq!(file.data.len(), 1_000);
@@ -280,7 +280,7 @@ async fn a_file_is_downloaded_from_the_engine_only_and_up_to_7_mb() {
     let id = EngineMessageId::parse(&format!("false_{CHAT}_3EB0F2")).unwrap();
     assert_eq!(
         adapter
-            .download_media(&name, &chat(CHAT), &id)
+            .download_media(&name, &chat(CHAT), &id, DOWNLOAD_MAX_BYTES)
             .await
             .map(|f| f.data.len()),
         Err(EngineError::Unavailable(Cause::TooLarge))
@@ -296,7 +296,7 @@ async fn a_file_is_downloaded_from_the_engine_only_and_up_to_7_mb() {
     fake.forget_received();
     assert_eq!(
         adapter
-            .download_media(&name, &chat(CHAT), &id)
+            .download_media(&name, &chat(CHAT), &id, DOWNLOAD_MAX_BYTES)
             .await
             .map(|f| f.data.len()),
         Err(EngineError::Unavailable(Cause::Malformed))
@@ -434,10 +434,11 @@ async fn sending_texts_files_reactions_and_the_rest() {
     assert_eq!(sent[1].1["file"]["data"], json!("AQID"));
     assert_eq!(sent[1].1["caption"], json!("the report"));
 
-    // Above 3 MB, or a mention outside a group, never reaches the engine.
+    // Above 10 MB (the largest file, which a file by address reaches: decision 0055), or a
+    // mention outside a group, never reaches the engine.
     fake.forget_received();
     let mut big = file.clone();
-    big.file.data = vec![0u8; SEND_FILE_MAX_BYTES + 1];
+    big.file.data = vec![0u8; FILE_BY_ADDRESS_MAX_BYTES + 1];
     assert_eq!(
         adapter.send_file(&name, &big).await,
         Err(EngineError::Invalid("file size"))

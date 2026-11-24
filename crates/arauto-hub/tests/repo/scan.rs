@@ -210,6 +210,12 @@ const OUTSIDE_THE_REPOSITORIES: &[(&str, &str, &str)] = &[
     ),
     (
         "db.rs",
+        "organization_of_media_link",
+        "entry: finds the organization by the digest of a short-lived address of a file \
+         (decision 0055), while it serves; one read-only SELECT",
+    ),
+    (
+        "db.rs",
         "organizations_for_system_task",
         "entry: every organization, for a named task of the hub itself",
     ),

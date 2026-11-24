@@ -144,12 +144,14 @@ pub trait WhatsappEngine: Send + Sync + std::fmt::Debug {
         contact: &'a EngineChatId,
     ) -> BoxFuture<'a, Result<Contact, EngineError>>;
 
-    /// The file of a message, up to 7 MB.
+    /// The file of a message, up to `max` bytes: 7 MB for `whatsapp_download_media`, 10 MB for
+    /// a short-lived address (decision 0055). Never above [`FILE_BY_ADDRESS_MAX_BYTES`].
     fn download_media<'a>(
         &'a self,
         session: &'a SessionName,
         chat: &'a EngineChatId,
         message: &'a EngineMessageId,
+        max: usize,
     ) -> BoxFuture<'a, Result<FileContent, EngineError>>;
 
     /// The groups of the number, each with how many participants it has.
@@ -201,7 +203,8 @@ pub trait WhatsappEngine: Send + Sync + std::fmt::Debug {
         text: &'a SendText,
     ) -> BoxFuture<'a, Result<Sent, EngineError>>;
 
-    /// Sends a file by content, up to 3 MB.
+    /// Sends a file: up to 3 MB given by content, up to 10 MB downloaded by the hub from an
+    /// address (decision 0055).
     fn send_file<'a>(
         &'a self,
         session: &'a SessionName,

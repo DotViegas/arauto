@@ -39,10 +39,6 @@ const RETRY_POLICY: &str = "exponential";
 const RETRY_DELAY_SECONDS: u32 = 2;
 const RETRY_ATTEMPTS: u32 = 7;
 
-/// The ceiling of the answer that carries the content of a file. The file itself is checked
-/// against [`DOWNLOAD_MAX_BYTES`].
-const MEDIA_ANSWER_MAX: usize = DOWNLOAD_MAX_BYTES;
-
 /// The prefix of the path of a downloaded file in the engine. The address the engine gives is
 /// never followed: only its path, under this prefix, is asked of the engine the hub knows.
 const FILES_PREFIX: &str = "/api/files/";
@@ -215,7 +211,10 @@ impl Waha {
         session: &SessionName,
         chat: &EngineChatId,
         message: &EngineMessageId,
+        max: usize,
     ) -> Result<FileContent, EngineError> {
+        // No call asks for more than the largest file of the hub, whatever it says.
+        let max = max.min(FILE_BY_ADDRESS_MAX_BYTES);
         let call = Call::new(
             Method::GET,
             format!(
@@ -247,14 +246,10 @@ impl Waha {
             .and_then(|text| FileName::parse(text).ok());
         let answer = self
             .http
-            .send(Call::new(
-                Method::GET,
-                path,
-                Expect::Bytes(MEDIA_ANSWER_MAX),
-            ))
+            .send(Call::new(Method::GET, path, Expect::Bytes(max)))
             .await?;
         let answer = check(answer)?;
-        if answer.body.len() > DOWNLOAD_MAX_BYTES {
+        if answer.body.len() > max {
             return Err(EngineError::Unavailable(Cause::TooLarge));
         }
         Ok(FileContent {
@@ -845,8 +840,21 @@ fn word_ok(text: &str, max: usize) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'+' | b'_' | b'-'))
 }
 
+/// Whether a media type is `audio/ogg`, whatever its parameters: the form of a voice message
+/// of WhatsApp, which the engine sends as it is.
+fn is_ogg(mimetype: &MimeType) -> bool {
+    mimetype
+        .as_str()
+        .split(';')
+        .next()
+        .is_some_and(|essence| essence.trim().eq_ignore_ascii_case("audio/ogg"))
+}
+
+/// The path and the body of a sending of a file. A file sent by content is at most 3 MB (the
+/// protocol checks it); one the hub downloaded from an address is at most 10 MB (decision
+/// 0055): this is the ceiling of both.
 fn file_body(session: &SessionName, file: &SendFile) -> Result<(&'static str, Value), EngineError> {
-    if file.file.data.is_empty() || file.file.data.len() > SEND_FILE_MAX_BYTES {
+    if file.file.data.is_empty() || file.file.data.len() > FILE_BY_ADDRESS_MAX_BYTES {
         return Err(EngineError::Invalid("file size"));
     }
     let filename = file
@@ -866,8 +874,10 @@ fn file_body(session: &SessionName, file: &SendFile) -> Result<(&'static str, Va
     let path = match file.kind {
         FileKind::Image => "/api/sendImage",
         FileKind::Document => "/api/sendFile",
+        // A voice message that is not `audio/ogg` is converted by the engine (decision 0055):
+        // otherwise an `audio/mpeg` file does not become a voice message.
         FileKind::Voice => {
-            body["convert"] = Value::Bool(false);
+            body["convert"] = Value::Bool(!is_ogg(&file.file.mimetype));
             "/api/sendVoice"
         }
     };
@@ -1098,8 +1108,9 @@ impl WhatsappEngine for Waha {
         session: &'a SessionName,
         chat: &'a EngineChatId,
         message: &'a EngineMessageId,
+        max: usize,
     ) -> BoxFuture<'a, Result<FileContent, EngineError>> {
-        Box::pin(self.download(session, chat, message))
+        Box::pin(self.download(session, chat, message, max))
     }
 
     fn groups<'a>(
@@ -1416,6 +1427,74 @@ mod tests {
         let id_object = json!({"id": {"_serialized": "120363012345678901@g.us"}});
         assert_eq!(parse_group(&id_object).unwrap().participants, 0);
         assert!(parse_group(&json!({"id": "5511@c.us"})).is_none());
+    }
+
+    fn voice(mimetype: &str, caption: Option<&str>) -> Result<(&'static str, Value), EngineError> {
+        let session = SessionName::draw().unwrap();
+        let file = SendFile {
+            chat: EngineChatId::parse("5511999990000@c.us").unwrap(),
+            kind: FileKind::Voice,
+            file: FileContent {
+                mimetype: MimeType::parse(mimetype).unwrap(),
+                filename: None,
+                data: vec![1, 2, 3],
+            },
+            caption: caption.map(|text| MessageBody::to_send(text).unwrap()),
+        };
+        file_body(&session, &file)
+    }
+
+    /// Decision 0055: a voice message that is not `audio/ogg` is converted by the engine; an
+    /// `audio/ogg` one goes as it is; a voice message still takes no caption.
+    #[test]
+    fn a_voice_message_is_converted_unless_it_is_ogg_and_takes_no_caption() {
+        let (path, body) = voice("audio/mpeg", None).unwrap();
+        assert_eq!(path, "/api/sendVoice");
+        assert_eq!(body["convert"], json!(true));
+        for other in ["audio/mp4", "audio/wav", "application/octet-stream"] {
+            assert_eq!(
+                voice(other, None).unwrap().1["convert"],
+                json!(true),
+                "{other}"
+            );
+        }
+        for ogg in ["audio/ogg", "audio/ogg; codecs=opus", "AUDIO/OGG"] {
+            assert_eq!(
+                voice(ogg, None).unwrap().1["convert"],
+                json!(false),
+                "{ogg}"
+            );
+        }
+        assert_eq!(
+            voice("audio/mpeg", Some("hi")),
+            Err(EngineError::Invalid("caption"))
+        );
+        assert_eq!(
+            voice("audio/ogg", Some("hi")),
+            Err(EngineError::Invalid("caption"))
+        );
+    }
+
+    /// The ceiling of a file sent is the largest file of the hub, 10 MB: above it, nothing goes.
+    #[test]
+    fn a_file_above_10_mb_never_reaches_the_engine() {
+        let session = SessionName::draw().unwrap();
+        let mut file = SendFile {
+            chat: EngineChatId::parse("5511999990000@c.us").unwrap(),
+            kind: FileKind::Document,
+            file: FileContent {
+                mimetype: MimeType::parse("application/pdf").unwrap(),
+                filename: None,
+                data: vec![0u8; FILE_BY_ADDRESS_MAX_BYTES],
+            },
+            caption: None,
+        };
+        assert!(file_body(&session, &file).is_ok());
+        file.file.data.push(0);
+        assert_eq!(
+            file_body(&session, &file),
+            Err(EngineError::Invalid("file size"))
+        );
     }
 
     #[test]
