@@ -159,7 +159,7 @@ an **[observed]** fact.
 | `POST /api/forwardMessage`: `session`, `chatId`, `messageId` | [documentation] It may fail for a chat that never received a message. |
 | `PUT /api/{s}/chats/{chat}/messages/{id}`: `text`, `linkPreview` | [documentation] The danger of editing without text is in the pitfalls ([code]); the page does not speak of it. |
 | `DELETE /api/{s}/chats/{chat}/messages/{id}` | [documentation] |
-| WhatsApp limits on the session (`me.messageCapping`, `me.reachoutTimelock`) | To check: the names come from the [code] of the checked version, not from the documentation. The hub only says whether they exist. A 429 from the engine is read as a WhatsApp limit. |
+| WhatsApp limits on the session (`me.messageCapping`, `me.reachoutTimelock`) | [code] of WAHA (`src/structures/sessions.dto.ts`, branch `core`, read on 24/11/2026; the changelog adds them in 2026.8.1): `messageCapping` is an object `{cappingStatus, totalQuota, usedQuota, cycleStart, cycleEnd, mvStatus, oteStatus}` with `cappingStatus` one of `NONE`, `FIRST_WARNING`, `SECOND_WARNING`, `CAPPED` (only `CAPPED` blocks new chats; `totalQuota` -1 = no cap); `reachoutTimelock` is `{isActive, enforcementType, timeEnforcementEnds}`; either may be `null`. [observed] 24/11/2026: six paired sessions of one installation all carried a non-null `messageCapping` while their sendings went through. Until that day the hub said only whether the fields existed (every session read as capped); since then it says capped only on `CAPPED` and timelock only on `isActive` true. A 429 from the engine is read as a WhatsApp limit (AR-704). |
 
 ### Contract test
 

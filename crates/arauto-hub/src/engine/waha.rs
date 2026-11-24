@@ -518,6 +518,32 @@ fn differences(
     differs
 }
 
+/// Whether the engine says WhatsApp blocks the new chats of the number now (`me.messageCapping`).
+/// The engine sends an object whose `cappingStatus` is `NONE`, `FIRST_WARNING`,
+/// `SECOND_WARNING` or `CAPPED`: only `CAPPED` blocks, the warnings only say the cap is near.
+/// Every paired session carries the object, so its presence says nothing (on 24/11/2026 six
+/// sessions carried it while their sendings went through). A bare string is read the same way.
+/// Anything else, an unknown value included, reads as not capped: a real cap still comes back as
+/// a refusal of the sending (HTTP 429, AR-704).
+fn capping_reached(value: Option<&Value>) -> bool {
+    let status = match value {
+        Some(Value::Object(fields)) => fields.get("cappingStatus").and_then(Value::as_str),
+        Some(Value::String(status)) => Some(status.as_str()),
+        _ => None,
+    };
+    status == Some("CAPPED")
+}
+
+/// Whether the engine says WhatsApp blocks writing first to someone new now
+/// (`me.reachoutTimelock`): only when its `isActive` is true, since the object can be present
+/// and inactive.
+fn timelock_active(value: Option<&Value>) -> bool {
+    value
+        .and_then(|value| value.get("isActive"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
 // ---------------------------------------------------------------------------- the shapes of the answers
 
 #[derive(Debug, Deserialize)]
@@ -953,10 +979,8 @@ impl WhatsappEngine for Waha {
                 Some(me) => {
                     let id = EngineChatId::parse(&me.id).map_err(|_| EngineError::malformed())?;
                     let limits = WhatsappLimits {
-                        message_capping: me.message_capping.is_some_and(|value| !value.is_null()),
-                        reachout_timelock: me
-                            .reachout_timelock
-                            .is_some_and(|value| !value.is_null()),
+                        message_capping: capping_reached(me.message_capping.as_ref()),
+                        reachout_timelock: timelock_active(me.reachout_timelock.as_ref()),
                     };
                     let phone = id.phone();
                     (Some(Me { id, phone }), limits)
@@ -1354,6 +1378,51 @@ impl WhatsappEngine for Waha {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_limit_counts_only_when_the_engine_says_it_is_in_force() {
+        // Every paired session carries the capping object: present is not reached.
+        for (value, capped) in [
+            (
+                json!({"cappingStatus": "NONE", "totalQuota": -1, "usedQuota": 0}),
+                false,
+            ),
+            (
+                json!({"cappingStatus": "FIRST_WARNING", "totalQuota": 50, "usedQuota": 40}),
+                false,
+            ),
+            (json!({"cappingStatus": "SECOND_WARNING"}), false),
+            (
+                json!({"cappingStatus": "CAPPED", "totalQuota": 50, "usedQuota": 50}),
+                true,
+            ),
+            (json!("NONE"), false),
+            (json!("CAPPED"), true),
+            (json!({"cappingStatus": "SOMETHING_NEW"}), false),
+            (json!({}), false),
+            (json!(true), false),
+            (Value::Null, false),
+        ] {
+            assert_eq!(capping_reached(Some(&value)), capped, "{value}");
+        }
+        assert!(!capping_reached(None));
+        for (value, active) in [
+            (
+                json!({"isActive": false, "enforcementType": "DEFAULT", "timeEnforcementEnds": null}),
+                false,
+            ),
+            (
+                json!({"isActive": true, "enforcementType": "BIZ_QUALITY", "timeEnforcementEnds": 1_800_000_000}),
+                true,
+            ),
+            (json!({"enforcementType": "BIZ_QUALITY"}), false),
+            (json!("NONE"), false),
+            (Value::Null, false),
+        ] {
+            assert_eq!(timelock_active(Some(&value)), active, "{value}");
+        }
+        assert!(!timelock_active(None));
+    }
 
     #[test]
     fn the_path_of_a_file_is_only_under_the_files_of_the_engine() {

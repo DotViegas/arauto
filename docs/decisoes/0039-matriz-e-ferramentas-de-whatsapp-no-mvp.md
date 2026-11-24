@@ -97,7 +97,7 @@ and where it moved away from them. Everything was tested only against the fake e
 
 | Tool | Arguments | Answer |
 |---|---|---|
-| `whatsapp_status` | `number?` | `number`, `state`, `connected`, `whatsapp_limits` (`message_capping`, `reachout_timelock`) or `null` |
+| `whatsapp_status` | `number?` | `number`, `state`, `connected`, `whatsapp_limits` (`message_capping`, `reachout_timelock`) or `null`. Since 24/11/2026 (a correction): `message_capping` is true only when WhatsApp blocks new chats now, and `reachout_timelock` only when the block on writing first is active; before, each was true whenever the engine sent the field ([waha-fatos](../../referencia/waha-fatos.md)) |
 | `whatsapp_list_chats` | `number?`, `limit` (1–100, 20), `offset` | `number`, `chats` [`chat`, `kind`, `name`, `phone`, `last_message`], `more`, `next_offset` |
 | `whatsapp_read_chat` | `number?`, `chat`, `limit` (1–200, 30), `before`, `after` (seconds) | `number`, `chat`, `messages` (the newest first), `more`, `next_before` |
 | message (in the read) | | `message_id`, `time` (seconds), `from_me`, `author` (`+phone` or `null`), `text`, `file` (`mimetype`, `filename`) or `null`, `reply_to` |

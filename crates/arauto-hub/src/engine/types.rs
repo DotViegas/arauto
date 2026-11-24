@@ -168,9 +168,10 @@ redacted_debug!(Me);
 /// What the engine says the WhatsApp imposes on a connected session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct WhatsappLimits {
-    /// A ceiling on the messages the number may send.
+    /// WhatsApp blocks the new chats of the number now: the engine says the cap is reached. The
+    /// warnings that come before it do not count.
     pub message_capping: bool,
-    /// A block on writing first to someone new.
+    /// WhatsApp blocks writing first to someone new now: the engine says the block is active.
     pub reachout_timelock: bool,
 }
 
